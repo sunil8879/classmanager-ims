@@ -808,41 +808,52 @@ const val = (id, selector) => {
    2. LOGIN SYSTEM (Signup, Login, Auth)
    ========================================== */
 async function handleSignup() {
+    // 1. Collect Data
     const email = val('#login', 'input[placeholder="Email Id"]');
     const password = val('#login', 'input[placeholder="Password"]');
     const fullName = val('#login', 'input[placeholder="Full Name"]');
     const mobile = val('#login', 'input[placeholder="Mobile Number"]');
-    const address = val('#login', 'input[placeholder="Address"]');
-
-    // FIX: Get only the role name, remove "Select Status: "
+    
     const roleDropdown = document.querySelector('#login select');
     const role = roleDropdown.options[roleDropdown.selectedIndex].text.replace('Select Status: ', '').trim();
 
-    // 1. Create the Auth User
-    const { data, error } = await db.auth.signUp({ 
-        email: email, 
-        password: password 
+    console.log("Starting Signup for:", email);
+
+    // 2. Create User in Supabase Auth
+    const { data, error } = await db.auth.signUp({
+        email: email,
+        password: password
     });
 
-    if (error) return alert("Auth Error: " + error.message);
+    if (error) {
+        alert("Signup Error: " + error.message);
+        return;
+    }
 
-    // 2. Insert into Profiles Table
+    // 3. Wait for 1 second (Safe delay to let Supabase breathe)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     if (data.user) {
+        console.log("Auth User Created. ID:", data.user.id);
+
+        // 4. Create the Profile
         const { error: profileError } = await db.from('profiles').insert([{ 
-            id: data.user.id, 
+            id: data.user.id, // This matches the PRIMARY KEY in profiles
             full_name: fullName, 
             email: email, 
             role: role, 
-            mobile_number: mobile,
-            address: address
+            mobile_number: mobile
         }]);
 
         if (profileError) {
-            console.error("Profile Table Error:", profileError);
-            alert("Auth worked, but Profile Table failed: " + profileError.message);
+            console.error("Profile Insert Error:", profileError);
+            alert("Auth worked, but Profile failed: " + profileError.message);
         } else {
-            alert("Signup Successful! You can now login.");
+            alert("SUCCESS! Account and Profile created. You can now login.");
+            showSection('home'); // Send them to home page
         }
+    } else {
+        alert("User created but no data returned. Check your dashboard.");
     }
 }
 
