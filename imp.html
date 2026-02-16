@@ -791,7 +791,7 @@ input:focus {
    ========================================== */
 const _supabaseUrl = 'https://erzwijnlbnwjdlluvxyk.supabase.co';
 const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-const supabase = supabase.createClient(_supabaseUrl, _supabaseKey);
+const _db =  supabase.createClient(_supabaseUrl, _supabaseKey);
 
 let currentUser = null;
 
@@ -811,7 +811,7 @@ async function handleSignup() {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return alert(error.message);
 
-    await supabase.from('profiles').insert([{ 
+    await _db.from('profiles').insert([{ 
         id: data.user.id, full_name: fullName, email, role, mobile_number: mobile 
     }]);
     alert("Signup Successful! Verify your email.");
@@ -830,7 +830,7 @@ async function handleLogin() {
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
 async function addStudent() {
-    const { error } = await supabase.from('students').insert([{
+    const { error } = await _db.from('students').insert([{
         full_name: val('#students', 'input[placeholder="Full Name"]'),
         mobile: val('#students', 'input[placeholder="Mobile"]'),
         standard: val('#students', 'input[placeholder="Class/Standard"]'),
@@ -843,7 +843,7 @@ async function addStudent() {
 
 async function fetchStudentByMobile() {
     const mobile = val('#students', 'input[placeholder="Mobile"]');
-    const { data, error } = await supabase.from('students').select('*').eq('mobile', mobile).single();
+    const { data, error } = await _db.from('students').select('*').eq('mobile', mobile).single();
     if (data) {
         document.querySelector('#students input[placeholder="Full Name"]').value = data.full_name;
         document.querySelector('#students input[placeholder="Total Fees"]').value = data.total_fees;
@@ -853,7 +853,7 @@ async function fetchStudentByMobile() {
 
 async function editStudent() {
     const mobile = val('#students', 'input[placeholder="Mobile"]');
-    const { error } = await supabase.from('students').update({
+    const { error } = await _db.from('students').update({
         full_name: val('#students', 'input[placeholder="Full Name"]'),
         paid_amount: parseFloat(val('#students', 'input[placeholder="Paid Amount"]'))
     }).eq('mobile', mobile);
@@ -864,7 +864,7 @@ async function editStudent() {
    4. FEE MANAGEMENT (Stats & Links)
    ========================================== */
 async function loadFeeStats() {
-    const { data, error } = await supabase.from('students').select('paid_amount, total_fees');
+    const { data, error } = await _db.from('students').select('paid_amount, total_fees');
     const collected = data.reduce((sum, s) => sum + (s.paid_amount || 0), 0);
     const total = data.reduce((sum, s) => sum + (s.total_fees || 0), 0);
     document.querySelector('#fee h4').innerText = `₹ ${collected}`;
@@ -875,7 +875,7 @@ async function loadFeeStats() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
-    await supabase.from('batches').insert([{
+    await _db.from('batches').insert([{
         batch_name: val('#batch', 'input[placeholder="Batch Name"]'),
         teacher_id: val('#batch', 'input[placeholder="Teacher ID"]'),
         batch_time: val('#batch', 'input[type="time"]')
@@ -885,7 +885,7 @@ async function addBatch() {
 
 async function fetchBatch() {
     const tID = val('#batch', 'input[placeholder="Teacher ID"]');
-    const { data, error } = await supabase.from('batches').select('*').eq('teacher_id', tID).single();
+    const { data, error } = await _db.from('batches').select('*').eq('teacher_id', tID).single();
     
     if (error) return alert("Batch not found for this Teacher ID");
     if (data) {
@@ -904,14 +904,14 @@ async function editBatch() {
         batch_time: val('#batch', 'input[type="time"]'),
         subject_name: val('#batch', 'input[placeholder="Subject Name"]')
     };
-    const { error } = await supabase.from('batches').update(updateData).eq('teacher_id', tID);
+    const { error } = await _db.from('batches').update(updateData).eq('teacher_id', tID);
     if (error) alert(error.message); else alert("Batch Updated Successfully!");
 }
 /* ==========================================
    6. ATTENDANCE (Mark & Fetch)
    ========================================== */
 async function markAttendance(status) {
-    const { error } = await supabase.from('attendance').insert([{
+    const { error } = await _db.from('attendance').insert([{
         user_id: currentUser.id,
         status: status,
         month_year: val('#attendance', 'input[type="month"]')
@@ -938,7 +938,7 @@ async function fetchAttendance() {
    7. ADMIN DASHBOARD (Dynamic Counts)
    ========================================== */
 async function loadDashboard() {
-    const { data: students } = await supabase.from('students').select('*');
+    const { data: students } = await _db.from('students').select('*');
     document.querySelector('#admin .stat-card h4').innerText = students.length;
     // Repeat for revenue and pending by summing students data
 }
@@ -947,7 +947,7 @@ async function loadDashboard() {
    8. FEE REMINDER (SMS/WhatsApp)
    ========================================== */
 async function sendReminder(type) {
-    const { data } = await supabase.from('students').select('full_name, mobile, pending_amount').gt('pending_amount', 0);
+    const { data } = await _db.from('students').select('full_name, mobile, pending_amount').gt('pending_amount', 0);
     data.forEach(s => {
         const msg = `Hi ${s.full_name}, your pending fee is ₹${s.pending_amount}. Please pay ASAP.`;
         if (type === 'WA') window.open(`https://wa.me/${s.mobile}?text=${encodeURIComponent(msg)}`);
@@ -959,7 +959,7 @@ async function sendReminder(type) {
    9. LEAD MANAGEMENT
    ========================================== */
 async function addLead() {
-    await supabase.from('leads').insert([{
+    await _db.from('leads').insert([{
         full_name: val('#leads', 'input[placeholder="Full Name"]'),
         contact: val('#leads', 'input[placeholder="Contact"]'),
         status: 'Follow up'
@@ -968,7 +968,7 @@ async function addLead() {
 }
 async function fetchLead() {
     const contact = val('#leads', 'input[placeholder="Contact"]');
-    const { data, error } = await supabase.from('leads').select('*').eq('contact', contact).single();
+    const { data, error } = await _db.from('leads').select('*').eq('contact', contact).single();
     
     if (error) return alert("Lead not found");
     if (data) {
@@ -982,7 +982,7 @@ async function fetchLead() {
    10. EXPENSE TRACKING (Add, Edit, Fetch)
    ========================================== */
 async function addExpense() {
-    await supabase.from('expenses').insert([{
+    await _db.from('expenses').insert([{
         month_year: val('#expense', 'input[type="month"]'),
         rent: parseFloat(val('#expense', 'input[placeholder="Rent"]')) || 0,
         teacher_salary: parseFloat(val('#expense', 'input[placeholder="Teacher Salary"]')) || 0
@@ -991,7 +991,7 @@ async function addExpense() {
 }
 async function fetchExpense() {
     const month = val('#expense', 'input[type="month"]');
-    const { data, error } = await supabase.from('expenses').select('*').eq('month_year', month).single();
+    const { data, error } = await _db.from('expenses').select('*').eq('month_year', month).single();
     
     if (error) return alert("No expenses found for this month");
     if (data) {
@@ -1009,14 +1009,14 @@ async function editExpense() {
         electricity: parseFloat(val('#expense', 'input[placeholder="Electricity"]')),
         teacher_salary: parseFloat(val('#expense', 'input[placeholder="Teacher Salary"]'))
     };
-    const { error } = await supabase.from('expenses').update(updateData).eq('month_year', month);
+    const { error } = await _db.from('expenses').update(updateData).eq('month_year', month);
     if (error) alert(error.message); else alert("Expense record updated!");
 }
 /* ==========================================
    11. TEACHER PORTAL (Admin Side)
    ========================================== */
 async function addTeacherDetails() {
-    await supabase.from('teacher_details').insert([{
+    await _db.from('teacher_details').insert([{
         id: val('#teacher', 'input[placeholder="Teacher ID"]'),
         qualification: val('#teacher', 'input[placeholder="Qualification"]'),
         salary_offered: val('#teacher', 'input[placeholder="Salary Offered"]')
@@ -1025,7 +1025,7 @@ async function addTeacherDetails() {
 }
 async function fetchTeacher() {
     const tID = val('#teacher', 'input[placeholder="Teacher ID"]');
-    const { data, error } = await supabase.from('teacher_details').select('*').eq('id', tID).single();
+    const { data, error } = await _db.from('teacher_details').select('*').eq('id', tID).single();
     
     if (error) return alert("Teacher ID not found");
     if (data) {
@@ -1044,14 +1044,14 @@ async function editTeacher() {
         salary_offered: parseFloat(val('#teacher', 'input[placeholder="Salary Offered"]')),
         subject_taught: val('#teacher', 'input[placeholder="Subject Taught"]')
     };
-    const { error } = await supabase.from('teacher_details').update(updateData).eq('id', tID);
+    const { error } = await _db.from('teacher_details').update(updateData).eq('id', tID);
     if (error) alert(error.message); else alert("Teacher Profile Updated!");
 }
 /* ==========================================
    12. STUDENT PORTAL (View Only)
    ========================================== */
 async function loadStudentPortal() {
-    const { data } = await supabase.from('student_portal_view').select('*').eq('user_id', currentUser.id).single();
+    const { data } = await _db.from('student_portal_view').select('*').eq('user_id', currentUser.id).single();
     if (data) {
         const container = document.querySelector('#student-p .form-grid');
         container.innerHTML = `<p><b>Name:</b> ${data.full_name}</p><p><b>Pending:</b> ₹${data.total_fees_pending}</p>`;
@@ -1079,7 +1079,7 @@ function generateCertificate() {
    14. PERFORMANCE TRACKING
    ========================================== */
 async function fetchPerformance() {
-    const { data } = await supabase.from('attendance').select('*').eq('user_id', currentUser.id);
+    const { data } = await _db.from('attendance').select('*').eq('user_id', currentUser.id);
     alert(`Your current attendance record count: ${data.length}`);
 }
 
