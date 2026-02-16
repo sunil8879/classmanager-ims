@@ -504,7 +504,10 @@ input:focus {
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total"></div>
             <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid"></div>
             <!-- Extra fields needed for ID Card -->
-            <div class="input-group"><label>Roll Number</label><input type="text" id="stu-roll" placeholder="Roll Number"></div>
+           <div class="input-group">
+    <label>Roll Number (Auto-Generated)</label>
+    <input type="text" id="stu-roll" placeholder="Assigned on Save" readonly style="background: #eee;">
+</div>
             <div class="input-group"><label>Course End Date</label><input type="date" id="stu-end-date"></div>
         </div>
         <div class="button-row">
@@ -918,31 +921,39 @@ async function handleLogin() {
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
 async function addStudent() {
-    // 1. Collect Data using the IDs from your HTML
+    // 1. AUTO-GENERATE ROLL NUMBER (Format: IMS-Year-RandomNumber)
+    const year = new Date().getFullYear();
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const autoRollNo = `IMS-${year}-${randomSuffix}`;
+
+    // 2. Collect ALL Data (Ensuring Father/Mother/User_ID are included)
     const stuData = {
         full_name: document.getElementById('stu-name').value,
         mobile: document.getElementById('stu-mobile').value,
+        father_mobile: document.getElementById('stu-father').value, // Fixed Null
+        mother_mobile: document.getElementById('stu-mother').value, // Fixed Null
         standard: document.getElementById('stu-standard').value,
         course: document.getElementById('stu-course').value,
-        batch_time: document.getElementById('stu-batch').value, // This is the field that caused the error
+        batch_time: document.getElementById('stu-batch').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
-        admission_date: document.getElementById('stu-date').value
+        admission_date: document.getElementById('stu-date').value,
+        user_id: currentUser ? currentUser.id : null // Saves the ID of the Admin who added them
     };
 
-    // 2. Save to 'students' table
+    // 3. Save to 'students' table
     const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
 
     if (stuError) {
         console.error(stuError);
-        return alert("Error saving basic info: " + stuError.message);
+        return alert("Error: " + stuError.message);
     }
 
-    // 3. Save to 'student_details' table for ID Card
+    // 4. Save to 'student_details' (Now with Auto-Generated Roll Number)
     if (newStu && newStu[0]) {
         const detailData = {
             student_id: newStu[0].id,
-            roll_number: document.getElementById('stu-roll').value,
+            roll_number: autoRollNo, // Use the generated number
             course_end_date: document.getElementById('stu-end-date').value
         };
 
@@ -951,7 +962,13 @@ async function addStudent() {
         if (detailError) {
             alert("Basic info saved, but ID card details failed: " + detailError.message);
         } else {
-            alert("STUDENT DATA SAVED SUCCESSFULLY!");
+            // Show the user the Roll Number they just got
+            alert(`STUDENT SAVED SUCCESSFULLY!\nGenerated Roll No: ${autoRollNo}`);
+            
+            // Optional: Update the UI to show the new Roll Number
+            if(document.getElementById('stu-roll')) {
+                document.getElementById('stu-roll').value = autoRollNo;
+            }
         }
     }
 }
