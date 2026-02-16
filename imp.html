@@ -488,27 +488,29 @@ input:focus {
 </section>
 
 <!-- 2. STUDENT MANAGEMENT -->
+<!-- 2. STUDENT MANAGEMENT -->
 <section id="students" class="content-section">
     <div class="card">
-        <h3>Student Management</h3>
+        <h3><i class="fas fa-user-plus"></i> Student Management</h3>
         <div class="form-grid">
-            <div class="input-group"><label>Date</label><input type="date"></div>
-            <div class="input-group"><label>Full Name</label><input type="text"></div>
-            <div class="input-group"><label>Mobile</label><input type="text"></div>
-            <div class="input-group"><label>Father's Mobile</label><input type="text"></div>
-            <div class="input-group"><label>Mother's Mobile</label><input type="text"></div>
-            <div class="input-group"><label>Class/Standard</label><input type="text"></div>
-            <div class="input-group"><label>Batch Time</label><input type="time"></div>
-            <div class="input-group"><label>Course</label><input type="text"></div>
-            <div class="input-group"><label>Total Fees</label><input type="number"></div>
-            <div class="input-group"><label>Paid Amount</label><input type="number"></div>
-            <div class="input-group"><label>Pending Amount</label><input type="number" readonly></div>
-            <div class="input-group"><label>Admission Date</label><input type="date"></div>
+            <div class="input-group"><label>Admission Date</label><input type="date" id="stu-date"></div>
+            <div class="input-group"><label>Full Name</label><input type="text" id="stu-name" placeholder="Full Name"></div>
+            <div class="input-group"><label>Mobile Number</label><input type="text" id="stu-mobile" placeholder="Mobile"></div>
+            <div class="input-group"><label>Father's Mobile</label><input type="text" id="stu-father"></div>
+            <div class="input-group"><label>Mother's Mobile</label><input type="text" id="stu-mother"></div>
+            <div class="input-group"><label>Class / Standard</label><input type="text" id="stu-standard"></div>
+            <div class="input-group"><label>Batch Time</label><input type="time" id="stu-batch"></div>
+            <div class="input-group"><label>Course</label><input type="text" id="stu-course" placeholder="Course"></div>
+            <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total"></div>
+            <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid"></div>
+            <!-- Extra fields needed for ID Card -->
+            <div class="input-group"><label>Roll Number</label><input type="text" id="stu-roll" placeholder="Roll Number"></div>
+            <div class="input-group"><label>Course End Date</label><input type="date" id="stu-end-date"></div>
         </div>
         <div class="button-row">
            <button class="btn-add" onclick="addStudent()">ADD Student</button>
-            <button class="btn-edit" onclick="editStudent()">EDIT Details</button>
-       <button class="btn-fetch" onclick="fetchStudentByMobile()">FETCH Details</button>
+           <button class="btn-edit" onclick="editStudent()">EDIT Details</button>
+           <button class="btn-fetch" onclick="fetchStudentByMobile()">FETCH Details</button>
         </div>
     </div>
 </section>
@@ -916,15 +918,42 @@ async function handleLogin() {
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
 async function addStudent() {
-    const { error } = await db.from('students').insert([{
-        full_name: val('#students', 'input[placeholder="Full Name"]'),
-        mobile: val('#students', 'input[placeholder="Mobile"]'),
-        standard: val('#students', 'input[placeholder="Class/Standard"]'),
-        total_fees: parseFloat(val('#students', 'input[placeholder="Total Fees"]')),
-        paid_amount: parseFloat(val('#students', 'input[placeholder="Paid Amount"]')),
-        admission_date: val('#students', 'input[type="date"]')
-    }]);
-    if (error) alert(error.message); else alert("Student Added!");
+    // 1. Collect Data using IDs (much safer than placeholders)
+    const stuData = {
+        full_name: document.getElementById('stu-name').value,
+        mobile: document.getElementById('stu-mobile').value,
+        standard: document.getElementById('stu-standard').value,
+        course: document.getElementById('stu-course').value,
+        batch_time: document.getElementById('stu-batch').value,
+        total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
+        paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
+        admission_date: document.getElementById('stu-date').value
+    };
+
+    // 2. Save to 'students' table
+    const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
+
+    if (stuError) {
+        console.error(stuError);
+        return alert("Error saving basic info: " + stuError.message);
+    }
+
+    // 3. Save to 'student_details' table (For ID Card)
+    if (newStu && newStu[0]) {
+        const detailData = {
+            student_id: newStu[0].id,
+            roll_number: document.getElementById('stu-roll').value,
+            course_end_date: document.getElementById('stu-end-date').value
+        };
+
+        const { error: detailError } = await db.from('student_details').insert([detailData]);
+        
+        if (detailError) {
+            alert("Basic info saved, but ID card details failed: " + detailError.message);
+        } else {
+            alert("STUDENT DATA SAVED SUCCESSFULLY!");
+        }
+    }
 }
 
 async function fetchStudentByMobile() {
