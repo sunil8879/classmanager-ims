@@ -796,8 +796,14 @@ const db =  supabase.createClient(_supabaseUrl, _supabaseKey);
 let currentUser = null;
 
 // Helper to get input values easily
-const val = (id, selector) => document.querySelector(`${id} ${selector}`).value;
-
+const val = (id, selector) => {
+    const el = document.querySelector(`${id} ${selector}`);
+    if (!el) {
+        console.warn(`Element ${id} ${selector} not found`);
+        return ""; // Return empty string instead of crashing
+    }
+    return el.value;
+};
 /* ==========================================
    2. LOGIN SYSTEM (Signup, Login, Auth)
    ========================================== */
@@ -808,7 +814,7 @@ async function handleSignup() {
     const role = document.querySelector('#login select').value;
     const mobile = val('#login', 'input[placeholder="Mobile Number"]');
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await db.auth.signUp({ email, password });
     if (error) return alert(error.message);
 
     await db.from('profiles').insert([{ 
@@ -1080,8 +1086,13 @@ function generateCertificate() {
    14. PERFORMANCE TRACKING
    ========================================== */
 async function fetchPerformance() {
+    if (!currentUser) {
+        alert("Please login first to view performance tracking.");
+        showSection('login'); // Redirect them to login
+        return;
+    }
     const { data } = await db.from('attendance').select('*').eq('user_id', currentUser.id);
-    alert(`Your current attendance record count: ${data.length}`);
+    alert(`Your current attendance record count: ${data ? data.length : 0}`);
 }
 
 /* ==========================================
@@ -1098,9 +1109,18 @@ function showSection(id) {
 }
 
 // Initial check on load
+// Initial check on load
 document.addEventListener('DOMContentLoaded', async () => {
-    const { data: { user } } = await db.auth.getUser();
-    if (user) currentUser = user;
+    try {
+        // Use 'db' here, NOT 'supabase'
+        const { data: { user } } = await db.auth.getUser();
+        if (user) {
+            currentUser = user;
+            console.log("User detected:", user.email);
+        }
+    } catch (e) {
+        console.log("No active session.");
+    }
 });
 
 
