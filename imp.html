@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Supabase JS Library CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>Class Manager - IMS</title>
+    <!-- PWA Setup -->
+    <meta name="theme-color" content="#007bff">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logo.png">
+    
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        :root {
+            --aquamarine: #7FFFD4;
+            --modern-blue: #007bff;
+            --deep-blue: #0056b3;
+            --white: #ffffff;
+            --dark: #333;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: var(--white);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* --- Header Section --- */
+        header {
+            background: linear-gradient(135deg, var(--white), var(--aquamarine));
+            padding: 40px 5%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            border-bottom: 5px solid var(--modern-blue);
+        }
+
+        .logo-container {
+            width: 100px;
+            height: 100px;
+            perspective: 1000px;
+        }
+
+        .rotating-logo {
+            width: 100%;
+            height: 100%;
+            background: var(--modern-blue);
+            border-radius: 20%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            animation: rotate3D 5s linear infinite;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        @keyframes rotate3D {
+            from { transform: rotateY(0deg); }
+            to { transform: rotateY(360deg); }
+        }
+
+        .title-box {
+            transform: rotate(-5deg) skew(5deg); /* Flamboyant Tilt */
+            text-align: center;
+        }
+
+        .main-title {
+            font-size: 4rem;
+            font-weight: 900;
+            line-height: 1;
+            position: relative;
+            display: inline-block;
+            text-transform: uppercase;
+            /* 3D Effect */
+            text-shadow: 
+                0 1px 0 #ccc, 0 2px 0 #c9c9c9, 0 3px 0 #bbb, 0 4px 0 #b9b9b9,
+                0 5px 0 #aaa, 0 6px 1px rgba(0,0,0,.1), 0 0 5px rgba(0,0,0,.1),
+                0 1px 3px rgba(0,0,0,.3), 0 3px 5px rgba(0,0,0,.2),
+                0 5px 10px rgba(0,0,0,.25), 0 10px 10px rgba(0,0,0,.2),
+                0 20px 20px rgba(0,0,0,.15);
+            /* Red-Black Split */
+            background: linear-gradient(to bottom, #ff0000 50%, #000000 50%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            display: block;
+            font-size: 1.5rem;
+            color: var(--modern-blue);
+            font-weight: 600;
+            margin-top: 10px;
+            letter-spacing: 2px;
+        }
+
+        /* --- Main Layout --- */
+        .app-container {
+            display: flex;
+            flex: 1;
+        }
+
+        /* --- Sidebar Tabs --- */
+        nav.sidebar {
+            width: 280px;
+            background: var(--modern-blue);
+            padding: 20px 0;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .nav-tab {
+            width: 100%;
+            padding: 15px 25px;
+            border: none;
+            background: transparent;
+            color: white;
+            text-align: left;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-left: 5px solid transparent;
+        }
+
+        .nav-tab:hover, .nav-tab.active {
+            background: var(--deep-blue);
+            border-left: 5px solid var(--aquamarine);
+            padding-left: 35px;
+        }
+
+        .nav-tab i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* --- Content Area --- */
+        main.content {
+            flex: 1;
+            padding: 40px;
+            background: #f4f7f6;
+        }
+
+        .content-section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Home Page Specific Styling --- */
+        .hero-title { font-size: 2.5rem; color: var(--dark); margin-bottom: 20px; }
+        .bullet-list { list-style: none; margin-bottom: 30px; }
+        .bullet-list li { margin: 10px 0; padding-left: 30px; position: relative; font-size: 1.1rem; }
+        .bullet-list li::before {
+            content: '✕'; color: red; position: absolute; left: 0; font-weight: bold;
+        }
+        .solve-text { color: var(--modern-blue); font-weight: 700; font-size: 1.5rem; margin-top: 20px; }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 4px solid var(--aquamarine);
+        }
+
+        .card h3 { color: var(--modern-blue); margin-bottom: 10px; }
+
+        /* --- Footer --- */
+        footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 60px 5% 20px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .footer-col h4 {
+            color: var(--aquamarine);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .footer-col ul { list-style: none; }
+        .footer-col ul li { margin-bottom: 10px; }
+        .footer-col ul li a { color: #ccc; text-decoration: none; transition: 0.3s; }
+        .footer-col ul li a:hover { color: white; }
+
+        .footer-bottom {
+            border-top: 1px solid #333;
+            padding-top: 20px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .india-flag { width: 20px; vertical-align: middle; }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 992px) {
+            .app-container { flex-direction: column; }
+            nav.sidebar { width: 100%; display: flex; overflow-x: auto; white-space: nowrap; }
+            .nav-tab { display: inline-flex; width: auto; }
+            .main-title { font-size: 2.5rem; }
+            header { flex-direction: column; text-align: center; }
+        }
+
+
+
+
+
+/* Update Sidebar to Aquamarine */
+nav.sidebar {
+    background: #7FFFD4 !important; /* Aquamarine */
+}
+
+/* Make Tab text dark for contrast against Aquamarine */
+.nav-tab {
+    color: #000 !important;
+    font-weight: 600;
+}
+
+.nav-tab:hover, .nav-tab.active {
+    background: #007bff !important; /* Modern Blue */
+    color: #fff !important;
+}
+
+/* Form & Input Styling */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.input-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #444;
+}
+
+input, select, textarea {
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+input:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+.button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.btn-add { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+.btn-edit { background: #f39c12; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+.btn-fetch { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+}
+
+.stat-card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-bottom: 4px solid #007bff;
+}
+
+.stat-card h4 { font-size: 1.5rem; color: #007bff; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container">
+            <!-- Provision for Logo -->
+            <div class="rotating-logo">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+        </div>
+        <div class="title-box">
+            <h1 class="main-title">CLASS MANAGER- IMS</h1>
+            <span class="tagline">Track Right, Grow Bright.</span>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <button class="nav-tab active" onclick="showSection('home')"><i class="fas fa-home"></i> Home</button>
+            <button class="nav-tab" onclick="showSection('login')"><i class="fas fa-user-lock"></i> Login System</button>
+            <button class="nav-tab" onclick="showSection('students')"><i class="fas fa-user-graduate"></i> Student Management</button>
+            <button class="nav-tab" onclick="showSection('fee')"><i class="fas fa-money-bill-wave"></i> Fee Management</button>
+            <button class="nav-tab" onclick="showSection('batch')"><i class="fas fa-layer-group"></i> Batch Management</button>
+            <button class="nav-tab" onclick="showSection('attendance')"><i class="fas fa-clipboard-check"></i> Attendance</button>
+            <button class="nav-tab" onclick="showSection('admin')"><i class="fas fa-user-shield"></i> Admin Dashboard</button>
+            <button class="nav-tab" onclick="showSection('reminder')"><i class="fas fa-bell"></i> Fee Reminder System</button>
+            <button class="nav-tab" onclick="showSection('leads')"><i class="fas fa-funnel-dollar"></i> Lead Management</button>
+            <button class="nav-tab" onclick="showSection('expense')"><i class="fas fa-wallet"></i> Expense Tracking</button>
+            <button class="nav-tab" onclick="showSection('teacher')"><i class="fas fa-chalkboard-teacher"></i> Teacher Portal</button>
+            <button class="nav-tab" onclick="showSection('student-p')"><i class="fas fa-user"></i> Students Portal</button>
+            <button class="nav-tab" onclick="showSection('id-gen')"><i class="fas fa-id-card"></i> ID Card Generator</button>
+            <button class="nav-tab" onclick="showSection('cert-gen')"><i class="fas fa-certificate"></i> Certificate Generator</button>
+            <button class="nav-tab" onclick="showSection('tracking')"><i class="fas fa-chart-line"></i> Performance Tracking</button>
+        </aside>
+
+        <main class="content" id="main-content">
+            <!-- DEFAULT HOME PAGE -->
+            <section id="home" class="content-section active">
+                <div class="hero-title">Still managing your institute manually?</div>
+                <ul class="bullet-list">
+                    <li>Tracking fees in notebooks?</li>
+                    <li>Forgetting pending payments?</li>
+                    <li>Managing students in Excel?</li>
+                    <li>Confused batch records?</li>
+                </ul>
+                <div class="solve-text">ClassManager solves all this.</div>
+
+                <hr style="margin: 40px 0;">
+
+                <h2 class="hero-title">Everything you need to manage your institute</h2>
+                <div class="feature-grid">
+                    <div class="card">
+                        <h3>Student Management</h3>
+                        <p>Centralized database for all student profiles and documents.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Fee Tracking</h3>
+                        <p>Automated receipts and pending fee alerts for parents.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Batch Management</h3>
+                        <p>Organize students into batches with scheduled timings.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Attendance Tracking</h3>
+                        <p>Digital attendance with instant SMS notification to parents.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Reports & Dashboard</h3>
+                        <p>Comprehensive visual reports for growth and revenue.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Enquiry Management</h3>
+                        <p>Convert leads into admissions with effective follow-ups.</p>
+                    </div>
+                </div>
+
+                <hr style="margin: 40px 0;">
+
+                <h2 class="hero-title">Why coaching institutes choose ClassManager</h2>
+                <div class="feature-grid">
+                    <div class="card"><li>Save hours daily</li></div>
+                    <div class="card"><li>Never miss fee collection</li></div>
+                    <div class="card"><li>Stay fully organized</li></div>
+                    <div class="card"><li>Access anywhere anytime</li></div>
+                    <div class="card"><li>Works on mobile and desktop</li></div>
+                </div>
+
+                <div style="margin-top: 50px; text-align: center; background: var(--aquamarine); padding: 30px; border-radius: 15px;">
+                    <h3>Built for coaching institutes</h3>
+                    <p>Secure and reliable | Made in India 🇮🇳</p>
+                    <p><strong>Trusted by 100+ institutes</strong></p>
+                </div>
+            </section>
+
+          <!-- 1. LOGIN SYSTEM -->
+<section id="login" class="content-section">
+    <div style="display: flex; gap: 40px; flex-wrap: wrap;">
+        <!-- Signup -->
+        <div class="card" style="flex: 1; min-width: 300px;">
+            <h3>Signup</h3>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <input type="text" placeholder="Full Name">
+                <select>
+                    <option>Select Status: Owner</option>
+                    <option>Teacher</option>
+                    <option>Student</option>
+                </select>
+                <input type="email" placeholder="Email Id">
+                <input type="password" placeholder="Password">
+                <input type="text" placeholder="Address">
+                <input type="text" placeholder="Mobile Number">
+                <button class="btn-fetch" onclick="handleSignup()">Sign up</button>
+            </div>
+        </div>
+        <!-- Login -->
+        <div class="card" style="flex: 1; min-width: 300px;">
+            <h3>Login</h3>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <select>
+                    <option>Select Status: Owner</option>
+                    <option>Teacher</option>
+                    <option>Student</option>
+                </select>
+                <input type="email" placeholder="Email Id">
+                <input type="password" placeholder="Password">
+              <button class="btn-add" onclick="handleLogin()">Login</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 2. STUDENT MANAGEMENT -->
+<section id="students" class="content-section">
+    <div class="card">
+        <h3>Student Management</h3>
+        <div class="form-grid">
+            <div class="input-group"><label>Date</label><input type="date"></div>
+            <div class="input-group"><label>Full Name</label><input type="text"></div>
+            <div class="input-group"><label>Mobile</label><input type="text"></div>
+            <div class="input-group"><label>Father's Mobile</label><input type="text"></div>
+            <div class="input-group"><label>Mother's Mobile</label><input type="text"></div>
+            <div class="input-group"><label>Class/Standard</label><input type="text"></div>
+            <div class="input-group"><label>Batch Time</label><input type="time"></div>
+            <div class="input-group"><label>Course</label><input type="text"></div>
+            <div class="input-group"><label>Total Fees</label><input type="number"></div>
+            <div class="input-group"><label>Paid Amount</label><input type="number"></div>
+            <div class="input-group"><label>Pending Amount</label><input type="number" readonly></div>
+            <div class="input-group"><label>Admission Date</label><input type="date"></div>
+        </div>
+        <div class="button-row">
+           <button class="btn-add" onclick="addStudent()">ADD Student</button>
+            <button class="btn-edit" onclick="editStudent()">EDIT Details</button>
+       <button class="btn-fetch" onclick="fetchStudentByMobile()">FETCH Details</button>
+        </div>
+    </div>
+</section>
+
+<!-- 3. FEE MANAGEMENT -->
+<section id="fee" class="content-section">
+    <div class="card">
+        <h3>Fee Management</h3>
+        <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+            <a href="#" style="color: blue;">Installment Tracking</a>
+            <a href="#" style="color: blue;">Auto-Calculate Pending</a>
+            <a href="#" style="color: blue;">Payment History Log</a>
+        </div>
+        <div class="dashboard-stats">
+            <div class="stat-card"><p>Collected (Month)</p><h4>₹ 0.00</h4></div>
+            <div class="stat-card"><p>Total Pending</p><h4 style="color: red;">₹ 0.00</h4></div>
+        </div>
+    </div>
+</section>
+
+<!-- 4. BATCH MANAGEMENT -->
+<section id="batch" class="content-section">
+    <div class="card">
+        <h3>Batch Management</h3>
+        <div class="form-grid">
+            <input type="date">
+            <input type="text" placeholder="Teacher Name">
+            <input type="text" placeholder="Teacher ID">
+            <input type="text" placeholder="Batch Name">
+            <input type="time" placeholder="Batch Time">
+            <input type="text" placeholder="Subject Name">
+            <input type="number" placeholder="Students Allotted">
+            <input type="text" placeholder="Remarks">
+        </div>
+        <div class="button-row">
+          <button class="btn-add" onclick="addBatch()">ADD Batch</button>
+<button class="btn-edit" onclick="editBatch()">EDIT (by ID)</button>
+<button class="btn-fetch" onclick="fetchBatch()">FETCH (by ID)</button>
+        </div>
+    </div>
+</section>
+
+<!-- 5. ATTENDANCE -->
+<section id="attendance" class="content-section">
+    <div class="card">
+        <h3>Attendance Tracker</h3>
+        <div class="form-grid">
+            <select><option>Select View: Student</option><option>Teacher</option></select>
+            <input type="month">
+            <input type="number" placeholder="Total Present">
+            <input type="number" placeholder="Total Absent">
+            <input type="text" placeholder="Remarks">
+     <!-- Update the buttons in Section #5 -->
+<div class="button-row">
+    <button class="btn-add" onclick="markAttendance('Present')">Mark Present</button>
+    <button class="btn-edit" onclick="markAttendance('Absent')">Mark Absent</button>
+    <button class="btn-fetch" onclick="fetchAttendance()">Fetch Statistics</button>
+</div>
+</section>
+
+<!-- 6. ADMIN DASHBOARD -->
+<section id="admin" class="content-section">
+    <div class="dashboard-stats">
+        <div class="stat-card"><p>Total Students</p><h4>120</h4></div>
+        <div class="stat-card"><p>Total Revenue</p><h4>₹ 4.5L</h4></div>
+        <div class="stat-card"><p>Pending Fees</p><h4 style="color: red;">₹ 85k</h4></div>
+        <div class="stat-card"><p>Today's Attendance</p><h4>92%</h4></div>
+    </div>
+    <div class="card" style="margin-top:20px;">
+        <h3>Upcoming Fee Reminders</h3>
+        <p>No immediate reminders.</p>
+    </div>
+</section>
+
+<!-- 7. FEE REMINDER -->
+<section id="reminder" class="content-section">
+    <div class="card">
+        <h3>Fee Reminder System</h3>
+        <input type="month" style="margin-bottom: 20px;">
+        <div class="stat-card" style="margin-bottom: 20px;">
+            <p>Total Pending Students</p><h4>15</h4>
+        </div>
+        <div class="button-row">
+           <!-- Find these in Section #7 -->
+<button class="btn-fetch" onclick="sendReminder('SMS')">
+    <i class="fas fa-sms"></i> Send SMS Reminder
+</button>
+<button class="btn-add" style="background: #25D366;" onclick="sendReminder('WA')">
+    <i class="fab fa-whatsapp"></i> WhatsApp Reminder
+</button>
+        </div>
+    </div>
+</section>
+
+<!-- 8. LEAD MANAGEMENT -->
+<section id="leads" class="content-section">
+    <div class="card">
+        <h3>Lead Management</h3>
+        <div class="form-grid">
+            <input type="text" placeholder="Full Name">
+            <input type="text" placeholder="Contact">
+            <input type="email" placeholder="Email">
+            <input type="text" placeholder="Interested Course">
+            <input type="date" placeholder="Date of Visit">
+            <input type="text" placeholder="Reference">
+            <select>
+                <option>Status: Follow up</option>
+                <option>Converted</option>
+                <option>Not interested</option>
+            </select>
+            <input type="text" placeholder="Remarks">
+        </div>
+        <div class="button-row">
+          <button class="btn-add" onclick="addLead()">ADD Lead</button>
+<button class="btn-fetch" onclick="fetchLead()">FETCH (Email/Contact)</button>
+        </div>
+    </div>
+</section>
+
+<!-- 9. EXPENSE TRACKING -->
+<section id="expense" class="content-section">
+    <div class="card">
+        <h3>Expense Tracking</h3>
+        <input type="month" style="margin-bottom: 20px;">
+        <div class="form-grid">
+            <input type="number" placeholder="Rent">
+            <input type="number" placeholder="Electricity">
+            <input type="number" placeholder="AC / Fridge / Oven">
+            <input type="number" placeholder="Teacher Salary">
+            <input type="number" placeholder="Admin Salary">
+            <input type="number" placeholder="Marketing">
+            <input type="number" placeholder="Other">
+        </div>
+        <div class="stat-card" style="background: #f8f9fa;">
+            <p>Total Expenses: <b>₹ 0.00</b> | Total Collection: <b>₹ 0.00</b></p>
+            <h4 style="color: green;">Net Profit: ₹ 0.00</h4>
+        </div>
+        <div class="button-row">
+           <button class="btn-add" onclick="addExpense()">ADD Expense</button>
+<button class="btn-edit" onclick="editExpense()">EDIT (Month)</button>
+<button class="btn-fetch" onclick="fetchExpense()">FETCH (Month)</button>
+        </div>
+    </div>
+</section>
+
+<!-- 10. REPORTS -->
+<section id="reports" class="content-section">
+    <div class="card">
+        <h3>Reports Center</h3>
+        <ul style="line-height: 2.5;">
+            <li><a href="#"><i class="fas fa-file-invoice"></i> Monthly Collection Report</a></li>
+            <li><a href="#"><i class="fas fa-user-chart"></i> Student Report</a></li>
+            <li><a href="#"><i class="fas fa-layer-group"></i> Batch Report</a></li>
+            <li><a href="#"><i class="fas fa-check-double"></i> Attendance Report</a></li>
+        </ul>
+    </div>
+</section>
+
+<!-- 11. TEACHER PORTAL -->
+<section id="teacher" class="content-section">
+    <div class="card">
+        <h3>Teacher Management</h3>
+        <div class="form-grid">
+            <input type="month">
+            <input type="text" placeholder="Teacher Name">
+            <input type="number" placeholder="Age">
+            <select><option>Male</option><option>Female</option></select>
+            <input type="text" placeholder="Teacher ID">
+            <input type="date" placeholder="Joining Date">
+            <input type="text" placeholder="Qualification">
+            <input type="text" placeholder="Subject Taught">
+            <input type="number" placeholder="Salary Offered">
+        </div>
+        <div class="button-row">
+         <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
+<button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
+<button class="btn-edit" onclick="editTeacher()">EDIT (ID)</button>
+        </div>
+    </div>
+</section>
+
+<!-- 12. STUDENT PORTAL (VIEW ONLY) -->
+<section id="student-p" class="content-section">
+    <div class="card" style="border-top-color: #007bff;">
+        <h3>My Portal (View Only)</h3>
+        <div class="form-grid">
+            <p><b>Name:</b> Rahul Sharma</p>
+            <p><b>Roll No:</b> CM102</p>
+            <p><b>Course:</b> Mathematics</p>
+            <p><b>Enrolled:</b> 12-Jan-2026</p>
+            <p><b>Fees Paid:</b> ₹ 5,000</p>
+            <p style="color: red;"><b>Pending:</b> ₹ 2,000</p>
+            <p><b>Present Days:</b> 22</p>
+            <p><b>Absent Days:</b> 2</p>
+        </div>
+        <hr>
+        <p><i>Remarks: Excellent progress in weekly tests.</i></p>
+    </div>
+</section>
+
+
+
+<!-- 13. ID CARD GENERATOR -->
+<section id="id-gen" class="content-section">
+    <div class="card">
+        <h3>ID Card Generator</h3>
+        <p>Enter Student Mobile to fetch data first.</p>
+        <button class="btn-add" onclick="generateIDCard()">Generate & Print ID Card</button>
+    </div>
+</section>
+
+<!-- 14. CERTIFICATE GENERATOR -->
+<section id="cert-gen" class="content-section">
+    <div class="card">
+        <h3>Certificate Generator</h3>
+        <button class="btn-add" onclick="generateCertificate()">Generate Completion Certificate</button>
+    </div>
+</section>
+
+<!-- 15. PERFORMANCE TRACKING -->
+<section id="tracking" class="content-section">
+    <div class="card">
+        <h3>Performance Tracking</h3>
+        <button class="btn-fetch" onclick="fetchPerformance()">View My Progress</button>
+    </div>
+</section>
+        </main>
+    </div>
+
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-col">
+                <h4>Product</h4>
+                <ul>
+                    <li><a href="#">Features</a></li>
+                    <li><a href="#">Pricing</a></li>
+                    <li><a href="#">Demo</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Support</h4>
+                <ul>
+                    <li><a href="#">Help Center</a></li>
+                    <li><a href="#">FAQs</a></li>
+                    <li><a href="#">Contact</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Company</h4>
+                <ul>
+                    <li><a href="#">About</a></li>
+                    <li><a href="#">Blog</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Legal</h4>
+                <ul>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms</a></li>
+                    <li><a href="#">Disclaimer</a></li>
+                    <li><a href="#">Refund Policy</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Social Media</h4>
+                <ul>
+                    <li><a href="#"><i class="fab fa-linkedin"></i> Linkedin</a></li>
+                    <li><a href="#"><i class="fab fa-instagram"></i> Instagram</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>Made in India <img src="https://upload.wikimedia.org/wikipedia/en/4/41/Flag_of_India.svg" class="india-flag" alt="India"> | Built for coaching institutes</p>
+            <p>2026 ClassManager. All rights Reserved</p>
+        </div>
+    </footer>
+<script>
+/* ==========================================
+   1. CORE INITIALIZATION
+   ========================================== */
+const _supabaseUrl = 'https://erzwijnlbnwjdlluvxyk.supabase.co';
+const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+const supabase = supabase.createClient(_supabaseUrl, _supabaseKey);
+
+let currentUser = null;
+
+// Helper to get input values easily
+const val = (id, selector) => document.querySelector(`${id} ${selector}`).value;
+
+/* ==========================================
+   2. LOGIN SYSTEM (Signup, Login, Auth)
+   ========================================== */
+async function handleSignup() {
+    const email = val('#login', 'input[placeholder="Email Id"]');
+    const password = val('#login', 'input[placeholder="Password"]');
+    const fullName = val('#login', 'input[placeholder="Full Name"]');
+    const role = document.querySelector('#login select').value;
+    const mobile = val('#login', 'input[placeholder="Mobile Number"]');
+
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return alert(error.message);
+
+    await supabase.from('profiles').insert([{ 
+        id: data.user.id, full_name: fullName, email, role, mobile_number: mobile 
+    }]);
+    alert("Signup Successful! Verify your email.");
+}
+
+async function handleLogin() {
+    const email = document.querySelector('#login .card:last-child input[placeholder="Email Id"]').value;
+    const password = document.querySelector('#login .card:last-child input[placeholder="Password"]').value;
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return alert(error.message);
+    location.reload(); 
+}
+
+/* ==========================================
+   3. STUDENT MANAGEMENT (Add, Edit, Fetch)
+   ========================================== */
+async function addStudent() {
+    const { error } = await supabase.from('students').insert([{
+        full_name: val('#students', 'input[placeholder="Full Name"]'),
+        mobile: val('#students', 'input[placeholder="Mobile"]'),
+        standard: val('#students', 'input[placeholder="Class/Standard"]'),
+        total_fees: parseFloat(val('#students', 'input[placeholder="Total Fees"]')),
+        paid_amount: parseFloat(val('#students', 'input[placeholder="Paid Amount"]')),
+        admission_date: val('#students', 'input[type="date"]')
+    }]);
+    if (error) alert(error.message); else alert("Student Added!");
+}
+
+async function fetchStudentByMobile() {
+    const mobile = val('#students', 'input[placeholder="Mobile"]');
+    const { data, error } = await supabase.from('students').select('*').eq('mobile', mobile).single();
+    if (data) {
+        document.querySelector('#students input[placeholder="Full Name"]').value = data.full_name;
+        document.querySelector('#students input[placeholder="Total Fees"]').value = data.total_fees;
+        document.querySelector('#students input[placeholder="Paid Amount"]').value = data.paid_amount;
+    } else alert("Not Found");
+}
+
+async function editStudent() {
+    const mobile = val('#students', 'input[placeholder="Mobile"]');
+    const { error } = await supabase.from('students').update({
+        full_name: val('#students', 'input[placeholder="Full Name"]'),
+        paid_amount: parseFloat(val('#students', 'input[placeholder="Paid Amount"]'))
+    }).eq('mobile', mobile);
+    if (error) alert(error.message); else alert("Updated!");
+}
+
+/* ==========================================
+   4. FEE MANAGEMENT (Stats & Links)
+   ========================================== */
+async function loadFeeStats() {
+    const { data, error } = await supabase.from('students').select('paid_amount, total_fees');
+    const collected = data.reduce((sum, s) => sum + (s.paid_amount || 0), 0);
+    const total = data.reduce((sum, s) => sum + (s.total_fees || 0), 0);
+    document.querySelector('#fee h4').innerText = `₹ ${collected}`;
+    document.querySelector('#fee h4:last-child').innerText = `₹ ${total - collected}`;
+}
+
+/* ==========================================
+   5. BATCH MANAGEMENT
+   ========================================== */
+async function addBatch() {
+    await supabase.from('batches').insert([{
+        batch_name: val('#batch', 'input[placeholder="Batch Name"]'),
+        teacher_id: val('#batch', 'input[placeholder="Teacher ID"]'),
+        batch_time: val('#batch', 'input[type="time"]')
+    }]);
+    alert("Batch Created");
+}
+
+async function fetchBatch() {
+    const tID = val('#batch', 'input[placeholder="Teacher ID"]');
+    const { data, error } = await supabase.from('batches').select('*').eq('teacher_id', tID).single();
+    
+    if (error) return alert("Batch not found for this Teacher ID");
+    if (data) {
+        document.querySelector('#batch input[placeholder="Batch Name"]').value = data.batch_name;
+        document.querySelector('#batch input[type="time"]').value = data.batch_time;
+        document.querySelector('#batch input[placeholder="Subject Name"]').value = data.subject_name;
+        document.querySelector('#batch input[placeholder="Teacher Name"]').value = data.teacher_name;
+        alert("Batch details loaded!");
+    }
+}
+
+async function editBatch() {
+    const tID = val('#batch', 'input[placeholder="Teacher ID"]');
+    const updateData = {
+        batch_name: val('#batch', 'input[placeholder="Batch Name"]'),
+        batch_time: val('#batch', 'input[type="time"]'),
+        subject_name: val('#batch', 'input[placeholder="Subject Name"]')
+    };
+    const { error } = await supabase.from('batches').update(updateData).eq('teacher_id', tID);
+    if (error) alert(error.message); else alert("Batch Updated Successfully!");
+}
+/* ==========================================
+   6. ATTENDANCE (Mark & Fetch)
+   ========================================== */
+async function markAttendance(status) {
+    const { error } = await supabase.from('attendance').insert([{
+        user_id: currentUser.id,
+        status: status,
+        month_year: val('#attendance', 'input[type="month"]')
+    }]);
+    alert("Attendance Saved");
+}
+
+async function fetchAttendance() {
+    const monthYear = val('#attendance', 'input[type="month"]');
+    // Fetches count of 'Present' days for the logged-in user in that month
+    const { data, error, count } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact' })
+        .eq('month_year', monthYear)
+        .eq('status', 'Present');
+    
+    if (error) alert(error.message);
+    else {
+        document.querySelector('#attendance input[placeholder="Total Present"]').value = count || 0;
+        alert("Attendance records fetched for " + monthYear);
+    }
+}
+/* ==========================================
+   7. ADMIN DASHBOARD (Dynamic Counts)
+   ========================================== */
+async function loadDashboard() {
+    const { data: students } = await supabase.from('students').select('*');
+    document.querySelector('#admin .stat-card h4').innerText = students.length;
+    // Repeat for revenue and pending by summing students data
+}
+
+/* ==========================================
+   8. FEE REMINDER (SMS/WhatsApp)
+   ========================================== */
+async function sendReminder(type) {
+    const { data } = await supabase.from('students').select('full_name, mobile, pending_amount').gt('pending_amount', 0);
+    data.forEach(s => {
+        const msg = `Hi ${s.full_name}, your pending fee is ₹${s.pending_amount}. Please pay ASAP.`;
+        if (type === 'WA') window.open(`https://wa.me/${s.mobile}?text=${encodeURIComponent(msg)}`);
+        else console.log("Sending SMS to " + s.mobile);
+    });
+}
+
+/* ==========================================
+   9. LEAD MANAGEMENT
+   ========================================== */
+async function addLead() {
+    await supabase.from('leads').insert([{
+        full_name: val('#leads', 'input[placeholder="Full Name"]'),
+        contact: val('#leads', 'input[placeholder="Contact"]'),
+        status: 'Follow up'
+    }]);
+    alert("Lead Added");
+}
+async function fetchLead() {
+    const contact = val('#leads', 'input[placeholder="Contact"]');
+    const { data, error } = await supabase.from('leads').select('*').eq('contact', contact).single();
+    
+    if (error) return alert("Lead not found");
+    if (data) {
+        document.querySelector('#leads input[placeholder="Full Name"]').value = data.full_name;
+        document.querySelector('#leads input[placeholder="Interested Course"]').value = data.interested_course;
+        document.querySelector('#leads select').value = "Status: " + data.status;
+        alert("Lead details loaded!");
+    }
+}
+/* ==========================================
+   10. EXPENSE TRACKING (Add, Edit, Fetch)
+   ========================================== */
+async function addExpense() {
+    await supabase.from('expenses').insert([{
+        month_year: val('#expense', 'input[type="month"]'),
+        rent: parseFloat(val('#expense', 'input[placeholder="Rent"]')) || 0,
+        teacher_salary: parseFloat(val('#expense', 'input[placeholder="Teacher Salary"]')) || 0
+    }]);
+    alert("Expense Added");
+}
+async function fetchExpense() {
+    const month = val('#expense', 'input[type="month"]');
+    const { data, error } = await supabase.from('expenses').select('*').eq('month_year', month).single();
+    
+    if (error) return alert("No expenses found for this month");
+    if (data) {
+        document.querySelector('#expense input[placeholder="Rent"]').value = data.rent;
+        document.querySelector('#expense input[placeholder="Electricity"]').value = data.electricity;
+        document.querySelector('#expense input[placeholder="Teacher Salary"]').value = data.teacher_salary;
+        alert("Monthly expenses loaded!");
+    }
+}
+
+async function editExpense() {
+    const month = val('#expense', 'input[type="month"]');
+    const updateData = {
+        rent: parseFloat(val('#expense', 'input[placeholder="Rent"]')),
+        electricity: parseFloat(val('#expense', 'input[placeholder="Electricity"]')),
+        teacher_salary: parseFloat(val('#expense', 'input[placeholder="Teacher Salary"]'))
+    };
+    const { error } = await supabase.from('expenses').update(updateData).eq('month_year', month);
+    if (error) alert(error.message); else alert("Expense record updated!");
+}
+/* ==========================================
+   11. TEACHER PORTAL (Admin Side)
+   ========================================== */
+async function addTeacherDetails() {
+    await supabase.from('teacher_details').insert([{
+        id: val('#teacher', 'input[placeholder="Teacher ID"]'),
+        qualification: val('#teacher', 'input[placeholder="Qualification"]'),
+        salary_offered: val('#teacher', 'input[placeholder="Salary Offered"]')
+    }]);
+    alert("Teacher Profile Updated");
+}
+async function fetchTeacher() {
+    const tID = val('#teacher', 'input[placeholder="Teacher ID"]');
+    const { data, error } = await supabase.from('teacher_details').select('*').eq('id', tID).single();
+    
+    if (error) return alert("Teacher ID not found");
+    if (data) {
+        document.querySelector('#teacher input[placeholder="Teacher Name"]').value = data.teacher_name || "";
+        document.querySelector('#teacher input[placeholder="Qualification"]').value = data.qualification;
+        document.querySelector('#teacher input[placeholder="Salary Offered"]').value = data.salary_offered;
+        document.querySelector('#teacher input[placeholder="Subject Taught"]').value = data.subject_taught;
+        alert("Teacher profile loaded!");
+    }
+}
+
+async function editTeacher() {
+    const tID = val('#teacher', 'input[placeholder="Teacher ID"]');
+    const updateData = {
+        qualification: val('#teacher', 'input[placeholder="Qualification"]'),
+        salary_offered: parseFloat(val('#teacher', 'input[placeholder="Salary Offered"]')),
+        subject_taught: val('#teacher', 'input[placeholder="Subject Taught"]')
+    };
+    const { error } = await supabase.from('teacher_details').update(updateData).eq('id', tID);
+    if (error) alert(error.message); else alert("Teacher Profile Updated!");
+}
+/* ==========================================
+   12. STUDENT PORTAL (View Only)
+   ========================================== */
+async function loadStudentPortal() {
+    const { data } = await supabase.from('student_portal_view').select('*').eq('user_id', currentUser.id).single();
+    if (data) {
+        const container = document.querySelector('#student-p .form-grid');
+        container.innerHTML = `<p><b>Name:</b> ${data.full_name}</p><p><b>Pending:</b> ₹${data.total_fees_pending}</p>`;
+    }
+}
+
+/* ==========================================
+   13. GENERATORS (ID Card & Certificate)
+   ========================================== */
+function generateIDCard() {
+    // Logic: Opens a small window with CSS styled as an ID Card and triggers Print
+    const name = val('#students', 'input[placeholder="Full Name"]');
+    const win = window.open('', '', 'width=400,height=600');
+    win.document.write(`<html><body><div style="border:2px solid #000; padding:20px; text-align:center;">
+        <h2>IMS ID CARD</h2><p>Name: ${name}</p></div></body></html>`);
+    win.print();
+}
+
+function generateCertificate() {
+    alert("Generating Certificate for " + val('#students', 'input[placeholder="Full Name"]'));
+    window.print(); // Simple way to print current view as certificate
+}
+
+/* ==========================================
+   14. PERFORMANCE TRACKING
+   ========================================== */
+async function fetchPerformance() {
+    const { data } = await supabase.from('attendance').select('*').eq('user_id', currentUser.id);
+    alert(`Your current attendance record count: ${data.length}`);
+}
+
+/* ==========================================
+   15. NAVIGATION & INIT
+   ========================================== */
+function showSection(id) {
+    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    
+    // Auto-load data based on tab
+    if (id === 'admin') loadDashboard();
+    if (id === 'fee') loadFeeStats();
+    if (id === 'student-p') loadStudentPortal();
+}
+
+// Initial check on load
+document.addEventListener('DOMContentLoaded', async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) currentUser = user;
+});
+    </script>
+</body>
+</html>

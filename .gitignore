@@ -1,0 +1,14 @@
+# OS Metadata
+.DS_Store
+Thumbs.db
+
+# Editing tools
+.vscode/
+.idea/
+
+# Local logs
+*.log
+
+# If you ever use Node.js in the future
+node_modules/
+.env
