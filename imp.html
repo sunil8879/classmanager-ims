@@ -821,7 +821,7 @@ async function handleLogin() {
     const email = document.querySelector('#login .card:last-child input[placeholder="Email Id"]').value;
     const password = document.querySelector('#login .card:last-child input[placeholder="Password"]').value;
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
     if (error) return alert(error.message);
     location.reload(); 
 }
@@ -853,7 +853,7 @@ async function fetchStudentByMobile() {
 
 async function editStudent() {
     const mobile = val('#students', 'input[placeholder="Mobile"]');
-    const { error } = await _db.from('students').update({
+    const { error } = await db.from('students').update({
         full_name: val('#students', 'input[placeholder="Full Name"]'),
         paid_amount: parseFloat(val('#students', 'input[placeholder="Paid Amount"]'))
     }).eq('mobile', mobile);
@@ -926,7 +926,7 @@ async function fetchAttendance() {
         .from('attendance')
         .select('*', { count: 'exact' })
         .eq('month_year', monthYear)
-        .eq('status', 'Present');
+        .eq('status', 'Present')
 .eq('user_id', currentUser.id); 
     
     if (error) alert(error.message);
@@ -1099,7 +1099,7 @@ function showSection(id) {
 
 // Initial check on load
 document.addEventListener('DOMContentLoaded', async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await db.auth.getUser();
     if (user) currentUser = user;
 });
 
