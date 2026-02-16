@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Manager IMS - Welcome</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff; /* White background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        /* --- Tap Screen Overlay --- */
+        #tap-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #7FFFD4, #007bff); /* Aquamarine to Modern Blue */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            cursor: pointer;
+            transition: opacity 0.5s ease;
+        }
+
+        #tap-overlay img {
+            width: 150px; /* Adjust size of tap.png */
+            height: auto;
+            animation: pulse 1.5s infinite;
+        }
+
+        #tap-overlay p {
+            color: white;
+            margin-top: 20px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* --- Video Styling --- */
+        #intro-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures video fills screen like a PWA splash */
+            display: none; /* Hidden until tap */
+        }
+
+        /* --- Animation --- */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Step 1: Human Input Trigger -->
+    <div id="tap-overlay" onclick="startIntro()">
+        <img src="tap.png" alt="Tap to Start">
+        <p>Tap to Enter IMS</p>
+    </div>
+
+    <!-- Step 2: Intro Video -->
+    <video id="intro-video" playsinline>
+        <source src="classmanager.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <script>
+        const video = document.getElementById('intro-video');
+        const overlay = document.getElementById('tap-overlay');
+
+        function startIntro() {
+            // Hide overlay
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 500);
+
+            // Show and Play Video
+            video.style.display = 'block';
+            video.play();
+        }
+
+        // Step 3: Redirect on Video End
+        video.onended = function() {
+            window.location.href = "imp.html";
+        };
+
+        // Fallback: If video fails to load, allow skip
+        video.onerror = function() {
+            console.error("Video failed to load.");
+            window.location.href = "imp.html";
+        };
+    </script>
+
+    <!-- Register Service Worker for PWA -->
+    <script>
+   if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+    .then(() => console.log("IMS Service Worker Registered"))
+    .catch(err => console.log("Service Worker Failed", err));
+}
+    </script>
+</body>
+</html>
