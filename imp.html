@@ -772,10 +772,65 @@ input:focus {
 </section>
 
 <!-- 14. CERTIFICATE GENERATOR -->
+<!-- 14. CERTIFICATE GENERATOR -->
 <section id="cert-gen" class="content-section">
     <div class="card">
-        <h3>Certificate Generator</h3>
-        <button class="btn-add" onclick="generateCertificate()">Generate Completion Certificate</button>
+        <h3><i class="fas fa-certificate"></i> Professional Certificate Generator</h3>
+        <div class="form-grid">
+            <input type="text" id="cert-fetch-mobile" placeholder="Enter Student Mobile">
+            <button class="btn-fetch" onclick="generateCertificate()">Generate Certificate</button>
+        </div>
+
+        <hr style="margin: 30px 0;">
+
+        <!-- Certificate Preview Area -->
+        <div id="cert-preview-area" style="display: none; justify-content: center;">
+            <div id="certificate-visual" style="width: 800px; height: 600px; background: white; border: 15px double #007bff; padding: 40px; position: relative; font-family: 'Poppins', sans-serif; box-shadow: 0 15px 40px rgba(0,0,0,0.2); background-image: radial-gradient(#7FFFD4 0.5px, transparent 0.5px); background-size: 20px 20px;">
+                
+                <!-- Logo Provision (Top Right) -->
+                <div style="position: absolute; top: 30px; right: 30px; width: 80px; height: 80px;">
+                    <img src="classmanager.png" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;">
+                </div>
+
+                <!-- Certificate Content -->
+                <div style="text-align: center; margin-top: 20px;">
+                    <h1 style="color: #007bff; font-size: 3.5rem; margin-bottom: 0; font-weight: 800;">CERTIFICATE</h1>
+                    <p style="letter-spacing: 5px; color: #333; font-weight: 600;">OF COMPLETION</p>
+                    
+                    <div style="margin-top: 40px;">
+                        <p style="font-size: 1.2rem; color: #666;">This is to certify that</p>
+                        <h2 id="cert-name" style="font-size: 2.5rem; color: #ff0000; border-bottom: 2px solid #ccc; display: inline-block; padding: 0 30px; margin: 10px 0;">Student Name</h2>
+                        <p style="font-size: 1.1rem; color: #666; margin-top: 15px;">
+                            Roll Number: <b id="cert-roll">---</b> | Certificate No: <b id="cert-number" style="color: #007bff;">---</b>
+                        </p>
+                    </div>
+
+                    <div style="margin-top: 30px; line-height: 1.8;">
+                        <p style="font-size: 1.3rem; color: #333;">
+                            has <b>Successfully Completed the Course</b> in <br>
+                            <span id="cert-course" style="font-size: 1.8rem; color: #007bff; font-weight: 700;">Course Name</span>
+                        </p>
+                        <p style="font-size: 1.1rem;">Course Duration: <span id="cert-duration">---</span></p>
+                    </div>
+
+                    <!-- Signatory Section -->
+                    <div style="margin-top: 60px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 50px;">
+                        <div style="text-align: center;">
+                            <p style="margin: 0; font-weight: bold; border-top: 1px solid #333; padding-top: 5px;" id="cert-inst-branch">Main Branch</p>
+                            <small>Institute Branch</small>
+                        </div>
+                        <div style="text-align: center;">
+                            <p style="margin: 0; font-family: 'Brush Script MT', cursive; font-size: 1.8rem; color: #333;" id="cert-signatory">Admin Name</p>
+                            <p style="margin: 0; font-weight: bold; border-top: 1px solid #333; padding-top: 5px;">Authorised Signatory</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="cert-print-btn" class="btn-add" style="display: none; margin: 30px auto;" onclick="printCertificate()">
+            <i class="fas fa-print"></i> Print Certificate
+        </button>
     </div>
 </section>
 
@@ -1247,9 +1302,72 @@ function printIDCard() {
     printWindow.document.close();
 }
 
-function generateCertificate() {
-    alert("Generating Certificate for " + val('#students', 'input[placeholder="Full Name"]'));
-    window.print(); // Simple way to print current view as certificate
+/* ==========================================
+   CERTIFICATE GENERATION LOGIC
+   ========================================== */
+async function generateCertificate() {
+    const mobile = document.getElementById('cert-fetch-mobile').value;
+    if(!mobile) return alert("Please enter mobile number");
+
+    // 1. Fetch Student Data
+    const { data: student, error: err1 } = await db.from('students').select('*').eq('mobile', mobile).single();
+    if (err1 || !student) return alert("Student not found.");
+
+    // 2. Fetch Extended Details (Roll No & End Date)
+    const { data: details } = await db.from('student_details').select('*').eq('student_id', student.id).single();
+    if (!details) return alert("ID card details not found. Please save student management details first.");
+
+    // 3. Fetch Institute Settings
+    const { data: settings } = await db.from('institute_settings').select('*').limit(1).single();
+
+    // 4. Generate or Fetch unique Certificate Number
+    let certNo;
+    const { data: existingCert } = await db.from('certificates').select('cert_number').eq('student_id', student.id).single();
+    
+    if (existingCert) {
+        certNo = existingCert.cert_number;
+    } else {
+        const randomID = Math.floor(1000 + Math.random() * 9000);
+        certNo = `IMS/CERT/${new Date().getFullYear()}/${randomID}`;
+        // Save it so it never changes for this student
+        await db.from('certificates').insert([{ student_id: student.id, cert_number: certNo }]);
+    }
+
+    // 5. Populate Template
+    document.getElementById('cert-name').innerText = student.full_name;
+    document.getElementById('cert-roll').innerText = details.roll_number;
+    document.getElementById('cert-number').innerText = certNo;
+    document.getElementById('cert-course').innerText = student.course;
+    
+    // Duration Logic
+    const duration = `${student.admission_date} to ${details.course_end_date || 'Ongoing'}`;
+    document.getElementById('cert-duration').innerText = duration;
+    
+    document.getElementById('cert-inst-branch').innerText = settings.branch_name;
+    document.getElementById('cert-signatory').innerText = settings.authorised_signatory;
+
+    // 6. Show Preview
+    document.getElementById('cert-preview-area').style.display = 'flex';
+    document.getElementById('cert-print-btn').style.display = 'block';
+}
+
+function printCertificate() {
+    const content = document.getElementById('certificate-visual').outerHTML;
+    const win = window.open('', '_blank', 'width=1000,height=800');
+    win.document.write(`
+        <html>
+            <head>
+                <title>IMS Certificate</title>
+                <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+                <style>
+                    body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+                    @media print { @page { size: landscape; margin: 0; } }
+                </style>
+            </head>
+            <body onload="window.print(); window.close();">${content}</body>
+        </html>
+    `);
+    win.document.close();
 }
 
 /* ==========================================
