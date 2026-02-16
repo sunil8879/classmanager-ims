@@ -712,11 +712,57 @@ input:focus {
 
 
 <!-- 13. ID CARD GENERATOR -->
+<!-- 13. ID CARD GENERATOR -->
 <section id="id-gen" class="content-section">
     <div class="card">
-        <h3>ID Card Generator</h3>
-        <p>Enter Student Mobile to fetch data first.</p>
-        <button class="btn-add" onclick="generateIDCard()">Generate & Print ID Card</button>
+        <h3><i class="fas fa-id-card"></i> ID Card Generator</h3>
+        <p>Enter Student Mobile Number to generate the card:</p>
+        
+        <div class="form-grid">
+            <input type="text" id="id-fetch-mobile" placeholder="Student Mobile Number">
+            <button class="btn-fetch" onclick="generateIDCard()">Generate & Preview</button>
+        </div>
+
+        <hr style="margin: 20px 0;">
+
+        <!-- ID Card Visual Preview (Hidden by default) -->
+        <div id="id-card-preview-area" style="display: none; justify-content: center; margin-top: 20px;">
+            <div id="id-card-visual" style="width: 350px; height: 500px; background: white; border: 2px solid #007bff; border-radius: 15px; position: relative; font-family: Arial; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden;">
+                
+                <!-- Header -->
+                <div style="background: #007bff; color: white; padding: 15px; text-align: center;">
+                    <h2 id="card-inst-name" style="margin: 0; font-size: 1.2rem;">INSTITUTE NAME</h2>
+                    <small id="card-branch-name">Branch Name</small>
+                </div>
+
+                <!-- Body -->
+                <div style="padding: 20px; text-align: center;">
+                    <div style="width: 100px; height: 100px; background: #eee; margin: 0 auto 15px; border: 2px solid #7FFFD4; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #ccc;">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h2 id="card-student-name" style="color: #333; margin: 5px 0;">Student Name</h2>
+                    <p style="margin: 2px 0; color: #666;">Roll No: <b id="card-roll">---</b></p>
+                    
+                    <div style="text-align: left; margin-top: 20px; font-size: 0.9rem; line-height: 1.6;">
+                        <p><b>Course:</b> <span id="card-course">---</span></p>
+                        <p><b>Batch:</b> <span id="card-batch">---</span></p>
+                        <p><b>Duration:</b> <span id="card-start">---</span> to <span id="card-end">---</span></p>
+                    </div>
+                </div>
+
+                <!-- Footer / Signatory -->
+                <div style="position: absolute; bottom: 0; width: 100%; border-top: 1px dashed #ccc; padding: 15px; text-align: center;">
+                    <div style="margin-bottom: 5px; font-family: 'Dancing Script', cursive; font-size: 1.2rem; color: #007bff;">
+                       <span id="card-sign-name">Admin</span>
+                    </div>
+                    <small style="color: #999;">Authorised Signatory</small>
+                </div>
+            </div>
+        </div>
+        
+        <button id="id-print-btn" class="btn-add" style="display: none; margin: 20px auto;" onclick="printIDCard()">
+            <i class="fas fa-print"></i> Print ID Card
+        </button>
     </div>
 </section>
 
@@ -1102,13 +1148,58 @@ async function loadStudentPortal() {
 /* ==========================================
    13. GENERATORS (ID Card & Certificate)
    ========================================== */
-function generateIDCard() {
-    // Logic: Opens a small window with CSS styled as an ID Card and triggers Print
-    const name = val('#students', 'input[placeholder="Full Name"]');
-    const win = window.open('', '', 'width=400,height=600');
-    win.document.write(`<html><body><div style="border:2px solid #000; padding:20px; text-align:center;">
-        <h2>IMS ID CARD</h2><p>Name: ${name}</p></div></body></html>`);
-    win.print();
+/* ==========================================
+   ID CARD GENERATION LOGIC
+   ========================================== */
+async function generateIDCard() {
+    const mobile = document.getElementById('id-fetch-mobile').value;
+    if(!mobile) return alert("Please enter a mobile number");
+
+    // 1. Fetch Student Basic Data
+    const { data: student, error: err1 } = await db.from('students').select('*').eq('mobile', mobile).single();
+    if (err1 || !student) return alert("Student not found in admission records.");
+
+    // 2. Fetch Student Extended Data (Roll No, End Date)
+    const { data: details, error: err2 } = await db.from('student_details').select('*').eq('student_id', student.id).single();
+    
+    // 3. Fetch Institute Settings
+    const { data: settings } = await db.from('institute_settings').select('*').limit(1).single();
+
+    // 4. Update the Visual Card
+    document.getElementById('card-inst-name').innerText = settings.institute_name;
+    document.getElementById('card-branch-name').innerText = settings.branch_name;
+    document.getElementById('card-student-name').innerText = student.full_name;
+    document.getElementById('card-course').innerText = student.course;
+    document.getElementById('card-batch').innerText = student.batch_time || "N/A";
+    document.getElementById('card-roll').innerText = details ? details.roll_number : "---";
+    document.getElementById('card-start').innerText = student.admission_date;
+    document.getElementById('card-end').innerText = details ? details.course_end_date : "---";
+    document.getElementById('card-sign-name').innerText = settings.authorised_signatory;
+
+    // 5. Show the card area
+    document.getElementById('id-card-preview-area').style.display = 'flex';
+    document.getElementById('id-print-btn').style.display = 'block';
+}
+
+function printIDCard() {
+    const cardContent = document.getElementById('id-card-visual').outerHTML;
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Print ID Card</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+                <style>
+                    body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                    @media print { .no-print { display: none; } }
+                </style>
+            </head>
+            <body onload="window.print(); window.close();">
+                ${cardContent}
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
 
 function generateCertificate() {
