@@ -918,13 +918,13 @@ async function handleLogin() {
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
 async function addStudent() {
-    // 1. Collect Data using IDs (much safer than placeholders)
+    // 1. Collect Data using the IDs from your HTML
     const stuData = {
         full_name: document.getElementById('stu-name').value,
         mobile: document.getElementById('stu-mobile').value,
         standard: document.getElementById('stu-standard').value,
         course: document.getElementById('stu-course').value,
-        batch_time: document.getElementById('stu-batch').value,
+        batch_time: document.getElementById('stu-batch').value, // This is the field that caused the error
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
         admission_date: document.getElementById('stu-date').value
@@ -938,7 +938,7 @@ async function addStudent() {
         return alert("Error saving basic info: " + stuError.message);
     }
 
-    // 3. Save to 'student_details' table (For ID Card)
+    // 3. Save to 'student_details' table for ID Card
     if (newStu && newStu[0]) {
         const detailData = {
             student_id: newStu[0].id,
@@ -955,7 +955,6 @@ async function addStudent() {
         }
     }
 }
-
 async function fetchStudentByMobile() {
     const mobile = val('#students', 'input[placeholder="Mobile"]');
     const { data, error } = await db.from('students').select('*').eq('mobile', mobile).single();
