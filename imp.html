@@ -811,16 +811,39 @@ async function handleSignup() {
     const email = val('#login', 'input[placeholder="Email Id"]');
     const password = val('#login', 'input[placeholder="Password"]');
     const fullName = val('#login', 'input[placeholder="Full Name"]');
-    const role = document.querySelector('#login select').value;
     const mobile = val('#login', 'input[placeholder="Mobile Number"]');
+    const address = val('#login', 'input[placeholder="Address"]');
 
-    const { data, error } = await db.auth.signUp({ email, password });
-    if (error) return alert(error.message);
+    // FIX: Get only the role name, remove "Select Status: "
+    const roleDropdown = document.querySelector('#login select');
+    const role = roleDropdown.options[roleDropdown.selectedIndex].text.replace('Select Status: ', '').trim();
 
-    await db.from('profiles').insert([{ 
-        id: data.user.id, full_name: fullName, email, role, mobile_number: mobile 
-    }]);
-    alert("Signup Successful! Verify your email.");
+    // 1. Create the Auth User
+    const { data, error } = await db.auth.signUp({ 
+        email: email, 
+        password: password 
+    });
+
+    if (error) return alert("Auth Error: " + error.message);
+
+    // 2. Insert into Profiles Table
+    if (data.user) {
+        const { error: profileError } = await db.from('profiles').insert([{ 
+            id: data.user.id, 
+            full_name: fullName, 
+            email: email, 
+            role: role, 
+            mobile_number: mobile,
+            address: address
+        }]);
+
+        if (profileError) {
+            console.error("Profile Table Error:", profileError);
+            alert("Auth worked, but Profile Table failed: " + profileError.message);
+        } else {
+            alert("Signup Successful! You can now login.");
+        }
+    }
 }
 
 async function handleLogin() {
