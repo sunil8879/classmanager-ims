@@ -1225,6 +1225,7 @@ function generateRollNow() {
 
 // 4. Validation & Add Student
 async function addStudent() {
+    // 1. Get Values from UI
     const admissionDate = document.getElementById('stu-date').value;
     const endDate = document.getElementById('stu-end-date').value;
     const mobile = document.getElementById('stu-mobile').value;
@@ -1233,7 +1234,7 @@ async function addStudent() {
     const roll = document.getElementById('stu-roll').value;
     const today = new Date().setHours(0,0,0,0);
 
-    // Strict Validations
+    // 2. Strict Validations
     if (!admissionDate || new Date(admissionDate).setHours(0,0,0,0) < today) 
         return alert("Error: Admission Date cannot be in the past.");
     if (!endDate || new Date(endDate).setHours(0,0,0,0) < today) 
@@ -1241,9 +1242,10 @@ async function addStudent() {
     if (mobile.length !== 10 || fMobile.length !== 10 || mMobile.length !== 10)
         return alert("Error: All Mobile Numbers must be exactly 10 digits.");
     if (!roll) 
-        return alert("Error: Please generate a Roll Number first.");
+        return alert("Error: Please click 'Gen' to create a Roll Number first.");
 
-const stuData = {
+    // 3. Prepare the Data Object (NO NULLS ALLOWED)
+    const stuData = {
         admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
         mobile: mobile,
@@ -1254,23 +1256,31 @@ const stuData = {
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
-        pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0 // ADD THIS LINE
+        pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
+        roll_number: roll,                     // SENDS ROLL NUMBER TO STUDENTS TABLE
+        user_id: currentUser ? currentUser.id : null // SENDS LOGGED-IN USER ID
     };
 
+    // 4. Save to 'students' table
     const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
 
-    if (stuError) return alert("Save Error: " + stuError.message);
+    if (stuError) {
+        console.error(stuError);
+        return alert("Save Error: " + stuError.message);
+    }
 
+    // 5. Save to 'student_details' table
     if (newStu && newStu[0]) {
         const { error: detailError } = await db.from('student_details').insert([{
             student_id: newStu[0].id,
-            roll_number: roll,
+            roll_number: roll,                // SENDS ROLL NUMBER HERE TOO
             course_end_date: endDate
         }]);
         
-        if (detailError) alert("Error saving roll info: " + detailError.message);
-        else {
-            alert("Success! Student registered with Roll No: " + roll);
+        if (detailError) {
+            alert("Error in secondary details: " + detailError.message);
+        } else {
+            alert("SUCCESS! Student " + stuData.full_name + " saved with Roll No: " + roll);
             clearStudentForm();
         }
     }
