@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Support - Class Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #fff; display: flex; flex-direction: column; min-height: 100vh; }
+        .hero { background: #7FFFD4; padding: 60px 20px; text-align: center; border-bottom: 8px solid #ff0000; }
+        h1 { color: #ff0000; margin: 0; font-size: 3rem; text-transform: uppercase; }
+        .container { display: flex; flex: 1; justify-content: center; align-items: center; gap: 40px; padding: 40px; flex-wrap: wrap; }
+        .contact-card { background: white; border: 3px solid #7FFFD4; border-radius: 20px; width: 350px; padding: 40px; text-align: center; transition: 0.3s; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .contact-card:hover { transform: translateY(-10px); box-shadow: 0 15px 30px rgba(255, 0, 0, 0.2); border-color: #ff0000; }
+        .icon-box { font-size: 4rem; margin-bottom: 20px; }
+        .email-icon { color: #ff0000; }
+        .whatsapp-icon { color: #25D366; } /* WhatsApp brand green for the icon only */
+        h2 { color: #333; }
+        p { color: #666; margin-bottom: 30px; line-height: 1.5; }
+        .btn { display: inline-block; text-decoration: none; padding: 15px 30px; border-radius: 50px; font-weight: bold; font-size: 1.1rem; transition: 0.3s; }
+        .btn-mail { background: #ff0000; color: white; }
+        .btn-whatsapp { background: #7FFFD4; color: #000; }
+        .btn:hover { opacity: 0.8; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>GET IN TOUCH</h1>
+        <p>We are here to help your institute grow.</p>
+    </div>
+    <div class="container">
+        <!-- EMAIL CARD -->
+        <div class="contact-card">
+            <div class="icon-box email-icon"><i class="fas fa-envelope-open-text"></i></div>
+            <h2>Official Email</h2>
+            <p>Send us your detailed queries, feature requests, or partnership proposals.</p>
+            <a href="mailto:sv@nexusai-group.in" class="btn btn-mail">Send Email</a>
+        </div>
+
+        <!-- WHATSAPP CARD -->
+        <div class="contact-card">
+            <div class="icon-box whatsapp-icon"><i class="fab fa-whatsapp"></i></div>
+            <h2>Quick Support</h2>
+            <p>Chat with our technical team instantly for quick resolutions and setup help.</p>
+            <a href="https://wa.me/919136516298" class="btn btn-whatsapp">Chat Now</a>
+        </div>
+    </div>
+</body>
+</html>

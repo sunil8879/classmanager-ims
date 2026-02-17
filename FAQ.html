@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FAQs - Class Manager</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; background: #fff; margin: 0; padding: 50px; }
+        .header { text-align: center; margin-bottom: 50px; }
+        h1 { color: #ff0000; font-size: 2.5rem; }
+        .faq-container { max-width: 800px; margin: 0 auto; }
+        details { background: #f9f9f9; border: 2px solid #7FFFD4; border-radius: 10px; margin-bottom: 15px; padding: 15px; cursor: pointer; transition: 0.3s; }
+        details[open] { border-color: #ff0000; background: #fff; }
+        summary { font-weight: bold; font-size: 1.2rem; color: #333; outline: none; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+        summary::after { content: '+'; color: #ff0000; font-size: 1.5rem; }
+        details[open] summary::after { content: '-'; }
+        .answer { padding-top: 15px; line-height: 1.6; color: #555; border-top: 1px solid #7FFFD4; margin-top: 10px; }
+        .highlight { color: #ff0000; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FREQUENTLY ASKED QUESTIONS</h1>
+        <p>Everything you need to know about Class Manager IMS.</p>
+    </div>
+
+    <div class="faq-container">
+        <details>
+            <summary>Is Class Manager a mobile app or a website?</summary>
+            <div class="answer">
+                Class Manager is a <span class="highlight">Progressive Web App (PWA)</span>. This means it works like a website but can be installed on your phone or desktop like a regular app without using the Play Store. It is lightweight and fast.
+            </div>
+        </details>
+
+        <details>
+            <summary>How does the automated Fee Reminder work?</summary>
+            <div class="answer">
+                Our system tracks the "Pending Amount" in the Fee Management section. You can simply go to the <span class="highlight">Fee Reminder System</span>, and with one click, it opens WhatsApp with a pre-filled message for the specific student.
+            </div>
+        </details>
+
+        <details>
+            <summary>Can I generate ID Cards for all students at once?</summary>
+            <div class="answer">
+                Yes! By entering the student's mobile number and uploading a photo, the <span class="highlight">ID Card Generator</span> creates a professional vertical ID card instantly which you can print or save as a PDF.
+            </div>
+        </details>
+
+        <details>
+            <summary>Is my institute data secure?</summary>
+            <div class="answer">
+                Absolutely. We use <span class="highlight">Supabase (PostgreSQL)</span> with enterprise-grade encryption. Each institute's data is isolated, ensuring that your financial and student records are private and visible only to you.
+            </div>
+        </details>
+
+        <details>
+            <summary>What is the 'Teacher Portal' for?</summary>
+            <div class="answer">
+                The Teacher Portal allows you to manage your staff records, including their qualifications, subjects taught, and salary details. It helps you keep track of which teacher is assigned to which batch.
+            </div>
+        </details>
+
+        <details>
+            <summary>Can students see their own marks and attendance?</summary>
+            <div class="answer">
+                Yes. Students can use the <span class="highlight">Student Portal</span> by entering their unique Roll Number. They can view their attendance percentage, fee balance, and performance reports for the month.
+            </div>
+        </details>
+    </div>
+</body>
+</html>

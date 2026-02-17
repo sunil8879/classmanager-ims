@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Plans - Class Manager IMS</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: 'Poppins', sans-serif; margin: 0; background: #f4f4f4; text-align: center; padding-bottom: 80px; }
+        
+        .pricing-header {
+            background: #ff0000;
+            color: white;
+            padding: 80px 20px;
+            clip-path: polygon(0 0, 100% 0, 100% 85%, 0% 100%);
+        }
+        .pricing-header h1 { font-size: 3rem; margin: 0; }
+        
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-top: -50px;
+            padding: 0 5%;
+            flex-wrap: wrap;
+        }
+
+        .price-card {
+            background: white;
+            border-radius: 20px;
+            width: 320px;
+            padding: 40px 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-top: 15px solid #7FFFD4;
+            transition: 0.3s;
+        }
+
+        .price-card.popular {
+            border-top-color: #ff0000;
+            transform: scale(1.05);
+            z-index: 2;
+        }
+
+        .price-card:hover { transform: translateY(-10px); }
+
+        .price-name { font-size: 1.5rem; font-weight: bold; color: #333; margin-bottom: 10px; }
+        .currency { font-size: 1.2rem; vertical-align: top; color: #ff0000; }
+        .amount { font-size: 3.5rem; font-weight: 800; color: #ff0000; }
+        .duration { color: #888; }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .feature-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+            color: #555;
+            font-size: 0.95rem;
+        }
+        .feature-list i { color: #27ae60; margin-right: 10px; }
+        .feature-list i.fa-times { color: #ccc; }
+
+        .buy-btn {
+            display: block;
+            background: #7FFFD4;
+            color: #333;
+            text-decoration: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .popular .buy-btn { background: #ff0000; color: white; }
+        .buy-btn:hover { letter-spacing: 2px; opacity: 0.9; }
+
+        .trust-badges {
+            margin-top: 60px;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <section class="pricing-header">
+        <h1>SIMPLE, HONEST PRICING</h1>
+        <p>No monthly rent. Pay once, use forever.</p>
+    </section>
+
+    <div class="container">
+        
+        <!-- Starter Plan -->
+        <div class="price-card">
+            <div class="price-name">STARTER</div>
+            <div class="price-value">
+                <span class="currency">₹</span>
+                <span class="amount">2,999</span>
+                <span class="duration">/Life</span>
+            </div>
+            <ul class="feature-list">
+                <li><i class="fas fa-check"></i> 50 Students Max</li>
+                <li><i class="fas fa-check"></i> Fee Management</li>
+                <li><i class="fas fa-check"></i> Attendance Tracker</li>
+                <li><i class="fas fa-times"></i> ID Card Generator</li>
+                <li><i class="fas fa-times"></i> Performance Analytics</li>
+            </ul>
+            <a href="#" class="buy-btn">GET STARTED</a>
+        </div>
+
+        <!-- Professional Plan -->
+        <div class="price-card popular">
+            <div style="color: #ff0000; font-weight: bold; font-size: 0.8rem; margin-bottom: 5px;">MOST POPULAR</div>
+            <div class="price-name">PROFESSIONAL</div>
+            <div class="price-value">
+                <span class="currency">₹</span>
+                <span class="amount">7,999</span>
+                <span class="duration">/Life</span>
+            </div>
+            <ul class="feature-list">
+                <li><i class="fas fa-check"></i> Unlimited Students</li>
+                <li><i class="fas fa-check"></i> Auto Fee Reminders</li>
+                <li><i class="fas fa-check"></i> ID Card Generator</li>
+                <li><i class="fas fa-check"></i> Certificate Generator</li>
+                <li><i class="fas fa-check"></i> Expense Tracking</li>
+            </ul>
+            <a href="#" class="buy-btn">BUY NOW</a>
+        </div>
+
+        <!-- Enterprise Plan -->
+        <div class="price-card">
+            <div class="price-name">ENTERPRISE</div>
+            <div class="price-value">
+                <span class="currency">₹</span>
+                <span class="amount">24,999</span>
+                <span class="duration">/Life</span>
+            </div>
+            <ul class="feature-list">
+                <li><i class="fas fa-check"></i> Your Own Logo/Branding</li>
+                <li><i class="fas fa-check"></i> Student & Teacher Portals</li>
+                <li><i class="fas fa-check"></i> Priority Setup Help</li>
+                <li><i class="fas fa-check"></i> Data Backup Support</li>
+                <li><i class="fas fa-check"></i> Personalized Training</li>
+            </ul>
+            <a href="#" class="buy-btn">CONTACT US</a>
+        </div>
+
+    </div>
+
+    <div class="trust-badges">
+        <div><i class="fas fa-shield-halved"></i> 100% Secure Data</div>
+        <div><i class="fas fa-indian-rupee-sign"></i> No Hidden Charges</div>
+        <div><i class="fas fa-heart"></i> Made in India</div>
+    </div>
+
+</body>
+</html>

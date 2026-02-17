@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features - Class Manager IMS</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --red: #ff0000;
+            --aqua: #7FFFD4;
+            --white: #ffffff;
+            --dark: #333;
+            --light-gray: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--white);
+            color: var(--dark);
+        }
+
+        /* Header Section */
+        header {
+            background: linear-gradient(135deg, var(--white), var(--aqua));
+            padding: 80px 5%;
+            text-align: center;
+            border-bottom: 8px solid var(--red);
+        }
+
+        header h1 {
+            font-size: 3.5rem;
+            color: var(--red);
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin: 15px auto 0;
+            color: #555;
+        }
+
+        /* Features Grid */
+        .features-section {
+            padding: 60px 10%;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .feature-card {
+            background: var(--white);
+            border: 2px solid var(--aqua);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--red);
+            box-shadow: 0 15px 30px rgba(255, 0, 0, 0.1);
+        }
+
+        .feature-card i {
+            font-size: 3.5rem;
+            color: var(--red);
+            background: var(--aqua);
+            width: 90px;
+            height: 90px;
+            line-height: 90px;
+            border-radius: 50%;
+            margin-bottom: 25px;
+            display: inline-block;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            color: var(--dark);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .feature-card p {
+            font-size: 0.95rem;
+            color: #666;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* Badge for new features */
+        .badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--red);
+            color: white;
+            padding: 5px 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            border-radius: 50px;
+        }
+
+        /* Call to Action */
+        .cta-footer {
+            background: var(--dark);
+            color: var(--white);
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .cta-footer h2 {
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+        }
+
+        .btn-red {
+            background: var(--red);
+            color: var(--white);
+            text-decoration: none;
+            padding: 18px 45px;
+            border-radius: 50px;
+            font-weight: 800;
+            font-size: 1.2rem;
+            transition: 0.3s;
+            display: inline-block;
+        }
+
+        .btn-red:hover {
+            background: var(--aqua);
+            color: var(--dark);
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            header h1 { font-size: 2.2rem; }
+            .features-section { padding: 40px 5%; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>12+ Game-Changing Features</h1>
+        <p>Everything you need to manage, track, and scale your coaching institute in one beautiful platform.</p>
+    </header>
+
+    <section class="features-section">
+        <div class="features-grid">
+            
+            <!-- Feature 1: Student Management -->
+            <div class="feature-card">
+                <i class="fas fa-user-graduate"></i>
+                <h3>Student 360° Records</h3>
+                <p>Digital admission forms, roll number generation, and secure cloud storage for student documents and profiles.</p>
+            </div>
+
+            <!-- Feature 2: Fee Tracking -->
+            <div class="feature-card">
+                <i class="fas fa-money-check-alt"></i>
+                <h3>Smart Fee Engine</h3>
+                <p>Track total fees, paid amounts, and pending balances automatically. Say goodbye to manual ledger notebooks.</p>
+            </div>
+
+            <!-- Feature 3: WhatsApp Reminders -->
+            <div class="feature-card">
+                <i class="fab fa-whatsapp"></i>
+                <h3>One-Click WhatsApp</h3>
+                <p>Send professional fee reminders to parents instantly. Pre-filled messages ensure you get paid on time without the awkward calls.</p>
+            </div>
+
+            <!-- Feature 4: Batch Management -->
+            <div class="feature-card">
+                <i class="fas fa-layer-group"></i>
+                <h3>Batch & Time Slots</h3>
+                <p>Organize students into specific batches with assigned timings, subjects, and allotted teacher seats.</p>
+            </div>
+
+            <!-- Feature 5: Attendance -->
+            <div class="feature-card">
+                <i class="fas fa-clipboard-user"></i>
+                <h3>Digital Attendance</h3>
+                <p>Mark daily attendance and view monthly statistics. Identify irregular students with automated present/absent logs.</p>
+            </div>
+
+            <!-- Feature 6: ID Card Generator -->
+            <div class="feature-card">
+                <span class="badge">POPULAR</span>
+                <i class="fas fa-id-card"></i>
+                <h3>ID Card Studio</h3>
+                <p>Generate professional, vertical identity cards for students. Just upload a photo, and the system handles the design.</p>
+            </div>
+
+            <!-- Feature 7: Certificate Generator -->
+            <div class="feature-card">
+                <i class="fas fa-certificate"></i>
+                <h3>Course Certificates</h3>
+                <p>Create official completion certificates for your graduates with unique serial numbers and institute branding.</p>
+            </div>
+
+            <!-- Feature 8: Expense Tracking -->
+            <div class="feature-card">
+                <i class="fas fa-wallet"></i>
+                <h3>Expense Manager</h3>
+                <p>Monitor your rent, electricity, teacher salaries, and marketing costs to calculate your net monthly profit.</p>
+            </div>
+
+            <!-- Feature 9: Lead Management -->
+            <div class="feature-card">
+                <i class="fas fa-filter-circle-dollar"></i>
+                <h3>Enquiry Funnel</h3>
+                <p>Manage new leads and visits. Track follow-ups and convert potential enquiries into confirmed admissions.</p>
+            </div>
+
+            <!-- Feature 10: Performance Tracking -->
+            <div class="feature-card">
+                <i class="fas fa-chart-line"></i>
+                <h3>Exam Performance</h3>
+                <p>Record exam marks and track the academic growth of every student with percentage and grading analytics.</p>
+            </div>
+
+            <!-- Feature 11: Teacher Portal -->
+            <div class="feature-card">
+                <i class="fas fa-chalkboard-teacher"></i>
+                <h3>Teacher Directory</h3>
+                <p>Maintain staff records, qualifications, subjects taught, and payroll details in a dedicated database.</p>
+            </div>
+
+            <!-- Feature 12: PWA Installation -->
+            <div class="feature-card">
+                <span class="badge">ADVANCED</span>
+                <i class="fas fa-mobile-alt"></i>
+                <h3>Installable PWA</h3>
+                <p>Works on Mobile and Desktop without Play Store. Lightweight, fast-loading, and accessible anywhere, anytime.</p>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="cta-footer">
+        <h2>Ready to go digital?</h2>
+        <p>Save 10+ hours of administrative work every single week.</p>
+        <br>
+        <a href="pricing.html" class="btn-red">CHOOSE YOUR PLAN</a>
+    </section>
+
+</body>
+</html>
