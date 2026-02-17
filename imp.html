@@ -2348,6 +2348,8 @@ async function fetchStudentPortalData() {
 
         if (stuErr || !student) throw new Error("Student Roll Number not found.");
 
+if (monthVal < student.admission_date.substring(0, 7)) return alert("NOT AVAILABLE: Selected month is before the student's date of joining.");
+
         // 2. Fetch Attendance Data for the selected month
         const { data: attendance } = await db
             .from('attendance')
