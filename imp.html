@@ -451,43 +451,71 @@ input:focus {
             </section>
 
           <!-- 1. LOGIN SYSTEM -->
+
 <section id="login" class="content-section">
     <div style="display: flex; gap: 40px; flex-wrap: wrap;">
         <!-- Signup -->
-        <div class="card" style="flex: 1; min-width: 300px;">
+        <div class="card" style="flex: 1; min-width: 320px;">
             <h3>Signup</h3>
-            <div class="form-grid" style="grid-template-columns: 1fr;">
-                <input type="text" placeholder="Full Name">
-                <select>
-                    <option>Select Status: Owner</option>
+            <div class="form-grid" style="grid-template-columns: 1fr;" id="signup-form">
+                <input type="text" id="sig-name" placeholder="Full Name">
+                <select id="sig-role">
+                    <option value="">Select Status</option>
+                    <option>Owner</option>
                     <option>Teacher</option>
                     <option>Student</option>
                 </select>
-                <input type="email" placeholder="Email Id">
-                <input type="password" placeholder="Password">
-                <input type="text" placeholder="Address">
-                <input type="text" placeholder="Mobile Number">
-                <button class="btn-fetch" onclick="handleSignup()">Sign up</button>
+                <input type="email" id="sig-email" placeholder="Email Id">
+                
+                <div style="position: relative;">
+                    <input type="password" id="sig-pass" placeholder="Password (Min 6 chars)" style="width: 100%;">
+                    <i class="fas fa-eye" onclick="togglePass('sig-pass')" style="position: absolute; right: 10px; top: 12px; cursor: pointer; color: #666;"></i>
+                </div>
+
+                <select id="sig-state">
+                    <option value="">Select State / UT</option>
+                    <optgroup label="States">
+                        <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option><option>Bihar</option><option>Chhattisgarh</option><option>Goa</option><option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option><option>Jharkhand</option><option>Karnataka</option><option>Kerala</option><option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option><option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option><option>Odisha</option><option>Punjab</option><option>Rajasthan</option><option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option><option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option><option>West Bengal</option>
+                    </optgroup>
+                    <optgroup label="Union Territories">
+                        <option>Andaman and Nicobar Islands</option><option>Chandigarh</option><option>Dadra and Nagar Haveli and Daman and Diu</option><option>Delhi</option><option>Jammu and Kashmir</option><option>Ladakh</option><option>Lakshadweep</option><option>Puducherry</option>
+                    </optgroup>
+                </select>
+
+                <input type="text" id="sig-mobile" placeholder="10-Digit Mobile Number" maxlength="10">
+                
+                <div class="button-row">
+                    <button class="btn-fetch" onclick="handleSignup()">Sign up</button>
+                    <button class="btn-edit" style="background:#666;" onclick="clearForm('signup-form')">Clear</button>
+                </div>
             </div>
         </div>
+
         <!-- Login -->
-        <div class="card" style="flex: 1; min-width: 300px;">
+        <div class="card" style="flex: 1; min-width: 320px;">
             <h3>Login</h3>
-            <div class="form-grid" style="grid-template-columns: 1fr;">
-                <select>
-                    <option>Select Status: Owner</option>
+            <div class="form-grid" style="grid-template-columns: 1fr;" id="login-form">
+                <select id="log-role">
+                    <option value="">Select Status</option>
+                    <option>Owner</option>
                     <option>Teacher</option>
                     <option>Student</option>
                 </select>
-                <input type="email" placeholder="Email Id">
-                <input type="password" placeholder="Password">
-              <button class="btn-add" onclick="handleLogin()">Login</button>
+                <input type="email" id="log-email" placeholder="Email Id">
+                <div style="position: relative;">
+                    <input type="password" id="log-pass" placeholder="Password">
+                    <i class="fas fa-eye" onclick="togglePass('log-pass')" style="position: absolute; right: 10px; top: 12px; cursor: pointer; color: #666;"></i>
+                </div>
+                <div class="button-row">
+                    <button class="btn-add" onclick="handleLogin()">Login</button>
+                    <button class="btn-edit" style="background:#666;" onclick="clearForm('login-form')">Clear</button>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- 2. STUDENT MANAGEMENT -->
+
 <!-- 2. STUDENT MANAGEMENT -->
 <section id="students" class="content-section">
     <div class="card">
@@ -1055,65 +1083,87 @@ const val = (id, selector) => {
 /* ==========================================
    2. LOGIN SYSTEM (Signup, Login, Auth)
    ========================================== */
+/* ==========================================
+   UPDATED LOGIN & SIGNUP WITH VALIDATION
+   ========================================== */
+
+// 1. Toggle Password Visibility
+function togglePass(id) {
+    const el = document.getElementById(id);
+    el.type = el.type === "password" ? "text" : "password";
+}
+
+// 2. Clear Form Data
+function clearForm(formId) {
+    const inputs = document.querySelectorAll(`#${formId} input, #${formId} select`);
+    inputs.forEach(input => input.value = "");
+}
+
+// 3. Validation Helpers
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidMobile(mobile) {
+    return /^[6-9]\d{9}$/.test(mobile); // Indian mobile starts with 6,7,8,9
+}
+
+// 4. Handle Signup
 async function handleSignup() {
-    // 1. Collect Data
-    const email = val('#login', 'input[placeholder="Email Id"]');
-    const password = val('#login', 'input[placeholder="Password"]');
-    const fullName = val('#login', 'input[placeholder="Full Name"]');
-    const mobile = val('#login', 'input[placeholder="Mobile Number"]');
-    
-    const roleDropdown = document.querySelector('#login select');
-    const role = roleDropdown.options[roleDropdown.selectedIndex].text.replace('Select Status: ', '').trim();
+    const name = document.getElementById('sig-name').value.trim();
+    const role = document.getElementById('sig-role').value;
+    const email = document.getElementById('sig-email').value.trim();
+    const pass = document.getElementById('sig-pass').value;
+    const state = document.getElementById('sig-state').value;
+    const mobile = document.getElementById('sig-mobile').value.trim();
 
-    console.log("Starting Signup for:", email);
+    // Validations
+    if (!name) return alert("Error: Please enter Full Name");
+    if (!role) return alert("Error: Please select your Status (Role)");
+    if (!isValidEmail(email)) return alert("Error: Please enter a valid Email ID");
+    if (pass.length < 6) return alert("Error: Password must be at least 6 characters long");
+    if (!state) return alert("Error: Please select your State/UT");
+    if (!isValidMobile(mobile)) return alert("Error: Please enter a valid 10-digit Indian Mobile Number");
 
-    // 2. Create User in Supabase Auth
-    const { data, error } = await db.auth.signUp({
-        email: email,
-        password: password
-    });
+    const { data, error } = await db.auth.signUp({ email, password: pass });
 
-    if (error) {
-        alert("Signup Error: " + error.message);
-        return;
-    }
-
-    // 3. Wait for 1 second (Safe delay to let Supabase breathe)
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (error) return alert("Signup Failed: " + error.message);
 
     if (data.user) {
-        console.log("Auth User Created. ID:", data.user.id);
-
-        // 4. Create the Profile
+        // Create Profile in DB
         const { error: profileError } = await db.from('profiles').insert([{ 
-            id: data.user.id, // This matches the PRIMARY KEY in profiles
-            full_name: fullName, 
+            id: data.user.id, 
+            full_name: name, 
             email: email, 
             role: role, 
-            mobile_number: mobile
+            mobile_number: mobile,
+            state: state
         }]);
 
-        if (profileError) {
-            console.error("Profile Insert Error:", profileError);
-            alert("Auth worked, but Profile failed: " + profileError.message);
-        } else {
-            alert("SUCCESS! Account and Profile created. You can now login.");
-            showSection('home'); // Send them to home page
+        if (profileError) alert("Profile Error: " + profileError.message);
+        else {
+            alert("Success! Account created. Please check your email for verification.");
+            clearForm('signup-form');
         }
-    } else {
-        alert("User created but no data returned. Check your dashboard.");
     }
 }
 
+// 5. Handle Login
 async function handleLogin() {
-    const email = document.querySelector('#login .card:last-child input[placeholder="Email Id"]').value;
-    const password = document.querySelector('#login .card:last-child input[placeholder="Password"]').value;
+    const role = document.getElementById('log-role').value;
+    const email = document.getElementById('log-email').value.trim();
+    const pass = document.getElementById('log-pass').value;
 
-    const { data, error } = await db.auth.signInWithPassword({ email, password });
-    if (error) return alert(error.message);
+    if (!role || !email || !pass) return alert("Error: Please fill all login fields");
+    if (!isValidEmail(email)) return alert("Error: Invalid Email format");
+
+    const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+    
+    if (error) return alert("Login Failed: " + error.message);
+    
+    alert("Login Successful!");
     location.reload(); 
 }
-
 /* ==========================================
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
