@@ -517,35 +517,41 @@ input:focus {
 
 
 <!-- 2. STUDENT MANAGEMENT -->
+<!-- 2. STUDENT MANAGEMENT -->
 <section id="students" class="content-section">
     <div class="card">
         <h3><i class="fas fa-user-plus"></i> Student Management</h3>
         <div class="form-grid">
             <div class="input-group"><label>Admission Date</label><input type="date" id="stu-date"></div>
             <div class="input-group"><label>Full Name</label><input type="text" id="stu-name" placeholder="Full Name"></div>
-            <div class="input-group"><label>Mobile Number</label><input type="text" id="stu-mobile" placeholder="Mobile"></div>
-            <div class="input-group"><label>Father's Mobile</label><input type="text" id="stu-father"></div>
-            <div class="input-group"><label>Mother's Mobile</label><input type="text" id="stu-mother"></div>
+            <div class="input-group"><label>Mobile Number (10 Digits)</label><input type="text" id="stu-mobile" placeholder="Mobile" maxlength="10"></div>
+            <div class="input-group"><label>Father's Mobile</label><input type="text" id="stu-father" maxlength="10"></div>
+            <div class="input-group"><label>Mother's Mobile</label><input type="text" id="stu-mother" maxlength="10"></div>
             <div class="input-group"><label>Class / Standard</label><input type="text" id="stu-standard"></div>
             <div class="input-group"><label>Batch Time</label><input type="time" id="stu-batch"></div>
             <div class="input-group"><label>Course</label><input type="text" id="stu-course" placeholder="Course"></div>
-            <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total"></div>
-            <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid"></div>
-            <!-- Extra fields needed for ID Card -->
-           <div class="input-group">
-    <label>Roll Number (Auto-Generated)</label>
-    <input type="text" id="stu-roll" placeholder="Assigned on Save" readonly style="background: #eee;">
-</div>
+            
+            <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
+            <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid" oninput="calcStuPending()"></div>
+            <div class="input-group"><label>Pending Amount</label><input type="number" id="stu-pending" readonly style="background:#eee;"></div>
+            
+            <div class="input-group">
+                <label>Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="stu-roll" placeholder="Click Generate" readonly style="background: #eee;">
+                    <button class="btn-fetch" onclick="generateRollNow()" style="padding: 5px;">Gen</button>
+                </div>
+            </div>
             <div class="input-group"><label>Course End Date</label><input type="date" id="stu-end-date"></div>
         </div>
         <div class="button-row">
            <button class="btn-add" onclick="addStudent()">ADD Student</button>
-           <button class="btn-edit" onclick="editStudent()">EDIT Details</button>
-           <button class="btn-fetch" onclick="fetchStudentByMobile()">FETCH Details</button>
+           <button class="btn-edit" onclick="editStudentByRoll()">EDIT (by Roll No)</button>
+           <button class="btn-fetch" onclick="fetchStudentByRoll()">FETCH (by Roll No)</button>
+           <button class="btn-edit" style="background:#666;" onclick="clearStudentForm()">Clear</button>
         </div>
     </div>
 </section>
-
 <!-- 3. FEE MANAGEMENT -->
 <!-- 3. FEE MANAGEMENT -->
 <section id="fee" class="content-section">
@@ -1187,77 +1193,137 @@ async function handleLogin() {
 /* ==========================================
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
-async function addStudent() {
-    // 1. AUTO-GENERATE ROLL NUMBER (Format: IMS-Year-RandomNumber)
-    const year = new Date().getFullYear();
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const autoRollNo = `IMS-${year}-${randomSuffix}`;
+/* ==========================================
+   UPDATED STUDENT MANAGEMENT LOGIC
+   ========================================== */
 
-    // 2. Collect ALL Data (Ensuring Father/Mother/User_ID are included)
+// 1. Auto-Calculate Pending Amount
+function calcStuPending() {
+    const total = parseFloat(document.getElementById('stu-total').value) || 0;
+    const paid = parseFloat(document.getElementById('stu-paid').value) || 0;
+    if (paid > total) {
+        alert("Error: Paid amount cannot be more than Total Fees");
+        document.getElementById('stu-paid').value = total;
+        document.getElementById('stu-pending').value = 0;
+    } else {
+        document.getElementById('stu-pending').value = total - paid;
+    }
+}
+
+// 2. Clear Form
+function clearStudentForm() {
+    const ids = ['stu-date','stu-name','stu-mobile','stu-father','stu-mother','stu-standard','stu-batch','stu-course','stu-total','stu-paid','stu-pending','stu-roll','stu-end-date'];
+    ids.forEach(id => document.getElementById(id).value = "");
+}
+
+// 3. Generate Roll Number Immediately
+function generateRollNow() {
+    const year = new Date().getFullYear();
+    const random = Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('stu-roll').value = `IMS-${year}-${random}`;
+}
+
+// 4. Validation & Add Student
+async function addStudent() {
+    const admissionDate = document.getElementById('stu-date').value;
+    const endDate = document.getElementById('stu-end-date').value;
+    const mobile = document.getElementById('stu-mobile').value;
+    const fMobile = document.getElementById('stu-father').value;
+    const mMobile = document.getElementById('stu-mother').value;
+    const roll = document.getElementById('stu-roll').value;
+    const today = new Date().setHours(0,0,0,0);
+
+    // Strict Validations
+    if (!admissionDate || new Date(admissionDate).setHours(0,0,0,0) < today) 
+        return alert("Error: Admission Date cannot be in the past.");
+    if (!endDate || new Date(endDate).setHours(0,0,0,0) < today) 
+        return alert("Error: Course End Date cannot be in the past.");
+    if (mobile.length !== 10 || fMobile.length !== 10 || mMobile.length !== 10)
+        return alert("Error: All Mobile Numbers must be exactly 10 digits.");
+    if (!roll) 
+        return alert("Error: Please generate a Roll Number first.");
+
     const stuData = {
+        admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
-        mobile: document.getElementById('stu-mobile').value,
-        father_mobile: document.getElementById('stu-father').value, // Fixed Null
-        mother_mobile: document.getElementById('stu-mother').value, // Fixed Null
+        mobile: mobile,
+        father_mobile: fMobile,
+        mother_mobile: mMobile,
         standard: document.getElementById('stu-standard').value,
-        course: document.getElementById('stu-course').value,
         batch_time: document.getElementById('stu-batch').value,
+        course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
-        admission_date: document.getElementById('stu-date').value,
-        user_id: currentUser ? currentUser.id : null // Saves the ID of the Admin who added them
     };
 
-    // 3. Save to 'students' table
     const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
 
-    if (stuError) {
-        console.error(stuError);
-        return alert("Error: " + stuError.message);
-    }
+    if (stuError) return alert("Save Error: " + stuError.message);
 
-    // 4. Save to 'student_details' (Now with Auto-Generated Roll Number)
     if (newStu && newStu[0]) {
-        const detailData = {
+        const { error: detailError } = await db.from('student_details').insert([{
             student_id: newStu[0].id,
-            roll_number: autoRollNo, // Use the generated number
-            course_end_date: document.getElementById('stu-end-date').value
-        };
-
-        const { error: detailError } = await db.from('student_details').insert([detailData]);
+            roll_number: roll,
+            course_end_date: endDate
+        }]);
         
-        if (detailError) {
-            alert("Basic info saved, but ID card details failed: " + detailError.message);
-        } else {
-            // Show the user the Roll Number they just got
-            alert(`STUDENT SAVED SUCCESSFULLY!\nGenerated Roll No: ${autoRollNo}`);
-            
-            // Optional: Update the UI to show the new Roll Number
-            if(document.getElementById('stu-roll')) {
-                document.getElementById('stu-roll').value = autoRollNo;
-            }
+        if (detailError) alert("Error saving roll info: " + detailError.message);
+        else {
+            alert("Success! Student registered with Roll No: " + roll);
+            clearStudentForm();
         }
     }
 }
-async function fetchStudentByMobile() {
-    const mobile = val('#students', 'input[placeholder="Mobile"]');
-    const { data, error } = await db.from('students').select('*').eq('mobile', mobile).single();
-    if (data) {
-        document.querySelector('#students input[placeholder="Full Name"]').value = data.full_name;
-        document.querySelector('#students input[placeholder="Total Fees"]').value = data.total_fees;
-        document.querySelector('#students input[placeholder="Paid Amount"]').value = data.paid_amount;
-    } else alert("Not Found");
+
+// 5. Fetch Details by Roll Number
+async function fetchStudentByRoll() {
+    const roll = prompt("Enter Student Roll Number:");
+    if (!roll) return;
+
+    // Join Query to get basic info and details
+    const { data, error } = await db
+        .from('student_details')
+        .select('roll_number, course_end_date, students(*)')
+        .eq('roll_number', roll)
+        .single();
+
+    if (error || !data) return alert("Student not found with this Roll Number.");
+
+    const s = data.students;
+    document.getElementById('stu-date').value = s.admission_date;
+    document.getElementById('stu-name').value = s.full_name;
+    document.getElementById('stu-mobile').value = s.mobile;
+    document.getElementById('stu-father').value = s.father_mobile;
+    document.getElementById('stu-mother').value = s.mother_mobile;
+    document.getElementById('stu-standard').value = s.standard;
+    document.getElementById('stu-batch').value = s.batch_time;
+    document.getElementById('stu-course').value = s.course;
+    document.getElementById('stu-total').value = s.total_fees;
+    document.getElementById('stu-paid').value = s.paid_amount;
+    document.getElementById('stu-roll').value = data.roll_number;
+    document.getElementById('stu-end-date').value = data.course_end_date;
+    calcStuPending();
+    alert("Details Loaded!");
 }
 
-async function editStudent() {
-    const mobile = val('#students', 'input[placeholder="Mobile"]');
-    const { error } = await db.from('students').update({
-        full_name: val('#students', 'input[placeholder="Full Name"]'),
-        paid_amount: parseFloat(val('#students', 'input[placeholder="Paid Amount"]'))
-    }).eq('mobile', mobile);
-    if (error) alert(error.message); else alert("Updated!");
-}
+// 6. Edit Details by Roll Number
+async function editStudentByRoll() {
+    const roll = document.getElementById('stu-roll').value;
+    if (!roll) return alert("Please fetch a student first using Roll Number.");
 
+    const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
+
+    const updateData = {
+        full_name: document.getElementById('stu-name').value,
+        mobile: document.getElementById('stu-mobile').value,
+        total_fees: parseFloat(document.getElementById('stu-total').value),
+        paid_amount: parseFloat(document.getElementById('stu-paid').value)
+    };
+
+    const { error } = await db.from('students').update(updateData).eq('id', detail.student_id);
+    if (error) alert("Update Error: " + error.message);
+    else alert("Updated Successfully!");
+}
 /* ==========================================
    4. FEE MANAGEMENT (Stats & Links)
    ========================================== */
