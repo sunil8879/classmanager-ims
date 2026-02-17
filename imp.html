@@ -611,20 +611,19 @@ input:focus {
 <!-- 4. BATCH MANAGEMENT -->
 <section id="batch" class="content-section">
     <div class="card">
-        <h3>Batch Management</h3>
+        <h3><i class="fas fa-layer-group"></i> Batch Management</h3>
         <div class="form-grid">
-    <input type="text" id="batch-name" placeholder="Batch Name">
-    <input type="text" id="batch-teacher-id" placeholder="Teacher ID (e.g. TCH-1234)">
-    <input type="text" id="batch-teacher-name" placeholder="Teacher Name">
-    <input type="time" id="batch-time">
-    <input type="text" id="batch-subject" placeholder="Subject Name">
-    <input type="number" id="batch-students" placeholder="Students Allotted">
-    <input type="text" id="batch-remarks" placeholder="Remarks">
-</div>
+            <input type="text" id="batch-name" placeholder="Batch Name">
+            <input type="text" id="batch-teacher-id" placeholder="Teacher ID (e.g. TCH-1234)">
+            <input type="text" id="batch-teacher-name" placeholder="Teacher Name">
+            <input type="time" id="batch-time">
+            <input type="text" id="batch-subject" placeholder="Subject Name">
+            <input type="number" id="batch-students" placeholder="Students Allotted">
+            <input type="text" id="batch-remarks" placeholder="Remarks">
+        </div>
         <div class="button-row">
-          <button class="btn-add" onclick="addBatch()">ADD Batch</button>
-<button class="btn-edit" onclick="editBatch()">EDIT (by ID)</button>
-<button class="btn-fetch" onclick="fetchBatch()">FETCH (by ID)</button>
+            <button class="btn-add" onclick="addBatch()">ADD Batch</button>
+            <button class="btn-fetch" onclick="fetchBatch()">FETCH (by Name)</button>
         </div>
     </div>
 </section>
@@ -803,23 +802,20 @@ input:focus {
     </div>
 </section>
 
+
 <!-- 11. TEACHER PORTAL -->
 <!-- 11. TEACHER PORTAL -->
 <section id="teacher" class="content-section">
     <div class="card">
         <h3><i class="fas fa-chalkboard-teacher"></i> Teacher Management</h3>
         <div class="form-grid">
-            <!-- AUTO GENERATE BUTTON ADDED HERE -->
             <div class="input-group">
                 <label>Teacher ID (Auto-Generated)</label>
                 <div style="display:flex; gap:5px;">
-                    <input type="text" id="tch-id" readonly style="background:#eee;" placeholder="Click GEN ->">
-                    <button type="button" class="btn-fetch" onclick="generateTchID()" style="padding: 10px; width: 80px; font-weight: 800; background: #007bff; color: white; border-radius: 5px;">
-                        GEN
-                    </button>
+                    <input type="text" id="tch-id" readonly style="background:#eee;" placeholder="Click GEN">
+                    <button type="button" class="btn-fetch" onclick="generateTchID()" style="width:80px; font-weight:800;">GEN</button>
                 </div>
             </div>
-
             <div class="input-group"><label>Teacher Name</label><input type="text" id="tch-name"></div>
             <div class="input-group"><label>Age</label><input type="number" id="tch-age"></div>
             <div class="input-group">
@@ -833,12 +829,12 @@ input:focus {
         </div>
         <div class="button-row">
             <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
-            <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
-            <button class="btn-edit" onclick="editTeacher()">EDIT (ID)</button>
+            <button class="btn-fetch" onclick="fetchTeacher()">FETCH (by ID)</button>
+            <button class="btn-edit" onclick="editTeacher()">EDIT Details</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearTeacherForm()">Clear</button>
         </div>
     </div>
 </section>
-
 <!-- 12. STUDENT PORTAL (VIEW ONLY) -->
 <section id="student-p" class="content-section">
     <div class="card" style="border-top-color: #007bff;">
@@ -1531,22 +1527,31 @@ async function addBatch() {
         remarks: document.getElementById('batch-remarks').value
     };
 
-    // Validation
-    if(!batchData.batch_name || !batchData.teacher_id) {
-        return alert("Error: Batch Name and Teacher ID are mandatory.");
-    }
-
     const { error } = await db.from('batches').insert([batchData]);
-    
-    if (error) {
-        alert("Error saving Batch: " + error.message);
-    } else {
-        alert("Success! Batch record has been saved to database.");
-        // Clear form
-        ['batch-name','batch-teacher-id','batch-teacher-name','batch-time','batch-subject','batch-students','batch-remarks'].forEach(id => {
-            document.getElementById(id).value = "";
-        });
-    }
+    if (error) alert("Save Error: " + error.message);
+    else alert("Batch Saved Successfully!");
+}
+
+// 4. THE MISSING FETCH FUNCTION
+async function fetchBatch() {
+    const name = prompt("Enter Batch Name to search:");
+    if (!name) return;
+
+    const { data, error } = await db.from('batches')
+        .select('*')
+        .eq('batch_name', name)
+        .single();
+
+    if (error || !data) return alert("Batch not found.");
+
+    document.getElementById('batch-name').value = data.batch_name;
+    document.getElementById('batch-teacher-id').value = data.teacher_id;
+    document.getElementById('batch-teacher-name').value = data.teacher_name;
+    document.getElementById('batch-time').value = data.batch_time;
+    document.getElementById('batch-subject').value = data.subject_name;
+    document.getElementById('batch-students').value = data.students_allotted;
+    document.getElementById('batch-remarks').value = data.remarks;
+    alert("Batch details loaded!");
 }
 async function editBatch() {
     const tID = val('#batch', 'input[placeholder="Teacher ID"]');
@@ -1801,29 +1806,27 @@ async function fetchExpense() {
 /* ==========================================
    11. TEACHER PORTAL (Admin Side)
    ========================================== */
-// 1. Function to Generate Teacher ID
+// 1. Generate Unique ID
 function generateTchID() {
-    // Generates a random number between 1000 and 9999
     const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const generatedID = `TCH-${randomNum}`;
-    
-    // Set the value in the input field
-    document.getElementById('tch-id').value = generatedID;
-    
-    // Visual feedback
-    console.log("Teacher ID Generated: " + generatedID);
+    document.getElementById('tch-id').value = `TCH-${randomNum}`;
 }
 
-// 2. Function to Save Teacher (sending the ID to Supabase)
+// 2. Clear Form
+function clearTeacherForm() {
+    const ids = ['tch-id','tch-name','tch-age','tch-gender','tch-join','tch-qual','tch-subject','tch-salary'];
+    ids.forEach(id => document.getElementById(id).value = "");
+}
+
+// 3. ADD TEACHER
 async function addTeacherDetails() {
     const id = document.getElementById('tch-id').value;
     const name = document.getElementById('tch-name').value;
-
-    if (!id) return alert("Error: Click 'GEN' to create a Teacher ID first.");
-    if (!name) return alert("Error: Teacher Name is mandatory.");
+    if (!id) return alert("Error: Please click 'GEN' to create a Teacher ID first.");
+    if (!name) return alert("Error: Teacher Name is required.");
 
     const tchData = {
-        id: id, // Primary Key in Supabase
+        id: id,
         teacher_name: name,
         age: parseInt(document.getElementById('tch-age').value) || 0,
         gender: document.getElementById('tch-gender').value,
@@ -1833,28 +1836,56 @@ async function addTeacherDetails() {
         salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0
     };
 
-    // Upsert ensures we don't duplicate IDs accidentally
-    const { error } = await db.from('teacher_details').upsert([tchData]);
-    
-    if (error) {
-        alert("Database Error: " + error.message);
-    } else {
-        alert("Success! Profile created for Teacher: " + name + " (ID: " + id + ")");
+    const { error } = await db.from('teacher_details').insert([tchData]);
+    if (error) alert("Save Error: " + error.message);
+    else {
+        alert("Success! Teacher Added.");
+        clearTeacherForm();
     }
 }
 
-async function editTeacher() {
-    const tID = val('#teacher', 'input[placeholder="Teacher ID"]');
-    const updateData = {
-        qualification: val('#teacher', 'input[placeholder="Qualification"]'),
-        salary_offered: parseFloat(val('#teacher', 'input[placeholder="Salary Offered"]')),
-        subject_taught: val('#teacher', 'input[placeholder="Subject Taught"]')
-    };
-    const { error } = await db.from('teacher_details').update(updateData).eq('id', tID);
-    if (error) alert(error.message); else alert("Teacher Profile Updated!");
+// 4. FETCH TEACHER (By ID)
+async function fetchTeacher() {
+    const id = prompt("Enter Teacher ID to fetch (e.g., TCH-1234):");
+    if (!id) return;
+
+    const { data, error } = await db.from('teacher_details').select('*').eq('id', id).single();
+
+    if (error || !data) return alert("Error: Teacher not found with ID " + id);
+
+    // Populate UI
+    document.getElementById('tch-id').value = data.id;
+    document.getElementById('tch-name').value = data.teacher_name;
+    document.getElementById('tch-age').value = data.age;
+    document.getElementById('tch-gender').value = data.gender;
+    document.getElementById('tch-join').value = data.joining_date;
+    document.getElementById('tch-qual').value = data.qualification;
+    document.getElementById('tch-subject').value = data.subject_taught;
+    document.getElementById('tch-salary').value = data.salary_offered;
+
+    alert("Details Loaded for " + data.teacher_name);
 }
 
+// 5. EDIT TEACHER
+async function editTeacher() {
+    const id = document.getElementById('tch-id').value;
+    if (!id) return alert("Error: Fetch a teacher first using FETCH button.");
 
+    const tchData = {
+        teacher_name: document.getElementById('tch-name').value,
+        age: parseInt(document.getElementById('tch-age').value) || 0,
+        gender: document.getElementById('tch-gender').value,
+        joining_date: document.getElementById('tch-join').value,
+        qualification: document.getElementById('tch-qual').value,
+        subject_taught: document.getElementById('tch-subject').value,
+        salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0
+    };
+
+    const { error } = await db.from('teacher_details').update(tchData).eq('id', id);
+
+    if (error) alert("Update Error: " + error.message);
+    else alert("Success! Teacher details updated.");
+}
 /* ==========================================
    12. STUDENT PORTAL (View Only)
    ========================================== */
