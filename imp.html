@@ -1571,24 +1571,24 @@ async function editBatch() {
 
 // 1. Fetch Student Name using Roll Number for the UI
 async function fetchStudentForAttn() {
-    const roll = document.getElementById('attn-roll').value;
+    const roll = document.getElementById('attn-roll').value.trim(); // .trim() handles accidental spaces
     if (!roll) return alert("Please enter a Roll Number");
 
-    // Join student_details and students to get the name
+    // Query the main 'students' table directly
     const { data, error } = await db
-        .from('student_details')
-        .select('students(full_name)')
+        .from('students')
+        .select('full_name')
         .eq('roll_number', roll)
         .single();
 
     if (error || !data) {
-        alert("Roll Number not found!");
+        console.error("Fetch Error:", error);
+        alert("Error: Roll Number '" + roll + "' not found in admission records.");
         document.getElementById('attn-name').value = "";
     } else {
-        document.getElementById('attn-name').value = data.students.full_name;
+        document.getElementById('attn-name').value = data.full_name;
     }
 }
-
 // 2. Trigger the calendar popup
 let currentAttnStatus = "";
 function triggerAttendance(status) {
@@ -1612,20 +1612,22 @@ function triggerAttendance(status) {
 
 // 3. Save to Supabase
 async function saveAttendance(dateValue, status) {
-    const roll = document.getElementById('attn-roll').value;
+    const roll = document.getElementById('attn-roll').value.trim();
     
-    // Get student ID
-    const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
+    // Get the internal student ID from the main table
+    const { data: student } = await db.from('students').select('id').eq('roll_number', roll).single();
     
+    if(!student) return alert("Error: Could not link attendance to Student ID.");
+
     const monthYear = new Date(dateValue).toLocaleString('default', { month: 'long', year: 'numeric' });
 
     const { error } = await db.from('attendance').insert([{
-        student_id: detail.student_id,
+        student_id: student.id,
         roll_number: roll,
         attendance_date: dateValue,
         status: status,
-        month_year: monthYear, // for old calendar compatibility
-        user_id: currentUser.id // Admin/Teacher who marked it
+        month_year: monthYear,
+        user_id: currentUser ? currentUser.id : null
     }]);
 
     if (error) alert("Error: " + error.message);
