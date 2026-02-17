@@ -1570,25 +1570,45 @@ function clearFeeForm() {
 
 // 2. Fetch Student with Balance
 async function fetchFeeByRoll() {
-    const roll = document.getElementById('fee-roll').value;
-    if (!roll) return alert("Enter Roll Number first.");
+    // 1. Get the roll number, trim whitespace and force Uppercase
+    const rawInput = document.getElementById('fee-roll').value;
+    if (!rawInput) return alert("Please enter a Roll Number first.");
+    
+    const roll = rawInput.trim().toUpperCase();
+    document.getElementById('fee-roll').value = roll; // Update UI to show cleaned version
 
-    const { data, error } = await db.from('student_details')
-        .select('roll_number, students(*)')
+    // 2. Query student_details but JOIN with the students table
+    // This looks for the roll in details and pulls matching data from the main student record
+    const { data: record, error } = await db.from('student_details')
+        .select('roll_number, students(*)') 
         .eq('roll_number', roll)
-        .single();
+        .maybeSingle(); // maybeSingle prevents errors if the record is missing
 
-    if (error || !data) return alert("Student not found.");
+    if (error) {
+        console.error("Supabase Error:", error);
+        return alert("System Error: " + error.message);
+    }
 
-    const s = data.students;
+    if (!record || !record.students) {
+        return alert("Record Not Found! Roll Number '" + roll + "' does not exist in student-details.");
+    }
+
+    // 3. Map the joined data to your Fee Form
+    const s = record.students;
     document.getElementById('fee-name').value = s.full_name;
     document.getElementById('fee-course').value = s.course;
     document.getElementById('fee-total').value = s.total_fees;
     document.getElementById('fee-prev-paid').value = s.paid_amount;
     document.getElementById('fee-status').value = s.status || "Active";
     document.getElementById('fee-due-dates').value = s.due_dates || "";
+    
+    // Auto-fill today's date for the transaction
     document.getElementById('fee-today').value = new Date().toISOString().split('T')[0];
+
+    // 4. Calculate the remaining balance
     calcPendingFee();
+    
+    alert("Record linked successfully for " + s.full_name);
 }
 
 // 3. Save Payment & Record in History
