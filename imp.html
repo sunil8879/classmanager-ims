@@ -271,6 +271,17 @@
             transform: translateY(2px);
             box-shadow: 0 1px 0px #990000;
         }
+
+
+
+#absent-wa-link {
+    box-shadow: 0 4px 0px #128C7E;
+    transition: 0.2s;
+}
+#absent-wa-link:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 7px 0px #128C7E;
+}
     </style>
 </head>
 <body>
@@ -609,6 +620,18 @@
             </button>
         </div>
         <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">* Clicking Mark buttons will open a calendar to select the date.</p>
+
+
+
+<div id="whatsapp-alert-area" style="display: none; margin-top: 20px; padding: 15px; background: #fff; border-radius: 10px; border: 2px dashed #25D366; text-align: center;">
+            <p style="color: #000; font-weight: bold; margin-bottom: 10px;">⚠️ Student is Absent! Notify parents?</p>
+            <a id="absent-wa-link" href="#" target="_blank" style="background: #25D366; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fab fa-whatsapp"></i> SEND ABSENT ALERT
+            </a>
+        </div>
+
+
+
     </div>
 </section>
 
@@ -1754,6 +1777,24 @@ async function saveAttendance(dateValue, status) {
 
     if (error) alert("Error: " + error.message);
     else alert(`Success: Marked ${status} for ${dateValue}`);
+
+
+// NEW ALERT LOGIC
+        if (status === "Absent") {
+            const stuName = document.getElementById('attn-name').value;
+            const { data: stuData } = await db.from('students').select('mobile').eq('roll_number', roll).single();
+            
+            if (stuData && stuData.mobile) {
+                const alertArea = document.getElementById('whatsapp-alert-area');
+                const waLink = document.getElementById('absent-wa-link');
+                const msg = encodeURIComponent(`Dear Parent, this is to inform you that ${stuName} was ABSENT for class on ${dateValue}. Regards, ClassManager IMS.`);
+                
+                waLink.href = `https://wa.me/91${stuData.mobile}?text=${msg}`;
+                alertArea.style.display = 'block'; 
+            }
+        } else {
+            document.getElementById('whatsapp-alert-area').style.display = 'none'; 
+        }
 }
 
 // 2. FETCH STATISTICS (Displaying data in UI)
