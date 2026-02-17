@@ -837,8 +837,47 @@ input:focus {
 <!-- 15. PERFORMANCE TRACKING -->
 <section id="tracking" class="content-section">
     <div class="card">
-        <h3>Performance Tracking</h3>
-        <button class="btn-fetch" onclick="fetchPerformance()">View My Progress</button>
+        <h3><i class="fas fa-chart-line"></i> Student Performance Tracking</h3>
+        <div class="form-grid">
+            <input type="text" id="perf-fetch-mobile" placeholder="Enter Student Mobile">
+            <button class="btn-fetch" onclick="fetchPerformanceData()">Fetch Performance</button>
+        </div>
+
+        <hr style="margin: 20px 0;">
+
+        <!-- Performance Dashboard (Hidden until fetched) -->
+        <div id="performance-report-area" style="display: none;">
+            <div class="form-grid">
+                <div class="input-group"><label>Date Today</label><input type="text" id="perf-today" readonly></div>
+                <div class="input-group"><label>Full Name</label><input type="text" id="perf-name" readonly></div>
+                <div class="input-group"><label>Roll Number</label><input type="text" id="perf-roll" readonly></div>
+                <div class="input-group"><label>Course</label><input type="text" id="perf-course" readonly></div>
+                <div class="input-group"><label>Date of Joining</label><input type="text" id="perf-joining" readonly></div>
+                <div class="input-group"><label>Course Duration</label><input type="text" id="perf-duration" readonly></div>
+            </div>
+
+            <div class="dashboard-stats" style="margin: 20px 0;">
+                <div class="stat-card" style="border-bottom-color: #ff0000;">
+                    <p>Days Absent (This Month)</p>
+                    <h4 id="perf-absent">0</h4>
+                </div>
+                <div class="stat-card" style="border-bottom-color: #27ae60;">
+                    <p>Attendance %</p>
+                    <h4 id="perf-attendance-pct">0%</h4>
+                </div>
+            </div>
+
+            <div class="card" style="background: #f0fffb; border: 1px solid var(--aquamarine);">
+                <h4>Exam Scores & Grading</h4>
+                <div class="form-grid">
+                    <div class="input-group"><label>Total Marks Secured</label><input type="number" id="perf-marks" oninput="calculateAvgScore()"></div>
+                    <div class="input-group"><label>Total No. of Exams</label><input type="number" id="perf-exam-count" oninput="calculateAvgScore()"></div>
+                    <div class="input-group"><label>Average Score (%)</label><input type="text" id="perf-avg-display" readonly style="font-weight: bold; color: #007bff;"></div>
+                    <div class="input-group"><label>Teacher's Name</label><input type="text" id="perf-teacher"></div>
+                </div>
+                <button class="btn-add" style="width: 100%; margin-top: 10px;" onclick="savePerformanceData()">Update Performance Record</button>
+            </div>
+        </div>
     </div>
 </section>
         </main>
@@ -1373,16 +1412,93 @@ function printCertificate() {
 /* ==========================================
    14. PERFORMANCE TRACKING
    ========================================== */
-async function fetchPerformance() {
-    if (!currentUser) {
-        alert("Please login first to view performance tracking.");
-        showSection('login'); // Redirect them to login
-        return;
+/* ==========================================
+   PERFORMANCE TRACKING LOGIC
+   ========================================== */
+
+// 1. Calculate Average Score Formula
+function calculateAvgScore() {
+    const marks = parseFloat(document.getElementById('perf-marks').value) || 0;
+    const exams = parseInt(document.getElementById('perf-exam-count').value) || 0;
+    
+    if (exams > 0) {
+        // Formula: (Marks / (Exams * 100)) * 100 -> Simplified: Marks / Exams
+        const avg = (marks / exams).toFixed(2);
+        document.getElementById('perf-avg-display').value = avg + "%";
+    } else {
+        document.getElementById('perf-avg-display').value = "0%";
     }
-    const { data } = await db.from('attendance').select('*').eq('user_id', currentUser.id);
-    alert(`Your current attendance record count: ${data ? data.length : 0}`);
 }
 
+// 2. Fetch and Calculate All Data
+async function fetchPerformanceData() {
+    const mobile = document.getElementById('perf-fetch-mobile').value;
+    if(!mobile) return alert("Please enter mobile number");
+
+    // A. Fetch Basic & Extended Data
+    const { data: student } = await db.from('students').select('*').eq('mobile', mobile).single();
+    if (!student) return alert("Student not found.");
+
+    const { data: details } = await db.from('student_details').select('*').eq('student_id', student.id).single();
+    
+    // B. Fetch Attendance for this month
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const monthYear = `${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()}`; // e.g. "February 2026"
+    
+    const { count: absentCount } = await db.from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', student.user_id) // Assuming user_id is linked
+        .eq('status', 'Absent')
+        .eq('month_year', monthYear);
+
+    // C. Fetch Saved Performance (if any)
+    const { data: perfSaved } = await db.from('performance_tracking').select('*').eq('student_id', student.id).single();
+
+    // D. Calculations
+    const daysAbsent = absentCount || 0;
+    const attendancePct = (((dayOfMonth - daysAbsent) / dayOfMonth) * 100).toFixed(2);
+
+    // E. Populate UI
+    document.getElementById('perf-today').value = now.toLocaleDateString();
+    document.getElementById('perf-name').value = student.full_name;
+    document.getElementById('perf-roll').value = details ? details.roll_number : "Not Assigned";
+    document.getElementById('perf-course').value = student.course;
+    document.getElementById('perf-joining').value = student.admission_date;
+    document.getElementById('perf-duration').value = details ? details.course_duration : "N/A";
+    
+    document.getElementById('perf-absent').innerText = daysAbsent;
+    document.getElementById('perf-attendance-pct').innerText = attendancePct + "%";
+
+    if (perfSaved) {
+        document.getElementById('perf-marks').value = perfSaved.total_marks_secured;
+        document.getElementById('perf-exam-count').value = perfSaved.total_exams;
+        document.getElementById('perf-teacher').value = perfSaved.teacher_name;
+        calculateAvgScore();
+    }
+
+    document.getElementById('performance-report-area').style.display = 'block';
+}
+
+// 3. Save performance to database
+async function savePerformanceData() {
+    const mobile = document.getElementById('perf-fetch-mobile').value;
+    const { data: student } = await db.from('students').select('id').eq('mobile', mobile).single();
+
+    const updateData = {
+        student_id: student.id,
+        total_marks_secured: parseFloat(document.getElementById('perf-marks').value) || 0,
+        total_exams: parseInt(document.getElementById('perf-exam-count').value) || 0,
+        teacher_name: document.getElementById('perf-teacher').value,
+        updated_at: new Date()
+    };
+
+    // Upsert (Update if exists, else Insert)
+    const { error } = await db.from('performance_tracking').upsert([updateData], { onConflict: 'student_id' });
+
+    if (error) alert("Error saving: " + error.message);
+    else alert("Performance record updated successfully!");
+}
 /* ==========================================
    15. NAVIGATION & INIT
    ========================================== */
