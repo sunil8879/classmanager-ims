@@ -554,65 +554,63 @@ input:focus {
 </section>
 <!-- 3. FEE MANAGEMENT -->
 <!-- 3. FEE MANAGEMENT -->
+<!-- 3. FEE MANAGEMENT -->
 <section id="fee" class="content-section">
     <!-- Part 1: FEE DETAILS -->
     <div class="card" style="margin-bottom: 30px;">
-        <h3>1. FEE DETAILS</h3>
+        <h3>1. FEE DETAILS (Transaction Entry)</h3>
         <div class="form-grid">
-            <div class="input-group"><label>Date Today</label><input type="date" id="fee-today"></div>
+            <div class="input-group"><label>Date of Payment</label><input type="date" id="fee-today"></div>
             <div class="input-group"><label>Roll Number</label><input type="text" id="fee-roll" placeholder="IMS-2026-XXXX"></div>
             <div class="input-group"><label>Full Name</label><input type="text" id="fee-name" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Date of Joining</label><input type="text" id="fee-join-date" readonly style="background:#eee;"></div>
             <div class="input-group"><label>Course Name</label><input type="text" id="fee-course" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Total Fees</label><input type="number" id="fee-total" oninput="calcPendingFee()"></div>
-            <div class="input-group"><label>Amount Now Paying</label><input type="number" id="fee-paid-now" oninput="calcPendingFee()" placeholder="Enter payment"></div>
+            
+            <div class="input-group"><label>Total Fees (Fixed)</label><input type="number" id="fee-total" readonly style="background:#eee;"></div>
             <div class="input-group"><label>Previously Paid</label><input type="number" id="fee-prev-paid" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Pending Fees</label><input type="number" id="fee-pending" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Due Dates (e.g. March 2026)</label><input type="text" id="fee-due-dates" placeholder="March 2026, July 2026"></div>
+            <div class="input-group"><label>Amount NOW Paying</label><input type="number" id="fee-paid-now" oninput="calcPendingFee()" placeholder="Enter amount"></div>
+            <div class="input-group"><label>Final Pending Balance</label><input type="number" id="fee-pending" readonly style="background:#eee;"></div>
+            
+            <div class="input-group"><label>Next Due Month</label><input type="text" id="fee-due-dates" placeholder="e.g. April 2026"></div>
             <div class="input-group">
-                <label>Status</label>
-                <select id="fee-status">
-                    <option value="Active">Active</option>
-                    <option value="Closed">Closed</option>
-                </select>
+                <label>Account Status</label>
+                <select id="fee-status"><option value="Active">Active</option><option value="Closed">Closed</option></select>
             </div>
         </div>
         <div class="button-row">
-            <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH Details</button>
-            <button class="btn-add" onclick="saveFeeUpdate('add')">ADD Payment</button>
-            <button class="btn-edit" onclick="saveFeeUpdate('edit')">EDIT Details</button>
+            <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH STUDENT</button>
+            <button class="btn-add" onclick="saveFeeUpdate()">SUBMIT PAYMENT</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearFeeForm()">Clear</button>
         </div>
     </div>
 
     <!-- Part 2: FEES PORTAL -->
     <div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
-        <h3>2. FEES PORTAL</h3>
-        <div class="form-grid">
-            <div class="input-group"><label>Select Month & Year</label><input type="month" id="portal-month" onchange="loadFeesPortal()"></div>
-            <div class="input-group"><label>Select Year Only</label><input type="number" id="portal-year" value="2026" onchange="loadFeesPortal()"></div>
+        <h3>2. FEES PORTAL (Institute Summary)</h3>
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="input-group"><label>Select Year for Collection Stats</label><input type="number" id="portal-year" value="2026" onchange="loadFeesPortal()"></div>
+            <button class="btn-fetch" onclick="loadFeesPortal()" style="margin-top:25px;">Refresh Statistics</button>
         </div>
         <div class="dashboard-stats">
             <div class="stat-card"><p>Active Students</p><h4 id="stat-active-count">0</h4></div>
-            <div class="stat-card"><p>Total Received</p><h4 id="stat-total-received">₹ 0</h4></div>
-            <div class="stat-card"><p>Total Pending</p><h4 id="stat-total-pending" style="color:red;">₹ 0</h4></div>
-            <div class="stat-card"><p>Yearly Collection</p><h4 id="stat-yearly">₹ 0</h4></div>
+            <div class="stat-card"><p>Total Fees Received</p><h4 id="stat-total-received">₹ 0</h4></div>
+            <div class="stat-card"><p>Total Pending Amount</p><h4 id="stat-total-pending" style="color:red;">₹ 0</h4></div>
+            <div class="stat-card"><p id="yearly-label">2026 Collection</p><h4 id="stat-yearly" style="color:green;">₹ 0</h4></div>
         </div>
     </div>
 
     <!-- Part 3: PAYMENT LOG -->
     <div class="card">
-        <h3>3. PAYMENT LOG</h3>
+        <h3>3. PAYMENT LOG (History)</h3>
         <div class="form-grid">
-            <div class="input-group"><label>Select Month & Year</label><input type="month" id="log-month"></div>
-            <div class="input-group"><label>Student Roll Number</label><input type="text" id="log-roll" placeholder="IMS-XXXX"></div>
-            <button class="btn-fetch" style="margin-top:25px;" onclick="fetchPaymentLog()">View Payments</button>
+            <div class="input-group"><label>Roll Number</label><input type="text" id="log-roll" placeholder="IMS-XXXX"></div>
+            <div class="input-group"><label>Filter by Month</label><input type="month" id="log-month"></div>
+            <button class="btn-fetch" style="margin-top:25px;" onclick="fetchPaymentLog()">Search History</button>
         </div>
-        <div id="log-result" style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px; line-height:2;">
-            <i>Payments will appear here...</i>
+        <div id="log-result" style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px; border-left: 5px solid #007bff;">
+            <i>Payment records will appear here...</i>
         </div>
     </div>
 </section>
-
 <!-- 4. BATCH MANAGEMENT -->
 <section id="batch" class="content-section">
     <div class="card">
@@ -1375,123 +1373,170 @@ async function editStudentByRoll() {
 /* ==========================================
    UPDATED FEE MANAGEMENT LOGIC
    ========================================== */
+/* ==========================================
+   FEE MANAGEMENT LOGIC (FIXED)
+   ========================================== */
 
-// 1. Calculate Pending Fee in Real-time
+// 1. Math: Total - (Previous + Now) = New Pending
 function calcPendingFee() {
     const total = parseFloat(document.getElementById('fee-total').value) || 0;
-    const prevPaid = parseFloat(document.getElementById('fee-prev-paid').value) || 0;
-    const nowPaying = parseFloat(document.getElementById('fee-paid-now').value) || 0;
-    const pending = total - (prevPaid + nowPaying);
-    document.getElementById('fee-pending').value = pending;
+    const prev = parseFloat(document.getElementById('fee-prev-paid').value) || 0;
+    const now = parseFloat(document.getElementById('fee-paid-now').value) || 0;
+    
+    const remaining = total - (prev + now);
+    document.getElementById('fee-pending').value = remaining.toFixed(2);
 }
 
-// 2. Fetch Student Fee Details by Roll
+function clearFeeForm() {
+    ['fee-roll','fee-name','fee-course','fee-total','fee-prev-paid','fee-paid-now','fee-pending','fee-due-dates','fee-today'].forEach(id => {
+        document.getElementById(id).value = "";
+    });
+}
+
+// 2. Fetch Student with Balance
 async function fetchFeeByRoll() {
     const roll = document.getElementById('fee-roll').value;
-    if (!roll) return alert("Enter Roll Number");
+    if (!roll) return alert("Enter Roll Number first.");
 
     const { data, error } = await db.from('student_details')
-        .select('roll_number, course_end_date, students(*)')
+        .select('roll_number, students(*)')
         .eq('roll_number', roll)
         .single();
 
-    if (error || !data) return alert("Roll Number not found");
+    if (error || !data) return alert("Student not found.");
 
     const s = data.students;
     document.getElementById('fee-name').value = s.full_name;
-    document.getElementById('fee-join-date').value = s.admission_date;
     document.getElementById('fee-course').value = s.course;
     document.getElementById('fee-total').value = s.total_fees;
     document.getElementById('fee-prev-paid').value = s.paid_amount;
     document.getElementById('fee-status').value = s.status || "Active";
     document.getElementById('fee-due-dates').value = s.due_dates || "";
+    document.getElementById('fee-today').value = new Date().toISOString().split('T')[0];
     calcPendingFee();
 }
 
-// 3. Add or Edit Payment/Fee Details
-async function saveFeeUpdate(mode) {
+// 3. Save Payment & Record in History
+async function saveFeeUpdate() {
     const roll = document.getElementById('fee-roll').value;
     const nowPaying = parseFloat(document.getElementById('fee-paid-now').value) || 0;
-    const totalFees = parseFloat(document.getElementById('fee-total').value) || 0;
-    
-    // Get current student ID
+    const payDate = document.getElementById('fee-today').value;
+
+// --- ADDED VALIDATION RULES ---
+    const fullNameVal = document.getElementById('fee-name').value.trim();
+    const totalFeesVal = parseFloat(document.getElementById('fee-total').value) || 0;
+    const prevPaidVal = parseFloat(document.getElementById('fee-prev-paid').value) || 0;
+    const joinDateVal = document.getElementById('fee-join-date').value;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 1. Full name must have at least two words (First name and Surname)
+    if (fullNameVal.split(/\s+/).filter(word => word.length > 0).length < 2) {
+        return alert("Error: Please enter Full Name (both First Name and Surname).");
+    }
+
+    // 2. Date of joining cannot be in the future
+    if (joinDateVal > todayStr) {
+        return alert("Error: Date of Joining cannot be a future date.");
+    }
+
+    // 3. Previously paid cannot be more than total fees
+    if (prevPaidVal > totalFeesVal) {
+        return alert("Error: Previously Paid amount cannot be more than Total Fees.");
+    }
+
+    // 4. Amount now paying cannot exceed the remaining balance (actual fees left)
+    if (nowPaying > (totalFeesVal - prevPaidVal)) {
+        return alert("Error: Amount Now Paying cannot be more than the remaining balance.");
+    }
+    // ------------------------------
+
+    if (!roll || nowPaying <= 0 || !payDate) return alert("Please enter Roll Number, Payment Amount and Date.");
+
+    // A. Get Student Link
     const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
-    if(!detail) return alert("Fetch student first");
-
+    
     const newPaidTotal = parseFloat(document.getElementById('fee-prev-paid').value) + nowPaying;
+    const newPending = parseFloat(document.getElementById('fee-pending').value);
 
-    // A. Update Students Table
-    const { error: upError } = await db.from('students').update({
-        total_fees: totalFees,
+    // B. Update Master Students Table
+    const { error: stuError } = await db.from('students').update({
         paid_amount: newPaidTotal,
+        pending_amount: newPending,
         status: document.getElementById('fee-status').value,
         due_dates: document.getElementById('fee-due-dates').value
     }).eq('id', detail.student_id);
 
-    if (upError) return alert(upError.message);
+    if (stuError) return alert("Error updating balance: " + stuError.message);
 
-    // B. If adding a payment, record in history
-    if (nowPaying > 0) {
-        const payDate = document.getElementById('fee-today').value || new Date().toISOString().split('T')[0];
-        const monthYear = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
-        
-        await db.from('payment_history').insert([{
-            student_id: detail.student_id,
-            roll_number: roll,
-            amount: nowPaying,
-            payment_date: payDate,
-            month_year: monthYear
-        }]);
+    // C. Record this transaction in Payment History
+    const monthYear = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    const { error: histError } = await db.from('payment_history').insert([{
+        student_id: detail.student_id,
+        roll_number: roll,
+        amount: nowPaying,
+        payment_date: payDate,
+        month_year: monthYear
+    }]);
+
+    if (histError) alert("Balance updated but history log failed: " + histError.message);
+    else {
+        alert("Success! ₹" + nowPaying + " received and logged.");
+        fetchFeeByRoll(); // Refresh display
+        loadFeesPortal(); // Refresh summary
     }
-
-    alert("Fee Record Updated Successfully!");
-    fetchFeeByRoll(); // Refresh UI
-    loadFeesPortal(); // Refresh Portal
 }
 
-// 4. Load Fees Portal Statistics
+// 4. Portal Stats: Active Only + Yearly Collection
 async function loadFeesPortal() {
-    const { data: students, error } = await db.from('students').select('*').eq('status', 'Active');
-    if (error) return;
+    const year = document.getElementById('portal-year').value || "2026";
+    
+    // Total Stats (from Students Table)
+    const { data: students } = await db.from('students').select('*').eq('status', 'Active');
+    
+    if (students) {
+        const activeCount = students.length;
+        const totalReceived = students.reduce((sum, s) => sum + (s.paid_amount || 0), 0);
+        const totalPending = students.reduce((sum, s) => sum + (s.pending_amount || 0), 0);
 
-    const activeCount = students.length;
-    const totalReceived = students.reduce((sum, s) => sum + (s.paid_amount || 0), 0);
-    const totalPending = students.reduce((sum, s) => sum + ((s.total_fees - s.paid_amount) || 0), 0);
+        document.getElementById('stat-active-count').innerText = activeCount;
+        document.getElementById('stat-total-received').innerText = `₹ ${totalReceived.toLocaleString()}`;
+        document.getElementById('stat-total-pending').innerText = `₹ ${totalPending.toLocaleString()}`;
+    }
 
-    document.getElementById('stat-active-count').innerText = activeCount;
-    document.getElementById('stat-total-received').innerText = `₹ ${totalReceived.toLocaleString()}`;
-    document.getElementById('stat-total-pending').innerText = `₹ ${totalPending.toLocaleString()}`;
-
-    // Yearly Collection Logic
-    const year = document.getElementById('portal-year').value;
-    const { data: yearlyData } = await db.from('payment_history').select('amount').like('payment_date', `${year}%`);
-    const yearlySum = yearlyData ? yearlyData.reduce((sum, p) => sum + (p.amount || 0), 0) : 0;
+    // Yearly Stats (from History Table)
+    const { data: history } = await db.from('payment_history').select('amount').like('payment_date', `${year}%`);
+    const yearlySum = history ? history.reduce((sum, p) => sum + (p.amount || 0), 0) : 0;
+    
+    document.getElementById('yearly-label').innerText = `${year} Total Collection`;
     document.getElementById('stat-yearly').innerText = `₹ ${yearlySum.toLocaleString()}`;
 }
 
-// 5. Fetch Payment Log
+// 5. Fetch Specific Payment Log
 async function fetchPaymentLog() {
     const roll = document.getElementById('log-roll').value;
     const monthVal = document.getElementById('log-month').value; // YYYY-MM
-    if(!roll || !monthVal) return alert("Enter Roll No and Month");
+    if (!roll) return alert("Enter Student Roll Number.");
 
-    const dateObj = new Date(monthVal + "-01");
-    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+    let query = db.from('payment_history').select('*').eq('roll_number', roll);
+    
+    if (monthVal) {
+        const dateObj = new Date(monthVal + "-01");
+        const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+        query = query.eq('month_year', targetMonthYear);
+    }
 
-    const { data, error } = await db.from('payment_history')
-        .select('*')
-        .eq('roll_number', roll)
-        .eq('month_year', targetMonthYear);
+    const { data, error } = await query;
+    const resultDiv = document.getElementById('log-result');
 
-    const logDiv = document.getElementById('log-result');
     if (data && data.length > 0) {
-        let html = `<strong>Payments for ${targetMonthYear}:</strong><br>`;
+        let html = `<strong>Transactions for ${roll}:</strong><hr>`;
         data.forEach(p => {
-            html += `<span style="color:green;">✔ ₹ ${p.amount}</span> paid on ${p.payment_date}<br>`;
+            html += `<p style="margin:5px 0;">📅 ${p.payment_date} — <b style="color:green;">₹ ${p.amount}</b> (${p.month_year})</p>`;
         });
-        logDiv.innerHTML = html;
+        resultDiv.innerHTML = html;
     } else {
-        logDiv.innerHTML = `<span style="color:red;">No payments found for this period.</span>`;
+        resultDiv.innerHTML = `<p style="color:red;">No transactions found.</p>`;
     }
 }
 /* ==========================================
