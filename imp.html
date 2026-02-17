@@ -685,16 +685,67 @@ input:focus {
 </section>
 
 <!-- 6. ADMIN DASHBOARD -->
+<!-- 6. ADMIN DASHBOARD -->
 <section id="admin" class="content-section">
-    <div class="dashboard-stats">
-        <div class="stat-card"><p>Total Students</p><h4>120</h4></div>
-        <div class="stat-card"><p>Total Revenue</p><h4>₹ 4.5L</h4></div>
-        <div class="stat-card"><p>Pending Fees</p><h4 style="color: red;">₹ 85k</h4></div>
-        <div class="stat-card"><p>Today's Attendance</p><h4>92%</h4></div>
+    <div class="card" style="margin-bottom: 20px; border-top-color: #007bff;">
+        <h3><i class="fas fa-chart-pie"></i> Analytics Filter</h3>
+        <div class="form-grid">
+            <div class="input-group">
+                <label>Report Type</label>
+                <select id="admin-filter-type" onchange="toggleAdminCalendar()">
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+            </div>
+            <div class="input-group" id="admin-month-container">
+                <label>Select Month</label>
+                <input type="month" id="admin-filter-month" onchange="loadAdminDashboard()">
+            </div>
+            <div class="input-group" id="admin-year-container" style="display:none;">
+                <label>Select Year</label>
+                <input type="number" id="admin-filter-year" value="2026" onchange="loadAdminDashboard()">
+            </div>
+            <div class="input-group" id="admin-quarter-container" style="display:none;">
+                <label>Select Quarter</label>
+                <select id="admin-filter-quarter" onchange="loadAdminDashboard()">
+                    <option value="1">Q1 (Jan - Mar)</option>
+                    <option value="2">Q2 (Apr - Jun)</option>
+                    <option value="3">Q3 (Jul - Sep)</option>
+                    <option value="4">Q4 (Oct - Dec)</option>
+                </select>
+            </div>
+        </div>
     </div>
+
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <p>Total Students</p>
+            <h4 id="dash-students">0</h4>
+            <small class="filter-label"></small>
+        </div>
+        <div class="stat-card">
+            <p>Total Revenue</p>
+            <h4 id="dash-revenue" style="color: green;">₹ 0</h4>
+            <small class="filter-label"></small>
+        </div>
+        <div class="stat-card">
+            <p>Pending Fees</p>
+            <h4 id="dash-pending" style="color: red;">₹ 0</h4>
+            <small class="filter-label"></small>
+        </div>
+        <div class="stat-card">
+            <p>Attendance Avg</p>
+            <h4 id="dash-attendance">0%</h4>
+            <small class="filter-label"></small>
+        </div>
+    </div>
+
     <div class="card" style="margin-top:20px;">
-        <h3>Upcoming Fee Reminders</h3>
-        <p>No immediate reminders.</p>
+        <h3><i class="fas fa-bell" style="color: #f39c12;"></i> Upcoming Fee Reminders (Current Month)</h3>
+        <div id="reminder-list" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
+            <p>Loading reminders...</p>
+        </div>
     </div>
 </section>
 
@@ -1684,10 +1735,117 @@ async function fetchAttendanceByPrompt() {
 /* ==========================================
    7. ADMIN DASHBOARD (Dynamic Counts)
    ========================================== */
-async function loadDashboard() {
-    const { data: students } = await db.from('students').select('*');
-    document.querySelector('#admin .stat-card h4').innerText = students.length;
-    // Repeat for revenue and pending by summing students data
+/* ==========================================
+   DYNAMIC ADMIN DASHBOARD LOGIC
+   ========================================== */
+
+// 1. Toggle visibility of calendars based on filter type
+function toggleAdminCalendar() {
+    const type = document.getElementById('admin-filter-type').value;
+    document.getElementById('admin-month-container').style.display = type === 'monthly' ? 'block' : 'none';
+    document.getElementById('admin-year-container').style.display = (type === 'yearly' || type === 'quarterly') ? 'block' : 'none';
+    document.getElementById('admin-quarter-container').style.display = type === 'quarterly' ? 'block' : 'none';
+    loadAdminDashboard();
+}
+
+// 2. Main Loader Function
+async function loadAdminDashboard() {
+    const type = document.getElementById('admin-filter-type').value;
+    const year = document.getElementById('admin-filter-year').value;
+    let startDate, endDate, label;
+
+    // A. Determine Date Range
+    if (type === 'monthly') {
+        const monthVal = document.getElementById('admin-filter-month').value;
+        if(!monthVal) return;
+        startDate = `${monthVal}-01`;
+        endDate = `${monthVal}-31`;
+        label = new Date(startDate).toLocaleString('default', { month: 'short', year: 'numeric' });
+    } else if (type === 'yearly') {
+        startDate = `${year}-01-01`;
+        endDate = `${year}-12-31`;
+        label = `Year ${year}`;
+    } else if (type === 'quarterly') {
+        const q = document.getElementById('admin-filter-quarter').value;
+        const qMap = { "1": ["01-01", "03-31"], "2": ["04-01", "06-30"], "3": ["07-01", "09-30"], "4": ["10-01", "12-31"] };
+        startDate = `${year}-${qMap[q][0]}`;
+        endDate = `${year}-${qMap[q][1]}`;
+        label = `Q${q} ${year}`;
+    }
+
+    document.querySelectorAll('.filter-label').forEach(el => el.innerText = label);
+
+    // B. Query Total Students (Joined in this period)
+    const { count: stuCount } = await db.from('students')
+        .select('*', { count: 'exact', head: true })
+        .gte('admission_date', startDate)
+        .lte('admission_date', endDate);
+    document.getElementById('dash-students').innerText = stuCount || 0;
+
+    // C. Query Total Revenue (Payments made in this period)
+    const { data: revenueData } = await db.from('payment_history')
+        .select('amount')
+        .gte('payment_date', startDate)
+        .lte('payment_date', endDate);
+    const totalRev = revenueData ? revenueData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
+    document.getElementById('dash-revenue').innerText = `₹ ${totalRev.toLocaleString('en-IN')}`;
+
+    // D. Query Pending Fees (From students active in this period)
+    const { data: pendingData } = await db.from('students')
+        .select('pending_amount')
+        .eq('status', 'Active')
+        .gte('admission_date', startDate)
+        .lte('admission_date', endDate);
+    const totalPen = pendingData ? pendingData.reduce((sum, p) => sum + (parseFloat(p.pending_amount) || 0), 0) : 0;
+    document.getElementById('dash-pending').innerText = `₹ ${totalPen.toLocaleString('en-IN')}`;
+
+    // E. Query Attendance %
+    const { data: attData } = await db.from('attendance')
+        .select('status')
+        .gte('attendance_date', startDate)
+        .lte('attendance_date', endDate);
+    
+    if (attData && attData.length > 0) {
+        const present = attData.filter(a => a.status === 'Present').length;
+        const percent = ((present / attData.length) * 100).toFixed(1);
+        document.getElementById('dash-attendance').innerText = `${percent}%`;
+    } else {
+        document.getElementById('dash-attendance').innerText = `0%`;
+    }
+
+    // F. Load Current Month Reminders (Auto-populated)
+    loadReminders();
+}
+
+// 3. Load Fee Reminders for the Current Month
+async function loadReminders() {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const { data: reminders, error } = await db.from('students')
+        .select('full_name, roll_number, pending_amount, mobile')
+        .eq('status', 'Active')
+        .gt('pending_amount', 0);
+
+    const container = document.getElementById('reminder-list');
+    if (reminders && reminders.length > 0) {
+        let html = '<table style="width:100%; border-collapse: collapse; font-size: 0.9rem;">';
+        html += '<tr style="background:#eee; text-align:left;"><th>Student</th><th>Roll No</th><th>Pending</th><th>Action</th></tr>';
+        
+        reminders.forEach(r => {
+            html += `<tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding:10px;">${r.full_name}</td>
+                <td>${r.roll_number}</td>
+                <td style="color:red; font-weight:bold;">₹${r.pending_amount}</td>
+                <td><a href="https://wa.me/91${r.mobile}?text=Reminder: Fee pending ₹${r.pending_amount}" target="_blank" style="color:green;"><i class="fab fa-whatsapp"></i> Notify</a></td>
+            </tr>`;
+        });
+        html += '</table>';
+        container.innerHTML = html;
+    } else {
+        container.innerHTML = "<p style='color:gray;'>No pending fees for the current month.</p>";
+    }
 }
 
 /* ==========================================
@@ -2204,17 +2362,20 @@ async function savePerformanceData() {
    15. NAVIGATION & INIT
    ========================================== */
 function showSection(id) {
-    // Hide all sections
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-    
-    // Show target
     const target = document.getElementById(id);
     if (target) target.classList.add('active');
 
-    // ONLY run extra functions if they exist. This prevents the "ReferenceError" crash.
-    if (id === 'fee' && typeof loadFeesPortal === 'function') {
-        loadFeesPortal();
+    if (id === 'admin') {
+        // Set default month for first load
+        const now = new Date();
+        const monthInput = document.getElementById('admin-filter-month');
+        if (monthInput && !monthInput.value) {
+            monthInput.value = now.toISOString().substring(0, 7); 
+        }
+        loadAdminDashboard();
     }
+    if (id === 'fee') typeof loadFeesPortal === 'function' && loadFeesPortal();
 }
 
 
