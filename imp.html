@@ -1406,17 +1406,18 @@ async function addStudent() {
     const roll = document.getElementById('stu-roll').value;
     const today = new Date().setHours(0,0,0,0);
 
-    // 2. Strict Validations
-    if (!admissionDate || new Date(admissionDate).setHours(0,0,0,0) < today) 
-        return alert("Error: Admission Date cannot be in the past.");
-    if (!endDate || new Date(endDate).setHours(0,0,0,0) < today) 
-        return alert("Error: Course End Date cannot be in the past.");
-    if (mobile.length !== 10 || fMobile.length !== 10 || mMobile.length !== 10)
-        return alert("Error: All Mobile Numbers must be exactly 10 digits.");
-    if (!roll) 
-        return alert("Error: Please click 'Gen' to create a Roll Number first.");
+    // 2. Validations
+    if (!admissionDate) return alert("Error: Admission Date is required.");
+    if (!roll) return alert("Error: Please click 'Gen' to create a Roll Number first.");
+    if (mobile.length !== 10) return alert("Error: Mobile Number must be 10 digits.");
 
-    // 3. Prepare the Data Object (NO NULLS ALLOWED)
+    // 3. Check if this Roll Number already exists in the database to prevent the "Duplicate" error
+    const { data: existingRoll } = await db.from('student_details').select('roll_number').eq('roll_number', roll).single();
+    if (existingRoll) {
+        return alert("Error: This Roll Number (" + roll + ") is already assigned to someone else. Please generate a new one.");
+    }
+
+    // 4. Prepare the Data Object
     const stuData = {
         admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
@@ -1429,11 +1430,11 @@ async function addStudent() {
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
-        roll_number: roll,                     // SENDS ROLL NUMBER TO STUDENTS TABLE
-        user_id: currentUser ? currentUser.id : null // SENDS LOGGED-IN USER ID
+        roll_number: roll,
+        user_id: (await db.auth.getUser()).data.user?.id 
     };
 
-    // 4. Save to 'students' table
+    // 5. Save to 'students' table
     const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
 
     if (stuError) {
@@ -1441,13 +1442,13 @@ async function addStudent() {
         return alert("Save Error: " + stuError.message);
     }
 
-    // 5. Save to 'student_details' table
+    // 6. Save to 'student_details' using UPSERT (This prevents the 'Unique Constraint' crash)
     if (newStu && newStu[0]) {
-        const { error: detailError } = await db.from('student_details').insert([{
+        const { error: detailError } = await db.from('student_details').upsert([{
             student_id: newStu[0].id,
-            roll_number: roll,                // SENDS ROLL NUMBER HERE TOO
+            roll_number: roll,
             course_end_date: endDate
-        }]);
+        }], { onConflict: 'student_id' }); // If ID exists, it updates; it won't crash.
         
         if (detailError) {
             alert("Error in secondary details: " + detailError.message);
