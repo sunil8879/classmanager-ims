@@ -1149,19 +1149,39 @@ async function handleSignup() {
 }
 
 // 5. Handle Login
+// 5. Updated Handle Login with Role Verification
 async function handleLogin() {
-    const role = document.getElementById('log-role').value;
+    const roleSelected = document.getElementById('log-role').value;
     const email = document.getElementById('log-email').value.trim();
     const pass = document.getElementById('log-pass').value;
 
-    if (!role || !email || !pass) return alert("Error: Please fill all login fields");
-    if (!isValidEmail(email)) return alert("Error: Invalid Email format");
+    if (!roleSelected || !email || !pass) return alert("Error: Please fill all login fields");
 
+    // Step 1: Check credentials with Auth
     const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
     
     if (error) return alert("Login Failed: " + error.message);
-    
-    alert("Login Successful!");
+
+    // Step 2: Auth successful, now check if the Role matches the database record
+    const { data: profile, error: profileError } = await db
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+    if (profileError || !profile) {
+        await db.auth.signOut(); // Log them out immediately
+        return alert("Error: Profile not found.");
+    }
+
+    // Step 3: Compare selected role vs stored role
+    if (profile.role !== roleSelected) {
+        await db.auth.signOut(); // Force logout
+        return alert(`Access Denied: You are registered as "${profile.role}". You cannot login as "${roleSelected}".`);
+    }
+
+    // Success
+    alert(`Login Successful! Welcome back ${profile.role}.`);
     location.reload(); 
 }
 /* ==========================================
