@@ -282,6 +282,20 @@
     transform: translateY(-3px);
     box-shadow: 0 7px 0px #128C7E;
 }
+
+
+#upi-qr-area {
+    box-shadow: 0 10px 0px #cccccc;
+    transition: 0.3s;
+}
+#upi-qr-area:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 0px #bbbbbb;
+}
+#upi-qr-img {
+    display: block;
+    margin: 0 auto;
+}
     </style>
 </head>
 <body>
@@ -517,6 +531,25 @@
             <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH Details</button>
             <button class="btn-add" onclick="saveFeeUpdate()">ADD Payment</button>
         </div>
+
+
+
+<!-- START: UPI QR Generator Area -->
+<div id="upi-qr-area" style="display: none; margin-top: 30px; padding: 20px; background: #fff; border-radius: 15px; border: 2px solid #000; text-align: center;">
+    <h4 style="color: #000; margin-bottom: 15px;">Scan to Pay Fees</h4>
+    <div id="qr-container" style="background: #fff; padding: 10px; display: inline-block; border-radius: 10px; border: 1px solid #ddd;">
+        <img id="upi-qr-img" src="" alt="UPI QR Code" style="width: 200px; height: 200px;">
+    </div>
+    <p style="margin-top: 10px; font-weight: bold; color: #1877F2;">Amount: ₹ <span id="disp-qr-amt">0</span></p>
+    <p style="font-size: 0.8rem; color: #666;">Generated for: <span id="disp-qr-name">Student</span></p>
+</div>
+
+<div class="button-row" style="margin-top: 15px;">
+    <button class="btn-add" style="background: #1877F2; width: 100%;" onclick="generateUPIQR()">
+        <i class="fas fa-qrcode"></i> GENERATE PAYMENT QR
+    </button>
+</div>
+<!-- END: UPI QR Generator Area -->
     </div>
 
     <!-- Part 2: FEES PORTAL -->
@@ -1648,6 +1681,46 @@ async function fetchPaymentLog() {
     } else {
         logDiv.innerHTML = `<span style="color:red;">No records found for ${formattedMonth}.</span>`;
     }
+}
+
+
+
+
+
+async function generateUPIQR() {
+    // 1. Get current data from the Fee Form
+    const amount = document.getElementById('fee-paid-now').value;
+    const studentName = document.getElementById('fee-name').value;
+    const roll = document.getElementById('fee-roll').value;
+
+    // 2. Validation
+    if (!amount || amount <= 0) return alert("Please enter the 'Amount Now Paying' first.");
+    if (!studentName) return alert("Please fetch student details first.");
+
+    // 3. Get UPI ID (VPA) from the owner
+    // For a production system, we pull this from 'institute_settings' table.
+    // As a shortcut, we will prompt once or you can hardcode it.
+    let upiID = prompt("Enter Institute UPI ID (e.g., owner@okaxis or 9876543210@upi):");
+    
+    if (!upiID) return;
+
+    // 4. Construct the UPI String
+    // Format: upi://pay?pa=VPA&pn=NAME&am=AMOUNT&tn=REMARK&cu=INR
+    const payeeName = encodeURIComponent("ClassManager Institute");
+    const remarks = encodeURIComponent(`Fees-${roll}`);
+    const upiString = `upi://pay?pa=${upiID}&pn=${payeeName}&am=${amount}&tn=${remarks}&cu=INR`;
+
+    // 5. Use Google Chart API or GoQR to generate the image
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+
+    // 6. Update UI
+    document.getElementById('upi-qr-img').src = qrUrl;
+    document.getElementById('disp-qr-amt').innerText = amount;
+    document.getElementById('disp-qr-name').innerText = studentName;
+    document.getElementById('upi-qr-area').style.display = 'block';
+
+    // Scroll to the QR code so the user sees it
+    document.getElementById('upi-qr-area').scrollIntoView({ behavior: 'smooth' });
 }
 /* ==========================================
    5. BATCH MANAGEMENT
