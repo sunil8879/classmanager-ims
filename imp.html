@@ -1310,20 +1310,54 @@ async function fetchStudentByRoll() {
 // 6. Edit Details by Roll Number
 async function editStudentByRoll() {
     const roll = document.getElementById('stu-roll').value;
-    if (!roll) return alert("Please fetch a student first using Roll Number.");
+    const admissionDate = document.getElementById('stu-date').value;
+    const endDate = document.getElementById('stu-end-date').value;
+    const today = new Date().setHours(0,0,0,0);
 
-    const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
+    if (!roll) return alert("Error: Please fetch a student first using Roll Number.");
 
+    // Re-validate dates before updating
+    if (new Date(admissionDate).setHours(0,0,0,0) < today) 
+        return alert("Error: Admission Date cannot be in the past.");
+    if (new Date(endDate).setHours(0,0,0,0) < today) 
+        return alert("Error: Course End Date cannot be in the past.");
+
+    // 1. Find the internal ID linked to this Roll Number
+    const { data: detail, error: fetchErr } = await db.from('student_details')
+        .select('student_id')
+        .eq('roll_number', roll)
+        .single();
+
+    if (fetchErr || !detail) return alert("Error finding student link.");
+
+    // 2. Prepare the data exactly as it appears in the UI
     const updateData = {
+        admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
         mobile: document.getElementById('stu-mobile').value,
-        total_fees: parseFloat(document.getElementById('stu-total').value),
-        paid_amount: parseFloat(document.getElementById('stu-paid').value)
+        father_mobile: document.getElementById('stu-father').value,
+        mother_mobile: document.getElementById('stu-mother').value,
+        standard: document.getElementById('stu-standard').value,
+        batch_time: document.getElementById('stu-batch').value,
+        course: document.getElementById('stu-course').value,
+        total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
+        paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
+        pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0 // CRITICAL LINE
     };
 
-    const { error } = await db.from('students').update(updateData).eq('id', detail.student_id);
-    if (error) alert("Update Error: " + error.message);
-    else alert("Updated Successfully!");
+    // 3. Update the main students table
+    const { error: stuErr } = await db.from('students').update(updateData).eq('id', detail.student_id);
+    
+    // 4. Update the course end date in the details table
+    const { error: detErr } = await db.from('student_details').update({
+        course_end_date: endDate
+    }).eq('student_id', detail.student_id);
+
+    if (stuErr || detErr) {
+        alert("Update Failed: " + (stuErr?.message || detErr?.message));
+    } else {
+        alert("Success: Student details for " + roll + " have been updated.");
+    }
 }
 /* ==========================================
    4. FEE MANAGEMENT (Stats & Links)
