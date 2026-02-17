@@ -1737,8 +1737,8 @@ async function loadFeesPortal() {
     const year = document.getElementById('portal-year').value || "2026";
     
     // 1. Get Totals for Active Students
-    const { data: students } = await db.from('students').select('*').eq('status', 'Active');
- .eq('institute_id', sessionInstID);
+    const { data: students } = await db.from('students').select('*').eq('status', 'Active')
+	.eq('institute_id', sessionInstID);
     if (students) {
         document.getElementById('stat-active-count').innerText = students.length;
         document.getElementById('stat-total-received').innerText = "₹ " + students.reduce((s, st) => s + (st.paid_amount || 0), 0).toLocaleString();
@@ -2291,7 +2291,7 @@ async function fetchAutoFees() {
     const { data, error } = await db
         .from('payment_history')
         .select('amount')
-        .eq('month_year', targetMonthYear);
+        .eq('month_year', targetMonthYear)
  .eq('institute_id', sessionInstID);
 
     const total = data ? data.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
