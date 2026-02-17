@@ -1210,7 +1210,37 @@ const db =  supabase.createClient(_supabaseUrl, _supabaseKey);
 let sessionInstID = ""; 
 let sessionUserName = "";
 
+async function checkCurrentSession() {
+    const { data: { user } } = await db.auth.getUser();
+    if (user) {
+        const { data: profile } = await db.from('profiles')
+            .select('full_name, institute_id')
+            .eq('id', user.id)
+            .single();
 
+        if (profile) {
+            sessionUserName = profile.full_name;
+            sessionInstID = profile.institute_id; 
+            
+            // 1. Update the Greeting Bar
+            document.getElementById('auth-status-bar').style.display = 'flex';
+            document.getElementById('user-greeting').innerText = `Welcome ${sessionUserName} (${sessionInstID})`;
+            
+            // 2. SWITCH THE HOME PAGE VIEW
+            document.getElementById('home-visitor-view').style.display = 'none';
+            document.getElementById('home-user-view').style.display = 'block'; 
+            
+            // 3. Load the actual numbers
+            loadHomeDashboardStats();
+        }
+    } else {
+        document.getElementById('auth-status-bar').style.display = 'none';
+        document.getElementById('home-visitor-view').style.display = 'block';
+        document.getElementById('home-user-view').style.display = 'none';
+    }
+}
+
+checkCurrentSession();
 
 // Helper to get input values easily
 const val = (id, selector) => {
@@ -1358,67 +1388,31 @@ async function handleLogout() {
     }
 }
 
-// 3. Add this to your page load logic to check if user is already logged in
-async function checkCurrentSession() {
-    const { data: { user } } = await db.auth.getUser();
-    if (user) {
-        // Fetch the institute_id from the profile table
-        const { data: profile } = await db.from('profiles')
-            .select('full_name, institute_id')
-            .eq('id', user.id)
-            .single();
-
-        if (profile) {
-            sessionUserName = profile.full_name;
-            sessionInstID = profile.institute_id; // <--- This fills the variable
-            
-            document.getElementById('auth-status-bar').style.display = 'flex';
-            document.getElementById('user-greeting').innerText = "Welcome " + sessionUserName + " (" + sessionInstID + ")";
-            
-            // Show the user view on home page
-            document.getElementById('home-visitor-view').style.display = 'none';
-            document.getElementById('home-user-view').style.display = 'block';
-            
-            if (typeof loadHomeDashboardStats === "function") loadHomeDashboardStats();
-        }
-    }
-}
 
 
 /* ==========================================
    HOME DASHBOARD STATS LOGIC
    ========================================== */
 async function loadHomeDashboardStats() {
-    // 1. Safety check: Don't fetch if the ID isn't loaded yet
     if (!sessionInstID) return;
 
-    console.log("Loading Home Stats for Institute:", sessionInstID);
+    const { data: students, error } = await db
+        .from('students')
+        .select('paid_amount, pending_amount')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
 
-    try {
-        // 2. Fetch all active students for this institute
-        const { data: students, error } = await db
-            .from('students')
-            .select('paid_amount, pending_amount')
-            .eq('institute_id', sessionInstID)
-            .eq('status', 'Active');
+    if (students) {
+        const totalStu = students.length;
+        const totalColl = students.reduce((sum, s) => sum + (Number(s.paid_amount) || 0), 0);
+        const totalPend = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
 
-        if (error) throw error;
-
-        if (students) {
-            // 3. Calculate Totals
-            const totalStudents = students.length;
-            const totalCollection = students.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
-            const totalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
-
-            // 4. Update the UI placeholders on the Home Page
-            document.getElementById('home-total-stu').innerText = totalStudents;
-            document.getElementById('home-total-coll').innerText = "₹ " + totalCollection.toLocaleString('en-IN');
-            document.getElementById('home-total-pend').innerText = "₹ " + totalPending.toLocaleString('en-IN');
-        }
-    } catch (err) {
-        console.error("Error loading home stats:", err.message);
+        document.getElementById('home-total-stu').innerText = totalStu;
+        document.getElementById('home-total-coll').innerText = "₹ " + totalColl.toLocaleString('en-IN');
+        document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
     }
 }
+
 /* ==========================================
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
@@ -1523,34 +1517,66 @@ if (!sessionInstID || sessionInstID === "") {
 
 // 5. Fetch Details by Roll Number
 async function fetchStudentByRoll() {
-    if (!sessionInstID) return alert("Error: Institute ID not loaded. Please refresh the page.");
+    // 1. Session Safety Check
+    if (!sessionInstID) {
+        await checkCurrentSession();
+    }
+    if (!sessionInstID) return alert("Error: Institute ID not loaded.");
 
     let roll = prompt("Enter Student Roll Number:");
     if (!roll) return;
-    
-    roll = roll.trim().toUpperCase(); // Normalizes case
 
+    roll = roll.trim().toUpperCase(); 
+
+    // 2. Fetch all columns from students and course_end_date from details
     const { data, error } = await db
         .from('student_details')
-        .select('roll_number, course_end_date, students(*)')
+        .select(`
+            roll_number, 
+            course_end_date, 
+            students (
+                admission_date, 
+                full_name, 
+                mobile, 
+                father_mobile, 
+                mother_mobile, 
+                standard, 
+                batch_time, 
+                course, 
+                total_fees, 
+                paid_amount, 
+                pending_amount
+            )
+        `)
         .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID) // Security Check
+        .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (error) return alert("Error: " + error.message);
-    if (!data) return alert("NOT FOUND: Roll No " + roll + " does not exist in your institute.");
+    if (error) return alert("Database Error: " + error.message);
+    if (!data || !data.students) {
+        return alert("NOT FOUND: Roll Number '" + roll + "' not found in your institute.");
+    }
 
     const s = data.students;
-    document.getElementById('stu-date').value = s.admission_date;
-    document.getElementById('stu-name').value = s.full_name;
-    document.getElementById('stu-mobile').value = s.mobile;
-    document.getElementById('stu-total').value = s.total_fees;
-    document.getElementById('stu-paid').value = s.paid_amount;
-    document.getElementById('stu-roll').value = data.roll_number;
-    document.getElementById('stu-end-date').value = data.course_end_date;
+
+    // 3. POPULATE EVERY FIELD IN THE FORM
+    document.getElementById('stu-date').value = s.admission_date || "";
+    document.getElementById('stu-name').value = s.full_name || "";
+    document.getElementById('stu-mobile').value = s.mobile || "";
+    document.getElementById('stu-father').value = s.father_mobile || "";
+    document.getElementById('stu-mother').value = s.mother_mobile || "";
+    document.getElementById('stu-standard').value = s.standard || "";
+    document.getElementById('stu-batch').value = s.batch_time || "";
+    document.getElementById('stu-course').value = s.course || "";
+    document.getElementById('stu-total').value = s.total_fees || 0;
+    document.getElementById('stu-paid').value = s.paid_amount || 0;
+    document.getElementById('stu-pending').value = s.pending_amount || 0;
     
-    if (typeof calcStuPending === "function") calcStuPending();
-    alert("Record Loaded Successfully!");
+    // Values from the student_details table
+    document.getElementById('stu-roll').value = data.roll_number || "";
+    document.getElementById('stu-end-date').value = data.course_end_date || "";
+
+    alert("Full Profile Loaded for " + s.full_name);
 }
 // 6. Edit Details by Roll Number
 async function editStudentByRoll() {
