@@ -1243,7 +1243,7 @@ async function addStudent() {
     if (!roll) 
         return alert("Error: Please generate a Roll Number first.");
 
-    const stuData = {
+const stuData = {
         admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
         mobile: mobile,
@@ -1254,6 +1254,7 @@ async function addStudent() {
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
+        pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0 // ADD THIS LINE
     };
 
     const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
