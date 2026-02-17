@@ -613,15 +613,14 @@ input:focus {
     <div class="card">
         <h3>Batch Management</h3>
         <div class="form-grid">
-            <input type="date">
-            <input type="text" placeholder="Teacher Name">
-            <input type="text" placeholder="Teacher ID">
-            <input type="text" placeholder="Batch Name">
-            <input type="time" placeholder="Batch Time">
-            <input type="text" placeholder="Subject Name">
-            <input type="number" placeholder="Students Allotted">
-            <input type="text" placeholder="Remarks">
-        </div>
+    <input type="text" id="batch-name" placeholder="Batch Name">
+    <input type="text" id="batch-teacher-id" placeholder="Teacher ID (e.g. TCH-1234)">
+    <input type="text" id="batch-teacher-name" placeholder="Teacher Name">
+    <input type="time" id="batch-time">
+    <input type="text" id="batch-subject" placeholder="Subject Name">
+    <input type="number" id="batch-students" placeholder="Students Allotted">
+    <input type="text" id="batch-remarks" placeholder="Remarks">
+</div>
         <div class="button-row">
           <button class="btn-add" onclick="addBatch()">ADD Batch</button>
 <button class="btn-edit" onclick="editBatch()">EDIT (by ID)</button>
@@ -808,17 +807,22 @@ input:focus {
 <section id="teacher" class="content-section">
     <div class="card">
         <h3>Teacher Management</h3>
-        <div class="form-grid">
-            <input type="month">
-            <input type="text" placeholder="Teacher Name">
-            <input type="number" placeholder="Age">
-            <select><option>Male</option><option>Female</option></select>
-            <input type="text" placeholder="Teacher ID">
-            <input type="date" placeholder="Joining Date">
-            <input type="text" placeholder="Qualification">
-            <input type="text" placeholder="Subject Taught">
-            <input type="number" placeholder="Salary Offered">
+       <div class="form-grid">
+    <div class="input-group">
+        <label>Teacher ID (Auto-Generated)</label>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="tch-id" readonly style="background:#eee;" placeholder="Click Gen">
+            <button class="btn-fetch" onclick="generateTchID()" style="padding:5px;">Gen</button>
         </div>
+    </div>
+    <input type="text" id="tch-name" placeholder="Teacher Name">
+    <input type="number" id="tch-age" placeholder="Age">
+    <select id="tch-gender"><option>Male</option><option>Female</option></select>
+    <input type="date" id="tch-join">
+    <input type="text" id="tch-qual" placeholder="Qualification">
+    <input type="text" id="tch-subject" placeholder="Subject Taught">
+    <input type="number" id="tch-salary" placeholder="Salary Offered">
+</div>
         <div class="button-row">
          <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
 <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
@@ -1509,28 +1513,33 @@ async function fetchPaymentLog() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
-    await db.from('batches').insert([{
-        batch_name: val('#batch', 'input[placeholder="Batch Name"]'),
-        teacher_id: val('#batch', 'input[placeholder="Teacher ID"]'),
-        batch_time: val('#batch', 'input[type="time"]')
-    }]);
-    alert("Batch Created");
-}
+    const batchData = {
+        batch_name: document.getElementById('batch-name').value,
+        teacher_id: document.getElementById('batch-teacher-id').value,
+        teacher_name: document.getElementById('batch-teacher-name').value,
+        batch_time: document.getElementById('batch-time').value,
+        subject_name: document.getElementById('batch-subject').value,
+        students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
+        remarks: document.getElementById('batch-remarks').value
+    };
 
-async function fetchBatch() {
-    const tID = val('#batch', 'input[placeholder="Teacher ID"]');
-    const { data, error } = await db.from('batches').select('*').eq('teacher_id', tID).single();
+    // Validation
+    if(!batchData.batch_name || !batchData.teacher_id) {
+        return alert("Error: Batch Name and Teacher ID are mandatory.");
+    }
+
+    const { error } = await db.from('batches').insert([batchData]);
     
-    if (error) return alert("Batch not found for this Teacher ID");
-    if (data) {
-        document.querySelector('#batch input[placeholder="Batch Name"]').value = data.batch_name;
-        document.querySelector('#batch input[type="time"]').value = data.batch_time;
-        document.querySelector('#batch input[placeholder="Subject Name"]').value = data.subject_name;
-        document.querySelector('#batch input[placeholder="Teacher Name"]').value = data.teacher_name;
-        alert("Batch details loaded!");
+    if (error) {
+        alert("Error saving Batch: " + error.message);
+    } else {
+        alert("Success! Batch record has been saved to database.");
+        // Clear form
+        ['batch-name','batch-teacher-id','batch-teacher-name','batch-time','batch-subject','batch-students','batch-remarks'].forEach(id => {
+            document.getElementById(id).value = "";
+        });
     }
 }
-
 async function editBatch() {
     const tID = val('#batch', 'input[placeholder="Teacher ID"]');
     const updateData = {
@@ -1785,12 +1794,27 @@ async function fetchExpense() {
    11. TEACHER PORTAL (Admin Side)
    ========================================== */
 async function addTeacherDetails() {
-    await db.from('teacher_details').insert([{
-        id: val('#teacher', 'input[placeholder="Teacher ID"]'),
-        qualification: val('#teacher', 'input[placeholder="Qualification"]'),
-        salary_offered: val('#teacher', 'input[placeholder="Salary Offered"]')
-    }]);
-    alert("Teacher Profile Updated");
+    const id = document.getElementById('tch-id').value;
+    if (!id) return alert("Error: Please click 'Gen' to create a Teacher ID first.");
+
+    const tchData = {
+        id: id,
+        teacher_name: document.getElementById('tch-name').value,
+        age: parseInt(document.getElementById('tch-age').value) || 0,
+        gender: document.getElementById('tch-gender').value,
+        joining_date: document.getElementById('tch-join').value,
+        qualification: document.getElementById('tch-qual').value,
+        subject_taught: document.getElementById('tch-subject').value,
+        salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0
+    };
+
+    const { error } = await db.from('teacher_details').upsert([tchData]);
+    
+    if (error) {
+        alert("Error saving Teacher: " + error.message);
+    } else {
+        alert("Success! Teacher Profile Saved with ID: " + id);
+    }
 }
 async function fetchTeacher() {
     const tID = val('#teacher', 'input[placeholder="Teacher ID"]');
@@ -1815,6 +1839,11 @@ async function editTeacher() {
     };
     const { error } = await db.from('teacher_details').update(updateData).eq('id', tID);
     if (error) alert(error.message); else alert("Teacher Profile Updated!");
+}
+
+function generateTchID() {
+    const random = Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('tch-id').value = `TCH-${random}`;
 }
 /* ==========================================
    12. STUDENT PORTAL (View Only)
