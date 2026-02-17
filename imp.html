@@ -54,7 +54,24 @@
         .rotating-logo img { width: 100%; height: 100%; object-fit: contain; }
         @keyframes rotate3D { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
 
-        .title-box { transform: rotate(-3deg); text-align: center; }
+ /* --- TITLE BOX FIX --- */
+        .title-box {
+            transform: rotate(-3deg);
+            text-align: center;
+            display: flex;         /* Use flexbox to stack items */
+            flex-direction: column; /* Stack vertically */
+            align-items: center;    /* Center horizontally */
+        }
+
+        .tagline {
+            display: block;         /* Force it to its own line */
+            font-size: 1.5rem;
+            color: #000;
+            font-weight: 600;
+            margin-top: 10px;       /* Adds space between Title and Tagline */
+            letter-spacing: 2px;
+            font-family: 'Times New Roman', Times, serif;
+        }
         .main-title {
             font-size: 4rem; font-weight: 900; line-height: 1;
             display: inline-block; text-transform: uppercase;
