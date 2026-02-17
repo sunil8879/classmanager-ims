@@ -807,16 +807,25 @@ input:focus {
 <!-- 11. TEACHER PORTAL -->
 <section id="teacher" class="content-section">
     <div class="card">
-        <h3><i class="fas fa-chalkboard-teacher"></i> Teacher Management</h3>
+        <h3 style="border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 20px;">
+            <i class="fas fa-chalkboard-teacher"></i> Teacher Management
+        </h3>
+        
         <div class="form-grid">
+            <!-- TEACHER ID GENERATOR BOX -->
             <div class="input-group">
-                <label>Teacher ID (Auto-Generated)</label>
-                <div style="display:flex; gap:5px;">
-                    <input type="text" id="tch-id" readonly style="background:#eee;" placeholder="Click GEN">
-                    <button type="button" class="btn-fetch" onclick="generateTchID()" style="width:80px; font-weight:800;">GEN</button>
+                <label>Teacher ID (System Generated)</label>
+                <div style="display: flex; gap: 5px; background: #fff; border: 1px solid #ddd; padding: 5px; border-radius: 8px;">
+                    <input type="text" id="tch-id" readonly placeholder="Click GEN" 
+                           style="border:none; background:transparent; font-weight:800; color:#007bff; flex:1;">
+                    <button type="button" onclick="generateTchID()" 
+                            style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                        GEN
+                    </button>
                 </div>
             </div>
-            <div class="input-group"><label>Teacher Name</label><input type="text" id="tch-name"></div>
+
+            <div class="input-group"><label>Teacher Name (Initial + Surname)</label><input type="text" id="tch-name"></div>
             <div class="input-group"><label>Age</label><input type="number" id="tch-age"></div>
             <div class="input-group">
                 <label>Gender</label>
@@ -825,9 +834,10 @@ input:focus {
             <div class="input-group"><label>Joining Date</label><input type="date" id="tch-join"></div>
             <div class="input-group"><label>Qualification</label><input type="text" id="tch-qual"></div>
             <div class="input-group"><label>Subject Taught</label><input type="text" id="tch-subject"></div>
-            <div class="input-group"><label>Salary Offered</label><input type="number" id="tch-salary"></div>
+            <div class="input-group"><label>Monthly Salary</label><input type="number" id="tch-salary"></div>
         </div>
-        <div class="button-row">
+
+        <div class="button-row" style="margin-top:20px;">
             <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
             <button class="btn-fetch" onclick="fetchTeacher()">FETCH (by ID)</button>
             <button class="btn-edit" onclick="editTeacher()">EDIT Details</button>
@@ -1806,12 +1816,73 @@ async function fetchExpense() {
 /* ==========================================
    11. TEACHER PORTAL (Admin Side)
    ========================================== */
-// 1. Generate Unique ID
 function generateTchID() {
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    document.getElementById('tch-id').value = `TCH-${randomNum}`;
+    const random = Math.floor(1000 + Math.random() * 9000);
+    const id = "TCH-" + random;
+    document.getElementById('tch-id').value = id;
 }
 
+/* ==========================================
+   COMPLETE FEE PORTAL LOGIC
+   ========================================== */
+async function loadFeesPortal() {
+    console.log("Syncing Fees Portal Statistics...");
+
+    try {
+        // 1. FETCH DATA FROM STUDENTS TABLE (Active Students Only)
+        // We fetch paid_amount and pending_amount for the totals
+        const { data: students, error: stuError } = await db
+            .from('students')
+            .select('paid_amount, pending_amount')
+            .eq('status', 'Active');
+
+        if (stuError) throw stuError;
+
+        if (students) {
+            const activeCount = students.length;
+            const totalReceived = students.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
+            const totalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+
+            // Update UI Counters
+            const elCount = document.getElementById('stat-active-count');
+            const elRec = document.getElementById('stat-total-received');
+            const elPen = document.getElementById('stat-total-pending');
+
+            if (elCount) elCount.innerText = activeCount;
+            if (elRec) elRec.innerText = "₹ " + totalReceived.toLocaleString('en-IN');
+            if (elPen) elPen.innerText = "₹ " + totalPending.toLocaleString('en-IN');
+        }
+
+        // 2. FETCH DATA FROM PAYMENT HISTORY (Yearly Collection Stats)
+        // Get the year from the UI input
+        const yearInput = document.getElementById('portal-year');
+        const selectedYear = yearInput ? yearInput.value : new Date().getFullYear();
+
+        // Calculate start and end of the year for the database query
+        const startDate = `${selectedYear}-01-01`;
+        const endDate = `${selectedYear}-12-31`;
+
+        const { data: history, error: histError } = await db
+            .from('payment_history')
+            .select('amount')
+            .gte('payment_date', startDate)
+            .lte('payment_date', endDate);
+
+        if (histError) throw histError;
+
+        const yearlySum = history ? history.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
+
+        // Update Yearly UI
+        const elYearly = document.getElementById('stat-yearly');
+        const elLabel = document.getElementById('yearly-label');
+
+        if (elYearly) elYearly.innerText = "₹ " + yearlySum.toLocaleString('en-IN');
+        if (elLabel) elLabel.innerText = selectedYear + " Total Collection";
+
+    } catch (err) {
+        console.error("Fee Portal Refresh Failed:", err.message);
+    }
+}
 // 2. Clear Form
 function clearTeacherForm() {
     const ids = ['tch-id','tch-name','tch-age','tch-gender','tch-join','tch-qual','tch-subject','tch-salary'];
@@ -2130,29 +2201,14 @@ async function savePerformanceData() {
    ========================================== */
 function showSection(id) {
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    
-    // Auto-load data based on tab
-    if (id === 'admin') loadDashboard();
-    if (id === 'fee') loadFeeStats();
-    if (id === 'student-p') loadStudentPortal();
-}
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
 
-// Initial check on load
-// Initial check on load
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // Use 'db' here, NOT 'supabase'
-        const { data: { user } } = await db.auth.getUser();
-        if (user) {
-            currentUser = user;
-            console.log("User detected:", user.email);
-        }
-    } catch (e) {
-        console.log("No active session.");
+    // Safe execution: only runs if function exists
+    if (id === 'fee') {
+        if (typeof loadFeesPortal === 'function') loadFeesPortal();
     }
-});
-
+}
 
 
 
