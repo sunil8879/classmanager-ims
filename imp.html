@@ -797,26 +797,28 @@ input:focus {
 </section>
 
 <!-- 8. LEAD MANAGEMENT -->
+<!-- 8. LEAD MANAGEMENT -->
 <section id="leads" class="content-section">
     <div class="card">
-        <h3>Lead Management</h3>
+        <h3><i class="fas fa-funnel-dollar"></i> Lead Management</h3>
         <div class="form-grid">
-            <input type="text" placeholder="Full Name">
-            <input type="text" placeholder="Contact">
-            <input type="email" placeholder="Email">
-            <input type="text" placeholder="Interested Course">
-            <input type="date" placeholder="Date of Visit">
-            <input type="text" placeholder="Reference">
-            <select>
-                <option>Status: Follow up</option>
-                <option>Converted</option>
-                <option>Not interested</option>
+            <input type="text" id="lead-name" placeholder="Full Name">
+            <input type="text" id="lead-contact" placeholder="Contact Number">
+            <input type="email" id="lead-email" placeholder="Email Address">
+            <input type="text" id="lead-course" placeholder="Interested Course">
+            <input type="date" id="lead-date" placeholder="Date of Visit">
+            <input type="text" id="lead-ref" placeholder="Reference (How they found us)">
+            <select id="lead-status">
+                <option value="Follow up">Status: Follow up</option>
+                <option value="Converted">Converted</option>
+                <option value="Not interested">Not interested</option>
             </select>
-            <input type="text" placeholder="Remarks">
+            <input type="text" id="lead-remarks" placeholder="Remarks">
         </div>
         <div class="button-row">
-          <button class="btn-add" onclick="addLead()">ADD Lead</button>
-<button class="btn-fetch" onclick="fetchLead()">FETCH (Email/Contact)</button>
+            <button class="btn-add" onclick="addLead()">ADD Lead</button>
+            <button class="btn-fetch" onclick="fetchLead()">FETCH (by Contact)</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearLeadForm()">Clear</button>
         </div>
     </div>
 </section>
@@ -1943,25 +1945,64 @@ async function loadFeeReminders() {
 /* ==========================================
    9. LEAD MANAGEMENT
    ========================================== */
-async function addLead() {
-    await db.from('leads').insert([{
-        full_name: val('#leads', 'input[placeholder="Full Name"]'),
-        contact: val('#leads', 'input[placeholder="Contact"]'),
-        status: 'Follow up'
-    }]);
-    alert("Lead Added");
+/* ==========================================
+   LEAD MANAGEMENT LOGIC (FIXED)
+   ========================================== */
+
+function clearLeadForm() {
+    ['lead-name','lead-contact','lead-email','lead-course','lead-date','lead-ref','lead-status','lead-remarks'].forEach(id => {
+        document.getElementById(id).value = (id === 'lead-status') ? 'Follow up' : '';
+    });
 }
-async function fetchLead() {
-    const contact = val('#leads', 'input[placeholder="Contact"]');
-    const { data, error } = await db.from('leads').select('*').eq('contact', contact).single();
-    
-    if (error) return alert("Lead not found");
-    if (data) {
-        document.querySelector('#leads input[placeholder="Full Name"]').value = data.full_name;
-        document.querySelector('#leads input[placeholder="Interested Course"]').value = data.interested_course;
-        document.querySelector('#leads select').value = "Status: " + data.status;
-        alert("Lead details loaded!");
+
+async function addLead() {
+    const leadData = {
+        full_name: document.getElementById('lead-name').value,
+        contact: document.getElementById('lead-contact').value,
+        email: document.getElementById('lead-email').value, // NO MORE NULL
+        interested_course: document.getElementById('lead-course').value,
+        date_of_visit: document.getElementById('lead-date').value,
+        reference: document.getElementById('lead-ref').value, // NO MORE NULL
+        status: document.getElementById('lead-status').value,
+        remarks: document.getElementById('lead-remarks').value
+    };
+
+    if (!leadData.full_name || !leadData.contact) {
+        return alert("Error: Name and Contact are mandatory.");
     }
+
+    const { error } = await db.from('leads').insert([leadData]);
+
+    if (error) {
+        alert("Save Error: " + error.message);
+    } else {
+        alert("Lead for " + leadData.full_name + " saved successfully!");
+        clearLeadForm();
+    }
+}
+
+async function fetchLead() {
+    const contact = prompt("Enter Lead Contact Number:");
+    if (!contact) return;
+
+    const { data, error } = await db
+        .from('leads')
+        .select('*')
+        .eq('contact', contact)
+        .single();
+
+    if (error || !data) return alert("Lead not found.");
+
+    document.getElementById('lead-name').value = data.full_name;
+    document.getElementById('lead-contact').value = data.contact;
+    document.getElementById('lead-email').value = data.email || "";
+    document.getElementById('lead-course').value = data.interested_course || "";
+    document.getElementById('lead-date').value = data.date_of_visit || "";
+    document.getElementById('lead-ref').value = data.reference || "";
+    document.getElementById('lead-status').value = data.status || "Follow up";
+    document.getElementById('lead-remarks').value = data.remarks || "";
+    
+    alert("Lead details loaded!");
 }
 /* ==========================================
    10. EXPENSE TRACKING (Add, Edit, Fetch)
