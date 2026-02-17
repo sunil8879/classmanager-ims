@@ -995,6 +995,11 @@ input:focus {
     <div class="card">
         <h3><i class="fas fa-id-card"></i> ID Card Generator</h3>
         <p>Enter Student Mobile Number to generate the card:</p>
+
+<div class="input-group">
+    <label>Upload Photo</label>
+    <input type="file" id="id-photo-input" accept="image/*">
+</div>
         
         <div class="form-grid">
             <input type="text" id="id-fetch-mobile" placeholder="Student Mobile Number">
@@ -1015,8 +1020,10 @@ input:focus {
 
                 <!-- Body -->
                 <div style="padding: 20px; text-align: center;">
-                    <div style="width: 100px; height: 100px; background: #eee; margin: 0 auto 15px; border: 2px solid #7FFFD4; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #ccc;">
-                        <i class="fas fa-user"></i>
+               <div style="width: 100px; height: 110px; background: #eee; margin: 0 auto 15px; border: 2px solid #7FFFD4; border-radius: 10px; overflow: hidden;">
+    <img id="card-photo-display" src="" alt="Photo" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+    <div id="card-photo-placeholder" style="font-size: 3rem; color: #ccc; padding-top: 20px;"><i class="fas fa-user"></i></div>
+</div>
                     </div>
                     <h2 id="card-student-name" style="color: #333; margin: 5px 0;">Student Name</h2>
                     <p style="margin: 2px 0; color: #666;">Roll No: <b id="card-roll">---</b></p>
@@ -2412,54 +2419,60 @@ if (monthVal < student.admission_date.substring(0, 7)) return alert("NOT AVAILAB
    ID CARD GENERATION LOGIC
    ========================================== */
 async function generateIDCard() {
-    const mobile = document.getElementById('id-fetch-mobile').value;
+    const mobile = document.getElementById('id-fetch-mobile').value.trim();
+    const photoInput = document.getElementById('id-photo-input');
+    
     if(!mobile) return alert("Please enter a mobile number");
 
-    // 1. Fetch Student Basic Data
-    const { data: student, error: err1 } = await db.from('students').select('*').eq('mobile', mobile).single();
-    if (err1 || !student) return alert("Student not found in admission records.");
-
-    // 2. Fetch Student Extended Data (Roll No, End Date)
-    const { data: details, error: err2 } = await db.from('student_details').select('*').eq('student_id', student.id).single();
+    // 1. Handle Photo Preview First
+    const photoDisplay = document.getElementById('card-photo-display');
+    const placeholder = document.getElementById('card-photo-placeholder');
     
-    // 3. Fetch Institute Settings
-    const { data: settings } = await db.from('institute_settings').select('*').limit(1).single();
+    if (photoInput.files && photoInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            photoDisplay.src = e.target.result;
+            photoDisplay.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(photoInput.files[0]);
+    } else {
+        // Reset to placeholder if no file selected
+        photoDisplay.style.display = 'none';
+        placeholder.style.display = 'block';
+    }
 
-    // 4. Update the Visual Card
-    document.getElementById('card-inst-name').innerText = settings.institute_name;
-    document.getElementById('card-branch-name').innerText = settings.branch_name;
+    // 2. Fetch Student Data from Supabase
+    const { data: student, error: stuErr } = await db
+        .from('students')
+        .select('*')
+        .eq('mobile', mobile)
+        .single();
+
+    if (stuErr || !student) return alert("Student not found with this mobile number.");
+
+    // 3. Fetch Roll Number and End Date from Details
+    const { data: detail } = await db
+        .from('student_details')
+        .select('*')
+        .eq('student_id', student.id)
+        .single();
+
+    // 4. Update the Visual Card UI
     document.getElementById('card-student-name').innerText = student.full_name;
-    document.getElementById('card-course').innerText = student.course;
+    document.getElementById('card-course').innerText = student.course || "N/A";
     document.getElementById('card-batch').innerText = student.batch_time || "N/A";
-    document.getElementById('card-roll').innerText = details ? details.roll_number : "---";
-    document.getElementById('card-start').innerText = student.admission_date;
-    document.getElementById('card-end').innerText = details ? details.course_end_date : "---";
-    document.getElementById('card-sign-name').innerText = settings.authorised_signatory;
+    document.getElementById('card-start').innerText = student.admission_date || "N/A";
+    
+    // Data from details table
+    document.getElementById('card-roll').innerText = detail ? detail.roll_number : "PENDING";
+    document.getElementById('card-end').innerText = detail ? detail.course_end_date : "N/A";
 
-    // 5. Show the card area
+    // 5. Show the Preview Area and Print Button
     document.getElementById('id-card-preview-area').style.display = 'flex';
     document.getElementById('id-print-btn').style.display = 'block';
-}
-
-function printIDCard() {
-    const cardContent = document.getElementById('id-card-visual').outerHTML;
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Print ID Card</title>
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-                <style>
-                    body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                    @media print { .no-print { display: none; } }
-                </style>
-            </head>
-            <body onload="window.print(); window.close();">
-                ${cardContent}
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
+    
+    console.log("ID Card Generated for: " + student.full_name);
 }
 
 /* ==========================================
