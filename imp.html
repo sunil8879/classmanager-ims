@@ -807,41 +807,30 @@ input:focus {
 <!-- 11. TEACHER PORTAL -->
 <section id="teacher" class="content-section">
     <div class="card">
-        <h3 style="border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 20px;">
-            <i class="fas fa-chalkboard-teacher"></i> Teacher Management
-        </h3>
-        
+        <h3>Teacher Management</h3>
         <div class="form-grid">
-            <!-- TEACHER ID GENERATOR BOX -->
-            <div class="input-group">
-                <label>Teacher ID (System Generated)</label>
-                <div style="display: flex; gap: 5px; background: #fff; border: 1px solid #ddd; padding: 5px; border-radius: 8px;">
-                    <input type="text" id="tch-id" readonly placeholder="Click GEN" 
-                           style="border:none; background:transparent; font-weight:800; color:#007bff; flex:1;">
+            <!-- ID GENERATOR -->
+            <div class="input-group" style="display: block !important;">
+                <label>Teacher ID</label>
+                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                    <input type="text" id="tch-id" readonly style="flex: 1; background: #eee; border: 2px solid #007bff; padding: 10px;" placeholder="ID">
                     <button type="button" onclick="generateTchID()" 
-                            style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                            style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; display: block !important; visibility: visible !important;">
                         GEN
                     </button>
                 </div>
             </div>
-
-            <div class="input-group"><label>Teacher Name (Initial + Surname)</label><input type="text" id="tch-name"></div>
+            <!-- OTHER FIELDS -->
+            <div class="input-group"><label>Teacher Name</label><input type="text" id="tch-name"></div>
             <div class="input-group"><label>Age</label><input type="number" id="tch-age"></div>
-            <div class="input-group">
-                <label>Gender</label>
-                <select id="tch-gender"><option>Male</option><option>Female</option></select>
-            </div>
             <div class="input-group"><label>Joining Date</label><input type="date" id="tch-join"></div>
             <div class="input-group"><label>Qualification</label><input type="text" id="tch-qual"></div>
             <div class="input-group"><label>Subject Taught</label><input type="text" id="tch-subject"></div>
-            <div class="input-group"><label>Monthly Salary</label><input type="number" id="tch-salary"></div>
+            <div class="input-group"><label>Salary</label><input type="number" id="tch-salary"></div>
         </div>
-
-        <div class="button-row" style="margin-top:20px;">
+        <div class="button-row">
             <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
-            <button class="btn-fetch" onclick="fetchTeacher()">FETCH (by ID)</button>
-            <button class="btn-edit" onclick="editTeacher()">EDIT Details</button>
-            <button class="btn-edit" style="background:#666;" onclick="clearTeacherForm()">Clear</button>
+            <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
         </div>
     </div>
 </section>
@@ -1819,7 +1808,13 @@ async function fetchExpense() {
 function generateTchID() {
     const random = Math.floor(1000 + Math.random() * 9000);
     const id = "TCH-" + random;
-    document.getElementById('tch-id').value = id;
+    const field = document.getElementById('tch-id');
+    if (field) {
+        field.value = id;
+        console.log("Teacher ID Created: " + id);
+    } else {
+        alert("System Error: 'tch-id' input not found in HTML!");
+    }
 }
 
 /* ==========================================
@@ -1893,28 +1888,22 @@ function clearTeacherForm() {
 async function addTeacherDetails() {
     const id = document.getElementById('tch-id').value;
     const name = document.getElementById('tch-name').value;
-    if (!id) return alert("Error: Please click 'GEN' to create a Teacher ID first.");
-    if (!name) return alert("Error: Teacher Name is required.");
 
-    const tchData = {
+    if (!id || !name) return alert("Error: Click GEN and enter Teacher Name.");
+
+    const { error } = await db.from('teacher_details').insert([{
         id: id,
         teacher_name: name,
         age: parseInt(document.getElementById('tch-age').value) || 0,
-        gender: document.getElementById('tch-gender').value,
         joining_date: document.getElementById('tch-join').value,
         qualification: document.getElementById('tch-qual').value,
         subject_taught: document.getElementById('tch-subject').value,
         salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0
-    };
+    }]);
 
-    const { error } = await db.from('teacher_details').insert([tchData]);
-    if (error) alert("Save Error: " + error.message);
-    else {
-        alert("Success! Teacher Added.");
-        clearTeacherForm();
-    }
+    if (error) alert("DB Error: " + error.message);
+    else alert("Teacher Saved Successfully!");
 }
-
 // 4. FETCH TEACHER (By ID)
 async function fetchTeacher() {
     const id = prompt("Enter Teacher ID to fetch (e.g., TCH-1234):");
@@ -2200,16 +2189,18 @@ async function savePerformanceData() {
    15. NAVIGATION & INIT
    ========================================== */
 function showSection(id) {
+    // Hide all sections
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+    
+    // Show target
     const target = document.getElementById(id);
     if (target) target.classList.add('active');
 
-    // Safe execution: only runs if function exists
-    if (id === 'fee') {
-        if (typeof loadFeesPortal === 'function') loadFeesPortal();
+    // ONLY run extra functions if they exist. This prevents the "ReferenceError" crash.
+    if (id === 'fee' && typeof loadFeesPortal === 'function') {
+        loadFeesPortal();
     }
 }
-
 
 
 /* --- PWA INSTALL LOGIC WRAPPED IN DOM CONTENT LOADED --- */
