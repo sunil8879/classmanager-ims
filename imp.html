@@ -917,21 +917,73 @@ input:focus {
     </div>
 </section>
 <!-- 12. STUDENT PORTAL (VIEW ONLY) -->
+<!-- 12. STUDENT PORTAL (VIEW ONLY) -->
 <section id="student-p" class="content-section">
     <div class="card" style="border-top-color: #007bff;">
-        <h3>My Portal (View Only)</h3>
-        <div class="form-grid">
-            <p><b>Name:</b> Rahul Sharma</p>
-            <p><b>Roll No:</b> CM102</p>
-            <p><b>Course:</b> Mathematics</p>
-            <p><b>Enrolled:</b> 12-Jan-2026</p>
-            <p><b>Fees Paid:</b> ₹ 5,000</p>
-            <p style="color: red;"><b>Pending:</b> ₹ 2,000</p>
-            <p><b>Present Days:</b> 22</p>
-            <p><b>Absent Days:</b> 2</p>
+        <h3><i class="fas fa-user-graduate"></i> Personal Student Dashboard</h3>
+        
+        <!-- Input Section -->
+        <div class="form-grid" style="background: #f8f9fa; padding: 15px; border-radius: 10px; align-items: end;">
+            <div class="input-group">
+                <label>Enter Roll Number</label>
+                <input type="text" id="portal-roll-input" placeholder="e.g. IMS-2026-1234">
+            </div>
+            <div class="input-group">
+                <label>Select Month & Year</label>
+                <input type="month" id="portal-month-input">
+            </div>
+            <button class="btn-fetch" onclick="fetchStudentPortalData()" style="height: 45px; font-weight: 800;">
+                FETCH PERFORMANCE
+            </button>
         </div>
-        <hr>
-        <p><i>Remarks: Excellent progress in weekly tests.</i></p>
+
+        <hr style="margin: 30px 0;">
+
+        <!-- Result Section (Hidden by default) -->
+        <div id="portal-display-area" style="display: none;">
+            <div class="form-grid" style="font-size: 1rem; line-height: 2;">
+                <div>
+                    <p><b>Full Name:</b> <span id="p-name">---</span></p>
+                    <p><b>Course Name:</b> <span id="p-course">---</span></p>
+                    <p><b>Assign Teacher:</b> <span id="p-teacher">---</span></p>
+                    <p><b>Date of Joining:</b> <span id="p-join">---</span></p>
+                </div>
+                <div style="border-left: 1px solid #ddd; padding-left: 20px;">
+                    <p><b>Total Fees Paid:</b> <span id="p-paid" style="color: green; font-weight: bold;">₹ 0</span></p>
+                    <p><b>Total Fees Pending:</b> <span id="p-pending" style="color: red; font-weight: bold;">₹ 0</span></p>
+                    <p><b>Days Present:</b> <span id="p-present">0</span></p>
+                    <p><b>Days Absent:</b> <span id="p-absent">0</span></p>
+                </div>
+            </div>
+
+            <!-- Exam Performance Card -->
+            <div style="margin-top: 20px; background: #fff8ee; padding: 20px; border-radius: 12px; border: 1px solid #f39c12;">
+                <h4 style="color: #f39c12; margin-bottom: 10px;"><i class="fas fa-chart-line"></i> Exam Performance</h4>
+                <div class="dashboard-stats" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="stat-card" style="padding: 10px;">
+                        <small>Total Marks</small>
+                        <h4 id="p-total-score">0</h4>
+                    </div>
+                    <div class="stat-card" style="padding: 10px;">
+                        <small>Exams Taken</small>
+                        <h4 id="p-exam-count">0</h4>
+                    </div>
+                    <div class="stat-card" style="padding: 10px; border-bottom-color: #f39c12;">
+                        <small>% Score</small>
+                        <h4 id="p-percent">0%</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resources Section -->
+    <div class="card" style="margin-top: 20px; background: #f0faff;">
+        <h4><i class="fas fa-book"></i> Institute Resources</h4>
+        <p>Access your study materials and textbooks below:</p>
+        <a href="#" style="display: inline-block; margin-top: 10px; color: #007bff; font-weight: 600; text-decoration: none; border-bottom: 2px solid #007bff;">
+            <i class="fas fa-external-link-alt"></i> Open Digital Library (Books & Resources)
+        </a>
     </div>
 </section>
 
@@ -2271,14 +2323,86 @@ async function editTeacher() {
 /* ==========================================
    12. STUDENT PORTAL (View Only)
    ========================================== */
-async function loadStudentPortal() {
-    const { data } = await db.from('student_portal_view').select('*').eq('user_id', currentUser.id).single();
-    if (data) {
-        const container = document.querySelector('#student-p .form-grid');
-        container.innerHTML = `<p><b>Name:</b> ${data.full_name}</p><p><b>Pending:</b> ₹${data.total_fees_pending}</p>`;
+/* ==========================================
+   STUDENT PORTAL DATA SYNC
+   ========================================== */
+async function fetchStudentPortalData() {
+    const roll = document.getElementById('portal-roll-input').value.trim();
+    const monthVal = document.getElementById('portal-month-input').value;
+
+    if (!roll || !monthVal) {
+        return alert("Please enter Roll Number and select a Month.");
+    }
+
+    // Convert YYYY-MM to "Month Year" for attendance query
+    const dateObj = new Date(monthVal + "-01");
+    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    try {
+        // 1. Fetch Student & Fee Data
+        const { data: student, error: stuErr } = await db
+            .from('students')
+            .select('*')
+            .eq('roll_number', roll)
+            .single();
+
+        if (stuErr || !student) throw new Error("Student Roll Number not found.");
+
+        // 2. Fetch Attendance Data for the selected month
+        const { data: attendance } = await db
+            .from('attendance')
+            .select('status')
+            .eq('roll_number', roll)
+            .eq('month_year', targetMonthYear);
+
+        const presentDays = attendance ? attendance.filter(a => a.status === 'Present').length : 0;
+        const absentDays = attendance ? attendance.filter(a => a.status === 'Absent').length : 0;
+
+        // 3. Fetch Performance Data (Exams)
+        const { data: performance } = await db
+            .from('performance_tracking')
+            .select('*')
+            .eq('student_id', student.id)
+            .single();
+
+        // 4. Update UI
+        document.getElementById('portal-display-area').style.display = 'block';
+        
+        // Basic Info
+        document.getElementById('p-name').innerText = student.full_name;
+        document.getElementById('p-course').innerText = student.course || "N/A";
+        document.getElementById('p-join').innerText = student.admission_date;
+        
+        // Fee Info
+        document.getElementById('p-paid').innerText = "₹ " + (student.paid_amount || 0).toLocaleString('en-IN');
+        document.getElementById('p-pending').innerText = "₹ " + (student.pending_amount || 0).toLocaleString('en-IN');
+        
+        // Attendance Info
+        document.getElementById('p-present').innerText = presentDays;
+        document.getElementById('p-absent').innerText = absentDays;
+
+        // Performance & Teacher Info
+        if (performance) {
+            const marks = parseFloat(performance.total_marks_secured) || 0;
+            const exams = parseInt(performance.total_exams) || 0;
+            const percent = exams > 0 ? ((marks / (exams * 100)) * 100).toFixed(1) : 0;
+
+            document.getElementById('p-teacher').innerText = performance.teacher_name || "N/A";
+            document.getElementById('p-total-score').innerText = marks;
+            document.getElementById('p-exam-count').innerText = exams;
+            document.getElementById('p-percent').innerText = percent + "%";
+        } else {
+            document.getElementById('p-teacher').innerText = "Not Assigned";
+            document.getElementById('p-total-score').innerText = "0";
+            document.getElementById('p-exam-count').innerText = "0";
+            document.getElementById('p-percent').innerText = "0%";
+        }
+
+    } catch (err) {
+        alert(err.message);
+        document.getElementById('portal-display-area').style.display = 'none';
     }
 }
-
 /* ==========================================
    13. GENERATORS (ID Card & Certificate)
    ========================================== */
