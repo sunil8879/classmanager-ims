@@ -1483,21 +1483,34 @@ async function fetchPerformanceData() {
 // 3. Save performance to database
 async function savePerformanceData() {
     const mobile = document.getElementById('perf-fetch-mobile').value;
-    const { data: student } = await db.from('students').select('id').eq('mobile', mobile).single();
+    if (!mobile) return alert("Please fetch a student first.");
 
+    // 1. Get the student ID
+    const { data: student, error: stuErr } = await db.from('students').select('id').eq('mobile', mobile).single();
+    if (stuErr || !student) return alert("Student not found.");
+
+    // 2. Prepare the data
     const updateData = {
         student_id: student.id,
         total_marks_secured: parseFloat(document.getElementById('perf-marks').value) || 0,
         total_exams: parseInt(document.getElementById('perf-exam-count').value) || 0,
         teacher_name: document.getElementById('perf-teacher').value,
-        updated_at: new Date()
+        updated_at: new Date().toISOString() // Use ISO string for Supabase timestamps
     };
 
-    // Upsert (Update if exists, else Insert)
-    const { error } = await db.from('performance_tracking').upsert([updateData], { onConflict: 'student_id' });
+    // 3. Perform Upsert (This will now work because of the Unique Constraint)
+    const { error } = await db
+        .from('performance_tracking')
+        .upsert(updateData, { 
+            onConflict: 'student_id' 
+        });
 
-    if (error) alert("Error saving: " + error.message);
-    else alert("Performance record updated successfully!");
+    if (error) {
+        console.error("Supabase Error:", error);
+        alert("Error saving: " + error.message);
+    } else {
+        alert("Performance record updated successfully!");
+    }
 }
 /* ==========================================
    15. NAVIGATION & INIT
