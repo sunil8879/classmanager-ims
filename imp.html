@@ -1611,13 +1611,21 @@ function triggerAttendance(status) {
 }
 
 // 3. Save to Supabase
+/* ==========================================
+   FIXED ATTENDANCE & STATISTICS LOGIC
+   ========================================== */
+
+// 1. SAVE ATTENDANCE (Fixing the NULL user_id)
 async function saveAttendance(dateValue, status) {
     const roll = document.getElementById('attn-roll').value.trim();
-    
-    // Get the internal student ID from the main table
+    if (!roll) return alert("Enter Roll Number first.");
+
+    // Get Student ID and current User Session
     const { data: student } = await db.from('students').select('id').eq('roll_number', roll).single();
-    
-    if(!student) return alert("Error: Could not link attendance to Student ID.");
+    const { data: { user } } = await db.auth.getUser(); // Fetches active login session
+
+    if (!student) return alert("Student record not found.");
+    if (!user) return alert("Error: You must be logged in to mark attendance.");
 
     const monthYear = new Date(dateValue).toLocaleString('default', { month: 'long', year: 'numeric' });
 
@@ -1627,46 +1635,51 @@ async function saveAttendance(dateValue, status) {
         attendance_date: dateValue,
         status: status,
         month_year: monthYear,
-        user_id: currentUser ? currentUser.id : null
+        user_id: user.id // Captures the ID of the person (Owner/Teacher) marking it
     }]);
 
     if (error) alert("Error: " + error.message);
     else alert(`Success: Marked ${status} for ${dateValue}`);
 }
 
-// 4. Fetch Statistics via Prompt
+// 2. FETCH STATISTICS (Displaying data in UI)
 async function fetchAttendanceByPrompt() {
-    const roll = prompt("Enter Student Roll Number to fetch records:");
+    // A. Input Verification
+    const roll = prompt("Enter Student Roll Number to see statistics:");
     if (!roll) return;
 
-    const monthView = document.getElementById('attn-month-view').value; // e.g., "2026-03"
-    if (!monthView) return alert("Please select a month in the 'View Monthly Record' field first.");
+    const monthView = document.getElementById('attn-month-view').value; // YYYY-MM from calendar
+    if (!monthView) return alert("Please select a month in the 'View Monthly Record' calendar first.");
 
-    // Format month for query
+    // B. Format the month string to match database (e.g., "March 2026")
     const dateObj = new Date(monthView + "-01");
-    const formattedMonth = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // Fetch Present Count
-    const { count: pCount } = await db.from('attendance')
+    // C. Query Database for Present Days
+    const { count: pCount, error: pErr } = await db.from('attendance')
         .select('*', { count: 'exact', head: true })
         .eq('roll_number', roll)
-        .eq('month_year', formattedMonth)
+        .eq('month_year', targetMonthYear)
         .eq('status', 'Present');
 
-    // Fetch Absent Count
-    const { count: aCount } = await db.from('attendance')
+    // D. Query Database for Absent Days
+    const { count: aCount, error: aErr } = await db.from('attendance')
         .select('*', { count: 'exact', head: true })
         .eq('roll_number', roll)
-        .eq('month_year', formattedMonth)
+        .eq('month_year', targetMonthYear)
         .eq('status', 'Absent');
 
-    // Update UI
+    if (pErr || aErr) return alert("Error fetching stats.");
+
+    // E. Update UI Fields
     document.getElementById('attn-total-p').value = pCount || 0;
     document.getElementById('attn-total-a').value = aCount || 0;
     document.getElementById('attn-roll').value = roll;
-    fetchStudentForAttn(); // Update name field too
     
-    alert(`Stats for ${roll} in ${formattedMonth} updated.`);
+    // Automatically fetch name so user knows who the stats belong to
+    fetchStudentForAttn(); 
+    
+    alert(`Statistics for ${roll} in ${targetMonthYear} updated successfully!`);
 }
 /* ==========================================
    7. ADMIN DASHBOARD (Dynamic Counts)
