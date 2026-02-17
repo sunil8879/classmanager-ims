@@ -1219,19 +1219,21 @@
 
 
 
-// GLOBAL VARIABLE TO HOLD THE INSTITUTE ID
-let sessionInstID = "";
+/* ==========================================
+   1. CORE INITIALIZATION (MUST BE AT THE TOP)
+   ========================================== */
+const _supabaseUrl = 'https://erzwijnlbnwjdlluvxyk.supabase.co';
+const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
-// 1. Function to fetch the Institute ID from the logged-in user's profile
+let sessionInstID = "";
+let sessionUserName = "";
+
+// Function to fetch the Institute ID from the logged-in user's profile
 async function syncInstituteSession() {
     const { data: { user } } = await db.auth.getUser();
     if (user) {
-        const { data: profile, error } = await db
-            .from('profiles')
-            .select('institute_id')
-            .eq('id', user.id)
-            .single();
-
+        const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
         if (profile) {
             sessionInstID = profile.institute_id;
             console.log("Institute Session Active: " + sessionInstID);
@@ -1239,22 +1241,69 @@ async function syncInstituteSession() {
     }
 }
 
-// Run this immediately when the script loads
-syncInstituteSession();
+/* ==========================================
+   2. DASHBOARD LOGIC (FIXES THE "NOT DEFINED" ERROR)
+   ========================================== */
+async function loadHomeDashboardStats() {
+    if (!sessionInstID) return;
 
+    // 1. Fetch count of all active students
+    const { count: stuCount } = await db.from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
 
+    // 2. Fetch financial totals
+    const { data: financeData } = await db.from('students')
+        .select('paid_amount, pending_amount')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
 
+    let totalColl = 0;
+    let totalPend = 0;
 
+    if (financeData) {
+        totalColl = financeData.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
+        totalPend = financeData.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+    }
 
+    // 3. Update the UI
+    document.getElementById('home-total-stu').innerText = stuCount || 0;
+    document.getElementById('home-total-coll').innerText = "₹ " + totalColl.toLocaleString('en-IN');
+    document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
+}
 
 /* ==========================================
-   1. CORE INITIALIZATION
+   3. SESSION CHECKER
    ========================================== */
-const _supabaseUrl = 'https://erzwijnlbnwjdlluvxyk.supabase.co';
-const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-const db =  supabase.createClient(_supabaseUrl, _supabaseKey);
+async function checkCurrentSession() {
+    const { data: { user } } = await db.auth.getUser();
+    if (user) {
+        const { data: profile } = await db.from('profiles').select('full_name, institute_id').eq('id', user.id).single();
+        if (profile) {
+            sessionUserName = profile.full_name;
+            sessionInstID = profile.institute_id;
 
-let currentUser = null;
+            // Update UI
+            document.getElementById('auth-status-bar').style.display = 'flex';
+            document.getElementById('user-greeting').innerText = "Welcome " + sessionUserName;
+            document.getElementById('logout-btn').style.display = 'block';
+
+            // Toggle Home View
+            document.getElementById('home-visitor-view').style.display = 'none';
+            document.getElementById('home-user-view').style.display = 'block';
+            
+            // Now this function exists!
+            loadHomeDashboardStats();
+        }
+    } else {
+        document.getElementById('home-visitor-view').style.display = 'block';
+        document.getElementById('home-user-view').style.display = 'none';
+    }
+}
+
+// Initialize everything
+syncInstituteSession().then(() => checkCurrentSession());
 
 // Helper to get input values easily
 const val = (id, selector) => {
@@ -1335,7 +1384,7 @@ async function handleSignup() {
 // 5. Handle Login
 // 5. Updated Handle Login with Role Verification
 // Global variable to store name for the "Bye Bye" message
-let sessionUserName = "";
+
 
 // 1. Updated Handle Login
 async function handleLogin() {
@@ -1397,33 +1446,7 @@ async function handleLogout() {
     }
 }
 
-// 3. Add this to your page load logic to check if user is already logged in
-async function checkCurrentSession() {
-    const { data: { user } } = await db.auth.getUser();
-    if (user) {
-        const { data: profile } = await db.from('profiles').select('full_name, institute_id').eq('id', user.id).single();
-        if (profile) {
-            sessionUserName = profile.full_name;
-            sessionInstID = profile.institute_id; // Set the Passport ID
 
-            // 1. Show the Top Welcome Bar
-            document.getElementById('auth-status-bar').style.display = 'flex';
-            document.getElementById('user-greeting').innerText = "Welcome " + sessionUserName;
-
-            // 2. TOGGLE HOME PAGE VIEW
-            document.getElementById('home-visitor-view').style.display = 'none'; // Hide the "Still managing?"
-            document.getElementById('home-user-view').style.display = 'block';  // Show the Stats
-            
-            loadHomeDashboardStats(); // Fetch the numbers
-        }
-    } else {
-        // Not logged in: Show the visitor view, hide user view
-        document.getElementById('home-visitor-view').style.display = 'block';
-        document.getElementById('home-user-view').style.display = 'none';
-    }
-}
-// Call this on script load
-checkCurrentSession();
 /* ==========================================
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
    ========================================== */
