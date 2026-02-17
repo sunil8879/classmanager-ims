@@ -1570,31 +1570,35 @@ function clearFeeForm() {
 
 // 2. Fetch Student with Balance
 async function fetchFeeByRoll() {
-    // 1. Get the roll number, trim whitespace and force Uppercase
+    // 1. Clean the input (remove spaces and make uppercase)
     const rawInput = document.getElementById('fee-roll').value;
     if (!rawInput) return alert("Please enter a Roll Number first.");
-    
     const roll = rawInput.trim().toUpperCase();
-    document.getElementById('fee-roll').value = roll; // Update UI to show cleaned version
+    document.getElementById('fee-roll').value = roll;
 
-    // 2. Query student_details but JOIN with the students table
-    // This looks for the roll in details and pulls matching data from the main student record
-    const { data: record, error } = await db.from('student_details')
-        .select('roll_number, students(*)') 
+    // 2. STEP ONE: Find the Roll Number in 'student_details' to get the internal Student ID
+    const { data: detailRecord, error: detailError } = await db.from('student_details')
+        .select('student_id')
         .eq('roll_number', roll)
-        .maybeSingle(); // maybeSingle prevents errors if the record is missing
+        .maybeSingle();
 
-    if (error) {
-        console.error("Supabase Error:", error);
-        return alert("System Error: " + error.message);
+    if (detailError) return alert("System Error: " + detailError.message);
+    
+    if (!detailRecord) {
+        return alert("Error: Roll Number '" + roll + "' not found in admission records.");
     }
 
-    if (!record || !record.students) {
-        return alert("Record Not Found! Roll Number '" + roll + "' does not exist in student-details.");
+    // 3. STEP TWO: Use the student_id we just found to get the full profile from 'students' table
+    const { data: s, error: studentError } = await db.from('students')
+        .select('*')
+        .eq('id', detailRecord.student_id)
+        .maybeSingle();
+
+    if (studentError || !s) {
+        return alert("Error: Found the roll number, but could not load the student's financial profile.");
     }
 
-    // 3. Map the joined data to your Fee Form
-    const s = record.students;
+    // 4. POPULATE THE UI
     document.getElementById('fee-name').value = s.full_name;
     document.getElementById('fee-course').value = s.course;
     document.getElementById('fee-total').value = s.total_fees;
@@ -1602,13 +1606,13 @@ async function fetchFeeByRoll() {
     document.getElementById('fee-status').value = s.status || "Active";
     document.getElementById('fee-due-dates').value = s.due_dates || "";
     
-    // Auto-fill today's date for the transaction
+    // Set payment date to today
     document.getElementById('fee-today').value = new Date().toISOString().split('T')[0];
 
-    // 4. Calculate the remaining balance
+    // Calculate the math automatically
     calcPendingFee();
     
-    alert("Record linked successfully for " + s.full_name);
+    alert("Details successfully loaded for " + s.full_name);
 }
 
 // 3. Save Payment & Record in History
