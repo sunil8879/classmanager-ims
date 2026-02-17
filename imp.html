@@ -804,29 +804,37 @@ input:focus {
 </section>
 
 <!-- 11. TEACHER PORTAL -->
+<!-- 11. TEACHER PORTAL -->
 <section id="teacher" class="content-section">
     <div class="card">
-        <h3>Teacher Management</h3>
-       <div class="form-grid">
-    <div class="input-group">
-        <label>Teacher ID (Auto-Generated)</label>
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="tch-id" readonly style="background:#eee;" placeholder="Click Gen">
-            <button class="btn-fetch" onclick="generateTchID()" style="padding:5px;">Gen</button>
+        <h3><i class="fas fa-chalkboard-teacher"></i> Teacher Management</h3>
+        <div class="form-grid">
+            <!-- AUTO GENERATE BUTTON ADDED HERE -->
+            <div class="input-group">
+                <label>Teacher ID (Auto-Generated)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="tch-id" readonly style="background:#eee;" placeholder="Click GEN ->">
+                    <button type="button" class="btn-fetch" onclick="generateTchID()" style="padding: 10px; width: 80px; font-weight: 800; background: #007bff; color: white; border-radius: 5px;">
+                        GEN
+                    </button>
+                </div>
+            </div>
+
+            <div class="input-group"><label>Teacher Name</label><input type="text" id="tch-name"></div>
+            <div class="input-group"><label>Age</label><input type="number" id="tch-age"></div>
+            <div class="input-group">
+                <label>Gender</label>
+                <select id="tch-gender"><option>Male</option><option>Female</option></select>
+            </div>
+            <div class="input-group"><label>Joining Date</label><input type="date" id="tch-join"></div>
+            <div class="input-group"><label>Qualification</label><input type="text" id="tch-qual"></div>
+            <div class="input-group"><label>Subject Taught</label><input type="text" id="tch-subject"></div>
+            <div class="input-group"><label>Salary Offered</label><input type="number" id="tch-salary"></div>
         </div>
-    </div>
-    <input type="text" id="tch-name" placeholder="Teacher Name">
-    <input type="number" id="tch-age" placeholder="Age">
-    <select id="tch-gender"><option>Male</option><option>Female</option></select>
-    <input type="date" id="tch-join">
-    <input type="text" id="tch-qual" placeholder="Qualification">
-    <input type="text" id="tch-subject" placeholder="Subject Taught">
-    <input type="number" id="tch-salary" placeholder="Salary Offered">
-</div>
         <div class="button-row">
-         <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
-<button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
-<button class="btn-edit" onclick="editTeacher()">EDIT (ID)</button>
+            <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
+            <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
+            <button class="btn-edit" onclick="editTeacher()">EDIT (ID)</button>
         </div>
     </div>
 </section>
@@ -1793,13 +1801,30 @@ async function fetchExpense() {
 /* ==========================================
    11. TEACHER PORTAL (Admin Side)
    ========================================== */
+// 1. Function to Generate Teacher ID
+function generateTchID() {
+    // Generates a random number between 1000 and 9999
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const generatedID = `TCH-${randomNum}`;
+    
+    // Set the value in the input field
+    document.getElementById('tch-id').value = generatedID;
+    
+    // Visual feedback
+    console.log("Teacher ID Generated: " + generatedID);
+}
+
+// 2. Function to Save Teacher (sending the ID to Supabase)
 async function addTeacherDetails() {
     const id = document.getElementById('tch-id').value;
-    if (!id) return alert("Error: Please click 'Gen' to create a Teacher ID first.");
+    const name = document.getElementById('tch-name').value;
+
+    if (!id) return alert("Error: Click 'GEN' to create a Teacher ID first.");
+    if (!name) return alert("Error: Teacher Name is mandatory.");
 
     const tchData = {
-        id: id,
-        teacher_name: document.getElementById('tch-name').value,
+        id: id, // Primary Key in Supabase
+        teacher_name: name,
         age: parseInt(document.getElementById('tch-age').value) || 0,
         gender: document.getElementById('tch-gender').value,
         joining_date: document.getElementById('tch-join').value,
@@ -1808,25 +1833,13 @@ async function addTeacherDetails() {
         salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0
     };
 
+    // Upsert ensures we don't duplicate IDs accidentally
     const { error } = await db.from('teacher_details').upsert([tchData]);
     
     if (error) {
-        alert("Error saving Teacher: " + error.message);
+        alert("Database Error: " + error.message);
     } else {
-        alert("Success! Teacher Profile Saved with ID: " + id);
-    }
-}
-async function fetchTeacher() {
-    const tID = val('#teacher', 'input[placeholder="Teacher ID"]');
-    const { data, error } = await db.from('teacher_details').select('*').eq('id', tID).single();
-    
-    if (error) return alert("Teacher ID not found");
-    if (data) {
-        document.querySelector('#teacher input[placeholder="Teacher Name"]').value = data.teacher_name || "";
-        document.querySelector('#teacher input[placeholder="Qualification"]').value = data.qualification;
-        document.querySelector('#teacher input[placeholder="Salary Offered"]').value = data.salary_offered;
-        document.querySelector('#teacher input[placeholder="Subject Taught"]').value = data.subject_taught;
-        alert("Teacher profile loaded!");
+        alert("Success! Profile created for Teacher: " + name + " (ID: " + id + ")");
     }
 }
 
@@ -1841,10 +1854,7 @@ async function editTeacher() {
     if (error) alert(error.message); else alert("Teacher Profile Updated!");
 }
 
-function generateTchID() {
-    const random = Math.floor(1000 + Math.random() * 9000);
-    document.getElementById('tch-id').value = `TCH-${random}`;
-}
+
 /* ==========================================
    12. STUDENT PORTAL (View Only)
    ========================================== */
