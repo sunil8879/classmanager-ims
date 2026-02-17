@@ -750,21 +750,48 @@ input:focus {
 </section>
 
 <!-- 7. FEE REMINDER -->
+<!-- 7. FEE REMINDER SYSTEM -->
 <section id="reminder" class="content-section">
-    <div class="card">
-        <h3>Fee Reminder System</h3>
-        <input type="month" style="margin-bottom: 20px;">
-        <div class="stat-card" style="margin-bottom: 20px;">
-            <p>Total Pending Students</p><h4>15</h4>
+    <div class="card" style="border-top-color: #f39c12;">
+        <h3><i class="fas fa-bell"></i> Fee Reminder Dashboard</h3>
+        
+        <!-- Year Filter -->
+        <div class="input-group" style="max-width: 250px; margin-bottom: 20px;">
+            <label>Select Admission Year</label>
+            <input type="number" id="remind-year" value="2026" onchange="loadFeeReminders()">
         </div>
-        <div class="button-row">
-           <!-- Find these in Section #7 -->
-<button class="btn-fetch" onclick="sendReminder('SMS')">
-    <i class="fas fa-sms"></i> Send SMS Reminder
-</button>
-<button class="btn-add" style="background: #25D366;" onclick="sendReminder('WA')">
-    <i class="fab fa-whatsapp"></i> WhatsApp Reminder
-</button>
+
+        <div class="dashboard-stats">
+            <div class="stat-card" style="border-bottom-color: #e74c3c;">
+                <p>Total Pending Fees (<span class="display-year">2026</span>)</p>
+                <h4 id="remind-total-amt" style="color: #e74c3c;">₹ 0</h4>
+            </div>
+            <div class="stat-card" style="border-bottom-color: #f39c12;">
+                <p>Pending Students (<span class="display-year">2026</span>)</p>
+                <h4 id="remind-stu-count">0</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+        <h3><i class="fas fa-list-ul"></i> Active Students with Pending Fees</h3>
+        <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">List shows only "Active" students with a balance > ₹0.</p>
+        
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                <thead>
+                    <tr style="background: #f4f7f6; text-align: left; border-bottom: 2px solid #ddd;">
+                        <th style="padding: 12px;">Roll Number</th>
+                        <th style="padding: 12px;">Student Name</th>
+                        <th style="padding: 12px;">Mobile</th>
+                        <th style="padding: 12px;">Pending Amount</th>
+                        <th style="padding: 12px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="reminder-table-body">
+                    <!-- Dynamic Rows Here -->
+                </tbody>
+            </table>
         </div>
     </div>
 </section>
@@ -1851,13 +1878,66 @@ async function loadReminders() {
 /* ==========================================
    8. FEE REMINDER (SMS/WhatsApp)
    ========================================== */
-async function sendReminder(type) {
-    const { data } = await db.from('students').select('full_name, mobile, pending_amount').gt('pending_amount', 0);
-    data.forEach(s => {
-        const msg = `Hi ${s.full_name}, your pending fee is ₹${s.pending_amount}. Please pay ASAP.`;
-        if (type === 'WA') window.open(`https://wa.me/${s.mobile}?text=${encodeURIComponent(msg)}`);
-        else console.log("Sending SMS to " + s.mobile);
-    });
+async function loadFeeReminders() {
+    const selectedYear = document.getElementById('remind-year').value || 2026;
+    const startDate = `${selectedYear}-01-01`;
+    const endDate = `${selectedYear}-12-31`;
+
+    // Update labels in UI
+    document.querySelectorAll('.display-year').forEach(el => el.innerText = selectedYear);
+
+    try {
+        // Fetch Active students with pending balance admitted in the selected year
+        const { data: students, error } = await db
+            .from('students')
+            .select('full_name, roll_number, mobile, pending_amount')
+            .eq('status', 'Active')
+            .gt('pending_amount', 0)
+            .gte('admission_date', startDate)
+            .lte('admission_date', endDate);
+
+        if (error) throw error;
+
+        const tableBody = document.getElementById('reminder-table-body');
+        let totalPendingAmt = 0;
+        let pendingStuCount = 0;
+
+        if (students && students.length > 0) {
+            tableBody.innerHTML = ''; // Clear old rows
+            pendingStuCount = students.length;
+
+            students.forEach(s => {
+                totalPendingAmt += parseFloat(s.pending_amount) || 0;
+
+                // Create WhatsApp Message
+                const msg = encodeURIComponent(`Hello ${s.full_name}, this is a reminder regarding your pending fee of ₹${s.pending_amount} for the year ${selectedYear}. Please settle it at the earliest. Thank you.`);
+                
+                tableBody.innerHTML += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 12px; font-weight: bold;">${s.roll_number}</td>
+                        <td style="padding: 12px;">${s.full_name}</td>
+                        <td style="padding: 12px;">${s.mobile}</td>
+                        <td style="padding: 12px; color: red; font-weight: bold;">₹ ${parseFloat(s.pending_amount).toLocaleString('en-IN')}</td>
+                        <td style="padding: 12px;">
+                            <a href="https://wa.me/91${s.mobile}?text=${msg}" target="_blank" 
+                               style="background: #25D366; color: white; padding: 6px 12px; border-radius: 5px; text-decoration: none; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
+                               <i class="fab fa-whatsapp"></i> Send Reminder
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            });
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #888;">No active students with pending fees found for this year.</td></tr>';
+        }
+
+        // Update Stats
+        document.getElementById('remind-total-amt').innerText = `₹ ${totalPendingAmt.toLocaleString('en-IN')}`;
+        document.getElementById('remind-stu-count').innerText = pendingStuCount;
+
+    } catch (err) {
+        console.error("Reminder Error:", err.message);
+    }
 }
 
 /* ==========================================
@@ -2361,21 +2441,58 @@ async function savePerformanceData() {
 /* ==========================================
    15. NAVIGATION & INIT
    ========================================== */
+/* ==========================================
+   FINAL NAVIGATION & AUTO-POPULATION LOGIC
+   ========================================== */
 function showSection(id) {
-    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-    const target = document.getElementById(id);
-    if (target) target.classList.add('active');
+    // 1. UI SWITCHING: Hide all sections and show the target one
+    const sections = document.querySelectorAll('.content-section');
+    sections.forEach(s => s.classList.remove('active'));
 
-    if (id === 'admin') {
-        // Set default month for first load
-        const now = new Date();
-        const monthInput = document.getElementById('admin-filter-month');
-        if (monthInput && !monthInput.value) {
-            monthInput.value = now.toISOString().substring(0, 7); 
-        }
-        loadAdminDashboard();
+    const targetSection = document.getElementById(id);
+    if (targetSection) {
+        targetSection.classList.add('active');
+        console.log("Navigated to: " + id);
+    } else {
+        console.error("Error: Section ID '" + id + "' does not exist in HTML.");
+        return;
     }
-    if (id === 'fee') typeof loadFeesPortal === 'function' && loadFeesPortal();
+
+    // 2. DATA AUTO-POPULATION: Trigger specific loaders based on the tab
+    try {
+        switch (id) {
+            case 'admin':
+                // Set default month to current month for Admin Dashboard if empty
+                const adminMonthInput = document.getElementById('admin-filter-month');
+                if (adminMonthInput && !adminMonthInput.value) {
+                    adminMonthInput.value = new Date().toISOString().substring(0, 7);
+                }
+                if (typeof loadAdminDashboard === 'function') loadAdminDashboard();
+                break;
+
+            case 'fee':
+                // Auto-load Fee Management Summary
+                if (typeof loadFeesPortal === 'function') loadFeesPortal();
+                break;
+
+            case 'reminder':
+                // Auto-load Fee Reminder Dashboard
+                if (typeof loadFeeReminders === 'function') loadFeeReminders();
+                break;
+
+            case 'student-p':
+                // Auto-load Personal Student Portal
+                if (typeof loadStudentPortal === 'function') loadStudentPortal();
+                break;
+
+            default:
+                // No auto-population required for other sections
+                break;
+        }
+    } catch (err) {
+        // This catch block prevents a crash in one module from killing the whole app
+        console.warn("Auto-population notice for section [" + id + "]: " + err.message);
+    }
 }
 
 
