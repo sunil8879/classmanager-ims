@@ -691,6 +691,10 @@ input:focus {
             <div class="input-group"><label>Marketing</label><input type="number" id="exp-mark" value="0" oninput="calcExp()"></div>
             <div class="input-group"><label>Other Expenses</label><input type="number" id="exp-other" value="0" oninput="calcExp()"></div>
             <div class="input-group" style="border: 1px solid #7FFFD4; border-radius: 8px; padding: 5px;">
+			<div class="input-group" style="border: 1px solid #007bff; border-radius: 8px; padding: 5px;">
+    <label style="color: #007bff;">Total Fees Collection (Manual)</label>
+    <input type="number" id="exp-fees-coll" value="0" oninput="calcExp()">
+</div>
                 <label style="color: #0056b3;">Other Income (Sales/Misc)</label>
                 <input type="number" id="exp-income" value="0" oninput="calcExp()">
             </div>
@@ -1338,8 +1342,15 @@ async function fetchLead() {
    10. EXPENSE TRACKING (Add, Edit, Fetch)
    ========================================== */
 // Function to calculate totals and profit
+/* ==========================================
+   EXPENSE LOGIC (MANUAL ENTRY)
+   ========================================== */
+
 async function calcExp() {
-    // 1. Get values from UI
+    // 1. Get Values from UI
+    const feesColl = parseFloat(document.getElementById('exp-fees-coll').value) || 0;
+    const otherInc = parseFloat(document.getElementById('exp-income').value) || 0;
+    
     const rent = parseFloat(document.getElementById('exp-rent').value) || 0;
     const elec = parseFloat(document.getElementById('exp-elec').value) || 0;
     const maint = parseFloat(document.getElementById('exp-maint').value) || 0;
@@ -1347,28 +1358,23 @@ async function calcExp() {
     const aSal = parseFloat(document.getElementById('exp-a-sal').value) || 0;
     const mark = parseFloat(document.getElementById('exp-mark').value) || 0;
     const otherExp = parseFloat(document.getElementById('exp-other').value) || 0;
-    const otherInc = parseFloat(document.getElementById('exp-income').value) || 0;
 
-    // 2. Fetch Fee Collection from Students Table
-    const { data: students } = await db.from('students').select('paid_amount');
-    const totalFees = students ? students.reduce((sum, s) => sum + (s.paid_amount || 0), 0) : 0;
-
-    // 3. Apply Formulas
+    // 2. Calculation Formulas
     const totalExpenses = rent + elec + maint + tSal + aSal + mark + otherExp;
-    const totalCollection = totalFees + otherInc;
-    const netProfit = totalCollection - totalExpenses;
+    const totalRevenue = feesColl + otherInc;
+    const netProfit = totalRevenue - totalExpenses;
 
-    // 4. Update UI Display
-    document.getElementById('disp-fees').innerText = `₹ ${totalFees.toFixed(2)}`;
+    // 3. Update UI Display
+    document.getElementById('disp-fees').innerText = `₹ ${feesColl.toFixed(2)}`;
     document.getElementById('disp-other-inc').innerText = `₹ ${otherInc.toFixed(2)}`;
     document.getElementById('disp-total-exp').innerText = `₹ ${totalExpenses.toFixed(2)}`;
     document.getElementById('disp-profit').innerText = `₹ ${netProfit.toFixed(2)}`;
+    
     document.getElementById('disp-profit').style.color = netProfit >= 0 ? "green" : "red";
 
-    return { totalExpenses, totalCollection, netProfit };
+    return { totalExpenses, totalRevenue, netProfit };
 }
 
-// Function to save to Supabase
 async function saveExpense() {
     const month = document.getElementById('exp-month').value;
     if (!month) return alert("Please select a month");
@@ -1377,6 +1383,8 @@ async function saveExpense() {
 
     const expData = {
         month_year: month,
+        total_fees_manual: parseFloat(document.getElementById('exp-fees-coll').value) || 0,
+        other_income: parseFloat(document.getElementById('exp-income').value) || 0,
         rent: parseFloat(document.getElementById('exp-rent').value) || 0,
         electricity: parseFloat(document.getElementById('exp-elec').value) || 0,
         maintenance: parseFloat(document.getElementById('exp-maint').value) || 0,
@@ -1384,18 +1392,21 @@ async function saveExpense() {
         admin_salary: parseFloat(document.getElementById('exp-a-sal').value) || 0,
         marketing: parseFloat(document.getElementById('exp-mark').value) || 0,
         other_exp: parseFloat(document.getElementById('exp-other').value) || 0,
-        other_income: parseFloat(document.getElementById('exp-income').value) || 0,
         total_expenses: stats.totalExpenses,
-        total_collection: stats.totalCollection,
+        total_collection: stats.totalRevenue,
         net_profit: stats.netProfit
     };
 
     const { error } = await db.from('expenses').upsert(expData);
-    if (error) alert("Error: " + error.message);
-    else alert("Data Saved Successfully!");
+    
+    if (error) {
+        console.error(error);
+        alert("Error: " + error.message);
+    } else {
+        alert("Record Saved Successfully!");
+    }
 }
 
-// Function to fetch data when month changes
 async function fetchExpense() {
     const month = document.getElementById('exp-month').value;
     if (!month) return;
@@ -1403,21 +1414,21 @@ async function fetchExpense() {
     const { data, error } = await db.from('expenses').select('*').eq('month_year', month).single();
 
     if (data) {
-        document.getElementById('exp-rent').value = data.rent;
-        document.getElementById('exp-elec').value = data.electricity;
-        document.getElementById('exp-maint').value = data.maintenance;
-        document.getElementById('exp-t-sal').value = data.teacher_salary;
-        document.getElementById('exp-a-sal').value = data.admin_salary;
-        document.getElementById('exp-mark').value = data.marketing;
-        document.getElementById('exp-other').value = data.other_exp;
-        document.getElementById('exp-income').value = data.other_income;
+        document.getElementById('exp-fees-coll').value = data.total_fees_manual || 0;
+        document.getElementById('exp-income').value = data.other_income || 0;
+        document.getElementById('exp-rent').value = data.rent || 0;
+        document.getElementById('exp-elec').value = data.electricity || 0;
+        document.getElementById('exp-maint').value = data.maintenance || 0;
+        document.getElementById('exp-t-sal').value = data.teacher_salary || 0;
+        document.getElementById('exp-a-sal').value = data.admin_salary || 0;
+        document.getElementById('exp-mark').value = data.marketing || 0;
+        document.getElementById('exp-other').value = data.other_exp || 0;
     } else {
-        // Clear fields if no record exists
-        ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other','exp-income'].forEach(id => {
-            document.getElementById(id).value = 0;
-        });
+        // Reset inputs if no data for the month
+        const ids = ['exp-fees-coll','exp-income','exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'];
+        ids.forEach(id => document.getElementById(id).value = 0);
     }
-    calcExp();
+    calcExp(); // Recalculate displays
 }
 /* ==========================================
    11. TEACHER PORTAL (Admin Side)
