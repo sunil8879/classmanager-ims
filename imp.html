@@ -1780,17 +1780,30 @@ async function saveAttendance(dateValue, status) {
 
 
 // NEW ALERT LOGIC
+      // REFINED ALERT LOGIC: Connects to Parent Mobile Numbers
         if (status === "Absent") {
             const stuName = document.getElementById('attn-name').value;
-            const { data: stuData } = await db.from('students').select('mobile').eq('roll_number', roll).single();
             
-            if (stuData && stuData.mobile) {
-                const alertArea = document.getElementById('whatsapp-alert-area');
-                const waLink = document.getElementById('absent-wa-link');
-                const msg = encodeURIComponent(`Dear Parent, this is to inform you that ${stuName} was ABSENT for class on ${dateValue}. Regards, ClassManager IMS.`);
+            // 1. Fetch Father, Mother, and Student mobile numbers from the database
+            const { data: stuData } = await db.from('students')
+                .select('mobile, father_mobile, mother_mobile')
+                .eq('roll_number', roll)
+                .single();
+            
+            if (stuData) {
+                // 2. Priority Logic: Use Father's mobile, if empty use Mother's, if empty use Student's
+                const targetMobile = stuData.father_mobile || stuData.mother_mobile || stuData.mobile;
                 
-                waLink.href = `https://wa.me/91${stuData.mobile}?text=${msg}`;
-                alertArea.style.display = 'block'; 
+                if (targetMobile) {
+                    const alertArea = document.getElementById('whatsapp-alert-area');
+                    const waLink = document.getElementById('absent-wa-link');
+                    
+                    // Formulate the message to the Parent
+                    const msg = encodeURIComponent(`Dear Parent, this is to inform you that your child ${stuName} was ABSENT for class on ${dateValue}. Please ensure their regular attendance. Regards, ClassManager IMS.`);
+                    
+                    waLink.href = `https://wa.me/91${targetMobile}?text=${msg}`;
+                    alertArea.style.display = 'block'; 
+                }
             }
         } else {
             document.getElementById('whatsapp-alert-area').style.display = 'none'; 
