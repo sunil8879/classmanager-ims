@@ -354,19 +354,38 @@
         <main class="content" id="main-content">
             <!-- DEFAULT HOME PAGE -->
            <!-- DEFAULT HOME PAGE -->
-            <section id="home" class="content-section active">
-                <div class="card">
-                    <h2 class="hero-title" style="color: white;">Still managing your institute manually?</h2>
-                    <ul class="bullet-list">
-                        <li>Tracking fees in notebooks?</li>
-                        <li>Forgetting pending payments?</li>
-                        <li>Managing students in Excel?</li>
-                        <li>Confused batch records?</li>
-                    </ul>
-                    <span class="solve-text">ClassManager solves all this.</span>
-                </div>
+          <section id="home" class="content-section active">
+    
+    <!-- DISPLAY THIS ONLY FOR LOGGED-IN USERS -->
+    <div id="home-user-view" style="display: none;">
+        <div class="dashboard-stats" style="margin-bottom: 30px;">
+            <div class="stat-card" style="border-bottom: 5px solid #27ae60;">
+                <p>ADMISSIONS</p><h4 id="home-total-stu">0</h4><small>Total Students</small>
+            </div>
+            <div class="stat-card" style="border-bottom: 5px solid #1877F2;">
+                <p>COLLECTION</p><h4 id="home-total-coll">₹ 0</h4><small>Total Received</small>
+            </div>
+            <div class="stat-card" style="border-bottom: 5px solid #ff0000;">
+                <p>PENDING</p><h4 id="home-total-pend" style="color:red !important;">₹ 0</h4><small>Outstanding Fees</small>
+            </div>
+        </div>
+    </div>
 
-                <hr style="margin: 40px 0; border: 1px solid rgba(0,0,0,0.1);">
+    <!-- DISPLAY THIS FOR VISITORS (YOUR ORIGINAL CONTENT) -->
+    <div id="home-visitor-view">
+        <div class="card">
+            <h2 class="hero-title" style="color: white; text-decoration: none;">Still managing your institute manually?</h2>
+            <ul class="bullet-list">
+                <li>Tracking fees in notebooks?</li>
+                <li>Forgetting pending payments?</li>
+                <li>Managing students in Excel?</li>
+                <li>Confused batch records?</li>
+            </ul>
+            <span class="solve-text">ClassManager solves all this.</span>
+        </div>
+    </div>
+
+      <hr style="margin: 40px 0; border: 1px solid rgba(0,0,0,0.1);">
 
                 <h2 style="font-size: 2.2rem; margin-bottom: 30px;">Everything you need to manage your institute</h2>
                 <div class="feature-grid">
@@ -1196,6 +1215,38 @@
         </div>
     </footer>
 <script>
+
+
+
+
+// GLOBAL VARIABLE TO HOLD THE INSTITUTE ID
+let sessionInstID = "";
+
+// 1. Function to fetch the Institute ID from the logged-in user's profile
+async function syncInstituteSession() {
+    const { data: { user } } = await db.auth.getUser();
+    if (user) {
+        const { data: profile, error } = await db
+            .from('profiles')
+            .select('institute_id')
+            .eq('id', user.id)
+            .single();
+
+        if (profile) {
+            sessionInstID = profile.institute_id;
+            console.log("Institute Session Active: " + sessionInstID);
+        }
+    }
+}
+
+// Run this immediately when the script loads
+syncInstituteSession();
+
+
+
+
+
+
 /* ==========================================
    1. CORE INITIALIZATION
    ========================================== */
@@ -1251,37 +1302,36 @@ async function handleSignup() {
     const state = document.getElementById('sig-state').value;
     const mobile = document.getElementById('sig-mobile').value.trim();
 
-    // Validations
-    if (!name) return alert("Error: Please enter Full Name");
-    if (!role) return alert("Error: Please select your Status (Role)");
-    if (!isValidEmail(email)) return alert("Error: Please enter a valid Email ID");
-    if (pass.length < 6) return alert("Error: Password must be at least 6 characters long");
-    if (!state) return alert("Error: Please select your State/UT");
-    if (!isValidMobile(mobile)) return alert("Error: Please enter a valid 10-digit Indian Mobile Number");
+    if (!name || !role || !isValidEmail(email) || pass.length < 6 || !state || !isValidMobile(mobile)) {
+        return alert("Error: Please fill all fields correctly.");
+    }
+
+    // GENERATE A UNIQUE INSTITUTE ID (e.g., CM-8821)
+    const newInstID = "CM-" + Math.floor(1000 + Math.random() * 9000);
 
     const { data, error } = await db.auth.signUp({ email, password: pass });
 
     if (error) return alert("Signup Failed: " + error.message);
 
     if (data.user) {
-        // Create Profile in DB
+        // Create Profile with the new Institute ID
         const { error: profileError } = await db.from('profiles').insert([{ 
             id: data.user.id, 
             full_name: name, 
             email: email, 
             role: role, 
             mobile_number: mobile,
-            state: state
+            state: state,
+            institute_id: newInstID // <--- TAGGING THE OWNER
         }]);
 
         if (profileError) alert("Profile Error: " + profileError.message);
         else {
-            alert("Success! Account created. Please check your email for verification.");
+            alert("Success! Your Institute ID is: " + newInstID + ". Please verify your email.");
             clearForm('signup-form');
         }
     }
 }
-
 // 5. Handle Login
 // 5. Updated Handle Login with Role Verification
 // Global variable to store name for the "Bye Bye" message
@@ -1351,15 +1401,27 @@ async function handleLogout() {
 async function checkCurrentSession() {
     const { data: { user } } = await db.auth.getUser();
     if (user) {
-        const { data: profile } = await db.from('profiles').select('full_name').eq('id', user.id).single();
+        const { data: profile } = await db.from('profiles').select('full_name, institute_id').eq('id', user.id).single();
         if (profile) {
             sessionUserName = profile.full_name;
+            sessionInstID = profile.institute_id; // Set the Passport ID
+
+            // 1. Show the Top Welcome Bar
             document.getElementById('auth-status-bar').style.display = 'flex';
             document.getElementById('user-greeting').innerText = "Welcome " + sessionUserName;
+
+            // 2. TOGGLE HOME PAGE VIEW
+            document.getElementById('home-visitor-view').style.display = 'none'; // Hide the "Still managing?"
+            document.getElementById('home-user-view').style.display = 'block';  // Show the Stats
+            
+            loadHomeDashboardStats(); // Fetch the numbers
         }
+    } else {
+        // Not logged in: Show the visitor view, hide user view
+        document.getElementById('home-visitor-view').style.display = 'block';
+        document.getElementById('home-user-view').style.display = 'none';
     }
 }
-
 // Call this on script load
 checkCurrentSession();
 /* ==========================================
@@ -1419,6 +1481,7 @@ async function addStudent() {
 
     // 4. Prepare the Data Object
     const stuData = {
+ institute_id: sessionInstID,
         admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
         mobile: mobile,
@@ -1445,6 +1508,7 @@ async function addStudent() {
     // 6. Save to 'student_details' using UPSERT (This prevents the 'Unique Constraint' crash)
     if (newStu && newStu[0]) {
         const { error: detailError } = await db.from('student_details').upsert([{
+ institute_id: sessionInstID,
             student_id: newStu[0].id,
             roll_number: roll,
             course_end_date: endDate
@@ -1469,6 +1533,7 @@ async function fetchStudentByRoll() {
         .from('student_details')
         .select('roll_number, course_end_date, students(*)')
         .eq('roll_number', roll)
+ .eq('institute_id', sessionInstID)
         .single();
 
     if (error || !data) return alert("Student not found with this Roll Number.");
@@ -1580,6 +1645,7 @@ async function fetchFeeByRoll() {
     const { data: detailRecord, error: detailError } = await db.from('student_details')
         .select('student_id')
         .eq('roll_number', roll)
+ .eq('institute_id', sessionInstID)
         .maybeSingle();
 
     if (detailError) return alert("System Error: " + detailError.message);
@@ -1651,6 +1717,7 @@ async function saveFeeUpdate() {
     // 2. Insert into payment_history (Crucial for Logs)
     const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
     const { error: histError } = await db.from('payment_history').insert([{
+ institute_id: sessionInstID,
         student_id: detail.student_id,
         roll_number: roll,
         amount: nowPaying,
@@ -1671,6 +1738,7 @@ async function loadFeesPortal() {
     
     // 1. Get Totals for Active Students
     const { data: students } = await db.from('students').select('*').eq('status', 'Active');
+ .eq('institute_id', sessionInstID);
     if (students) {
         document.getElementById('stat-active-count').innerText = students.length;
         document.getElementById('stat-total-received').innerText = "₹ " + students.reduce((s, st) => s + (st.paid_amount || 0), 0).toLocaleString();
@@ -1752,6 +1820,7 @@ async function generateUPIQR() {
    ========================================== */
 async function addBatch() {
     const batchData = {
+ institute_id: sessionInstID,
         batch_name: document.getElementById('batch-name').value,
         teacher_id: document.getElementById('batch-teacher-id').value,
         teacher_name: document.getElementById('batch-teacher-name').value,
@@ -1774,6 +1843,7 @@ async function fetchBatch() {
     const { data, error } = await db.from('batches')
         .select('*')
         .eq('batch_name', name)
+ .eq('institute_id', sessionInstID)
         .single();
 
     if (error || !data) return alert("Batch not found.");
@@ -1814,6 +1884,7 @@ async function fetchStudentForAttn() {
         .from('students')
         .select('full_name')
         .eq('roll_number', roll)
+ .eq('institute_id', sessionInstID)
         .single();
 
     if (error || !data) {
@@ -1865,6 +1936,7 @@ async function saveAttendance(dateValue, status) {
     const monthYear = new Date(dateValue).toLocaleString('default', { month: 'long', year: 'numeric' });
 
     const { error } = await db.from('attendance').insert([{
+ institute_id: sessionInstID,
         student_id: student.id,
         roll_number: roll,
         attendance_date: dateValue,
@@ -1993,6 +2065,7 @@ async function loadAdminDashboard() {
     // B. Query Total Students (Joined in this period)
     const { count: stuCount } = await db.from('students')
         .select('*', { count: 'exact', head: true })
+ .eq('institute_id', sessionInstID)
         .gte('admission_date', startDate)
         .lte('admission_date', endDate);
     document.getElementById('dash-students').innerText = stuCount || 0;
@@ -2143,6 +2216,7 @@ function clearLeadForm() {
 
 async function addLead() {
     const leadData = {
+ institute_id: sessionInstID,
         full_name: document.getElementById('lead-name').value,
         contact: document.getElementById('lead-contact').value,
         email: document.getElementById('lead-email').value, // NO MORE NULL
@@ -2175,6 +2249,7 @@ async function fetchLead() {
         .from('leads')
         .select('*')
         .eq('contact', contact)
+ .eq('institute_id', sessionInstID)
         .single();
 
     if (error || !data) return alert("Lead not found.");
@@ -2217,6 +2292,7 @@ async function fetchAutoFees() {
         .from('payment_history')
         .select('amount')
         .eq('month_year', targetMonthYear);
+ .eq('institute_id', sessionInstID);
 
     const total = data ? data.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
     
@@ -2263,6 +2339,7 @@ async function saveExpenses() {
     const otherInc = parseFloat(document.getElementById('exp-income').value) || 0;
 
     const dataObj = {
+ institute_id: sessionInstID,
         month_year: monthYear,
         rent: parseFloat(document.getElementById('exp-rent').value) || 0,
         electricity: parseFloat(document.getElementById('exp-elec').value) || 0,
@@ -2398,6 +2475,7 @@ async function addTeacherDetails() {
     if (!id || !name) return alert("Error: Click GEN and enter Teacher Name.");
 
     const { error } = await db.from('teacher_details').insert([{
+ institute_id: sessionInstID,
         id: id,
         teacher_name: name,
         age: parseInt(document.getElementById('tch-age').value) || 0,
@@ -2415,7 +2493,9 @@ async function fetchTeacher() {
     const id = prompt("Enter Teacher ID to fetch (e.g., TCH-1234):");
     if (!id) return;
 
-    const { data, error } = await db.from('teacher_details').select('*').eq('id', id).single();
+    const { data, error } = await db.from('teacher_details').select('*').eq('id', id)
+ .eq('institute_id', sessionInstID)
+.single();
 
     if (error || !data) return alert("Error: Teacher not found with ID " + id);
 
@@ -2628,7 +2708,8 @@ async function generateCertificate() {
         const randomID = Math.floor(1000 + Math.random() * 9000);
         certNo = `IMS/CERT/${new Date().getFullYear()}/${randomID}`;
         // Save it so it never changes for this student
-        await db.from('certificates').insert([{ student_id: student.id, cert_number: certNo }]);
+        await db.from('certificates').insert([{
+ institute_id: sessionInstID, student_id: student.id, cert_number: certNo }]);
     }
 
     // 5. Populate Template
@@ -2695,7 +2776,9 @@ async function fetchPerformanceData() {
     if(!mobile) return alert("Please enter mobile number");
 
     // A. Fetch Basic & Extended Data
-    const { data: student } = await db.from('students').select('*').eq('mobile', mobile).single();
+    const { data: student } = await db.from('students').select('*').eq('mobile', mobile)
+ .eq('institute_id', sessionInstID)
+.single();
     if (!student) return alert("Student not found.");
 
     const { data: details } = await db.from('student_details').select('*').eq('student_id', student.id).single();
@@ -2750,6 +2833,7 @@ async function savePerformanceData() {
 
     // 2. Prepare the data
     const updateData = {
+ institute_id: sessionInstID,
         student_id: student.id,
         total_marks_secured: parseFloat(document.getElementById('perf-marks').value) || 0,
         total_exams: parseInt(document.getElementById('perf-exam-count').value) || 0,
