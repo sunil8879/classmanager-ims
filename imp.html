@@ -557,21 +557,59 @@ input:focus {
 </section>
 
 <!-- 5. ATTENDANCE -->
+<!-- 5. ATTENDANCE -->
 <section id="attendance" class="content-section">
     <div class="card">
-        <h3>Attendance Tracker</h3>
+        <h3><i class="fas fa-clipboard-check"></i> Attendance Tracker</h3>
+        
+        <!-- Student Link Fields -->
         <div class="form-grid">
-            <select><option>Select View: Student</option><option>Teacher</option></select>
-            <input type="month">
-            <input type="number" placeholder="Total Present">
-            <input type="number" placeholder="Total Absent">
-            <input type="text" placeholder="Remarks">
-     <!-- Update the buttons in Section #5 -->
-<div class="button-row">
-    <button class="btn-add" onclick="markAttendance('Present')">Mark Present</button>
-    <button class="btn-edit" onclick="markAttendance('Absent')">Mark Absent</button>
-    <button class="btn-fetch" onclick="fetchAttendance()">Fetch Statistics</button>
-</div>
+            <div class="input-group">
+                <label>Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="attn-roll" placeholder="e.g. IMS-2026-1234">
+                    <button class="btn-fetch" onclick="fetchStudentForAttn()" style="padding: 5px 10px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Student Name</label>
+                <input type="text" id="attn-name" readonly style="background: #eee;" placeholder="Fetched automatically">
+            </div>
+        </div>
+
+        <hr style="margin: 20px 0;">
+
+        <div class="form-grid">
+            <div class="input-group">
+                <label>View Monthly Record (Old Calendar)</label>
+                <input type="month" id="attn-month-view">
+            </div>
+            <div class="input-group">
+                <label>Total Present</label>
+                <input type="number" id="attn-total-p" placeholder="0" readonly>
+            </div>
+            <div class="input-group">
+                <label>Total Absent</label>
+                <input type="number" id="attn-total-a" placeholder="0" readonly>
+            </div>
+        </div>
+
+        <!-- Hidden Date Picker that will be triggered by buttons -->
+        <input type="date" id="attn-date-picker" style="display: none;">
+
+        <div class="button-row">
+            <button class="btn-add" onclick="triggerAttendance('Present')">
+                <i class="fas fa-check-circle"></i> MARK PRESENT
+            </button>
+            <button class="btn-edit" style="background: #e74c3c;" onclick="triggerAttendance('Absent')">
+                <i class="fas fa-times-circle"></i> MARK ABSENT
+            </button>
+            <button class="btn-fetch" onclick="fetchAttendanceByPrompt()">
+                <i class="fas fa-sync"></i> Fetch Statistics
+            </button>
+        </div>
+        <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">* Clicking Mark buttons will open a calendar to select the date.</p>
+    </div>
 </section>
 
 <!-- 6. ADMIN DASHBOARD -->
@@ -1135,30 +1173,106 @@ async function editBatch() {
 /* ==========================================
    6. ATTENDANCE (Mark & Fetch)
    ========================================== */
-async function markAttendance(status) {
-    const { error } = await db.from('attendance').insert([{
-        user_id: currentUser.id,
-        status: status,
-        month_year: val('#attendance', 'input[type="month"]')
-    }]);
-    alert("Attendance Saved");
+/* ==========================================
+   UPDATED ATTENDANCE LOGIC
+   ========================================== */
+
+// 1. Fetch Student Name using Roll Number for the UI
+async function fetchStudentForAttn() {
+    const roll = document.getElementById('attn-roll').value;
+    if (!roll) return alert("Please enter a Roll Number");
+
+    // Join student_details and students to get the name
+    const { data, error } = await db
+        .from('student_details')
+        .select('students(full_name)')
+        .eq('roll_number', roll)
+        .single();
+
+    if (error || !data) {
+        alert("Roll Number not found!");
+        document.getElementById('attn-name').value = "";
+    } else {
+        document.getElementById('attn-name').value = data.students.full_name;
+    }
 }
 
-async function fetchAttendance() {
-    const monthYear = val('#attendance', 'input[type="month"]');
-    // Fetches count of 'Present' days for the logged-in user in that month
-    const { data, error, count } = await db
-        .from('attendance')
-        .select('*', { count: 'exact' })
-        .eq('month_year', monthYear)
-        .eq('status', 'Present')
-.eq('user_id', currentUser.id); 
+// 2. Trigger the calendar popup
+let currentAttnStatus = "";
+function triggerAttendance(status) {
+    const name = document.getElementById('attn-name').value;
+    if (!name) return alert("Please fetch a student by Roll Number first!");
     
-    if (error) alert(error.message);
-    else {
-        document.querySelector('#attendance input[placeholder="Total Present"]').value = count || 0;
-        alert("Attendance records fetched for " + monthYear);
-    }
+    currentAttnStatus = status;
+    const picker = document.getElementById('attn-date-picker');
+    
+    // Programmatically open the calendar
+    picker.showPicker(); 
+    
+    // Listen for the date selection
+    picker.onchange = async function() {
+        if (this.value) {
+            await saveAttendance(this.value, currentAttnStatus);
+            this.value = ""; // reset
+        }
+    };
+}
+
+// 3. Save to Supabase
+async function saveAttendance(dateValue, status) {
+    const roll = document.getElementById('attn-roll').value;
+    
+    // Get student ID
+    const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
+    
+    const monthYear = new Date(dateValue).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const { error } = await db.from('attendance').insert([{
+        student_id: detail.student_id,
+        roll_number: roll,
+        attendance_date: dateValue,
+        status: status,
+        month_year: monthYear, // for old calendar compatibility
+        user_id: currentUser.id // Admin/Teacher who marked it
+    }]);
+
+    if (error) alert("Error: " + error.message);
+    else alert(`Success: Marked ${status} for ${dateValue}`);
+}
+
+// 4. Fetch Statistics via Prompt
+async function fetchAttendanceByPrompt() {
+    const roll = prompt("Enter Student Roll Number to fetch records:");
+    if (!roll) return;
+
+    const monthView = document.getElementById('attn-month-view').value; // e.g., "2026-03"
+    if (!monthView) return alert("Please select a month in the 'View Monthly Record' field first.");
+
+    // Format month for query
+    const dateObj = new Date(monthView + "-01");
+    const formattedMonth = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Fetch Present Count
+    const { count: pCount } = await db.from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('roll_number', roll)
+        .eq('month_year', formattedMonth)
+        .eq('status', 'Present');
+
+    // Fetch Absent Count
+    const { count: aCount } = await db.from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('roll_number', roll)
+        .eq('month_year', formattedMonth)
+        .eq('status', 'Absent');
+
+    // Update UI
+    document.getElementById('attn-total-p').value = pCount || 0;
+    document.getElementById('attn-total-a').value = aCount || 0;
+    document.getElementById('attn-roll').value = roll;
+    fetchStudentForAttn(); // Update name field too
+    
+    alert(`Stats for ${roll} in ${formattedMonth} updated.`);
 }
 /* ==========================================
    7. ADMIN DASHBOARD (Dynamic Counts)
