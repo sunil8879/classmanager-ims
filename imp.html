@@ -456,6 +456,7 @@
 <button class="nav-tab" onclick="showSection('t-attn-mod')"><i class="fas fa-user-check"></i> Teacher Attendance</button>
 <button class="nav-tab" onclick="showSection('allocation-mod')"><i class="fas fa-link"></i> Student Allocation</button>
 <button class="nav-tab" onclick="showSection('message-corner'); msgEngine('General');"><i class="fas fa-comments"></i> Message Corner</button>
+<button class="nav-tab" onclick="showSection('calendar-mod')"><i class="fas fa-calendar-alt"></i> Academic Calendar</button>
         </aside>
 
         <main class="content" id="main-content">
@@ -1455,6 +1456,38 @@
                 </button>
             </div>
 
+        </div>
+    </div>
+</section>
+
+
+<section id="calendar-mod" class="content-section">
+    <!-- OWNER: Add Event -->
+    <div class="card" id="calendar-admin-view" style="border-top: 5px solid #ff0000;">
+        <h3><i class="fas fa-calendar-plus"></i> Manage Holidays & Events</h3>
+        <div class="form-grid">
+            <div class="input-group"><label>Event Date</label><input type="date" id="cal-date"></div>
+            <div class="input-group"><label>Event Name</label><input type="text" id="cal-name" placeholder="e.g. Diwali Holiday"></div>
+            <div class="input-group">
+                <label>Type</label>
+                <select id="cal-type">
+                    <option>Holiday</option>
+                    <option>Exam</option>
+                    <option>Event/Function</option>
+                </select>
+            </div>
+            <div class="input-group"><label>Short Description</label><input type="text" id="cal-desc" placeholder="e.g. Institute will remain closed"></div>
+        </div>
+        <div class="button-row">
+            <button class="btn-add" onclick="saveCalendarEvent()">ADD TO CALENDAR</button>
+        </div>
+    </div>
+
+    <!-- EVERYONE: View Calendar -->
+    <div class="card" style="margin-top: 20px;">
+        <h3><i class="fas fa-calendar-day"></i> Upcoming Dates</h3>
+        <div id="calendar-list" style="text-align: left; margin-top: 15px;">
+            <p style="color: #888; text-align: center;">Loading calendar...</p>
         </div>
     </div>
 </section>
@@ -3804,6 +3837,59 @@ async function viewTeacherStudents() {
         listArea.style.display = 'none';
     }
 }
+
+
+// 1. Save Event (For Owners)
+async function saveCalendarEvent() {
+    const data = {
+        institute_id: sessionInstID,
+        event_date: document.getElementById('cal-date').value,
+        event_name: document.getElementById('cal-name').value,
+        event_type: document.getElementById('cal-type').value,
+        description: document.getElementById('cal-desc').value
+    };
+
+    if (!data.event_date || !data.event_name) return alert("Date and Name are required!");
+
+    const { error } = await db.from('institute_calendar').insert([data]);
+    if (error) alert(error.message);
+    else {
+        alert("Event Added!");
+        loadCalendar();
+        document.getElementById('cal-name').value = "";
+        document.getElementById('cal-desc').value = "";
+    }
+}
+
+// 2. Load Events (For Everyone)
+async function loadCalendar() {
+    const listDiv = document.getElementById('calendar-list');
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await db.from('institute_calendar')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .gte('event_date', today) // Show only today and future dates
+        .order('event_date', { ascending: true });
+
+    if (data && data.length > 0) {
+        listDiv.innerHTML = data.map(item => `
+            <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 20px;">
+                <div style="background: #000; color: #fff; padding: 10px; border-radius: 8px; text-align: center; min-width: 80px;">
+                    <small>${new Date(item.event_date).toLocaleString('default', { month: 'short' })}</small>
+                    <h2 style="margin:0; color: #7FFFD4 !important; text-decoration: none !important;">${new Date(item.event_date).getDate()}</h2>
+                </div>
+                <div>
+                    <b style="font-size: 1.1rem;">${item.event_name}</b> 
+                    <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: ${item.event_type === 'Holiday' ? '#ffcccc' : '#ccffea'}; color: #000; margin-left: 10px;">${item.event_type}</span>
+                    <p style="margin: 5px 0 0; color: #666; font-size: 0.9rem;">${item.description}</p>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        listDiv.innerHTML = "<p style='text-align:center; color: #999;'>No upcoming holidays or events.</p>";
+    }
+}
 /* ==========================================
    15. NAVIGATION & INIT
    ========================================== */
@@ -3850,6 +3936,11 @@ function showSection(id) {
                 // Auto-load Personal Student Portal
                 if (typeof loadStudentPortal === 'function') loadStudentPortal();
                 break;
+				
+				// Inside your switch (id) statement in showSection(id)
+case 'calendar-mod':
+    loadCalendar();
+    break;
 
             default:
                 // No auto-population required for other sections
