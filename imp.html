@@ -2815,6 +2815,7 @@ async function loadFeeReminders() {
         const { data: students, error } = await db
             .from('students')
             .select('full_name, roll_number, mobile, pending_amount')
+.eq('institute_id', sessionInstID)
             .eq('status', 'Active')
             .gt('pending_amount', 0)
             .gte('admission_date', startDate)
