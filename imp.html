@@ -3869,25 +3869,41 @@ async function loadCalendar() {
     const { data, error } = await db.from('institute_calendar')
         .select('*')
         .eq('institute_id', sessionInstID)
-        .gte('event_date', today) // Show only today and future dates
+        .gte('event_date', today)
         .order('event_date', { ascending: true });
 
     if (data && data.length > 0) {
         listDiv.innerHTML = data.map(item => `
-            <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 20px;">
-                <div style="background: #000; color: #fff; padding: 10px; border-radius: 8px; text-align: center; min-width: 80px;">
-                    <small>${new Date(item.event_date).toLocaleString('default', { month: 'short' })}</small>
-                    <h2 style="margin:0; color: #7FFFD4 !important; text-decoration: none !important;">${new Date(item.event_date).getDate()}</h2>
+            <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="background: #000; color: #fff; padding: 10px; border-radius: 8px; text-align: center; min-width: 80px;">
+                        <small>${new Date(item.event_date).toLocaleString('default', { month: 'short' })}</small>
+                        <h2 style="margin:0; color: #7FFFD4 !important; text-decoration: none !important;">${new Date(item.event_date).getDate()}</h2>
+                    </div>
+                    <div>
+                        <b style="font-size: 1.1rem;">${item.event_name}</b> 
+                        <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: ${item.event_type === 'Holiday' ? '#ffcccc' : '#ccffea'}; color: #000; margin-left: 10px;">${item.event_type}</span>
+                        <p style="margin: 5px 0 0; color: #666; font-size: 0.9rem;">${item.description}</p>
+                    </div>
                 </div>
-                <div>
-                    <b style="font-size: 1.1rem;">${item.event_name}</b> 
-                    <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: ${item.event_type === 'Holiday' ? '#ffcccc' : '#ccffea'}; color: #000; margin-left: 10px;">${item.event_type}</span>
-                    <p style="margin: 5px 0 0; color: #666; font-size: 0.9rem;">${item.description}</p>
-                </div>
+                <!-- Delete Button (Only works/shows for Owners) -->
+                ${sessionUserName ? `<button onclick="deleteEvent('${item.id}')" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button>` : ''}
             </div>
         `).join('');
     } else {
         listDiv.innerHTML = "<p style='text-align:center; color: #999;'>No upcoming holidays or events.</p>";
+    }
+}
+
+// Function to delete an event
+async function deleteEvent(id) {
+    if (!confirm("Are you sure you want to remove this event?")) return;
+    
+    const { error } = await db.from('institute_calendar').delete().eq('id', id);
+    if (error) alert("Error: " + error.message);
+    else {
+        alert("Event Removed");
+        loadCalendar();
     }
 }
 /* ==========================================
