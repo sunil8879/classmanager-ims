@@ -3897,28 +3897,26 @@ async function initMessageCorner() {
     setMsgTab('General'); // Default view
 }
 
-/ 1. Updated Tab Switcher
+
+// 1. Updated Tab Switcher (No logic changes, just ultra-stable code)
 function setMsgTab(type) {
     msgActiveTab = type;
     document.getElementById('msg-mode-label').innerText = "Mode: " + type;
     
-    const inputBox = document.getElementById('msg-input-box');
-
-    // STRAIGHTFORWARD ROLE CHECK
-    // If Owner: Can type in OwnerToTeacher & General.
-    // If Teacher: Can type in TeacherToStudent & General.
-    // If Student: Can only type in General.
+    var inputBox = document.getElementById('msg-input-box');
     
+    // SIMPLE PERMISSIONS
     if (type === "General") {
-        inputBox.style.display = "block"; 
+        inputBox.style.display = "block";
     } else if (type === "OwnerToTeacher") {
         inputBox.style.display = (loggedRole === "Owner") ? "block" : "none";
     } else if (type === "TeacherToStudent") {
         inputBox.style.display = (loggedRole === "Teacher") ? "block" : "none";
     }
-
+    
     refreshMessages();
 }
+
 
 
 async function submitMessage() {
@@ -3938,49 +3936,52 @@ async function submitMessage() {
     refreshMessages();
 }
 
+// 2. Updated Message Loader (String-safe version to fix Syntax Error)
 async function refreshMessages() {
-    const display = document.getElementById('msg-list');
-    
-    // Show a loading state so it doesn't flicker/disappear
-    display.innerHTML = "<p style='text-align:center;color:gray;'>Loading messages...</p>";
+    var display = document.getElementById('msg-list');
+    display.innerHTML = "Fetching messages...";
 
-    // Fetch from Supabase
-    const { data: msgs, error } = await db.from('messages')
+    var { data: msgs, error } = await db.from('messages')
         .select('*')
         .eq('institute_id', sessionInstID)
         .eq('message_type', msgActiveTab)
         .order('created_at', { ascending: false });
 
     if (error) {
-        display.innerHTML = "<p style='color:red;'>Error loading messages.</p>";
+        display.innerHTML = "Error loading messages.";
         return;
     }
 
     if (!msgs || msgs.length === 0) {
-        display.innerHTML = `<p style='color:gray;text-align:center;padding:20px;'>No messages in ${msgActiveTab} yet.</p>`;
+        display.innerHTML = "No messages in this category yet.";
         return;
     }
 
-    // SUBJECT FILTERING LOGIC
-    // Owners see all. Teachers/Students only see "All" or their specific subject.
-    const filtered = msgs.filter(m => {
+    // Filter by subject
+    var filtered = msgs.filter(function(m) {
         if (loggedRole === "Owner") return true; 
         if (m.target_subject === "All" || m.target_subject === loggedSubject) return true;
         return false;
     });
 
-    display.innerHTML = filtered.map(m => `
-        <div style="border-bottom: 1px solid #eee; padding: 10px; text-align: left;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role})</small>
-                <small style="color:#999; font-size:0.7rem;">${new Date(m.created_at).toLocaleTimeString()}</small>
-            </div>
-            <p style="margin: 5px 0; color:#333; font-size:0.95rem;">${m.content}</p>
-            <span style="font-size:0.7rem; background:#7FFFD4; padding:1px 6px; border-radius:10px; border:1px solid #555;">${m.target_subject}</span>
-        </div>
-    `).join('');
-}
+    // Build HTML without using complex backticks to avoid Syntax Errors
+    var htmlContent = "";
+    for (var i = 0; i < filtered.length; i++) {
+        var m = filtered[i];
+        var time = new Date(m.created_at).toLocaleTimeString();
+        
+        htmlContent += '<div style="border-bottom: 1px solid #eee; padding: 10px; text-align: left;">';
+        htmlContent += '<div style="display:flex; justify-content:space-between;">';
+        htmlContent += '<small style="color:#1877F2;"><b>' + m.sender_name + '</b> (' + m.sender_role + ')</small>';
+        htmlContent += '<small style="color:#999; font-size:0.7rem;">' + time + '</small>';
+        htmlContent += '</div>';
+        htmlContent += '<p style="margin: 5px 0; color:#333;">' + m.content + '</p>';
+        htmlContent += '<span style="font-size:0.7rem; background:#7FFFD4; padding:2px 6px; border-radius:5px;">' + m.target_subject + '</span>';
+        htmlContent += '</div>';
+    }
 
+    display.innerHTML = htmlContent;
+}
 
 // 1. CLEAR: Just hides the messages from the screen (Doesn't delete from DB)
 function clearChatDisplay() {
