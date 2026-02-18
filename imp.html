@@ -612,7 +612,15 @@
         <h3>1. FEE DETAILS</h3>
         <div class="form-grid">
             <div class="input-group"><label>Date Today</label><input type="date" id="fee-today"></div>
-            <div class="input-group"><label>Roll Number</label><input type="text" id="fee-roll" placeholder="IMS-2026-XXXX"></div>
+         <div class="input-group">
+    <label>Roll Number</label>
+    <div style="display: flex; gap: 5px;">
+        <input type="text" id="fee-roll" placeholder="IMS-2026-XXXX">
+        <button type="button" onclick="fetchFeeByRoll()" style="background: #007bff; color: white; border: 1px solid #000; border-radius: 5px; padding: 0 10px; cursor: pointer;">
+            <i class="fas fa-search"></i>
+        </button>
+    </div>
+</div>
             <div class="input-group"><label>Full Name</label><input type="text" id="fee-name" placeholder="Initial + Surname"></div>
             <div class="input-group"><label>Date of Joining</label><input type="date" id="fee-join-date"></div>
             <div class="input-group"><label>Course Name</label><input type="text" id="fee-course" readonly style="background:#eee;"></div>
@@ -1923,15 +1931,14 @@ async function fetchFeeByRoll() {
     const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter a Roll Number.");
 
-    // Link: Find student through the student_details bridge
     const { data: detail } = await db.from('student_details')
         .select('student_id').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
 
     if (!detail) return alert("Roll Number not found.");
 
-    // Fetch live data from Students table
+    // ADDED 'pending_amount' to your original select below
     const { data: s } = await db.from('students')
-        .select('full_name, course, total_fees, paid_amount, due_dates, status')
+        .select('full_name, course, total_fees, paid_amount, pending_amount, due_dates, status')
         .eq('id', detail.student_id).maybeSingle();
 
     if (s) {
@@ -1939,6 +1946,9 @@ async function fetchFeeByRoll() {
         document.getElementById('fee-course').value = s.course;
         document.getElementById('fee-total').value = s.total_fees;
         document.getElementById('fee-prev-paid').value = s.paid_amount;
+        // POPULATING the 3rd greyed field
+        document.getElementById('fee-pending').value = s.pending_amount; 
+        
         document.getElementById('fee-due-dates').value = s.due_dates || "";
         document.getElementById('fee-status').value = s.status || "Active";
         document.getElementById('fee-today').value = new Date().toISOString().split('T')[0];
