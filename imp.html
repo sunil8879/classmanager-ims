@@ -455,7 +455,7 @@
 <button class="nav-tab" onclick="showSection('exam-mod')"><i class="fas fa-file-signature"></i> Exam Management</button>
 <button class="nav-tab" onclick="showSection('t-attn-mod')"><i class="fas fa-user-check"></i> Teacher Attendance</button>
 <button class="nav-tab" onclick="showSection('allocation-mod')"><i class="fas fa-link"></i> Student Allocation</button>
-<button class="nav-tab" onclick="showSection('message-corner'); initMessageCorner();"><i class="fas fa-comments"></i> Message Corner</button>
+<button class="nav-tab" onclick="showSection('message-corner'); syncRoleAndBox();"><i class="fas fa-comments"></i> Message Corner</button>
         </aside>
 
         <main class="content" id="main-content">
@@ -3880,45 +3880,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+// --- NEW STRAIGHTFORWARD LOGIC ---
+var msgTab = "General";
+var myRole = ""; 
+var mySub = "";
 
-
-let msgActiveTab = "General";
-let loggedRole = "";
-let loggedSubject = "";
-
-async function initMessageCorner() {
-    // Discovery Logic: Get User Details without touching existing session code
+async function syncRoleAndBox() {
     const { data: { user } } = await db.auth.getUser();
-    const { data: prof } = await db.from('profiles').select('role, subject_taught, course').eq('id', user.id).single();
+    const { data: p } = await db.from('profiles').select('role, subject_taught, course').eq('id', user.id).single();
     
-    loggedRole = prof.role;
-    loggedSubject = prof.subject_taught || prof.course || "All";
+    myRole = p.role;
+    mySub = p.subject_taught || p.course || "All";
     
-    setMsgTab('General'); // Default view
+    setMsgTab("General"); 
 }
 
+function setMsgTab(mode) {
+    msgTab = mode;
+    document.getElementById('msg-mode-label').innerText = "Mode: " + mode;
+    var box = document.getElementById('msg-input-box');
 
-// 1. Updated Tab Switcher (No logic changes, just ultra-stable code)
-function setMsgTab(type) {
-    msgActiveTab = type;
-    document.getElementById('msg-mode-label').innerText = "Mode: " + type;
-    
-    var inputBox = document.getElementById('msg-input-box');
-    
-    // SIMPLE PERMISSIONS
-    if (type === "General") {
-        inputBox.style.display = "block";
-    } else if (type === "OwnerToTeacher") {
-        inputBox.style.display = (loggedRole === "Owner") ? "block" : "none";
-    } else if (type === "TeacherToStudent") {
-        inputBox.style.display = (loggedRole === "Teacher") ? "block" : "none";
+    if (mode === "General") {
+        box.style.display = "block";
+    } else if (mode === "OwnerToTeacher") {
+        box.style.display = (myRole === "Owner") ? "block" : "none";
+    } else if (mode === "TeacherToStudent") {
+        box.style.display = (myRole === "Teacher") ? "block" : "none";
     }
-    
     refreshMessages();
 }
 
+async function refreshMessages() {
+    var list = document.getElementById('msg-list');
+    list.innerHTML = "Loading...";
 
+    var { data: msgs } = await db.from('messages')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .eq('message_type', msgTab)
+        .order('created_at', { ascending: false });
 
+    var html = "";
+    if (msgs) {
+        for (var i = 0; i < msgs.length; i++) {
+            var m = msgs[i];
+            if (myRole === "Owner" || m.target_subject === "All" || m.target_subject === mySub) {
+                html += '<div style="border-bottom:1px solid #eee; padding:10px;">';
+                html += '<small style="color:#1877F2;"><b>' + m.sender_name + '</b> (' + m.sender_role + ')</small>';
+                html += '<p style="margin:5px 0; font-weight:500;">' + m.content + '</p>';
+                html += '<span style="font-size:0.7rem; background:#7FFFD4; padding:2px 5px; border-radius:3px;">' + m.target_subject + '</span>';
+                html += '</div>';
+            }
+        }
+    }
+    list.innerHTML = html || "No messages found.";
+}
+
+// THE UPDATED SEND LOGIC (Uses new variable names)
 async function submitMessage() {
     const text = document.getElementById('msg-text').value;
     if(!text) return alert("Empty message");
@@ -3926,8 +3944,8 @@ async function submitMessage() {
     await db.from('messages').insert([{
         institute_id: sessionInstID,
         sender_name: sessionUserName,
-        sender_role: loggedRole,
-        message_type: msgActiveTab,
+        sender_role: myRole, // Updated
+        message_type: msgTab, // Updated
         target_subject: document.getElementById('msg-cat').value,
         content: text
     }]);
@@ -3936,57 +3954,13 @@ async function submitMessage() {
     refreshMessages();
 }
 
-// 2. Updated Message Loader (String-safe version to fix Syntax Error)
-async function refreshMessages() {
-    var display = document.getElementById('msg-list');
-    display.innerHTML = "Fetching messages...";
-
-    var { data: msgs, error } = await db.from('messages')
-        .select('*')
-        .eq('institute_id', sessionInstID)
-        .eq('message_type', msgActiveTab)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        display.innerHTML = "Error loading messages.";
-        return;
-    }
-
-    if (!msgs || msgs.length === 0) {
-        display.innerHTML = "No messages in this category yet.";
-        return;
-    }
-
-    // Filter by subject
-    var filtered = msgs.filter(function(m) {
-        if (loggedRole === "Owner") return true; 
-        if (m.target_subject === "All" || m.target_subject === loggedSubject) return true;
-        return false;
-    });
-
-    // Build HTML without using complex backticks to avoid Syntax Errors
-    var htmlContent = "";
-    for (var i = 0; i < filtered.length; i++) {
-        var m = filtered[i];
-        var time = new Date(m.created_at).toLocaleTimeString();
-        
-        htmlContent += '<div style="border-bottom: 1px solid #eee; padding: 10px; text-align: left;">';
-        htmlContent += '<div style="display:flex; justify-content:space-between;">';
-        htmlContent += '<small style="color:#1877F2;"><b>' + m.sender_name + '</b> (' + m.sender_role + ')</small>';
-        htmlContent += '<small style="color:#999; font-size:0.7rem;">' + time + '</small>';
-        htmlContent += '</div>';
-        htmlContent += '<p style="margin: 5px 0; color:#333;">' + m.content + '</p>';
-        htmlContent += '<span style="font-size:0.7rem; background:#7FFFD4; padding:2px 6px; border-radius:5px;">' + m.target_subject + '</span>';
-        htmlContent += '</div>';
-    }
-
-    display.innerHTML = htmlContent;
-}
-
-// 1. CLEAR: Just hides the messages from the screen (Doesn't delete from DB)
+// THE CLEAR VIEW LOGIC (Keep this)
 function clearChatDisplay() {
-    document.getElementById('msg-list').innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>View cleared. Click RESTORE to see history.</p>";
+    document.getElementById('msg-list').innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>View cleared. Click RESTORE ALL to see history.</p>";
 }
+
+
+
 
 // 2. RESTORE: The restore button simply calls your existing refresh function
 // (Note: refreshMessages already exists in your code, so this button just triggers it!)
