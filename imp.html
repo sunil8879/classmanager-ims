@@ -2958,6 +2958,19 @@ async function fetchPerformanceData() {
 
         const roll = student.roll_number;
 
+
+// FETCH EXAM DATA
+        const { data: examRecords } = await db.from('exam').select('marks_obtained, total_marks')
+            .eq('roll_number', roll).eq('institute_id', sessionInstID);
+
+        let totalObtained = 0, examCount = 0, avgPercent = 0;
+        if (examRecords && examRecords.length > 0) {
+            examCount = examRecords.length;
+            totalObtained = examRecords.reduce((s, r) => s + (parseFloat(r.marks_obtained) || 0), 0);
+            const totalPossible = examRecords.reduce((s, r) => s + (parseFloat(r.total_marks) || 0), 0);
+            avgPercent = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
+        }
+
         // STEP 2: Fetch all marks for this Roll Number from 'exam' table
         const { data: examRecords, error: examErr } = await db
             .from('exam')
@@ -2967,52 +2980,40 @@ async function fetchPerformanceData() {
 
         if (examErr) throw examErr;
 
-      // STEP 3: Fetch Attendance for THIS MONTH (Calculates real percentage)
+        // FETCH ATTENDANCE (This Month)
         const monthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        const { data: attData } = await db.from('attendance')
-            .select('status')
-            .eq('roll_number', roll)
-            .eq('month_year', monthYear)
-            .eq('institute_id', sessionInstID);
+        const { data: attData } = await db.from('attendance').select('status')
+            .eq('roll_number', roll).eq('month_year', monthYear).eq('institute_id', sessionInstID);
 
         const totalDays = attData ? attData.length : 0;
         const absentCount = attData ? attData.filter(a => a.status === 'Absent').length : 0;
-        // If no attendance marked yet, show 100%, otherwise calculate
         const attPct = totalDays > 0 ? (((totalDays - absentCount) / totalDays) * 100).toFixed(1) : "100";
 
-        // STEP 4: Fetch summary (for Teacher Name)
-        const { data: summary } = await db.from('performance_tracking')
-            .select('teacher_name')
-            .eq('roll_number', roll)
-            .eq('institute_id', sessionInstID).maybeSingle();
-
-        // STEP 5: Populate UI
-        document.getElementById('perf-today').value = new Date().toLocaleDateString();
+        // POPULATE UI
         document.getElementById('perf-name').value = student.full_name;
         document.getElementById('perf-roll').value = roll;
-        document.getElementById('perf-course').value = student.course || "N/A";
-        document.getElementById('perf-joining').value = student.admission_date || "N/A";
-        
-        // Stats Display
         document.getElementById('perf-absent').innerText = absentCount;
         document.getElementById('perf-attendance-pct').innerText = attPct + "%";
         document.getElementById('perf-marks').value = totalObtained;
         document.getElementById('perf-exam-count').value = examCount;
         document.getElementById('perf-avg-display').value = avgPercent.toFixed(2) + "%";
+
+        // TEACHER FIX: If blank, look into Batches
+        const { data: summary } = await db.from('performance_tracking').select('teacher_name')
+            .eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
         
-        // Teacher Name: If not in Performance table, check the Batches table
         if (summary && summary.teacher_name) {
             document.getElementById('perf-teacher').value = summary.teacher_name;
         } else {
             const { data: b } = await db.from('batches').select('teacher_name').eq('batch_time', student.batch_time).eq('institute_id', sessionInstID).maybeSingle();
-            document.getElementById('perf-teacher').value = b ? b.teacher_name : "";
+            document.getElementById('perf-teacher').value = b ? b.teacher_name : "Not Assigned";
         }
 
         document.getElementById('performance-report-area').style.display = 'block';
 
     } catch (err) {
-        console.error("Fetch Error:", err);
-        alert("Error: " + err.message);
+        console.error("Link Error:", err);
+        alert("Database connection error: " + err.message);
     }
 }
 // 3. Save performance to database
