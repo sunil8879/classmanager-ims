@@ -813,6 +813,20 @@
         <button class="btn-add" style="background:#f39c12;" onclick="generateExamReport()">GENERATE EXAM REPORT</button>
     </div>
 </div>
+
+<!-- FEE COLLECTION REPORT INPUTS (Hidden by default) -->
+<div id="report-ui-fee" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Select Month & Year</label>
+            <input type="month" id="rep-fee-month">
+        </div>
+        <p style="grid-column: 1/-1; font-size: 0.8rem; color: #666;">* This report generates a financial ledger for all active students during this period.</p>
+    </div>
+    <div class="button-row">
+        <button class="btn-add" style="background:#27ae60;" onclick="generateFeeReport()">GENERATE FEE REPORT</button>
+    </div>
+</div>
     </div>
 
     <!-- REPORT DISPLAY AREA -->
@@ -2202,7 +2216,8 @@ async function fetchAttendanceByPrompt() {
 function toggleReportUI() {
     const val = document.getElementById('report-selector').value;
     document.getElementById('report-ui-attendance').style.display = (val === 'attendance') ? 'block' : 'none';
-    document.getElementById('report-ui-exam').style.display = (val === 'exam') ? 'block' : 'none'; // ADD THIS LINE
+    document.getElementById('report-ui-exam').style.display = (val === 'exam') ? 'block' : 'none';
+    document.getElementById('report-ui-fee').style.display = (val === 'fee') ? 'block' : 'none'; // ADD THIS LINE
     document.getElementById('report-output-area').style.display = 'none';
 }
 
@@ -2292,7 +2307,87 @@ function drawAttendanceChart(p, a) {
 
 
 
+async function generateFeeReport() {
+    const monthInput = document.getElementById('rep-fee-month').value;
+    if (!monthInput) return alert("Please select a Month and Year");
 
+    const dateObj = new Date(monthInput + "-01");
+    const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // 1. Fetch all students for this institute
+    const { data: students, error } = await db.from('students')
+        .select('roll_number, full_name, course, total_fees, paid_amount, pending_amount')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    if (error) return alert("Error fetching data: " + error.message);
+    if (students.length === 0) return alert("No active student records found.");
+
+    // 2. Build Table and Calculate Totals
+    let tableBody = "";
+    let grandTotal = 0, grandPaid = 0, grandPending = 0;
+
+    students.forEach(s => {
+        tableBody += `
+            <tr>
+                <td>${s.roll_number}</td>
+                <td>${s.full_name}</td>
+                <td>${s.course}</td>
+                <td>₹${s.total_fees}</td>
+                <td style="color:green;">₹${s.paid_amount}</td>
+                <td style="color:red;">₹${s.pending_amount}</td>
+            </tr>`;
+        grandTotal += Number(s.total_fees);
+        grandPaid += Number(s.paid_amount);
+        grandPending += Number(s.pending_amount);
+    });
+
+    // 3. Update UI
+    document.getElementById('rep-title').innerText = `Fee Collection Report: ${monthYearStr}`;
+    document.getElementById('rep-summary-text').innerHTML = `<b>Total Students Tracked:</b> ${students.length}`;
+    document.getElementById('rep-table-head').innerHTML = `
+        <tr>
+            <th>Roll No</th>
+            <th>Full Name</th>
+            <th>Course</th>
+            <th>Total Fees</th>
+            <th>Paid</th>
+            <th>Pending</th>
+        </tr>`;
+    document.getElementById('rep-table-body').innerHTML = tableBody;
+
+    document.getElementById('rep-stats-boxes').innerHTML = `
+        <div class="stat-card"><b>Grand Total</b><h4>₹${grandTotal.toLocaleString()}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid green;"><b>Grand Paid</b><h4>₹${grandPaid.toLocaleString()}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid red;"><b>Grand Pending</b><h4>₹${grandPending.toLocaleString()}</h4></div>
+    `;
+
+    document.getElementById('report-output-area').style.display = 'block';
+
+    // 4. Draw Google Chart
+    drawFeeCharts(grandPaid, grandPending);
+}
+
+function drawFeeCharts(paid, pending) {
+    google.charts.load('current', { 'packages': ['corechart'] });
+    google.charts.setOnLoadCallback(() => {
+        const data = google.visualization.arrayToDataTable([
+            ['Type', 'Amount', { role: 'style' }],
+            ['Collected', paid, '#27ae60'],
+            ['Outstanding', pending, '#e74c3c']
+        ]);
+
+        const options = {
+            title: 'Fee Collection Overview (Actuals vs Dues)',
+            chartArea: { width: '60%' },
+            hAxis: { title: 'Amount in ₹', minValue: 0 },
+            legend: { position: 'none' }
+        };
+
+        const chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+    });
+}
 
 // 1. Auto-populate Student & Course info for Exam Report
 async function populateExamRepName() {
