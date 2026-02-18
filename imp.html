@@ -1403,37 +1403,57 @@
 
 <!-- STANDALONE MESSAGE HUB -->
 <section id="message-corner" class="content-section">
-    <div class="card">
-        <h3><i class="fas fa-comments"></i> Message Hub</h3>
+    <div class="card" style="border-top: 5px solid #000;">
+        <h3><i class="fas fa-bullhorn"></i> Owner's Message Console</h3>
         
-        <!-- Tab Selectors -->
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap;">
-            <button class="btn-fetch" onclick="msgEngine('OwnerToTeacher')">Owner ➔ Staff</button>
-            <button class="btn-fetch" onclick="msgEngine('TeacherToStudent')">Staff ➔ Students</button>
-            <button class="btn-fetch" onclick="msgEngine('General')">General</button>
+        <!-- 1. Target Selection (Only visible to Owner) -->
+        <div id="owner-target-controls" style="margin-bottom: 20px; display: flex; gap: 15px; justify-content: center;">
+            <button class="btn-fetch" style="background: #007bff;" onclick="prepMessage('Teacher')">
+                <i class="fas fa-chalkboard-teacher"></i> TO THE TEACHERS
+            </button>
+            <button class="btn-fetch" style="background: #28a745;" onclick="prepMessage('Student')">
+                <i class="fas fa-user-graduate"></i> TO THE STUDENTS
+            </button>
         </div>
 
-        <!-- Posting Area (Hidden by default, shown by Engine) -->
-        <div id="msg-post-box" style="display:none; background: #f0fffb; padding: 15px; border-radius: 10px; border: 2px solid #7FFFD4; margin-bottom: 20px;">
-            <h4 id="msg-label" style="text-decoration:none !important; color:#000;">Post to: General</h4>
-            <select id="msg-subject-pick" style="width:100%; margin-bottom:10px;">
-                <option value="All">All Subjects</option>
-                <option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option>
-            </select>
-            <textarea id="msg-input-text" placeholder="Write your message..." rows="2" style="width:100%;"></textarea>
-            <button class="btn-add" style="width:100%; margin-top:10px;" onclick="sendNow()">POST MESSAGE</button>
+        <!-- 2. Message Input Box (Hidden until Target is clicked) -->
+        <div id="owner-input-area" style="display: none; background: #fff; padding: 20px; border: 3px solid #000; border-radius: 15px; text-align: left;">
+            <h4 id="display-target" style="text-decoration: none; color: #ff0000; margin-bottom: 10px;">Posting to: ...</h4>
+            
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 15px;">
+                <div class="input-group">
+                    <label>Relevant Subject / Category</label>
+                    <select id="owner-msg-subject">
+                        <option value="General">General Announcement</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Physics">Physics</option>
+                        <option value="Chemistry">Chemistry</option>
+                        <option value="Biology</option>
+                        <option value="Accounts">Accounts</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Institute ID (Verified)</label>
+                    <input type="text" id="owner-msg-inst-id" readonly style="background: #eee;">
+                </div>
+            </div>
+
+            <textarea id="owner-msg-text" placeholder="Type your message here..." rows="4" style="width: 100%; font-size: 1.1rem; padding: 12px; border: 2px solid #000; border-radius: 8px;"></textarea>
+
+            <!-- 3. Action Buttons -->
+            <div class="button-row" style="margin-top: 20px;">
+                <button class="btn-add" style="background: #000; color: #fff;" onclick="sendOwnerMessage()">SEND</button>
+                <button class="btn-edit" style="background: #666;" onclick="clearOwnerMessage()">CLEAR</button>
+                <button class="btn-fetch" style="background: #f39c12;" onclick="restoreOwnerMessage()">RESTORE</button>
+            </div>
         </div>
 
-        <!-- History Display -->
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-            <span style="font-weight: bold;">Message History:</span>
-            <button onclick="document.getElementById('msg-board').innerHTML=''" style="border:none; background:none; color:red; cursor:pointer; font-size:0.8rem;">Clear Screen</button>
-        </div>
-        <div id="msg-board" style="max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 10px;">
-            <!-- Messages load here -->
+        <!-- 4. Mini History (For Restore) -->
+        <div id="owner-restore-log" style="margin-top: 20px; max-height: 200px; overflow-y: auto; display: none; border-top: 2px dashed #ccc; padding-top: 15px;">
+            <p style="font-weight: bold;">Last Sent Messages:</p>
+            <div id="restore-list"></div>
         </div>
     </div>
-
 </section>
         </main>
     </div>
@@ -3881,121 +3901,76 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-// Global State for the Hub
-var currentHubTab = "General";
-var hubRole = "";
-var hubSub = "";
+let currentTarget = ""; // Global to track Teacher vs Student
 
-async function msgEngine(tabName) {
-    currentHubTab = tabName;
-    const board = document.getElementById('msg-board');
-    const postBox = document.getElementById('msg-post-box');
-    const label = document.getElementById('msg-label');
-    
-    if (!board || !postBox) return;
-
-    board.innerHTML = "<p style='text-align:center;'><i class='fas fa-spinner fa-spin'></i> Loading messages...</p>";
-    
-    // 1. IDENTITY & SESSION CHECK
-    const { data: { user } } = await db.auth.getUser();
-    if(!user) {
-        board.innerHTML = "<p style='text-align:center; color:red;'>Please login to view messages.</p>";
-        return;
-    }
-    
-    // Fetch profile if not already set globally
-    const { data: p, error: pErr } = await db.from('profiles').select('role, subject_taught').eq('id', user.id).single();
-    if (p) {
-        hubRole = p.role;
-        hubSub = p.subject_taught || "General";
-    }
-
-    // 2. PERMISSION LOGIC - Who can post where?
-    label.innerText = "Post to: " + tabName;
-    
-    // Default: Hide post box
-    postBox.style.display = "none";
-
-    if (tabName === "General") {
-        // Owners and Teachers can post to General
-        if (hubRole === "Owner" || hubRole === "Teacher") postBox.style.display = "block";
-    } else if (tabName === "OwnerToTeacher") {
-        // Only Owners can post here
-        if (hubRole === "Owner") postBox.style.display = "block";
-    } else if (tabName === "TeacherToStudent") {
-        // Only Teachers can post here
-        if (hubRole === "Teacher") postBox.style.display = "block";
-    }
-
-    // 3. FETCH DATA FROM SUPABASE
-    // Ensure sessionInstID is available
-    if (!sessionInstID) {
-        const { data: prof } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
-        sessionInstID = prof ? prof.institute_id : "";
-    }
-
-    const { data: records, error: msgErr } = await db.from('messages')
-        .select('*')
-        .eq('institute_id', sessionInstID)
-        .eq('message_type', tabName)
-        .order('created_at', { ascending: false });
-
-    if (msgErr) {
-        board.innerHTML = "<p style='text-align:center; color:red;'>Error loading messages: " + msgErr.message + "</p>";
+// 1. Prepare the Box
+async function prepMessage(target) {
+    // Only allow if logged in as Owner
+    if (hubRole !== "Owner") {
+        alert("Access Denied: Only the Institute Owner can use this console.");
         return;
     }
 
-    // 4. DRAW LIST
-    let html = "";
-    if (records && records.length > 0) {
-        records.forEach(m => {
-            // Visibility Filter: 
-            // - Show if subject is "All"
-            // - Show if subject matches teacher's subject
-            // - Owners see everything
-            if (hubRole === "Owner" || m.target_subject === "All" || m.target_subject === hubSub) {
-                const date = new Date(m.created_at).toLocaleDateString();
-                html += `
-                <div style="border-bottom:1px solid #eee; padding:15px; text-align:left; background: ${m.sender_role === 'Owner' ? '#fff8f8' : '#fff'};">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role})</small>
-                        <small style="color:#999;">${date}</small>
-                    </div>
-                    <p style="margin:8px 0; font-size:1.1rem; color:#333;">${m.content}</p>
-                    <span style="background:var(--aquamarine); padding:2px 8px; border-radius:12px; font-size:0.75rem; border:1px solid #000;">
-                        Target: ${m.target_subject}
-                    </span>
-                </div>`;
-            }
-        });
-    }
+    currentTarget = target;
+    document.getElementById('owner-input-area').style.display = 'block';
+    document.getElementById('display-target').innerText = "Target Audience: " + target + "s";
+    document.getElementById('owner-msg-inst-id').value = sessionInstID;
     
-    board.innerHTML = html || "<p style='text-align:center;color:gray;padding:20px;'>No messages found in this category.</p>";
+    // Smooth scroll to input
+    document.getElementById('owner-input-area').scrollIntoView({ behavior: 'smooth' });
 }
 
-async function sendNow() {
-    const txtEl = document.getElementById('msg-input-text');
-    const subEl = document.getElementById('msg-subject-pick');
-    const txt = txtEl.value.trim();
-    const sub = subEl.value;
+// 2. SEND Button
+async function sendOwnerMessage() {
+    const text = document.getElementById('owner-msg-text').value.trim();
+    const subject = document.getElementById('owner-msg-subject').value;
+    const instID = sessionInstID;
 
-    if(!txt) return alert("Please type a message before posting.");
-    if(!sessionInstID) return alert("Institute ID missing. Try refreshing.");
+    if (!text) return alert("Please type a message.");
 
     const { error } = await db.from('messages').insert([{
-        institute_id: sessionInstID,
-        sender_name: sessionUserName || "Staff Member",
-        sender_role: hubRole,
-        message_type: currentHubTab,
-        target_subject: sub,
-        content: txt
+        institute_id: instID,
+        sender_name: sessionUserName,
+        sender_role: "Owner",
+        message_type: currentTarget, // "Teacher" or "Student"
+        target_subject: subject,
+        content: text
     }]);
 
-    if(error) {
-        alert("Failed to post: " + error.message);
+    if (error) {
+        alert("Send Failed: " + error.message);
     } else {
-        txtEl.value = ""; // Clear input
-        msgEngine(currentHubTab); // Refresh list
+        alert("Message successfully sent to " + currentTarget + "s regarding " + subject);
+        document.getElementById('owner-msg-text').value = ""; // Auto clear after send
+    }
+}
+
+// 3. CLEAR Button
+function clearOwnerMessage() {
+    document.getElementById('owner-msg-text').value = "";
+}
+
+// 4. RESTORE Button
+async function restoreOwnerMessage() {
+    const logArea = document.getElementById('owner-restore-log');
+    const list = document.getElementById('restore-list');
+
+    const { data, error } = await db.from('messages')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .eq('sender_role', 'Owner')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+    if (data && data.length > 0) {
+        logArea.style.display = 'block';
+        list.innerHTML = data.map(m => `
+            <div style="font-size: 0.85rem; padding: 8px; border-bottom: 1px solid #eee;">
+                <b>To ${m.message_type}s (${m.target_subject}):</b> ${m.content.substring(0, 50)}...
+            </div>
+        `).join('');
+    } else {
+        alert("No previous messages found to restore.");
     }
 }
     </script>
