@@ -827,6 +827,26 @@
         <button class="btn-add" style="background:#27ae60;" onclick="generateFeeReport()">GENERATE FEE REPORT</button>
     </div>
 </div>
+<!-- TEACHERS ATTENDANCE REPORT INPUTS (Hidden by default) -->
+<div id="report-ui-t-attendance" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Select Month & Year</label>
+            <input type="month" id="rep-t-month">
+        </div>
+        <div class="input-group">
+            <label>Teacher ID</label>
+            <input type="text" id="rep-t-id" placeholder="TCH-XXXX" oninput="populateTeacherRepName()">
+        </div>
+        <div class="input-group">
+            <label>Full Name</label>
+            <input type="text" id="rep-t-name" readonly style="background:#eee;">
+        </div>
+    </div>
+    <div class="button-row">
+        <button class="btn-add" style="background:#673ab7;" onclick="generateTeacherAttendanceReport()">GENERATE STAFF REPORT</button>
+    </div>
+</div>
     </div>
 
     <!-- REPORT DISPLAY AREA -->
@@ -2217,7 +2237,8 @@ function toggleReportUI() {
     const val = document.getElementById('report-selector').value;
     document.getElementById('report-ui-attendance').style.display = (val === 'attendance') ? 'block' : 'none';
     document.getElementById('report-ui-exam').style.display = (val === 'exam') ? 'block' : 'none';
-    document.getElementById('report-ui-fee').style.display = (val === 'fee') ? 'block' : 'none'; // ADD THIS LINE
+    document.getElementById('report-ui-fee').style.display = (val === 'fee') ? 'block' : 'none';
+    document.getElementById('report-ui-t-attendance').style.display = (val === 't-attendance') ? 'block' : 'none'; // ADD THIS LINE
     document.getElementById('report-output-area').style.display = 'none';
 }
 
@@ -2478,6 +2499,99 @@ function drawExamTrendChart(records) {
         chart.draw(data, options);
     });
 }
+
+
+
+
+
+
+
+// 1. Auto-populate Teacher Name
+async function populateTeacherRepName() {
+    const tid = document.getElementById('rep-t-id').value.toUpperCase().trim();
+    if (tid.length < 4) return;
+    const { data } = await db.from('teacher_details')
+        .select('teacher_name')
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+    if(data) document.getElementById('rep-t-name').value = data.teacher_name;
+}
+
+// 2. Generate the Staff Attendance Report
+async function generateTeacherAttendanceReport() {
+    const tid = document.getElementById('rep-t-id').value.toUpperCase().trim();
+    const monthInput = document.getElementById('rep-t-month').value;
+    const name = document.getElementById('rep-t-name').value;
+
+    if(!tid || !monthInput || !name) return alert("Please enter Teacher ID and select a Month.");
+
+    // Format Month Year string (e.g., "March 2026")
+    const dateObj = new Date(monthInput + "-01");
+    const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Fetch attendance records
+    const { data: records, error } = await db.from('teachers_attendance')
+        .select('attendance_date, status')
+        .eq('teacher_id', tid)
+        .eq('month_year', monthYearStr)
+        .eq('institute_id', sessionInstID)
+        .order('attendance_date', { ascending: true });
+
+    if(error) return alert("Error: " + error.message);
+
+    // Build the table body and count stats
+    let tableBody = "";
+    let presentCount = 0;
+    let absentCount = 0;
+
+    records.forEach(r => {
+        const dayNum = new Date(r.attendance_date).getDate();
+        const statusColor = r.status === 'Present' ? 'green' : 'red';
+        tableBody += `<tr><td>${dayNum}</td><td style="color:${statusColor}; font-weight:bold;">${r.status}</td></tr>`;
+        if(r.status === 'Present') presentCount++; else absentCount++;
+    });
+
+    // 3. Update the Output UI
+    document.getElementById('rep-title').innerText = `Staff Attendance: ${monthYearStr}`;
+    document.getElementById('rep-summary-text').innerHTML = `<b>Teacher:</b> ${name} | <b>ID:</b> ${tid}`;
+    document.getElementById('rep-table-head').innerHTML = `<tr><th>Date</th><th>Status</th></tr>`;
+    document.getElementById('rep-table-body').innerHTML = tableBody;
+
+    document.getElementById('rep-stats-boxes').innerHTML = `
+        <div class="stat-card"><b>Total Records</b><h4>${records.length}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid green;"><b>Present</b><h4>${presentCount}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid red;"><b>Absent</b><h4>${absentCount}</h4></div>
+    `;
+
+    document.getElementById('report-output-area').style.display = 'block';
+
+    // 4. Draw Google Chart (Bar chart for summary)
+    drawStaffAttendanceChart(presentCount, absentCount);
+}
+
+function drawStaffAttendanceChart(p, a) {
+    google.charts.load('current', { 'packages': ['corechart'] });
+    google.charts.setOnLoadCallback(() => {
+        const data = google.visualization.arrayToDataTable([
+            ['Status', 'Days', { role: 'style' }],
+            ['Present', p, '#2e7d32'], // Deep Green
+            ['Absent', a, '#c62828']   // Deep Red
+        ]);
+
+        const options = {
+            title: 'Monthly Staff Attendance Distribution',
+            hAxis: { title: 'Number of Days', minValue: 0 },
+            vAxis: { title: 'Attendance Status' },
+            legend: { position: 'none' },
+            chartArea: { width: '50%' }
+        };
+
+        const chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+    });
+}
+
 
 
 // 1. Toggle visibility of calendars based on filter type
