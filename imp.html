@@ -2940,58 +2940,69 @@ function calculateAvgScore() {
 // 2. Fetch and Calculate All Data
 async function fetchPerformanceData() {
     const mobile = document.getElementById('perf-fetch-mobile').value.trim();
-    if (!mobile) return alert("Please enter the Student Mobile Number");
-
-    if (!sessionInstID) return alert("Login required.");
+    if (!mobile) return alert("Please enter Mobile Number");
 
     try {
-        // STEP 1: Find Student by Mobile in 'students' table
-        const { data: student, error: stuErr } = await db
-            .from('students')
-            .select('id, full_name, roll_number, course, admission_date')
-            .eq('mobile', mobile)
-            .eq('institute_id', sessionInstID)
-            .maybeSingle();
-
-        if (stuErr) throw stuErr;
-        if (!student) return alert("No student found with this mobile number in your institute.");
-
+        // 1. GET STUDENT + ROLL NO (From Students Table)
+        const { data: student, error: sErr } = await db.from('students').select('*')
+            .eq('mobile', mobile).eq('institute_id', sessionInstID).maybeSingle();
+        
+        if (!student) return alert("Student not found in your institute.");
         const roll = student.roll_number;
 
+        // 2. GET DURATION (From Student_Details Table)
+        const { data: details } = await db.from('student_details').select('course_end_date')
+            .eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
 
+        // 3. GET TEACHER NAME (From Batches Table by matching Batch Time)
+        const { data: batch } = await db.from('batches').select('teacher_name')
+            .eq('batch_time', student.batch_time).eq('institute_id', sessionInstID).maybeSingle();
 
+        // 4. GET EXAMS & CALCULATE ACCURATE PERCENTAGE (Raw Math)
+        const { data: exams } = await db.from('exam').select('marks_obtained, total_marks')
+            .eq('roll_number', roll).eq('institute_id', sessionInstID);
 
-    // 1. FETCH ALL DATA (Exams, Attendance, Details, Batch)
+        let totalObt = 0, totalPoss = 0, count = 0;
+        if (exams && exams.length > 0) {
+            count = exams.length;
+            exams.forEach(e => {
+                totalObt += parseFloat(e.marks_obtained || 0);
+                totalPoss += parseFloat(e.total_marks || 0);
+            });
+        }
+
+        // 5. GET ATTENDANCE (This Month)
         const monthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        
-        const { data: exams } = await db.from('exam').select('marks_obtained, total_marks').eq('roll_number', roll).eq('institute_id', sessionInstID);
-        const { data: att } = await db.from('attendance').select('status').eq('roll_number', roll).eq('month_year', monthYear).eq('institute_id', sessionInstID);
-        const { data: det } = await db.from('student_details').select('course_duration').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-        const { data: bch } = await db.from('batches').select('teacher_name').eq('batch_time', student.batch_time).eq('institute_id', sessionInstID).maybeSingle();
+        const { data: att } = await db.from('attendance').select('status')
+            .eq('roll_number', roll).eq('month_year', monthYear).eq('institute_id', sessionInstID);
 
-        // 2. SIMPLE MATH
-        let obt = exams?.reduce((s, r) => s + Number(r.marks_obtained), 0) || 0;
-        let tot = exams?.reduce((s, r) => s + Number(r.total_marks), 1) || 1;
         let abs = att?.filter(a => a.status === 'Absent').length || 0;
         let pct = att?.length > 0 ? (((att.length - abs) / att.length) * 100).toFixed(1) : "100";
 
-        // 3. POPULATE UI (One go)
+        // 6. POPULATE UI WITH FULL DATA
         document.getElementById('perf-name').value = student.full_name;
         document.getElementById('perf-roll').value = roll;
-        document.getElementById('perf-joining').value = student.admission_date;
         document.getElementById('perf-course').value = student.course;
+        document.getElementById('perf-joining').value = student.admission_date;
         
-        document.getElementById('perf-duration').value = det?.course_duration || "N/A";
-        document.getElementById('perf-teacher').value = bch?.teacher_name || "Not Assigned";
+        // Fix for Duration: Show joining to end date
+        document.getElementById('perf-duration').value = details?.course_end_date ? `${student.admission_date} to ${details.course_end_date}` : "Ongoing";
+        
+        // Fix for Teacher: Use data from Batches table
+        document.getElementById('perf-teacher').value = batch?.teacher_name || "Not Assigned in Batches";
+        
         document.getElementById('perf-absent').innerText = abs;
         document.getElementById('perf-attendance-pct').innerText = pct + "%";
-        document.getElementById('perf-marks').value = obt;
-        document.getElementById('perf-exam-count').value = exams?.length || 0;
-        document.getElementById('perf-avg-display').value = ((obt/tot)*100).toFixed(2) + "%";
+        document.getElementById('perf-marks').value = totalObt;
+        document.getElementById('perf-exam-count').value = count;
+        
+        // Final Math Fix: (Total Obtained / Total Possible) * 100
+        const finalAvg = totalPoss > 0 ? ((totalObt / totalPoss) * 100).toFixed(2) : "0.00";
+        document.getElementById('perf-avg-display').value = finalAvg + "%";
 
         document.getElementById('performance-report-area').style.display = 'block';
 
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { alert("System Error: " + err.message); }
 }
 // 3. Save performance to database
 async function savePerformanceData() {
