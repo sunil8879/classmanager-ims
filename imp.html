@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- Supabase JS Library CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <title>Class Manager - IMS</title>
     <!-- PWA Setup -->
     <meta name="theme-color" content="#007bff">
@@ -767,65 +768,56 @@
 
 <!-- 6. ADMIN DASHBOARD -->
 <!-- 6. ADMIN DASHBOARD -->
+<!-- ADMIN DASHBOARD: REPORTS CENTER -->
 <section id="admin" class="content-section">
-    <div class="card" style="margin-bottom: 20px; border-top-color: #007bff;">
-        <h3><i class="fas fa-chart-pie"></i> Analytics Filter</h3>
+    <div class="card" style="margin-bottom: 20px; border-top: 5px solid #1877F2;">
+        <h3><i class="fas fa-file-invoice"></i> Reports Center</h3>
         <div class="form-grid">
             <div class="input-group">
-                <label>Report Type</label>
-                <select id="admin-filter-type" onchange="toggleAdminCalendar()">
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="yearly">Yearly</option>
+                <label>REPORT NAME</label>
+                <select id="report-selector" onchange="toggleReportUI()">
+                    <option value="">-- Select Report --</option>
+                    <option value="attendance">1. Attendance Report (Student)</option>
+                    <option value="fee">2. Fee Collection Report</option>
+                    <option value="exam">3. Exam Report</option>
+                    <option value="t-attendance">4. Teachers Attendance Report</option>
                 </select>
             </div>
-            <div class="input-group" id="admin-month-container">
-                <label>Select Month</label>
-                <input type="month" id="admin-filter-month" onchange="loadAdminDashboard()">
+        </div>
+
+        <!-- ATTENDANCE REPORT INPUTS (Hidden by default) -->
+        <div id="report-ui-attendance" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+            <div class="form-grid">
+                <div class="input-group"><label>Select Month & Year</label><input type="month" id="rep-attn-month"></div>
+                <div class="input-group">
+                    <label>Roll Number</label>
+                    <input type="text" id="rep-attn-roll" placeholder="IMS-XXXX" oninput="populateRepName()">
+                </div>
+                <div class="input-group"><label>Student Name</label><input type="text" id="rep-attn-name" readonly style="background:#eee;"></div>
             </div>
-            <div class="input-group" id="admin-year-container" style="display:none;">
-                <label>Select Year</label>
-                <input type="number" id="admin-filter-year" value="2026" onchange="loadAdminDashboard()">
-            </div>
-            <div class="input-group" id="admin-quarter-container" style="display:none;">
-                <label>Select Quarter</label>
-                <select id="admin-filter-quarter" onchange="loadAdminDashboard()">
-                    <option value="1">Q1 (Jan - Mar)</option>
-                    <option value="2">Q2 (Apr - Jun)</option>
-                    <option value="3">Q3 (Jul - Sep)</option>
-                    <option value="4">Q4 (Oct - Dec)</option>
-                </select>
+            <div class="button-row">
+                <button class="btn-add" onclick="generateAttendanceReport()">GENERATE REPORT</button>
             </div>
         </div>
     </div>
 
-    <div class="dashboard-stats">
-        <div class="stat-card">
-            <p>Total Students</p>
-            <h4 id="dash-students">0</h4>
-            <small class="filter-label"></small>
+    <!-- REPORT DISPLAY AREA -->
+    <div id="report-output-area" style="display:none;" class="card">
+        <div id="report-print-content">
+            <h2 id="rep-title">REPORT</h2>
+            <div id="rep-summary-text" style="text-align:left; margin-bottom:20px;"></div>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:20px;" border="1">
+                <thead id="rep-table-head"></thead>
+                <tbody id="rep-table-body"></tbody>
+            </table>
+            <div class="dashboard-stats" id="rep-stats-boxes"></div>
         </div>
-        <div class="stat-card">
-            <p>Total Revenue</p>
-            <h4 id="dash-revenue" style="color: green;">₹ 0</h4>
-            <small class="filter-label"></small>
-        </div>
-        <div class="stat-card">
-            <p>Pending Fees</p>
-            <h4 id="dash-pending" style="color: red;">₹ 0</h4>
-            <small class="filter-label"></small>
-        </div>
-        <div class="stat-card">
-            <p>Attendance Avg</p>
-            <h4 id="dash-attendance">0%</h4>
-            <small class="filter-label"></small>
-        </div>
-    </div>
+        
+        <!-- Google Charts Area -->
+         <div id="chart_div" style="width: 100%; height: 400px; margin-top:30px;"></div>
 
-    <div class="card" style="margin-top:20px;">
-        <h3><i class="fas fa-bell" style="color: #f39c12;"></i> Upcoming Fee Reminders (Current Month)</h3>
-        <div id="reminder-list" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
-            <p>Loading reminders...</p>
+        <div class="button-row">
+            <button class="btn-fetch" onclick="window.print()"><i class="fas fa-print"></i> PRINT / SAVE AS PDF</button>
         </div>
     </div>
 </section>
@@ -2192,7 +2184,91 @@ async function fetchAttendanceByPrompt() {
 /* ==========================================
    DYNAMIC ADMIN DASHBOARD LOGIC
    ========================================== */
+// 1. Toggle UI based on Dropdown
+function toggleReportUI() {
+    const val = document.getElementById('report-selector').value;
+    document.getElementById('report-ui-attendance').style.display = (val === 'attendance') ? 'block' : 'none';
+    document.getElementById('report-output-area').style.display = 'none';
+}
 
+// 2. Auto-populate name in report
+async function populateRepName() {
+    const roll = document.getElementById('rep-attn-roll').value.toUpperCase();
+    const { data } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if(data) document.getElementById('rep-attn-name').value = data.full_name;
+}
+
+// 3. Generate the Report
+async function generateAttendanceReport() {
+    const roll = document.getElementById('rep-attn-roll').value.toUpperCase();
+    const monthInput = document.getElementById('rep-attn-month').value; // YYYY-MM
+    const name = document.getElementById('rep-attn-name').value;
+
+    if(!roll || !monthInput) return alert("Please fill Roll Number and Month");
+
+    // Convert YYYY-MM to Month Year (e.g. "February 2026")
+    const dateObj = new Date(monthInput + "-01");
+    const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Fetch records
+    const { data: records, error } = await db.from('attendance')
+        .select('attendance_date, status')
+        .eq('roll_number', roll)
+        .eq('month_year', monthYearStr)
+        .eq('institute_id', sessionInstID)
+        .order('attendance_date', { ascending: true });
+
+    if(error) return alert(error.message);
+
+    // Build Table
+    let tableBody = "";
+    let present = 0, absent = 0;
+    
+    records.forEach(r => {
+        const day = new Date(r.attendance_date).getDate();
+        tableBody += `<tr><td>${day}</td><td style="color:${r.status==='Present'?'green':'red'}">${r.status}</td></tr>`;
+        if(r.status === 'Present') present++; else absent++;
+    });
+
+    // Update UI
+    document.getElementById('rep-title').innerText = `Attendance Report: ${monthYearStr}`;
+    document.getElementById('rep-summary-text').innerHTML = `<b>Student:</b> ${name} | <b>Roll No:</b> ${roll}`;
+    document.getElementById('rep-table-head').innerHTML = `<tr><th>Date</th><th>Status</th></tr>`;
+    document.getElementById('rep-table-body').innerHTML = tableBody;
+    
+    document.getElementById('rep-stats-boxes').innerHTML = `
+        <div class="stat-card"><b>Total Days</b><h4>${records.length}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid green;"><b>Present</b><h4>${present}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid red;"><b>Absent</b><h4>${absent}</h4></div>
+    `;
+
+    document.getElementById('report-output-area').style.display = 'block';
+
+    // Draw Google Chart
+    drawAttendanceChart(present, absent);
+}
+
+// 4. Google Charts Integration
+function drawAttendanceChart(p, a) {
+    google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(() => {
+        const data = google.visualization.arrayToDataTable([
+            ['Status', 'Days', { role: 'style' }],
+            ['Present', p, '#27ae60'],
+            ['Absent', a, '#e74c3c']
+        ]);
+
+        const options = {
+            title: 'Attendance Visualization',
+            hAxis: { title: 'Days' },
+            legend: { position: 'none' },
+            chartArea: { width: '50%' }
+        };
+
+        const chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+    });
+}
 // 1. Toggle visibility of calendars based on filter type
 function toggleAdminCalendar() {
     const type = document.getElementById('admin-filter-type').value;
