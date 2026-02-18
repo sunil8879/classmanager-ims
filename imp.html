@@ -3888,81 +3888,116 @@ var hubSub = "";
 
 async function msgEngine(tabName) {
     currentHubTab = tabName;
-    var board = document.getElementById('msg-board');
-    var postBox = document.getElementById('msg-post-box');
-    var label = document.getElementById('msg-label');
+    const board = document.getElementById('msg-board');
+    const postBox = document.getElementById('msg-post-box');
+    const label = document.getElementById('msg-label');
     
-    board.innerHTML = "<p style='text-align:center;'>Verifying access...</p>";
-    
-    // 1. IDENTITY VERIFICATION (Ensures it works in Incognito/Mobile)
-    const { data: { user } } = await db.auth.getUser();
-    if(!user) return alert("Session expired. Please login again.");
-    
-    const { data: p } = await db.from('profiles').select('role, subject_taught').eq('id', user.id).single();
-    hubRole = p.role;
-    hubSub = p.subject_taught || "All";
+    if (!board || !postBox) return;
 
-    // 2. PERMISSION LOGIC (Straightforward)
-    label.innerText = "Post to: " + tabName;
+    board.innerHTML = "<p style='text-align:center;'><i class='fas fa-spinner fa-spin'></i> Loading messages...</p>";
     
-    if (tabName === "General") {
-        postBox.style.display = "block";
-    } else if (tabName === "OwnerToTeacher") {
-        postBox.style.display = (hubRole === "Owner") ? "block" : "none";
-    } else if (tabName === "TeacherToStudent") {
-        postBox.style.display = (hubRole === "Teacher") ? "block" : "none";
+    // 1. IDENTITY & SESSION CHECK
+    const { data: { user } } = await db.auth.getUser();
+    if(!user) {
+        board.innerHTML = "<p style='text-align:center; color:red;'>Please login to view messages.</p>";
+        return;
+    }
+    
+    // Fetch profile if not already set globally
+    const { data: p, error: pErr } = await db.from('profiles').select('role, subject_taught').eq('id', user.id).single();
+    if (p) {
+        hubRole = p.role;
+        hubSub = p.subject_taught || "General";
     }
 
-    // 3. FETCH DATA
-    const { data: records } = await db.from('messages')
+    // 2. PERMISSION LOGIC - Who can post where?
+    label.innerText = "Post to: " + tabName;
+    
+    // Default: Hide post box
+    postBox.style.display = "none";
+
+    if (tabName === "General") {
+        // Owners and Teachers can post to General
+        if (hubRole === "Owner" || hubRole === "Teacher") postBox.style.display = "block";
+    } else if (tabName === "OwnerToTeacher") {
+        // Only Owners can post here
+        if (hubRole === "Owner") postBox.style.display = "block";
+    } else if (tabName === "TeacherToStudent") {
+        // Only Teachers can post here
+        if (hubRole === "Teacher") postBox.style.display = "block";
+    }
+
+    // 3. FETCH DATA FROM SUPABASE
+    // Ensure sessionInstID is available
+    if (!sessionInstID) {
+        const { data: prof } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+        sessionInstID = prof ? prof.institute_id : "";
+    }
+
+    const { data: records, error: msgErr } = await db.from('messages')
         .select('*')
         .eq('institute_id', sessionInstID)
         .eq('message_type', tabName)
         .order('created_at', { ascending: false });
 
-    // 4. DRAW LIST with Subject Filtering
-    var html = "";
-    if (records) {
-        for (var i = 0; i < records.length; i++) {
-            var m = records[i];
-            // Security: Math teachers only see Math + All
-            if (hubRole === "Owner" || m.target_subject === "All" || m.target_subject === hubSub) {
-                html += '<div style="border-bottom:1px solid #eee; padding:10px; text-align:left;">';
-                html += '<small style="color:#1877F2;"><b>' + m.sender_name + '</b> (' + m.sender_role + ')</small>';
-                html += '<p style="margin:5px 0;">' + m.content + '</p>';
-                html += '<small style="background:#7FFFD4; padding:2px 5px; border-radius:3px;">' + m.target_subject + '</small>';
-                html += '</div>';
-            }
-        }
+    if (msgErr) {
+        board.innerHTML = "<p style='text-align:center; color:red;'>Error loading messages: " + msgErr.message + "</p>";
+        return;
     }
-    board.innerHTML = html || "<p style='text-align:center;color:gray;padding:20px;'>No messages here.</p>";
+
+    // 4. DRAW LIST
+    let html = "";
+    if (records && records.length > 0) {
+        records.forEach(m => {
+            // Visibility Filter: 
+            // - Show if subject is "All"
+            // - Show if subject matches teacher's subject
+            // - Owners see everything
+            if (hubRole === "Owner" || m.target_subject === "All" || m.target_subject === hubSub) {
+                const date = new Date(m.created_at).toLocaleDateString();
+                html += `
+                <div style="border-bottom:1px solid #eee; padding:15px; text-align:left; background: ${m.sender_role === 'Owner' ? '#fff8f8' : '#fff'};">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role})</small>
+                        <small style="color:#999;">${date}</small>
+                    </div>
+                    <p style="margin:8px 0; font-size:1.1rem; color:#333;">${m.content}</p>
+                    <span style="background:var(--aquamarine); padding:2px 8px; border-radius:12px; font-size:0.75rem; border:1px solid #000;">
+                        Target: ${m.target_subject}
+                    </span>
+                </div>`;
+            }
+        });
+    }
+    
+    board.innerHTML = html || "<p style='text-align:center;color:gray;padding:20px;'>No messages found in this category.</p>";
 }
 
 async function sendNow() {
-    var txt = document.getElementById('msg-input-text').value;
-    var sub = document.getElementById('msg-subject-pick').value;
-    if(!txt) return alert("Type something!");
+    const txtEl = document.getElementById('msg-input-text');
+    const subEl = document.getElementById('msg-subject-pick');
+    const txt = txtEl.value.trim();
+    const sub = subEl.value;
+
+    if(!txt) return alert("Please type a message before posting.");
+    if(!sessionInstID) return alert("Institute ID missing. Try refreshing.");
 
     const { error } = await db.from('messages').insert([{
         institute_id: sessionInstID,
-        sender_name: sessionUserName,
+        sender_name: sessionUserName || "Staff Member",
         sender_role: hubRole,
         message_type: currentHubTab,
         target_subject: sub,
         content: txt
     }]);
 
-    if(error) alert(error.message);
-    else {
-        document.getElementById('msg-input-text').value = "";
-        msgEngine(currentHubTab); // Refresh
+    if(error) {
+        alert("Failed to post: " + error.message);
+    } else {
+        txtEl.value = ""; // Clear input
+        msgEngine(currentHubTab); // Refresh list
     }
 }
-
-
-
-// 2. RESTORE: The restore button simply calls your existing refresh function
-// (Note: refreshMessages already exists in your code, so this button just triggers it!)
     </script>
 <script>
 if ('serviceWorker' in navigator) {
