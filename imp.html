@@ -2471,7 +2471,6 @@ async function generateExamReport() {
     
     if(!roll || !name) return alert("Please enter a valid Roll Number");
 
-    // Fetch all exam records for this student
     const { data: records, error } = await db.from('exam')
         .select('*')
         .eq('roll_number', roll)
@@ -2479,85 +2478,67 @@ async function generateExamReport() {
         .order('exam_date', { ascending: true });
 
     if(error) return alert(error.message);
-    if(records.length === 0) return alert("No exam records found for this student.");
+    if(records.length === 0) return alert("No exam records found.");
 
-    // Build Table Body
+    // --- SHORTCUT FIX: Show the area FIRST so the graph has space to draw ---
+    document.getElementById('report-output-area').style.display = 'block';
+
     let tableBody = "";
     let totalObtained = 0;
     let totalPossible = 0;
 
     records.forEach(r => {
-        tableBody += `
-            <tr>
-                <td>${r.exam_date}</td>
-                <td>${r.marks_obtained} / ${r.total_marks}</td>
-                <td>${r.percentage}%</td>
-                <td style="font-weight:bold; color:${r.result === 'Failed' ? 'red' : 'black'}">${r.result}</td>
-            </tr>`;
+        tableBody += `<tr><td>${r.exam_date}</td><td>${r.marks_obtained} / ${r.total_marks}</td><td>${r.percentage}%</td><td style="font-weight:bold;">${r.result}</td></tr>`;
         totalObtained += Number(r.marks_obtained);
         totalPossible += Number(r.total_marks);
     });
 
-    // Update UI Elements
     document.getElementById('rep-title').innerText = `Student Performance Report`;
-    document.getElementById('rep-summary-text').innerHTML = `<b>Student:</b> ${name} | <b>Roll No:</b> ${roll} | <b>Course:</b> ${records[0].course_name}`;
+    document.getElementById('rep-summary-text').innerHTML = `<b>Student:</b> ${name} | <b>Roll No:</b> ${roll}`;
     document.getElementById('rep-table-head').innerHTML = `<tr><th>Date</th><th>Score</th><th>%</th><th>Result</th></tr>`;
     document.getElementById('rep-table-body').innerHTML = tableBody;
     
     const avgPct = ((totalObtained / totalPossible) * 100).toFixed(2);
-
     document.getElementById('rep-stats-boxes').innerHTML = `
         <div class="stat-card"><b>Exams Taken</b><h4>${records.length}</h4></div>
         <div class="stat-card" style="border-bottom:5px solid #1877F2;"><b>Total Marks</b><h4>${totalObtained}</h4></div>
         <div class="stat-card" style="border-bottom:5px solid #f39c12;"><b>Avg Percentage</b><h4>${avgPct}%</h4></div>
     `;
 
-    document.getElementById('report-output-area').style.display = 'block';
-
-    // Draw Graph: Percentage trend over time
+    // Now call the graph
     drawExamTrendChart(records);
 }
-
 // 3. Google Chart: Line Chart for Performance Trend
 function drawExamTrendChart(records) {
-    var data = new google.visualization.DataTable();
-    data.addColumn('string', 'Exam Date');
-    data.addColumn('number', 'Percentage');
+    // Header must be 'Date' and 'Percentage' to stop the "Staff" label
+    let dataArr = [['Date', 'Percentage']]; 
+    records.forEach(r => dataArr.push([r.exam_date, parseFloat(r.percentage)]));
 
-    records.forEach(r => {
-        data.push([r.exam_date, parseFloat(r.percentage)]);
-    });
-
+    var data = google.visualization.arrayToDataTable(dataArr);
     var dashboard = new google.visualization.Dashboard(document.getElementById('report-output-area'));
 
-    // SLIDER SLICER for Percentage
     var percentageSlider = new google.visualization.ControlWrapper({
         'controlType': 'NumberRangeFilter',
         'containerId': 'filter_div',
-        'options': {
-            'filterColumnLabel': 'Percentage',
-            'ui': {'label': 'Filter by Score Range (%):'}
-        }
+        'options': { 'filterColumnLabel': 'Percentage', 'ui': {'label': 'Filter by Score:'} }
     });
 
     var lineChart = new google.visualization.ChartWrapper({
         'chartType': 'LineChart',
         'containerId': 'chart_div',
         'options': {
-            'title': 'Progress Trend',
+            'title': 'Student Academic Progress Trend', // Corrected Title
+            'colors': ['#f39c12'], 
             'curveType': 'function',
-            'pointSize': 10,
-            'vAxis': { minValue: 0, maxValue: 100 },
-            'height': 400
+            'vAxis': { title: 'Percentage (%)', minValue: 0, maxValue: 100 },
+            'height': 400,
+            'legend': { position: 'bottom' }
         }
     });
 
     dashboard.bind(percentageSlider, lineChart);
     dashboard.draw(data);
 }
-
-
-
 
 
 
