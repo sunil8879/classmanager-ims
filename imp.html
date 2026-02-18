@@ -2939,64 +2939,76 @@ function calculateAvgScore() {
 
 // 2. Fetch and Calculate All Data
 async function fetchPerformanceData() {
-    // 1. Get Roll Number from input
-    const inputRoll = document.getElementById('perf-fetch-mobile').value.trim().toUpperCase();
-    if (!inputRoll) return alert("Please enter a Student Roll Number");
+    const mobile = document.getElementById('perf-fetch-mobile').value.trim();
+    if (!mobile) return alert("Please enter the Student Mobile Number");
 
-    if (!sessionInstID) return alert("Login required to load Institute ID");
+    if (!sessionInstID) return alert("Login required.");
 
     try {
-        // 2. Fetch Student Basic Info (Name, Course, etc.)
+        // STEP 1: Find Student by Mobile in 'students' table
         const { data: student, error: stuErr } = await db
             .from('students')
-            .select('full_name, course, admission_date, id')
-            .eq('roll_number', inputRoll)
+            .select('id, full_name, roll_number, course, admission_date')
+            .eq('mobile', mobile)
             .eq('institute_id', sessionInstID)
             .maybeSingle();
 
-        if (stuErr || !student) return alert("Student not found in your records.");
+        if (stuErr) throw stuErr;
+        if (!student) return alert("No student found with this mobile number in your institute.");
 
-        // 3. Fetch Aggregate Exam Data (CONNECTING TO EXAM TABLE)
+        const roll = student.roll_number;
+
+        // STEP 2: Fetch all marks for this Roll Number from 'exam' table
         const { data: examRecords, error: examErr } = await db
             .from('exam')
-            .select('marks_obtained, total_marks, percentage')
-            .eq('roll_number', inputRoll)
+            .select('marks_obtained, total_marks')
+            .eq('roll_number', roll)
             .eq('institute_id', sessionInstID);
 
         if (examErr) throw examErr;
 
-        // 4. Calculate real-time stats
+        // STEP 3: Fetch existing summary from 'performance_tracking' (for Teacher Name)
+        const { data: summary } = await db
+            .from('performance_tracking')
+            .select('teacher_name')
+            .eq('roll_number', roll)
+            .eq('institute_id', sessionInstID)
+            .maybeSingle();
+
+        // STEP 4: Calculate Totals
         let totalObtained = 0;
         let examCount = 0;
         let avgPercent = 0;
 
         if (examRecords && examRecords.length > 0) {
             examCount = examRecords.length;
-            totalObtained = examRecords.reduce((sum, rec) => sum + (parseFloat(rec.marks_obtained) || 0), 0);
-            const totalPossible = examRecords.reduce((sum, rec) => sum + (parseFloat(rec.total_marks) || 0), 0);
+            totalObtained = examRecords.reduce((sum, r) => sum + (parseFloat(r.marks_obtained) || 0), 0);
+            const totalPossible = examRecords.reduce((sum, r) => sum + (parseFloat(r.total_marks) || 0), 0);
             avgPercent = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
         }
 
-        // 5. Populate UI Fields
-        const now = new Date();
-        document.getElementById('perf-today').value = now.toLocaleDateString();
+        // STEP 5: Populate the UI
+        document.getElementById('perf-today').value = new Date().toLocaleDateString();
         document.getElementById('perf-name').value = student.full_name;
-        document.getElementById('perf-roll').value = inputRoll;
+        document.getElementById('perf-roll').value = roll;
         document.getElementById('perf-course').value = student.course || "N/A";
         document.getElementById('perf-joining').value = student.admission_date || "N/A";
         
-        // Update the Performance specific fields
+        // Auto-calculated fields
         document.getElementById('perf-marks').value = totalObtained;
         document.getElementById('perf-exam-count').value = examCount;
         document.getElementById('perf-avg-display').value = avgPercent.toFixed(2) + "%";
+        
+        // Populate teacher name if it was saved before
+        document.getElementById('perf-teacher').value = summary ? summary.teacher_name : "";
 
-        // Show the report area
+        // Show the UI
         document.getElementById('performance-report-area').style.display = 'block';
-        alert(`Performance data synced from ${examCount} exam records!`);
+        alert(`Found ${student.full_name}. Performance synced from ${examCount} exam records.`);
 
     } catch (err) {
-        console.error("Performance Fetch Error:", err);
-        alert("Error connecting tables: " + err.message);
+        console.error("Link Error:", err);
+        alert("Database connection error: " + err.message);
     }
 }
 // 3. Save performance to database
@@ -3013,15 +3025,14 @@ async function savePerformanceData() {
         updated_at: new Date().toISOString()
     };
 
-    // Upsert using roll_number and institute_id as the unique combo
+    // This uses the 'onConflict' rule we set in SQL in Part 1
     const { error } = await db
         .from('performance_tracking')
         .upsert(updateData, { onConflict: 'roll_number, institute_id' });
 
     if (error) alert("Save Error: " + error.message);
-    else alert("Overall Performance Record Updated!");
+    else alert("Performance summary updated successfully!");
 }
-
 
 /* ==========================================
    EXAM MODULE LOGIC
