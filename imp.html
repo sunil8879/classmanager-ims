@@ -455,6 +455,7 @@
 <button class="nav-tab" onclick="showSection('exam-mod')"><i class="fas fa-file-signature"></i> Exam Management</button>
 <button class="nav-tab" onclick="showSection('t-attn-mod')"><i class="fas fa-user-check"></i> Teacher Attendance</button>
 <button class="nav-tab" onclick="showSection('allocation-mod')"><i class="fas fa-link"></i> Student Allocation</button>
+<button class="nav-tab" onclick="showSection('message-corner'); initMessageCorner();"><i class="fas fa-comments"></i> Message Corner</button>
         </aside>
 
         <main class="content" id="main-content">
@@ -1394,6 +1395,33 @@
     <div id="allocation-list-area" style="display:none; margin-top:20px;" class="card">
         <h4>Students Assigned to Teacher</h4>
         <ul id="alloc-list" style="text-align: left; list-style: square; padding-left: 20px;"></ul>
+    </div>
+</section>
+
+
+
+
+<section id="message-corner" class="content-section">
+    <div class="card">
+        <h3><i class="fas fa-paper-plane"></i> Message Corner</h3>
+        <div style="display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center;">
+            <button class="btn-fetch" style="font-size: 0.8rem; padding: 8px;" onclick="setMsgTab('OwnerToTeacher')">Owner ➔ Teachers</button>
+            <button class="btn-fetch" style="font-size: 0.8rem; padding: 8px;" onclick="setMsgTab('TeacherToStudent')">Teacher ➔ Students</button>
+            <button class="btn-fetch" style="font-size: 0.8rem; padding: 8px;" onclick="setMsgTab('General')">General</button>
+        </div>
+
+        <div id="msg-input-box" style="background: #f0fffb; padding: 15px; border-radius: 10px; border: 1px solid #7FFFD4; margin-bottom: 20px;">
+            <h4 id="msg-mode-label" style="text-decoration: none !important;">Posting to: General</h4>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <select id="msg-cat"><option value="All">All Subjects</option><option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option></select>
+                <textarea id="msg-text" placeholder="Type your message..." rows="2" style="width: 100%; margin-top: 10px;"></textarea>
+            </div>
+            <button class="btn-add" style="width: 100%; margin-top: 10px;" onclick="submitMessage()">SEND</button>
+        </div>
+
+        <div id="msg-list" style="max-height: 350px; overflow-y: auto; background: white; border-radius: 10px; border: 1px solid #ddd; padding: 10px;">
+            <!-- Messages appear here -->
+        </div>
     </div>
 </section>
         </main>
@@ -3839,6 +3867,83 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('IMS installed successfully');
     });
 });
+
+
+
+
+
+let msgActiveTab = "General";
+let loggedRole = "";
+let loggedSubject = "";
+
+async function initMessageCorner() {
+    // Discovery Logic: Get User Details without touching existing session code
+    const { data: { user } } = await db.auth.getUser();
+    const { data: prof } = await db.from('profiles').select('role, subject_taught, course').eq('id', user.id).single();
+    
+    loggedRole = prof.role;
+    loggedSubject = prof.subject_taught || prof.course || "All";
+    
+    setMsgTab('General'); // Default view
+}
+
+function setMsgTab(type) {
+    msgActiveTab = type;
+    document.getElementById('msg-mode-label').innerText = "Posting to: " + type;
+    
+    // UI Rule: Only Owners can post in OwnerToTeacher
+    document.getElementById('msg-input-box').style.display = 
+        (type === "OwnerToTeacher" && loggedRole !== "Owner") ? "none" : "block";
+        
+    refreshMessages();
+}
+
+async function submitMessage() {
+    const text = document.getElementById('msg-text').value;
+    if(!text) return alert("Empty message");
+
+    await db.from('messages').insert([{
+        institute_id: sessionInstID,
+        sender_name: sessionUserName,
+        sender_role: loggedRole,
+        message_type: msgActiveTab,
+        target_subject: document.getElementById('msg-cat').value,
+        content: text
+    }]);
+
+    document.getElementById('msg-text').value = "";
+    refreshMessages();
+}
+
+async function refreshMessages() {
+    const { data: msgs } = await db.from('messages')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .eq('message_type', msgActiveTab)
+        .order('created_at', { ascending: false });
+
+    const display = document.getElementById('msg-list');
+    
+    // FILTERING: Show only relevant subject messages
+    const filtered = msgs.filter(m => {
+        if (m.target_subject === "All" || m.target_subject === loggedSubject) return true;
+        if (loggedRole === "Owner") return true; // Owner sees everything
+        return false;
+    });
+
+    if(!filtered.length) {
+        display.innerHTML = "<p style='color:gray;text-align:center;'>No messages here.</p>";
+        return;
+    }
+
+    display.innerHTML = filtered.map(m => `
+        <div style="border-bottom: 1px solid #eee; padding: 10px; text-align: left;">
+            <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role}) • ${new Date(m.created_at).toLocaleTimeString()}</small>
+            <p style="margin: 5px 0;">${m.content}</p>
+            <span style="font-size:0.7rem; background:#7FFFD4; padding:2px 5px; border-radius:3px;">${m.target_subject}</span>
+        </div>
+    `).join('');
+}
     </script>
 <script>
 if ('serviceWorker' in navigator) {
