@@ -2967,48 +2967,52 @@ async function fetchPerformanceData() {
 
         if (examErr) throw examErr;
 
-        // STEP 3: Fetch existing summary from 'performance_tracking' (for Teacher Name)
-        const { data: summary } = await db
-            .from('performance_tracking')
+      // STEP 3: Fetch Attendance for THIS MONTH (Calculates real percentage)
+        const monthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        const { data: attData } = await db.from('attendance')
+            .select('status')
+            .eq('roll_number', roll)
+            .eq('month_year', monthYear)
+            .eq('institute_id', sessionInstID);
+
+        const totalDays = attData ? attData.length : 0;
+        const absentCount = attData ? attData.filter(a => a.status === 'Absent').length : 0;
+        // If no attendance marked yet, show 100%, otherwise calculate
+        const attPct = totalDays > 0 ? (((totalDays - absentCount) / totalDays) * 100).toFixed(1) : "100";
+
+        // STEP 4: Fetch summary (for Teacher Name)
+        const { data: summary } = await db.from('performance_tracking')
             .select('teacher_name')
             .eq('roll_number', roll)
-            .eq('institute_id', sessionInstID)
-            .maybeSingle();
+            .eq('institute_id', sessionInstID).maybeSingle();
 
-        // STEP 4: Calculate Totals
-        let totalObtained = 0;
-        let examCount = 0;
-        let avgPercent = 0;
-
-        if (examRecords && examRecords.length > 0) {
-            examCount = examRecords.length;
-            totalObtained = examRecords.reduce((sum, r) => sum + (parseFloat(r.marks_obtained) || 0), 0);
-            const totalPossible = examRecords.reduce((sum, r) => sum + (parseFloat(r.total_marks) || 0), 0);
-            avgPercent = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
-        }
-
-        // STEP 5: Populate the UI
+        // STEP 5: Populate UI
         document.getElementById('perf-today').value = new Date().toLocaleDateString();
         document.getElementById('perf-name').value = student.full_name;
         document.getElementById('perf-roll').value = roll;
         document.getElementById('perf-course').value = student.course || "N/A";
         document.getElementById('perf-joining').value = student.admission_date || "N/A";
         
-        // Auto-calculated fields
+        // Stats Display
+        document.getElementById('perf-absent').innerText = absentCount;
+        document.getElementById('perf-attendance-pct').innerText = attPct + "%";
         document.getElementById('perf-marks').value = totalObtained;
         document.getElementById('perf-exam-count').value = examCount;
         document.getElementById('perf-avg-display').value = avgPercent.toFixed(2) + "%";
         
-        // Populate teacher name if it was saved before
-        document.getElementById('perf-teacher').value = summary ? summary.teacher_name : "";
+        // Teacher Name: If not in Performance table, check the Batches table
+        if (summary && summary.teacher_name) {
+            document.getElementById('perf-teacher').value = summary.teacher_name;
+        } else {
+            const { data: b } = await db.from('batches').select('teacher_name').eq('batch_time', student.batch_time).eq('institute_id', sessionInstID).maybeSingle();
+            document.getElementById('perf-teacher').value = b ? b.teacher_name : "";
+        }
 
-        // Show the UI
         document.getElementById('performance-report-area').style.display = 'block';
-        alert(`Found ${student.full_name}. Performance synced from ${examCount} exam records.`);
 
     } catch (err) {
-        console.error("Link Error:", err);
-        alert("Database connection error: " + err.message);
+        console.error("Fetch Error:", err);
+        alert("Error: " + err.message);
     }
 }
 // 3. Save performance to database
