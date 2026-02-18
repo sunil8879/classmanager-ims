@@ -799,6 +799,20 @@
                 <button class="btn-add" onclick="generateAttendanceReport()">GENERATE REPORT</button>
             </div>
         </div>
+<!-- EXAM REPORT INPUTS (Hidden by default) -->
+<div id="report-ui-exam" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Roll Number</label>
+            <input type="text" id="rep-ex-roll" placeholder="IMS-XXXX" oninput="populateExamRepName()">
+        </div>
+        <div class="input-group"><label>Student Name</label><input type="text" id="rep-ex-name" readonly style="background:#eee;"></div>
+        <div class="input-group"><label>Course Name</label><input type="text" id="rep-ex-course" readonly style="background:#eee;"></div>
+    </div>
+    <div class="button-row">
+        <button class="btn-add" style="background:#f39c12;" onclick="generateExamReport()">GENERATE EXAM REPORT</button>
+    </div>
+</div>
     </div>
 
     <!-- REPORT DISPLAY AREA -->
@@ -2188,6 +2202,7 @@ async function fetchAttendanceByPrompt() {
 function toggleReportUI() {
     const val = document.getElementById('report-selector').value;
     document.getElementById('report-ui-attendance').style.display = (val === 'attendance') ? 'block' : 'none';
+    document.getElementById('report-ui-exam').style.display = (val === 'exam') ? 'block' : 'none'; // ADD THIS LINE
     document.getElementById('report-output-area').style.display = 'none';
 }
 
@@ -2269,6 +2284,107 @@ function drawAttendanceChart(p, a) {
         chart.draw(data, options);
     });
 }
+
+
+
+
+
+
+
+
+
+
+// 1. Auto-populate Student & Course info for Exam Report
+async function populateExamRepName() {
+    const roll = document.getElementById('rep-ex-roll').value.toUpperCase().trim();
+    if (roll.length < 4) return;
+    const { data } = await db.from('students').select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if(data) {
+        document.getElementById('rep-ex-name').value = data.full_name;
+        document.getElementById('rep-ex-course').value = data.course;
+    }
+}
+
+// 2. Generate the Detailed Exam Report
+async function generateExamReport() {
+    const roll = document.getElementById('rep-ex-roll').value.toUpperCase().trim();
+    const name = document.getElementById('rep-ex-name').value;
+    
+    if(!roll || !name) return alert("Please enter a valid Roll Number");
+
+    // Fetch all exam records for this student
+    const { data: records, error } = await db.from('exam')
+        .select('*')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .order('exam_date', { ascending: true });
+
+    if(error) return alert(error.message);
+    if(records.length === 0) return alert("No exam records found for this student.");
+
+    // Build Table Body
+    let tableBody = "";
+    let totalObtained = 0;
+    let totalPossible = 0;
+
+    records.forEach(r => {
+        tableBody += `
+            <tr>
+                <td>${r.exam_date}</td>
+                <td>${r.marks_obtained} / ${r.total_marks}</td>
+                <td>${r.percentage}%</td>
+                <td style="font-weight:bold; color:${r.result === 'Failed' ? 'red' : 'black'}">${r.result}</td>
+            </tr>`;
+        totalObtained += Number(r.marks_obtained);
+        totalPossible += Number(r.total_marks);
+    });
+
+    // Update UI Elements
+    document.getElementById('rep-title').innerText = `Student Performance Report`;
+    document.getElementById('rep-summary-text').innerHTML = `<b>Student:</b> ${name} | <b>Roll No:</b> ${roll} | <b>Course:</b> ${records[0].course_name}`;
+    document.getElementById('rep-table-head').innerHTML = `<tr><th>Date</th><th>Score</th><th>%</th><th>Result</th></tr>`;
+    document.getElementById('rep-table-body').innerHTML = tableBody;
+    
+    const avgPct = ((totalObtained / totalPossible) * 100).toFixed(2);
+
+    document.getElementById('rep-stats-boxes').innerHTML = `
+        <div class="stat-card"><b>Exams Taken</b><h4>${records.length}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid #1877F2;"><b>Total Marks</b><h4>${totalObtained}</h4></div>
+        <div class="stat-card" style="border-bottom:5px solid #f39c12;"><b>Avg Percentage</b><h4>${avgPct}%</h4></div>
+    `;
+
+    document.getElementById('report-output-area').style.display = 'block';
+
+    // Draw Graph: Percentage trend over time
+    drawExamTrendChart(records);
+}
+
+// 3. Google Chart: Line Chart for Performance Trend
+function drawExamTrendChart(records) {
+    google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(() => {
+        const chartData = [['Exam Date', 'Percentage']];
+        records.forEach(r => {
+            chartData.push([r.exam_date, parseFloat(r.percentage)]);
+        });
+
+        const data = google.visualization.arrayToDataTable(chartData);
+        const options = {
+            title: 'Academic Progress Trend',
+            curveType: 'function',
+            legend: { position: 'bottom' },
+            hAxis: { title: 'Date' },
+            vAxis: { title: 'Percentage (%)', minValue: 0, maxValue: 100 },
+            colors: ['#1877F2'],
+            pointSize: 10
+        };
+
+        const chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+    });
+}
+
+
 // 1. Toggle visibility of calendars based on filter type
 function toggleAdminCalendar() {
     const type = document.getElementById('admin-filter-type').value;
