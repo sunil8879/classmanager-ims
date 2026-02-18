@@ -860,6 +860,13 @@
             </table>
             <div class="dashboard-stats" id="rep-stats-boxes"></div>
         </div>
+
+
+
+
+ <!-- ADD THIS LINE FOR THE SLICER -->
+    <div id="filter_div" style="margin-bottom: 20px; padding: 10px; background: #f0fdfa; border-radius: 8px; border: 1px solid #7FFFD4;"></div>
+
         
         <!-- Google Charts Area -->
          <div id="chart_div" style="width: 100%; height: 400px; margin-top:30px;"></div>
@@ -1399,6 +1406,9 @@
 const _supabaseUrl = 'https://erzwijnlbnwjdlluvxyk.supabase.co';
 const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
 const db =  supabase.createClient(_supabaseUrl, _supabaseKey);
+
+
+google.charts.load('current', {'packages':['corechart', 'controls']});
 
 // ADD THESE TWO LINES HERE
 let sessionInstID = ""; 
@@ -2301,27 +2311,38 @@ async function generateAttendanceReport() {
 
 // 4. Google Charts Integration
 function drawAttendanceChart(p, a) {
-    google.charts.load('current', {'packages':['corechart']});
-    google.charts.setOnLoadCallback(() => {
-        const data = google.visualization.arrayToDataTable([
-            ['Status', 'Days', { role: 'style' }],
-            ['Present', p, '#27ae60'],
-            ['Absent', a, '#e74c3c']
-        ]);
+    // No need to load again here
+    var data = google.visualization.arrayToDataTable([
+        ['Status', 'Days'],
+        ['Present', p],
+        ['Absent', a]
+    ]);
 
-        const options = {
-            title: 'Attendance Visualization',
-            hAxis: { title: 'Days' },
-            legend: { position: 'none' },
-            chartArea: { width: '50%' }
-        };
+    var dashboard = new google.visualization.Dashboard(document.getElementById('report-output-area'));
 
-        const chart = new google.visualization.BarChart(document.getElementById('chart_div'));
-        chart.draw(data, options);
+    var statusPicker = new google.visualization.ControlWrapper({
+        'controlType': 'CategoryFilter',
+        'containerId': 'filter_div',
+        'options': {
+            'filterColumnLabel': 'Status',
+            'ui': {'label': 'Filter Status:', 'allowTyping': false, 'allowMultiple': true}
+        }
     });
+
+    var barChart = new google.visualization.ChartWrapper({
+        'chartType': 'BarChart',
+        'containerId': 'chart_div',
+        'options': { 'title': 'Attendance Overview', 'colors': ['#27ae60'], 'height': 300, 'legend':'none' }
+    });
+
+    dashboard.bind(statusPicker, barChart);
+    dashboard.draw(data);
 }
 
-
+// Apply the same logic to drawStaffAttendanceChart
+function drawStaffAttendanceChart(p, a) {
+    drawAttendanceChart(p, a); // Re-use the same slicer logic
+}
 
 
 
@@ -2390,26 +2411,48 @@ async function generateFeeReport() {
 }
 
 function drawFeeCharts(paid, pending) {
-    google.charts.load('current', { 'packages': ['corechart'] });
-    google.charts.setOnLoadCallback(() => {
-        const data = google.visualization.arrayToDataTable([
-            ['Type', 'Amount', { role: 'style' }],
-            ['Collected', paid, '#27ae60'],
-            ['Outstanding', pending, '#e74c3c']
-        ]);
+    // 1. Prepare Data
+    var data = google.visualization.arrayToDataTable([
+        ['Type', 'Amount'],
+        ['Collected', paid],
+        ['Outstanding', pending]
+    ]);
 
-        const options = {
-            title: 'Fee Collection Overview (Actuals vs Dues)',
-            chartArea: { width: '60%' },
-            hAxis: { title: 'Amount in ₹', minValue: 0 },
-            legend: { position: 'none' }
-        };
+    // 2. Define the Dashboard
+    var dashboard = new google.visualization.Dashboard(document.getElementById('report-output-area'));
 
-        const chart = new google.visualization.BarChart(document.getElementById('chart_div'));
-        chart.draw(data, options);
+    // 3. Create the Slicer (Filter between Collected vs Outstanding)
+    var feePicker = new google.visualization.ControlWrapper({
+        'controlType': 'CategoryFilter',
+        'containerId': 'filter_div',
+        'options': {
+            'filterColumnLabel': 'Type',
+            'ui': {
+                'label': 'Filter Financial Type:',
+                'allowTyping': false,
+                'allowMultiple': true
+            }
+        }
     });
-}
 
+    // 4. Create the Horizontal Bar Chart
+    var barChart = new google.visualization.ChartWrapper({
+        'chartType': 'BarChart',
+        'containerId': 'chart_div',
+        'options': {
+            'title': 'Revenue Overview (Actuals vs Dues)',
+            'colors': ['#27ae60'], // Brand Green
+            'hAxis': { title: 'Amount in ₹', minValue: 0 },
+            'chartArea': { width: '50%' },
+            'legend': 'none',
+            'height': 300
+        }
+    });
+
+    // 5. Bind and Draw
+    dashboard.bind(feePicker, barChart);
+    dashboard.draw(data);
+}
 // 1. Auto-populate Student & Course info for Exam Report
 async function populateExamRepName() {
     const roll = document.getElementById('rep-ex-roll').value.toUpperCase().trim();
@@ -2477,29 +2520,41 @@ async function generateExamReport() {
 
 // 3. Google Chart: Line Chart for Performance Trend
 function drawExamTrendChart(records) {
-    google.charts.load('current', {'packages':['corechart']});
-    google.charts.setOnLoadCallback(() => {
-        const chartData = [['Exam Date', 'Percentage']];
-        records.forEach(r => {
-            chartData.push([r.exam_date, parseFloat(r.percentage)]);
-        });
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Exam Date');
+    data.addColumn('number', 'Percentage');
 
-        const data = google.visualization.arrayToDataTable(chartData);
-        const options = {
-            title: 'Academic Progress Trend',
-            curveType: 'function',
-            legend: { position: 'bottom' },
-            hAxis: { title: 'Date' },
-            vAxis: { title: 'Percentage (%)', minValue: 0, maxValue: 100 },
-            colors: ['#1877F2'],
-            pointSize: 10
-        };
-
-        const chart = new google.visualization.LineChart(document.getElementById('chart_div'));
-        chart.draw(data, options);
+    records.forEach(r => {
+        data.push([r.exam_date, parseFloat(r.percentage)]);
     });
-}
 
+    var dashboard = new google.visualization.Dashboard(document.getElementById('report-output-area'));
+
+    // SLIDER SLICER for Percentage
+    var percentageSlider = new google.visualization.ControlWrapper({
+        'controlType': 'NumberRangeFilter',
+        'containerId': 'filter_div',
+        'options': {
+            'filterColumnLabel': 'Percentage',
+            'ui': {'label': 'Filter by Score Range (%):'}
+        }
+    });
+
+    var lineChart = new google.visualization.ChartWrapper({
+        'chartType': 'LineChart',
+        'containerId': 'chart_div',
+        'options': {
+            'title': 'Progress Trend',
+            'curveType': 'function',
+            'pointSize': 10,
+            'vAxis': { minValue: 0, maxValue: 100 },
+            'height': 400
+        }
+    });
+
+    dashboard.bind(percentageSlider, lineChart);
+    dashboard.draw(data);
+}
 
 
 
@@ -2571,25 +2626,46 @@ async function generateTeacherAttendanceReport() {
 }
 
 function drawStaffAttendanceChart(p, a) {
-    google.charts.load('current', { 'packages': ['corechart'] });
-    google.charts.setOnLoadCallback(() => {
-        const data = google.visualization.arrayToDataTable([
-            ['Status', 'Days', { role: 'style' }],
-            ['Present', p, '#2e7d32'], // Deep Green
-            ['Absent', a, '#c62828']   // Deep Red
-        ]);
+    // 1. Prepare Data
+    var data = google.visualization.arrayToDataTable([
+        ['Status', 'Days'],
+        ['Present', p],
+        ['Absent', a]
+    ]);
 
-        const options = {
-            title: 'Monthly Staff Attendance Distribution',
-            hAxis: { title: 'Number of Days', minValue: 0 },
-            vAxis: { title: 'Attendance Status' },
-            legend: { position: 'none' },
-            chartArea: { width: '50%' }
-        };
+    // 2. Define the Dashboard
+    var dashboard = new google.visualization.Dashboard(document.getElementById('report-output-area'));
 
-        const chart = new google.visualization.BarChart(document.getElementById('chart_div'));
-        chart.draw(data, options);
+    // 3. Create the Slicer (Status Filter)
+    var staffStatusPicker = new google.visualization.ControlWrapper({
+        'controlType': 'CategoryFilter',
+        'containerId': 'filter_div',
+        'options': {
+            'filterColumnLabel': 'Status',
+            'ui': {
+                'label': 'Filter Staff Attendance:',
+                'allowTyping': false,
+                'allowMultiple': true
+            }
+        }
     });
+
+    // 4. Create the Pie Chart (Great for Staff Ratios)
+    var pieChart = new google.visualization.ChartWrapper({
+        'chartType': 'PieChart',
+        'containerId': 'chart_div',
+        'options': {
+            'title': 'Staff Attendance Distribution',
+            'colors': ['#2e7d32', '#c62828'], // Deep Green and Red
+            'is3D': true,
+            'height': 300,
+            'chartArea': { width: '90%', height: '80%' }
+        }
+    });
+
+    // 5. Bind and Draw
+    dashboard.bind(staffStatusPicker, pieChart);
+    dashboard.draw(data);
 }
 
 
