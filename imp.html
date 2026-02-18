@@ -296,6 +296,34 @@
     display: block;
     margin: 0 auto;
 }
+
+
+
+
+--shadow-aqua: #66ccaa; 
+    }
+
+    /* ADD THIS DASHBOARD CSS */
+    .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        width: 100%;
+        max-width: 900px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        text-align: center;
+        border: 1px solid #000;
+    }
+    .stat-card p { font-weight: bold; font-size: 0.9rem; color: #666; margin-bottom: 10px; }
+    .stat-card h4 { font-size: 2rem !important; margin: 0 !important; text-decoration: none !important; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     </style>
 </head>
 <body>
@@ -355,53 +383,46 @@
             <!-- DEFAULT HOME PAGE -->
            <!-- DEFAULT HOME PAGE -->
             <section id="home" class="content-section active">
-                <div class="card">
-                    <h2 class="hero-title" style="color: white;">Still managing your institute manually?</h2>
-                    <ul class="bullet-list">
-                        <li>Tracking fees in notebooks?</li>
-                        <li>Forgetting pending payments?</li>
-                        <li>Managing students in Excel?</li>
-                        <li>Confused batch records?</li>
-                    </ul>
-                    <span class="solve-text">ClassManager solves all this.</span>
-                </div>
+    <!-- 1. DISPLAY THIS ONLY FOR LOGGED-IN OWNERS -->
+    <div id="home-user-view" style="display: none; width: 100%;">
+        <div class="dashboard-stats" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px;">
+            <div class="stat-card" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; border: 1px solid #000; min-width: 200px; border-bottom: 5px solid #27ae60;">
+                <p style="font-weight: bold; color: #666; margin-bottom: 10px;">ADMISSIONS</p>
+                <h4 id="home-total-stu" style="font-size: 2.5rem; margin: 0; color: #000;">0</h4>
+                <small>Active Students</small>
+            </div>
+            <div class="stat-card" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; border: 1px solid #000; min-width: 200px; border-bottom: 5px solid #1877F2;">
+                <p style="font-weight: bold; color: #666; margin-bottom: 10px;">COLLECTION</p>
+                <h4 id="home-total-coll" style="font-size: 2.5rem; margin: 0; color: #000;">₹ 0</h4>
+                <small>Total Received</small>
+            </div>
+            <div class="stat-card" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; border: 1px solid #000; min-width: 200px; border-bottom: 5px solid #ff0000;">
+                <p style="font-weight: bold; color: #666; margin-bottom: 10px;">PENDING</p>
+                <h4 id="home-total-pend" style="font-size: 2.5rem; margin: 0; color: #ff0000;">₹ 0</h4>
+                <small>Outstanding Fees</small>
+            </div>
+        </div>
+    </div>
 
-                <hr style="margin: 40px 0; border: 1px solid rgba(0,0,0,0.1);">
+    <!-- 2. DISPLAY THIS FOR VISITORS (YOUR ORIGINAL CONTENT) -->
+    <div id="home-visitor-view">
+        <div class="card">
+            <h2 class="hero-title" style="color: white; text-decoration: none;">Still managing your institute manually?</h2>
+            <ul class="bullet-list">
+                <li>Tracking fees in notebooks?</li>
+                <li>Forgetting pending payments?</li>
+                <li>Managing students in Excel?</li>
+                <li>Confused batch records?</li>
+            </ul>
+            <span class="solve-text">ClassManager solves all this.</span>
+        </div>
+    </div>
 
-                <h2 style="font-size: 2.2rem; margin-bottom: 30px;">Everything you need to manage your institute</h2>
-                <div class="feature-grid">
-                    <div class="card">
-                        <h3>Student Management</h3>
-                        <p>Centralized database for all student profiles and documents.</p>
-                    </div>
-                    <div class="card">
-                        <h3>Fee Tracking</h3>
-                        <p>Automated receipts and pending fee alerts for parents.</p>
-                    </div>
-                    <div class="card">
-                        <h3>Batch Management</h3>
-                        <p>Organize students into batches with scheduled timings.</p>
-                    </div>
-                    <div class="card">
-                        <h3>Attendance Tracking</h3>
-                        <p>Digital attendance with instant notification to parents.</p>
-                    </div>
-                    <div class="card">
-                        <h3>Reports & Dashboard</h3>
-                        <p>Comprehensive visual reports for growth and revenue.</p>
-                    </div>
-                    <div class="card">
-                        <h3>Enquiry Management</h3>
-                        <p>Convert leads into admissions with effective follow-ups.</p>
-                    </div>
-                </div>
-
-                <div style="margin-top: 50px; text-align: center; background: #ffffff; border: 4px solid #1877F2; padding: 30px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
-                    <h3 style="color: #1877F2; font-size: 1.8rem;">Built for coaching institutes</h3>
-                    <p style="font-size: 1.2rem; margin: 10px 0;">Secure and reliable | Made in India</p>
-                    <p><strong>Trusted by 100+ institutes</strong></p>
-                </div>
-            </section>
+    <!-- The rest of your "Features" list stays here below -->
+    <hr style="margin: 40px 0; border: 1px solid rgba(0,0,0,0.1);">
+    <h2 style="font-size: 2.2rem; margin-bottom: 30px;">Everything you need to manage your institute</h2>
+    <!-- ... (rest of your feature-grid code) ... -->
+</section>
 
           <!-- 1. LOGIN SYSTEM -->
 
@@ -1213,24 +1234,18 @@ let sessionUserName = "";
 async function checkCurrentSession() {
     const { data: { user } } = await db.auth.getUser();
     if (user) {
-        const { data: profile } = await db.from('profiles')
-            .select('full_name, institute_id')
-            .eq('id', user.id)
-            .single();
-
+        const { data: profile } = await db.from('profiles').select('full_name, institute_id').eq('id', user.id).single();
         if (profile) {
             sessionUserName = profile.full_name;
             sessionInstID = profile.institute_id; 
-            
-            // 1. Update the Greeting Bar
+
             document.getElementById('auth-status-bar').style.display = 'flex';
             document.getElementById('user-greeting').innerText = `Welcome ${sessionUserName} (${sessionInstID})`;
             
-            // 2. SWITCH THE HOME PAGE VIEW
+            // SHOW the Stats, HIDE the "Still managing manually" text
             document.getElementById('home-visitor-view').style.display = 'none';
-            document.getElementById('home-user-view').style.display = 'block'; 
+            document.getElementById('home-user-view').style.display = 'block';
             
-            // 3. Load the actual numbers
             loadHomeDashboardStats();
         }
     } else {
@@ -1239,7 +1254,6 @@ async function checkCurrentSession() {
         document.getElementById('home-user-view').style.display = 'none';
     }
 }
-
 checkCurrentSession();
 
 // Helper to get input values easily
@@ -1388,16 +1402,9 @@ async function handleLogout() {
     }
 }
 
-
-
-/* ==========================================
-   HOME DASHBOARD STATS LOGIC
-   ========================================== */
 async function loadHomeDashboardStats() {
     if (!sessionInstID) return;
-
-    const { data: students, error } = await db
-        .from('students')
+    const { data: students } = await db.from('students')
         .select('paid_amount, pending_amount')
         .eq('institute_id', sessionInstID)
         .eq('status', 'Active');
@@ -1412,6 +1419,10 @@ async function loadHomeDashboardStats() {
         document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
     }
 }
+
+/* ==========================================
+   HOME DASHBOARD STATS LOGIC
+   ========================================== */
 
 /* ==========================================
    3. STUDENT MANAGEMENT (Add, Edit, Fetch)
