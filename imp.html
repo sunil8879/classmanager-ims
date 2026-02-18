@@ -2959,17 +2959,7 @@ async function fetchPerformanceData() {
         const roll = student.roll_number;
 
 
-// FETCH EXAM DATA
-        const { data: examRecords } = await db.from('exam').select('marks_obtained, total_marks')
-            .eq('roll_number', roll).eq('institute_id', sessionInstID);
 
-        let totalObtained = 0, examCount = 0, avgPercent = 0;
-        if (examRecords && examRecords.length > 0) {
-            examCount = examRecords.length;
-            totalObtained = examRecords.reduce((s, r) => s + (parseFloat(r.marks_obtained) || 0), 0);
-            const totalPossible = examRecords.reduce((s, r) => s + (parseFloat(r.total_marks) || 0), 0);
-            avgPercent = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
-        }
 
         // STEP 2: Fetch all marks for this Roll Number from 'exam' table
         const { data: examRecords, error: examErr } = await db
@@ -2980,36 +2970,44 @@ async function fetchPerformanceData() {
 
         if (examErr) throw examErr;
 
-        // FETCH ATTENDANCE (This Month)
-        const monthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        const { data: attData } = await db.from('attendance').select('status')
-            .eq('roll_number', roll).eq('month_year', monthYear).eq('institute_id', sessionInstID);
+        // STEP 3: Fetch existing summary from 'performance_tracking' (for Teacher Name)
+        const { data: summary } = await db
+            .from('performance_tracking')
+            .select('teacher_name')
+            .eq('roll_number', roll)
+            .eq('institute_id', sessionInstID)
+            .maybeSingle();
 
-        const totalDays = attData ? attData.length : 0;
-        const absentCount = attData ? attData.filter(a => a.status === 'Absent').length : 0;
-        const attPct = totalDays > 0 ? (((totalDays - absentCount) / totalDays) * 100).toFixed(1) : "100";
+        // STEP 4: Calculate Totals
+        let totalObtained = 0;
+        let examCount = 0;
+        let avgPercent = 0;
 
-        // POPULATE UI
+        if (examRecords && examRecords.length > 0) {
+            examCount = examRecords.length;
+            totalObtained = examRecords.reduce((sum, r) => sum + (parseFloat(r.marks_obtained) || 0), 0);
+            const totalPossible = examRecords.reduce((sum, r) => sum + (parseFloat(r.total_marks) || 0), 0);
+            avgPercent = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
+        }
+
+        // STEP 5: Populate the UI
+        document.getElementById('perf-today').value = new Date().toLocaleDateString();
         document.getElementById('perf-name').value = student.full_name;
         document.getElementById('perf-roll').value = roll;
-        document.getElementById('perf-absent').innerText = absentCount;
-        document.getElementById('perf-attendance-pct').innerText = attPct + "%";
+        document.getElementById('perf-course').value = student.course || "N/A";
+        document.getElementById('perf-joining').value = student.admission_date || "N/A";
+        
+        // Auto-calculated fields
         document.getElementById('perf-marks').value = totalObtained;
         document.getElementById('perf-exam-count').value = examCount;
         document.getElementById('perf-avg-display').value = avgPercent.toFixed(2) + "%";
-
-        // TEACHER FIX: If blank, look into Batches
-        const { data: summary } = await db.from('performance_tracking').select('teacher_name')
-            .eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
         
-        if (summary && summary.teacher_name) {
-            document.getElementById('perf-teacher').value = summary.teacher_name;
-        } else {
-            const { data: b } = await db.from('batches').select('teacher_name').eq('batch_time', student.batch_time).eq('institute_id', sessionInstID).maybeSingle();
-            document.getElementById('perf-teacher').value = b ? b.teacher_name : "Not Assigned";
-        }
+        // Populate teacher name if it was saved before
+        document.getElementById('perf-teacher').value = summary ? summary.teacher_name : "";
 
+        // Show the UI
         document.getElementById('performance-report-area').style.display = 'block';
+        alert(`Found ${student.full_name}. Performance synced from ${examCount} exam records.`);
 
     } catch (err) {
         console.error("Link Error:", err);
