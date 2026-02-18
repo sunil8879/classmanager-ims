@@ -1047,6 +1047,16 @@
             <div class="input-group"><label>Qualification</label><input type="text" id="tch-qual"></div>
             <div class="input-group"><label>Subject Taught</label><input type="text" id="tch-subject"></div>
             <div class="input-group"><label>Salary</label><input type="number" id="tch-salary"></div>
+			<!-- Inside <section id="teacher"> inside <div class="form-grid"> -->
+
+<!-- Other inputs like Name, Age, etc are here... -->
+
+<div class="input-group" style="grid-column: 1 / -1; width: 100%; max-width: 350px; margin: 15px auto 0; text-align: center;">
+    <label style="display: block; margin-bottom: 5px; color: #000; font-weight: bold;">WhatsApp Mobile Number</label>
+    <input type="text" id="tch-mobile" placeholder="10-Digit Mobile Number" maxlength="10" style="text-align: center; border: 2px solid #25D366;">
+</div>
+
+<!-- ... the </div> for form-grid follows -->
         </div>
         <div class="button-row">
             <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
@@ -1412,49 +1422,39 @@
 
 <!-- STANDALONE MESSAGE HUB -->
 <section id="message-corner" class="content-section">
-    <div class="card" style="border-top: 5px solid #000; background: #fff;">
-        <h2 style="text-decoration: none; margin-bottom: 20px;"><i class="fas fa-comments"></i> Message Hub</h2>
-        
-        <!-- TARGET BUTTONS -->
-        <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 25px;">
-            <button class="btn-fetch" style="background: #1877F2; flex: 1;" onclick="prepareOwnerBox('Teacher')">TO THE TEACHERS</button>
-            <button class="btn-fetch" style="background: #27ae60; flex: 1;" onclick="prepareOwnerBox('Student')">TO THE STUDENTS</button>
-        </div>
+    <div class="card" style="border-top: 5px solid #25D366; background: #fff;">
+        <h2 style="text-decoration: none; color: #000;"><i class="fab fa-whatsapp"></i> Quick Connect Hub</h2>
+        <p style="margin-bottom: 25px; color: #666;">Select a recipient to open a direct WhatsApp chat.</p>
 
-        <!-- INPUT AREA -->
-        <div id="owner-msg-box" style="display: none; border: 3px solid #000; border-radius: 15px; padding: 25px; background: #f9f9f9; text-align: left;">
-            <h3 id="target-header" style="color: #ff0000; margin-bottom: 15px;">Target: ...</h3>
-            <div class="form-grid" style="margin-bottom: 15px;">
-                <div class="input-group">
-                    <label>Relevant Subject</label>
-                    <select id="msg-sub-tag">
-                        <option value="General">General / All</option>
-                        <option>Mathematics</option><option>Physics</option><option>Chemistry</option>
-                        <option>Biology</option><option>Accounts</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label>Institute ID</label>
-                    <input type="text" id="msg-inst-display" readonly style="background: #eee;">
-                </div>
+        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            
+            <!-- 1. MESSAGE OWNER -->
+            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
+                <h4 style="text-decoration: none;"><i class="fas fa-user-tie"></i> For Teachers/Students</h4>
+                <p style="font-size: 0.8rem; margin-bottom: 10px;">Send a message to the Institute Owner.</p>
+                <button class="btn-add" style="background: #25D366; width: 100%; border: none;" onclick="connectToOwner()">
+                    <i class="fab fa-whatsapp"></i> MESSAGE OWNER
+                </button>
             </div>
-            <textarea id="msg-body-text" rows="5" style="width: 100%; padding: 10px; border: 2px solid #000; border-radius: 10px;" placeholder="Type message here..."></textarea>
-            <div class="button-row" style="margin-top: 20px;">
-                <button class="btn-add" style="background: #000;" onclick="sendFinalMessage()">SEND</button>
-                <button class="btn-edit" style="background: #666;" onclick="document.getElementById('msg-body-text').value=''">CLEAR</button>
-                <button class="btn-fetch" style="background: #f39c12;" onclick="restoreLastMessages()">RESTORE</button>
-            </div>
-        </div>
 
-        <!-- OUTBOX (Verification Area) -->
-        <div style="margin-top: 30px; border-top: 3px solid #000; padding-top: 20px;">
-            <button class="btn-fetch" style="background: #6c757d; width: 100%;" onclick="fetchOwnerOutbox()">VERIFY SENT MESSAGES (OUTBOX)</button>
-            <div id="outbox-area" style="display: none; margin-top: 15px;">
-                <table style="width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #000;">
-                    <thead><tr style="background: #eee;"><th style="padding:10px; border:1px solid #000;">To</th><th style="padding:10px; border:1px solid #000;">Subject</th><th style="padding:10px; border:1px solid #000;">Message</th></tr></thead>
-                    <tbody id="outbox-list"></tbody>
-                </table>
+            <!-- 2. MESSAGE TEACHER -->
+            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
+                <h4 style="text-decoration: none;"><i class="fas fa-chalkboard-teacher"></i> For Owner/Students</h4>
+                <input type="text" id="wa-teacher-id" placeholder="Enter Teacher ID (e.g. TCH-1234)" style="width: 100%; margin-bottom: 10px;">
+                <button class="btn-add" style="background: #128C7E; width: 100%; border: none;" onclick="connectToTeacher()">
+                    <i class="fab fa-whatsapp"></i> MESSAGE TEACHER
+                </button>
             </div>
+
+            <!-- 3. MESSAGE STUDENT -->
+            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
+                <h4 style="text-decoration: none;"><i class="fas fa-user-graduate"></i> For Owner/Teachers</h4>
+                <input type="text" id="wa-student-roll" placeholder="Enter Student Roll No" style="width: 100%; margin-bottom: 10px;">
+                <button class="btn-add" style="background: #075E54; width: 100%; border: none;" onclick="connectToStudent()">
+                    <i class="fab fa-whatsapp"></i> MESSAGE STUDENT
+                </button>
+            </div>
+
         </div>
     </div>
 </section>
@@ -3227,16 +3227,19 @@ function clearTeacherForm() {
 }
 
 // 3. ADD TEACHER
+// 1. UPDATED: ADD TEACHER (Now includes Mobile)
 async function addTeacherDetails() {
     const id = document.getElementById('tch-id').value;
     const name = document.getElementById('tch-name').value;
+    const mobile = document.getElementById('tch-mobile').value;
 
-    if (!id || !name) return alert("Error: Click GEN and enter Teacher Name.");
+    if (!id || !name || !mobile) return alert("Error: ID, Name, and Mobile are mandatory.");
 
     const { error } = await db.from('teacher_details').insert([{
- institute_id: sessionInstID,
+        institute_id: sessionInstID,
         id: id,
         teacher_name: name,
+        mobile: mobile, // New Column
         age: parseInt(document.getElementById('tch-age').value) || 0,
         joining_date: document.getElementById('tch-join').value,
         qualification: document.getElementById('tch-qual').value,
@@ -3247,22 +3250,25 @@ async function addTeacherDetails() {
     if (error) alert("DB Error: " + error.message);
     else alert("Teacher Saved Successfully!");
 }
-// 4. FETCH TEACHER (By ID)
+
+// 2. UPDATED: FETCH TEACHER (Now includes Mobile)
 async function fetchTeacher() {
-    const id = prompt("Enter Teacher ID to fetch (e.g., TCH-1234):");
+    const id = prompt("Enter Teacher ID to fetch:");
     if (!id) return;
 
-    const { data, error } = await db.from('teacher_details').select('*').eq('id', id)
- .eq('institute_id', sessionInstID)
-.single();
+    const { data, error } = await db.from('teacher_details')
+        .select('*')
+        .eq('id', id.toUpperCase())
+        .eq('institute_id', sessionInstID)
+        .single();
 
-    if (error || !data) return alert("Error: Teacher not found with ID " + id);
+    if (error || !data) return alert("Error: Teacher not found.");
 
     // Populate UI
     document.getElementById('tch-id').value = data.id;
     document.getElementById('tch-name').value = data.teacher_name;
+    document.getElementById('tch-mobile').value = data.mobile || ""; // New Field
     document.getElementById('tch-age').value = data.age;
-    document.getElementById('tch-gender').value = data.gender;
     document.getElementById('tch-join').value = data.joining_date;
     document.getElementById('tch-qual').value = data.qualification;
     document.getElementById('tch-subject').value = data.subject_taught;
@@ -3906,94 +3912,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let currentTarget = ""; // Global to track Teacher vs Student
 
-var activeMsgTarget = "";
+/* --- WHATSAPP HUB LOGIC --- */
 
-// Sidebar Switcher
-function msgEngine(tab) { showSection('message-corner'); }
+// 1. Connect to OWNER
+async function connectToOwner() {
+    // Fetches the Owner's mobile from the profiles table
+    const { data, error } = await db.from('profiles')
+        .select('mobile_number')
+        .eq('institute_id', sessionInstID)
+        .eq('role', 'Owner')
+        .single();
 
-// OWNER LOGIC
-function prepareOwnerBox(target) {
-    activeMsgTarget = target;
-    document.getElementById('owner-msg-box').style.display = 'block';
-    document.getElementById('target-header').innerText = "Target Audience: " + target + "s";
-    document.getElementById('msg-inst-display').value = sessionInstID;
-}
-
-async function sendFinalMessage() {
-    const content = document.getElementById('msg-body-text').value.trim();
-    const subject = document.getElementById('msg-sub-tag').value;
-    if (!content) return alert("Message is empty!");
-    const { error } = await db.from('messages').insert([{
-        institute_id: sessionInstID, sender_name: sessionUserName,
-        sender_role: "Owner", message_type: activeMsgTarget,
-        target_subject: subject, content: content
-    }]);
-    if (error) alert("Error: " + error.message);
-    else { alert("Sent!"); document.getElementById('msg-body-text').value = ""; }
-}
-
-async function fetchOwnerOutbox() {
-    const { data } = await db.from('messages').select('*').eq('institute_id', sessionInstID).order('created_at', { ascending: false });
-    if (data) {
-        document.getElementById('outbox-area').style.display = 'block';
-        document.getElementById('outbox-list').innerHTML = data.map(m => `
-            <tr><td style="padding:10px; border:1px solid #000;">${m.message_type}</td>
-            <td style="padding:10px; border:1px solid #000;">${m.target_subject}</td>
-            <td style="padding:10px; border:1px solid #000;">${m.content}</td></tr>`).join('');
+    if (data && data.mobile_number) {
+        const msg = encodeURIComponent("Hello, I am contacting you from the ClassManager Portal.");
+        window.open(`https://wa.me/91${data.mobile_number}?text=${msg}`, '_blank');
+    } else {
+        alert("Owner's contact number not found in database.");
     }
 }
 
-// STUDENT PORTAL LOGIC
-async function fetchStudentPortalData() {
-    const roll = document.getElementById('portal-roll-input').value.trim();
-    const monthVal = document.getElementById('portal-month-input').value;
-    if (!roll || !monthVal) return alert("Fill all fields");
+// 2. Connect to TEACHER
+async function connectToTeacher() {
+    const tid = document.getElementById('wa-teacher-id').value.toUpperCase().trim();
+    if (!tid) return alert("Please enter a Teacher ID.");
 
-    try {
-        const { data: student } = await db.from('students').select('*').eq('roll_number', roll).single();
-        if (!student) throw new Error("Roll No not found");
-
-        document.getElementById('portal-display-area').style.display = 'block';
-        document.getElementById('p-name').innerText = student.full_name;
-        document.getElementById('p-course').innerText = student.course;
-        document.getElementById('p-paid').innerText = "₹ " + student.paid_amount;
-        document.getElementById('p-pending').innerText = "₹ " + student.pending_amount;
-
-        // FETCH MESSAGES RELEVANT TO THIS STUDENT
-        fetchStudentMessages(student.course);
-
-    } catch (err) { alert(err.message); }
-}
-
-async function fetchStudentMessages(course) {
-    const noticeDiv = document.getElementById('student-notices');
-    const { data } = await db.from('messages')
-        .select('*').eq('institute_id', sessionInstID).eq('message_type', 'Student')
-        .or(`target_subject.eq.General,target_subject.eq.${course}`)
-        .order('created_at', { ascending: false });
-
-    if (data && data.length > 0) {
-        noticeDiv.innerHTML = data.map(m => `
-            <div style="background: #f0fff4; padding: 10px; border-bottom: 1px solid #27ae60; margin-bottom: 5px;">
-                <b style="color: #27ae60;">[${m.target_subject}]</b> ${m.content}
-            </div>`).join('');
-    } else { noticeDiv.innerHTML = "No messages for your course."; }
-}
-async function fetchOwnerOutbox() {
-    const { data, error } = await db.from('messages')
-        .select('*')
+    const { data } = await db.from('teacher_details')
+        .select('mobile, teacher_name')
+        .eq('id', tid)
         .eq('institute_id', sessionInstID)
-        .order('created_at', { ascending: false });
+        .single();
 
-    if (data) {
-        document.getElementById('outbox-area').style.display = 'block';
-        document.getElementById('outbox-list').innerHTML = data.map(m => `
-            <tr>
-                <td style="padding: 10px; border: 1px solid #000;">${m.message_type}s</td>
-                <td style="padding: 10px; border: 1px solid #000;">${m.target_subject}</td>
-                <td style="padding: 10px; border: 1px solid #000;">${m.content}</td>
-            </tr>
-        `).join('');
+    if (data && data.mobile) {
+        const msg = encodeURIComponent(`Hello ${data.teacher_name}, this is from ${sessionUserName} regarding the institute.`);
+        window.open(`https://wa.me/91${data.mobile}?text=${msg}`, '_blank');
+    } else {
+        alert("Teacher ID not found or WhatsApp number is not registered.");
+    }
+}
+
+// 3. Connect to STUDENT
+async function connectToStudent() {
+    const roll = document.getElementById('wa-student-roll').value.toUpperCase().trim();
+    if (!roll) return alert("Please enter a Student Roll Number.");
+
+    // Fetches mobile from the students table
+    const { data, error } = await db.from('students')
+        .select('mobile, full_name')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .single();
+
+    if (data && data.mobile) {
+        const msg = encodeURIComponent(`Hello ${data.full_name}, this is regarding your classes at the institute.`);
+        window.open(`https://wa.me/91${data.mobile}?text=${msg}`, '_blank');
+    } else {
+        alert("Student Roll Number not found.");
     }
 }
     </script>
