@@ -1419,6 +1419,16 @@
             <button class="btn-add" style="width: 100%; margin-top: 10px;" onclick="submitMessage()">SEND</button>
         </div>
 
+
+
+
+
+
+<div style="display: flex; gap: 10px; margin-bottom: 10px; justify-content: flex-end;">
+    <button class="btn-edit" style="background: #666; font-size: 0.7rem; padding: 5px 10px;" onclick="clearChatDisplay()">CLEAR VIEW</button>
+    <button class="btn-fetch" style="background: #1877F2; font-size: 0.7rem; padding: 5px 10px;" onclick="refreshMessages()">RESTORE ALL</button>
+</div>
+
         <div id="msg-list" style="max-height: 350px; overflow-y: auto; background: white; border-radius: 10px; border: 1px solid #ddd; padding: 10px;">
             <!-- Messages appear here -->
         </div>
@@ -3944,6 +3954,19 @@ async function refreshMessages() {
         </div>
     `).join('');
 }
+
+
+
+
+
+
+// 1. CLEAR: Just hides the messages from the screen (Doesn't delete from DB)
+function clearChatDisplay() {
+    document.getElementById('msg-list').innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>View cleared. Click RESTORE to see history.</p>";
+}
+
+// 2. RESTORE: The restore button simply calls your existing refresh function
+// (Note: refreshMessages already exists in your code, so this button just triggers it!)
     </script>
 <script>
 if ('serviceWorker' in navigator) {
