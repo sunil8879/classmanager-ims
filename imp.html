@@ -454,6 +454,7 @@
             <button class="nav-tab" onclick="showSection('tracking')"><i class="fas fa-chart-line"></i> Performance Tracking</button>
 <button class="nav-tab" onclick="showSection('exam-mod')"><i class="fas fa-file-signature"></i> Exam Management</button>
 <button class="nav-tab" onclick="showSection('t-attn-mod')"><i class="fas fa-user-check"></i> Teacher Attendance</button>
+<button class="nav-tab" onclick="showSection('allocation-mod')"><i class="fas fa-link"></i> Student Allocation</button>
         </aside>
 
         <main class="content" id="main-content">
@@ -1348,6 +1349,43 @@
             <button class="btn-edit" style="background:#e74c3c;" onclick="triggerTAttn('Absent')">MARK ABSENT</button>
             <button class="btn-fetch" onclick="fetchTeacherHistory()">FETCH Records</button>
         </div>
+    </div>
+</section>
+
+
+<section id="allocation-mod" class="content-section">
+    <div class="card">
+        <h3><i class="fas fa-user-tag"></i> Link Student to Teacher</h3>
+        <div class="form-grid">
+            <div class="input-group">
+                <label>Teacher ID</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="alloc-tid" placeholder="TCH-XXXX">
+                    <button class="btn-fetch" onclick="fetchTeacherForAlloc()" style="padding:5px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="input-group"><label>Teacher Name</label><input type="text" id="alloc-tname" readonly style="background:#eee;"></div>
+            
+            <div class="input-group">
+                <label>Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="alloc-roll" placeholder="IMS-XXXX">
+                    <button class="btn-fetch" onclick="fetchStudentForAlloc()" style="padding:5px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="input-group"><label>Student Name</label><input type="text" id="alloc-sname" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Subject / Batch</label><input type="text" id="alloc-subject" placeholder="e.g. Mathematics"></div>
+        </div>
+        <div class="button-row">
+            <button class="btn-add" onclick="saveAllocation()">LINK STUDENT</button>
+            <button class="btn-fetch" onclick="viewTeacherStudents()">VIEW ALLOCATION</button>
+        </div>
+    </div>
+    
+    <!-- Area to show list of students under a teacher -->
+    <div id="allocation-list-area" style="display:none; margin-top:20px;" class="card">
+        <h4>Students Assigned to Teacher</h4>
+        <ul id="alloc-list" style="text-align: left; list-style: square; padding-left: 20px;"></ul>
     </div>
 </section>
         </main>
@@ -3602,6 +3640,55 @@ async function fetchTeacherHistory() {
         .eq('teacher_id', tid).eq('month_year', monthYear).eq('status', 'Present');
     
     alert(`Teacher ${tid} was Present for ${count} days in ${monthYear}`);
+}
+
+// 1. Fetch Teacher Info
+async function fetchTeacherForAlloc() {
+    const tid = document.getElementById('alloc-tid').value.toUpperCase();
+    const { data } = await db.from('teacher_details').select('teacher_name').eq('id', tid).eq('institute_id', sessionInstID).maybeSingle();
+    if(data) document.getElementById('alloc-tname').value = data.teacher_name;
+    else alert("Teacher not found.");
+}
+
+// 2. Fetch Student Info
+async function fetchStudentForAlloc() {
+    const roll = document.getElementById('alloc-roll').value.toUpperCase();
+    const { data } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if(data) document.getElementById('alloc-sname').value = data.full_name;
+    else alert("Student not found.");
+}
+
+// 3. Save the Relationship
+async function saveAllocation() {
+    const data = {
+        institute_id: sessionInstID,
+        teacher_id: document.getElementById('alloc-tid').value.toUpperCase(),
+        teacher_name: document.getElementById('alloc-tname').value,
+        roll_number: document.getElementById('alloc-roll').value.toUpperCase(),
+        student_name: document.getElementById('alloc-sname').value,
+        subject: document.getElementById('alloc-subject').value
+    };
+    if(!data.teacher_id || !data.roll_number) return alert("Please select both Teacher and Student.");
+    
+    const { error } = await db.from('student_allocations').insert([data]);
+    if(error) alert(error.message); else alert("Link Created Successfully!");
+}
+
+// 4. View all students assigned to a specific teacher
+async function viewTeacherStudents() {
+    const tid = document.getElementById('alloc-tid').value.toUpperCase();
+    const { data, error } = await db.from('student_allocations').select('student_name, subject').eq('teacher_id', tid).eq('institute_id', sessionInstID);
+    
+    const listArea = document.getElementById('allocation-list-area');
+    const listUl = document.getElementById('alloc-list');
+    
+    if(data && data.length > 0) {
+        listUl.innerHTML = data.map(item => `<li>${item.student_name} (${item.subject})</li>`).join('');
+        listArea.style.display = 'block';
+    } else {
+        alert("No students allocated to this teacher yet.");
+        listArea.style.display = 'none';
+    }
 }
 /* ==========================================
    15. NAVIGATION & INIT
