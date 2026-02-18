@@ -324,6 +324,80 @@
     .stat-card h4 { font-size: 2rem !important; margin: 0 !important; text-decoration: none !important; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+
+
+
+
+
+
+/* --- MOBILE COMPLIANCE ADDITIONS (OVERRIDE ONLY) --- */
+@media (max-width: 768px) {
+    /* 1. Shrink the giant 3D title so it fits on one screen */
+    .main-title { 
+        font-size: 1.8rem !important; 
+    }
+    .tagline { 
+        font-size: 0.9rem !important; 
+    }
+    header { 
+        flex-direction: column !important; 
+        padding: 15px !important; 
+        gap: 10px !important; 
+    }
+
+    /* 2. Change Sidebar to a Horizontal Scroll bar at the top */
+    .app-container { 
+        flex-direction: column !important; 
+    }
+    nav.sidebar {
+        width: 100% !important;
+        min-width: 100% !important;
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        padding: 10px !important;
+        position: sticky !important;
+        top: 0 !important;
+        background: #fff !important;
+        border-bottom: 2px solid #ddd !important;
+        z-index: 1000 !important;
+    }
+    .nav-tab {
+        margin-bottom: 0 !important;
+        margin-right: 10px !important;
+        padding: 10px 15px !important;
+        font-size: 0.85rem !important;
+        white-space: nowrap !important; /* Prevents text from wrapping */
+    }
+
+    /* 3. Reduce huge desktop padding and stack all grids into 1 column */
+    main.content { 
+        padding: 15px !important; 
+    }
+    .card { 
+        padding: 20px !important; 
+        margin-bottom: 20px !important; 
+    }
+    .form-grid, .dashboard-stats, .feature-grid, .footer-grid {
+        grid-template-columns: 1fr !important; 
+    }
+
+    /* 4. Make buttons easier to click with thumbs */
+    .button-row { 
+        flex-direction: column !important; 
+        width: 100% !important; 
+    }
+    .btn-add, .btn-edit, .btn-fetch { 
+        width: 100% !important; 
+    }
+
+    /* 5. Adjust Auth bar for small screens */
+    #auth-status-bar {
+        flex-direction: column !important;
+        gap: 10px !important;
+        text-align: center !important;
+    }
+}
     </style>
 </head>
 <body>
