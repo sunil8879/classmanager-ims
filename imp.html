@@ -1920,55 +1920,35 @@ function clearFeeForm() {
 
 // 2. Fetch Student with Balance
 async function fetchFeeByRoll() {
-    // 1. Clean the input (remove spaces and make uppercase)
-    const rawInput = document.getElementById('fee-roll').value;
-    if (!rawInput) return alert("Please enter a Roll Number first.");
-    const roll = rawInput.trim().toUpperCase();
-    document.getElementById('fee-roll').value = roll;
+    const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter a Roll Number.");
 
-    // 2. STEP ONE: Find the Roll Number in 'student_details' to get the internal Student ID
-    const { data: detailRecord, error: detailError } = await db.from('student_details')
-        .select('student_id')
-        .eq('roll_number', roll)
- .eq('institute_id', sessionInstID)
-        .maybeSingle();
+    // Link: Find student through the student_details bridge
+    const { data: detail } = await db.from('student_details')
+        .select('student_id').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
 
-    if (detailError) return alert("System Error: " + detailError.message);
-    
-    if (!detailRecord) {
-        return alert("Error: Roll Number '" + roll + "' not found in admission records.");
+    if (!detail) return alert("Roll Number not found.");
+
+    // Fetch live data from Students table
+    const { data: s } = await db.from('students')
+        .select('full_name, course, total_fees, paid_amount, due_dates, status')
+        .eq('id', detail.student_id).maybeSingle();
+
+    if (s) {
+        document.getElementById('fee-name').value = s.full_name;
+        document.getElementById('fee-course').value = s.course;
+        document.getElementById('fee-total').value = s.total_fees;
+        document.getElementById('fee-prev-paid').value = s.paid_amount;
+        document.getElementById('fee-due-dates').value = s.due_dates || "";
+        document.getElementById('fee-status').value = s.status || "Active";
+        document.getElementById('fee-today').value = new Date().toISOString().split('T')[0];
+        calcPendingFee();
     }
-
-    // 3. STEP TWO: Use the student_id we just found to get the full profile from 'students' table
-    const { data: s, error: studentError } = await db.from('students')
-        .select('*')
-        .eq('id', detailRecord.student_id)
-        .maybeSingle();
-
-    if (studentError || !s) {
-        return alert("Error: Found the roll number, but could not load the student's financial profile.");
-    }
-
-    // 4. POPULATE THE UI
-    document.getElementById('fee-name').value = s.full_name;
-    document.getElementById('fee-course').value = s.course;
-    document.getElementById('fee-total').value = s.total_fees;
-    document.getElementById('fee-prev-paid').value = s.paid_amount;
-    document.getElementById('fee-status').value = s.status || "Active";
-    document.getElementById('fee-due-dates').value = s.due_dates || "";
-    
-    // Set payment date to today
-    document.getElementById('fee-today').value = new Date().toISOString().split('T')[0];
-
-    // Calculate the math automatically
-    calcPendingFee();
-    
-    alert("Details successfully loaded for " + s.full_name);
 }
-
 // 3. Save Payment & Record in History
 async function saveFeeUpdate() {
-    const roll = document.getElementById('fee-roll').value;
+    // 1. GET INPUTS
+    const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
     const nowPaying = parseFloat(document.getElementById('fee-paid-now').value) || 0;
     const totalFees = parseFloat(document.getElementById('fee-total').value) || 0;
     const payDate = document.getElementById('fee-today').value;
@@ -1977,19 +1957,35 @@ async function saveFeeUpdate() {
     const joinDateVal = document.getElementById('fee-join-date').value;
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Validations
+    // 2. FULL ORIGINAL VALIDATIONS RESTORED
     if (!roll || !payDate) return alert("Error: Roll Number and Date are required.");
-    if (fullNameVal.split(/\s+/).filter(w => w.length > 0).length < 2) return alert("Error: Enter Full Name (First + Surname).");
+    
+    // Name validation (Ensure first + surname)
+    if (fullNameVal.split(/\s+/).filter(w => w.length > 0).length < 2) {
+        return alert("Error: Enter Full Name (Initial + Surname).");
+    }
+    
+    // Future date check
     if (joinDateVal > todayStr) return alert("Error: Date of Joining cannot be in future.");
+    
+    // Financial logic checks
     if (prevPaidVal > totalFees) return alert("Error: Previously Paid cannot exceed Total Fees.");
-    if (nowPaying > (totalFees - prevPaidVal)) return alert("Error: Payment exceeds remaining balance.");
+    if (nowPaying > (totalFees - prevPaidVal)) {
+        return alert("Error: Payment exceeds remaining balance.");
+    }
 
-    const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
-    if(!detail) return alert("Fetch student first.");
+    // 3. DATABASE CONNECTION (BRIDGE TO STUDENT_DETAILS)
+    const { data: detail, error: fetchErr } = await db.from('student_details')
+        .select('student_id')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if(fetchErr || !detail) return alert("Fetch student first using roll number.");
 
     const newPaidTotal = prevPaidVal + nowPaying;
 
-    // 1. Update Students Table
+    // 4. UPDATE MASTER STUDENTS TABLE
     const { error: upError } = await db.from('students').update({
         paid_amount: newPaidTotal,
         pending_amount: totalFees - newPaidTotal,
@@ -1997,12 +1993,12 @@ async function saveFeeUpdate() {
         due_dates: document.getElementById('fee-due-dates').value
     }).eq('id', detail.student_id);
 
-    if (upError) return alert(upError.message);
+    if (upError) return alert("Student Update Failed: " + upError.message);
 
-    // 2. Insert into payment_history (Crucial for Logs)
+    // 5. INSERT INTO PAYMENT HISTORY (STAMP WITH INSTITUTE ID)
     const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
     const { error: histError } = await db.from('payment_history').insert([{
- institute_id: sessionInstID,
+        institute_id: sessionInstID, // Crucial for multi-tenant isolation
         student_id: detail.student_id,
         roll_number: roll,
         amount: nowPaying,
@@ -2010,11 +2006,14 @@ async function saveFeeUpdate() {
         month_year: monthYearStr
     }]);
 
-    if (histError) alert("Balance updated, but log failed: " + histError.message);
-    else {
-        alert("Payment Recorded & Logged!");
+    if (histError) {
+        alert("Balance updated, but history log failed: " + histError.message);
+    } else {
+        alert("SUCCESS: Payment Recorded, Master Student Table Updated & Transaction Logged!");
+        
+        // REFRESH UI
         fetchFeeByRoll();
-        loadFeesPortal();
+        if (typeof loadFeesPortal === "function") loadFeesPortal();
     }
 }
 
