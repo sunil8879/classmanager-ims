@@ -3897,23 +3897,29 @@ async function initMessageCorner() {
     setMsgTab('General'); // Default view
 }
 
+/ 1. Updated Tab Switcher
 function setMsgTab(type) {
     msgActiveTab = type;
     document.getElementById('msg-mode-label').innerText = "Mode: " + type;
     
     const inputBox = document.getElementById('msg-input-box');
 
-    // --- PERMISSION LOGIC: WHO CAN SEND? ---
-    if (type === "OwnerToTeacher" && loggedRole !== "Owner") {
-        inputBox.style.display = "none"; // Non-owners can't send here
-    } else if (type === "TeacherToStudent" && loggedRole !== "Teacher") {
-        inputBox.style.display = "none"; // Non-teachers can't send here
-    } else {
-        inputBox.style.display = "block"; // Everyone can send in General (or permitted roles in their tabs)
+    // STRAIGHTFORWARD ROLE CHECK
+    // If Owner: Can type in OwnerToTeacher & General.
+    // If Teacher: Can type in TeacherToStudent & General.
+    // If Student: Can only type in General.
+    
+    if (type === "General") {
+        inputBox.style.display = "block"; 
+    } else if (type === "OwnerToTeacher") {
+        inputBox.style.display = (loggedRole === "Owner") ? "block" : "none";
+    } else if (type === "TeacherToStudent") {
+        inputBox.style.display = (loggedRole === "Teacher") ? "block" : "none";
     }
-        
+
     refreshMessages();
 }
+
 
 async function submitMessage() {
     const text = document.getElementById('msg-text').value;
@@ -3934,46 +3940,46 @@ async function submitMessage() {
 
 async function refreshMessages() {
     const display = document.getElementById('msg-list');
+    
+    // Show a loading state so it doesn't flicker/disappear
+    display.innerHTML = "<p style='text-align:center;color:gray;'>Loading messages...</p>";
 
-    // --- PRIVACY LOGIC: WHO CAN VIEW? ---
-    // Prevent Students from even seeing the list in Owner-Teacher private tab
-    if (msgActiveTab === "OwnerToTeacher" && loggedRole === "Student") {
-        display.innerHTML = "<p style='color:red;text-align:center;padding:10px;'>ACCESS DENIED: Private Staff Channel.</p>";
-        return;
-    }
-
-    const { data: msgs } = await db.from('messages')
+    // Fetch from Supabase
+    const { data: msgs, error } = await db.from('messages')
         .select('*')
         .eq('institute_id', sessionInstID)
         .eq('message_type', msgActiveTab)
         .order('created_at', { ascending: false });
 
-    if(!msgs || !msgs.length) {
-        display.innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>No messages in this category yet.</p>";
+    if (error) {
+        display.innerHTML = "<p style='color:red;'>Error loading messages.</p>";
         return;
     }
 
-    // SUBJECT FILTERING: Only show relevant subject messages to Teachers/Students
-    // (Owners see all subjects)
+    if (!msgs || msgs.length === 0) {
+        display.innerHTML = `<p style='color:gray;text-align:center;padding:20px;'>No messages in ${msgActiveTab} yet.</p>`;
+        return;
+    }
+
+    // SUBJECT FILTERING LOGIC
+    // Owners see all. Teachers/Students only see "All" or their specific subject.
     const filtered = msgs.filter(m => {
-        if (loggedRole === "Owner" || m.target_subject === "All" || m.target_subject === loggedSubject) return true;
+        if (loggedRole === "Owner") return true; 
+        if (m.target_subject === "All" || m.target_subject === loggedSubject) return true;
         return false;
     });
 
-    if(!filtered.length) {
-        display.innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>No messages matching your subject.</p>";
-        return;
-    }
-
     display.innerHTML = filtered.map(m => `
         <div style="border-bottom: 1px solid #eee; padding: 10px; text-align: left;">
-            <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role}) • ${new Date(m.created_at).toLocaleDateString()} ${new Date(m.created_at).toLocaleTimeString()}</small>
-            <p style="margin: 5px 0; font-weight: 500;">${m.content}</p>
-            <span style="font-size:0.7rem; background:#f0f0f0; border:1px solid #ccc; padding:2px 5px; border-radius:3px;">Subject: ${m.target_subject}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role})</small>
+                <small style="color:#999; font-size:0.7rem;">${new Date(m.created_at).toLocaleTimeString()}</small>
+            </div>
+            <p style="margin: 5px 0; color:#333; font-size:0.95rem;">${m.content}</p>
+            <span style="font-size:0.7rem; background:#7FFFD4; padding:1px 6px; border-radius:10px; border:1px solid #555;">${m.target_subject}</span>
         </div>
     `).join('');
 }
-
 
 
 // 1. CLEAR: Just hides the messages from the screen (Doesn't delete from DB)
