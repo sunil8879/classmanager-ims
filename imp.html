@@ -3653,9 +3653,21 @@ async function fetchTeacherForAlloc() {
 // 2. Fetch Student Info
 async function fetchStudentForAlloc() {
     const roll = document.getElementById('alloc-roll').value.toUpperCase();
-    const { data } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-    if(data) document.getElementById('alloc-sname').value = data.full_name;
-    else alert("Student not found.");
+    
+    // We now select both 'full_name' AND 'course'
+    const { data } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if(data) {
+        document.getElementById('alloc-sname').value = data.full_name;
+        // Autopopulate Subject with the Course name
+        document.getElementById('alloc-subject').value = data.course || "N/A";
+    } else {
+        alert("Student not found.");
+    }
 }
 
 // 3. Save the Relationship
