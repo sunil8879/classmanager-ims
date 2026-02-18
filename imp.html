@@ -451,6 +451,8 @@
             <button class="nav-tab" onclick="showSection('id-gen')"><i class="fas fa-id-card"></i> ID Card Generator</button>
             <button class="nav-tab" onclick="showSection('cert-gen')"><i class="fas fa-certificate"></i> Certificate Generator</button>
             <button class="nav-tab" onclick="showSection('tracking')"><i class="fas fa-chart-line"></i> Performance Tracking</button>
+<button class="nav-tab" onclick="showSection('exam-mod')"><i class="fas fa-file-signature"></i> Exam Management</button>
+<button class="nav-tab" onclick="showSection('t-attn-mod')"><i class="fas fa-user-check"></i> Teacher Attendance</button>
         </aside>
 
         <main class="content" id="main-content">
@@ -1241,6 +1243,63 @@
                 </div>
                 <button class="btn-add" style="width: 100%; margin-top: 10px;" onclick="savePerformanceData()">Update Performance Record</button>
             </div>
+        </div>
+    </div>
+</section>
+
+
+
+
+
+<!-- EXAM MANAGEMENT SECTION -->
+<section id="exam-mod" class="content-section">
+    <div class="card">
+        <h3><i class="fas fa-file-alt"></i> Exam Record Entry</h3>
+        <div class="form-grid">
+            <div class="input-group"><label>Exam Date</label><input type="date" id="ex-date"></div>
+            <div class="input-group">
+                <label>Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="ex-roll" placeholder="IMS-XXXX">
+                    <button class="btn-fetch" onclick="fetchStudentForExam()" style="padding: 5px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="input-group"><label>Full Name</label><input type="text" id="ex-name" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Course</label><input type="text" id="ex-course" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Total Marks</label><input type="number" id="ex-total" oninput="calcExamResult()"></div>
+            <div class="input-group"><label>Marks Obtained</label><input type="number" id="ex-obt" oninput="calcExamResult()"></div>
+            <div class="input-group"><label>Percentage (%)</label><input type="text" id="ex-pct" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Result</label><input type="text" id="ex-res" readonly style="font-weight:bold; background:#eee;"></div>
+        </div>
+        <div class="button-row">
+            <button class="btn-add" onclick="addExamRecord()">ADD Result</button>
+            <button class="btn-fetch" onclick="fetchExamByRoll()">FETCH (Roll No)</button>
+        </div>
+    </div>
+</section>
+
+<!-- TEACHER ATTENDANCE SECTION -->
+<section id="t-attn-mod" class="content-section">
+    <div class="card">
+        <h3><i class="fas fa-calendar-check"></i> Staff Attendance Tracker</h3>
+        <div class="form-grid">
+            <div class="input-group"><label>Select Month/Year</label><input type="month" id="t-attn-month"></div>
+            <div class="input-group">
+                <label>Teacher ID</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="t-attn-id" placeholder="TCH-XXXX">
+                    <button class="btn-fetch" onclick="fetchTeacherForTAttn()" style="padding: 5px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="input-group"><label>Full Name</label><input type="text" id="t-attn-name" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Last Marked Status</label><input type="text" id="t-attn-status" readonly style="background:#eee;"></div>
+        </div>
+        <!-- Hidden Date Picker -->
+        <input type="date" id="t-date-picker" style="display:none;">
+        <div class="button-row">
+            <button class="btn-add" onclick="triggerTAttn('Present')">MARK PRESENT</button>
+            <button class="btn-edit" style="background:#e74c3c;" onclick="triggerTAttn('Absent')">MARK ABSENT</button>
+            <button class="btn-fetch" onclick="fetchTeacherHistory()">FETCH Records</button>
         </div>
     </div>
 </section>
@@ -2962,6 +3021,127 @@ async function savePerformanceData() {
     } else {
         alert("Performance record updated successfully!");
     }
+}
+
+
+
+/* ==========================================
+   EXAM MODULE LOGIC
+   ========================================== */
+
+async function fetchStudentForExam() {
+    const roll = document.getElementById('ex-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Enter Roll Number");
+    const { data } = await db.from('students').select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if(data) {
+        document.getElementById('ex-name').value = data.full_name;
+        document.getElementById('ex-course').value = data.course;
+    } else alert("Student not found in your institute.");
+}
+
+function calcExamResult() {
+    const total = parseFloat(document.getElementById('ex-total').value) || 0;
+    const obt = parseFloat(document.getElementById('ex-obt').value) || 0;
+    
+    if (total > 0) {
+        const pctValue = (obt / total) * 100;
+        document.getElementById('ex-pct').value = pctValue.toFixed(2); // Store as number for DB
+        
+        let res = "";
+        if (pctValue >= 85) res = "Distinction";
+        else if (pctValue >= 75) res = "A Grade";
+        else if (pctValue >= 60) res = "B Grade";
+        else if (pctValue >= 40) res = "C Grade";
+        else res = "Failed";
+        
+        document.getElementById('ex-res').value = res;
+    }
+}
+
+
+async function addExamRecord() {
+    if(!sessionInstID) return alert("Login required");
+    
+    const record = {
+        institute_id: sessionInstID,
+        exam_date: document.getElementById('ex-date').value,
+        roll_number: document.getElementById('ex-roll').value.toUpperCase(),
+        full_name: document.getElementById('ex-name').value,
+        course_name: document.getElementById('ex-course').value,
+        total_marks: parseFloat(document.getElementById('ex-total').value),
+        marks_obtained: parseFloat(document.getElementById('ex-obt').value),
+        percentage: parseFloat(document.getElementById('ex-pct').value), // Numerical
+        result: document.getElementById('ex-res').value
+    };
+
+    if(!record.exam_date || !record.roll_number) return alert("Please fill Date and Roll Number");
+
+    const { error } = await db.from('exam').insert([record]);
+    if(error) alert("Error: " + error.message); 
+    else alert("Exam Result Saved Successfully!");
+}
+
+
+async function fetchExamByRoll() {
+    const roll = prompt("Enter Roll Number to see last exam:");
+    const { data, error } = await db.from('exam').select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).order('exam_date', {ascending: false}).limit(1).maybeSingle();
+    if(data) {
+        document.getElementById('ex-date').value = data.exam_date;
+        document.getElementById('ex-roll').value = data.roll_number;
+        document.getElementById('ex-name').value = data.full_name;
+        document.getElementById('ex-course').value = data.course_name;
+        document.getElementById('ex-total').value = data.total_marks;
+        document.getElementById('ex-obt').value = data.marks_obtained;
+        calcExamResult();
+    } else alert("No exam records found.");
+}
+
+/* ==========================================
+   TEACHER ATTENDANCE LOGIC
+   ========================================== */
+
+async function fetchTeacherForTAttn() {
+    const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
+    const { data } = await db.from('teacher_details').select('teacher_name').eq('id', tid).eq('institute_id', sessionInstID).maybeSingle();
+    if(data) document.getElementById('t-attn-name').value = data.teacher_name;
+    else alert("Teacher ID not found.");
+}
+
+function triggerTAttn(status) {
+    const name = document.getElementById('t-attn-name').value;
+    if(!name) return alert("Fetch Teacher first");
+    const picker = document.getElementById('t-date-picker');
+    picker.showPicker();
+    picker.onchange = async () => {
+        if(!picker.value) return;
+        const monthYear = new Date(picker.value).toLocaleString('default', { month: 'long', year: 'numeric' });
+        const { error } = await db.from('teachers_attendance').insert([{
+            institute_id: sessionInstID,
+            teacher_id: document.getElementById('t-attn-id').value.toUpperCase(),
+            full_name: name,
+            attendance_date: picker.value,
+            status: status,
+            month_year: monthYear
+        }]);
+        if(error) alert(error.message); 
+        else {
+            alert("Teacher marked " + status);
+            document.getElementById('t-attn-status').value = status;
+        }
+    };
+}
+
+async function fetchTeacherHistory() {
+    const tid = document.getElementById('t-attn-id').value.toUpperCase();
+    const month = document.getElementById('t-attn-month').value; // YYYY-MM
+    if(!tid || !month) return alert("Select Teacher ID and Month");
+    const monthYear = new Date(month + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    const { count } = await db.from('teachers_attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('teacher_id', tid).eq('month_year', monthYear).eq('status', 'Present');
+    
+    alert(`Teacher ${tid} was Present for ${count} days in ${monthYear}`);
 }
 /* ==========================================
    15. NAVIGATION & INIT
