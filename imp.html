@@ -1402,56 +1402,58 @@
 
 
 <!-- STANDALONE MESSAGE HUB -->
+<!-- MESSAGE CORNER - FULL SYSTEM -->
 <section id="message-corner" class="content-section">
-    <div class="card" style="border-top: 5px solid #000;">
-        <h3><i class="fas fa-bullhorn"></i> Owner's Message Console</h3>
+    <div class="card" style="border-top: 5px solid #000; background: #fff;">
+        <h2 style="text-decoration: none; margin-bottom: 20px;"><i class="fas fa-comments"></i> Message Hub</h2>
         
-        <!-- 1. Target Selection (Only visible to Owner) -->
-        <div id="owner-target-controls" style="margin-bottom: 20px; display: flex; gap: 15px; justify-content: center;">
-            <button class="btn-fetch" style="background: #007bff;" onclick="prepMessage('Teacher')">
+        <!-- OWNER ONLY CONTROLS -->
+        <div id="owner-console-buttons" style="display: flex; gap: 15px; justify-content: center; margin-bottom: 25px;">
+            <button class="btn-fetch" style="background: #1877F2; flex: 1;" onclick="prepareOwnerBox('Teacher')">
                 <i class="fas fa-chalkboard-teacher"></i> TO THE TEACHERS
             </button>
-            <button class="btn-fetch" style="background: #28a745;" onclick="prepMessage('Student')">
+            <button class="btn-fetch" style="background: #27ae60; flex: 1;" onclick="prepareOwnerBox('Student')">
                 <i class="fas fa-user-graduate"></i> TO THE STUDENTS
             </button>
         </div>
 
-        <!-- 2. Message Input Box (Hidden until Target is clicked) -->
-        <div id="owner-input-area" style="display: none; background: #fff; padding: 20px; border: 3px solid #000; border-radius: 15px; text-align: left;">
-            <h4 id="display-target" style="text-decoration: none; color: #ff0000; margin-bottom: 10px;">Posting to: ...</h4>
+        <!-- MESSAGE BOX (Appears on click) -->
+        <div id="owner-msg-box" style="display: none; border: 3px solid #000; border-radius: 15px; padding: 25px; background: #f9f9f9; text-align: left;">
+            <h3 id="target-header" style="color: #ff0000; text-decoration: underline; margin-bottom: 15px;">Target: ...</h3>
             
-            <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 15px;">
+            <div class="form-grid" style="margin-bottom: 15px;">
                 <div class="input-group">
-                    <label>Relevant Subject / Category</label>
-                    <select id="owner-msg-subject">
-                        <option value="General">General Announcement</option>
-                        <option value="Mathematics">Mathematics</option>
-                        <option value="Physics">Physics</option>
-                        <option value="Chemistry">Chemistry</option>
-                        <option value="Biology</option>
-                        <option value="Accounts">Accounts</option>
+                    <label>Select Subject / Group</label>
+                    <select id="msg-sub-tag">
+                        <option value="General">General / All</option>
+                        <option>Mathematics</option>
+                        <option>Physics</option>
+                        <option>Chemistry</option>
+                        <option>Biology</option>
+                        <option>Accounts</option>
+                        <option>English</option>
                     </select>
                 </div>
                 <div class="input-group">
-                    <label>Institute ID (Verified)</label>
-                    <input type="text" id="owner-msg-inst-id" readonly style="background: #eee;">
+                    <label>Logged Institute ID</label>
+                    <input type="text" id="msg-inst-display" readonly style="background: #eee; font-weight: bold;">
                 </div>
             </div>
 
-            <textarea id="owner-msg-text" placeholder="Type your message here..." rows="4" style="width: 100%; font-size: 1.1rem; padding: 12px; border: 2px solid #000; border-radius: 8px;"></textarea>
+            <label style="font-weight: bold;">Message Content:</label>
+            <textarea id="msg-body-text" rows="5" style="width: 100%; padding: 10px; border: 2px solid #000; border-radius: 10px; font-family: 'Times New Roman'; font-size: 1.1rem;" placeholder="Write your message here..."></textarea>
 
-            <!-- 3. Action Buttons -->
             <div class="button-row" style="margin-top: 20px;">
-                <button class="btn-add" style="background: #000; color: #fff;" onclick="sendOwnerMessage()">SEND</button>
-                <button class="btn-edit" style="background: #666;" onclick="clearOwnerMessage()">CLEAR</button>
-                <button class="btn-fetch" style="background: #f39c12;" onclick="restoreOwnerMessage()">RESTORE</button>
+                <button class="btn-add" style="background: #000; color: #fff; width: 120px;" onclick="sendFinalMessage()">SEND</button>
+                <button class="btn-edit" style="background: #666; color: #fff; width: 120px;" onclick="clearMsgBox()">CLEAR</button>
+                <button class="btn-fetch" style="background: #f39c12; color: #fff; width: 120px;" onclick="restoreLastMessages()">RESTORE</button>
             </div>
         </div>
 
-        <!-- 4. Mini History (For Restore) -->
-        <div id="owner-restore-log" style="margin-top: 20px; max-height: 200px; overflow-y: auto; display: none; border-top: 2px dashed #ccc; padding-top: 15px;">
-            <p style="font-weight: bold;">Last Sent Messages:</p>
-            <div id="restore-list"></div>
+        <!-- RESTORE LIST -->
+        <div id="restore-log-area" style="display: none; margin-top: 30px; border-top: 2px dashed #000; padding-top: 20px;">
+            <h4 style="text-align: left;">Recently Sent Messages:</h4>
+            <div id="restore-items-list" style="text-align: left;"></div>
         </div>
     </div>
 </section>
@@ -3904,56 +3906,67 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentTarget = ""; // Global to track Teacher vs Student
 
 // 1. Prepare the Box
-async function prepMessage(target) {
-    // Only allow if logged in as Owner
-    if (hubRole !== "Owner") {
-        alert("Access Denied: Only the Institute Owner can use this console.");
+/* --- MESSAGE HUB GLOBAL LOGIC --- */
+var activeMsgTarget = ""; 
+
+// This function is called by the Sidebar button
+function msgEngine(tab) {
+    showSection('message-corner');
+    console.log("Message Corner Loaded");
+}
+
+// 1. Prepare Box (TO TEACHER / TO STUDENT)
+function prepareOwnerBox(targetType) {
+    // Safety check for Institute ID
+    if (!sessionInstID) {
+        alert("Please login as Owner first to access this feature.");
         return;
     }
 
-    currentTarget = target;
-    document.getElementById('owner-input-area').style.display = 'block';
-    document.getElementById('display-target').innerText = "Target Audience: " + target + "s";
-    document.getElementById('owner-msg-inst-id').value = sessionInstID;
+    activeMsgTarget = targetType;
+    document.getElementById('owner-msg-box').style.display = 'block';
+    document.getElementById('target-header').innerText = "Target Audience: " + targetType + "s";
+    document.getElementById('msg-inst-display').value = sessionInstID;
     
-    // Smooth scroll to input
-    document.getElementById('owner-input-area').scrollIntoView({ behavior: 'smooth' });
+    // Auto scroll to the box
+    document.getElementById('owner-msg-box').scrollIntoView({ behavior: 'smooth' });
 }
 
-// 2. SEND Button
-async function sendOwnerMessage() {
-    const text = document.getElementById('owner-msg-text').value.trim();
-    const subject = document.getElementById('owner-msg-subject').value;
-    const instID = sessionInstID;
+// 2. SEND MESSAGE
+async function sendFinalMessage() {
+    const content = document.getElementById('msg-body-text').value.trim();
+    const subject = document.getElementById('msg-sub-tag').value;
 
-    if (!text) return alert("Please type a message.");
+    if (!content) return alert("Error: Message body cannot be empty!");
 
     const { error } = await db.from('messages').insert([{
-        institute_id: instID,
+        institute_id: sessionInstID,
         sender_name: sessionUserName,
         sender_role: "Owner",
-        message_type: currentTarget, // "Teacher" or "Student"
+        message_type: activeMsgTarget, // "Teacher" or "Student"
         target_subject: subject,
-        content: text
+        content: content,
+        created_at: new Date()
     }]);
 
     if (error) {
-        alert("Send Failed: " + error.message);
+        alert("Database Error: " + error.message);
     } else {
-        alert("Message successfully sent to " + currentTarget + "s regarding " + subject);
-        document.getElementById('owner-msg-text').value = ""; // Auto clear after send
+        alert("SUCCESS: Message sent to all " + activeMsgTarget + "s in " + subject);
+        document.getElementById('msg-body-text').value = ""; // Clear after success
     }
 }
 
-// 3. CLEAR Button
-function clearOwnerMessage() {
-    document.getElementById('owner-msg-text').value = "";
+// 3. CLEAR MESSAGE
+function clearMsgBox() {
+    document.getElementById('msg-body-text').value = "";
+    console.log("Box Cleared");
 }
 
-// 4. RESTORE Button
-async function restoreOwnerMessage() {
-    const logArea = document.getElementById('owner-restore-log');
-    const list = document.getElementById('restore-list');
+// 4. RESTORE MESSAGE (Fetch last 5 history)
+async function restoreLastMessages() {
+    const listDiv = document.getElementById('restore-items-list');
+    const logArea = document.getElementById('restore-log-area');
 
     const { data, error } = await db.from('messages')
         .select('*')
@@ -3962,15 +3975,19 @@ async function restoreOwnerMessage() {
         .order('created_at', { ascending: false })
         .limit(5);
 
+    if (error) return alert("Restore failed: " + error.message);
+
     if (data && data.length > 0) {
         logArea.style.display = 'block';
-        list.innerHTML = data.map(m => `
-            <div style="font-size: 0.85rem; padding: 8px; border-bottom: 1px solid #eee;">
-                <b>To ${m.message_type}s (${m.target_subject}):</b> ${m.content.substring(0, 50)}...
+        listDiv.innerHTML = data.map(m => `
+            <div style="background: #fff; border: 1px solid #000; padding: 10px; margin-bottom: 10px; border-radius: 8px;">
+                <b style="color: blue;">Sent to ${m.message_type}s (${m.target_subject}):</b><br>
+                <span>${m.content}</span>
+                <div style="font-size: 0.7rem; color: #888; margin-top: 5px;">${new Date(m.created_at).toLocaleString()}</div>
             </div>
         `).join('');
     } else {
-        alert("No previous messages found to restore.");
+        alert("No message history found for your Institute ID.");
     }
 }
     </script>
