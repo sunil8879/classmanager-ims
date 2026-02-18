@@ -1053,6 +1053,15 @@
             <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
         </div>
     </div>
+	
+	
+	<!-- STUDENT NOTICE BOARD -->
+    <div class="card" style="margin-top: 20px; border-left: 10px solid #27ae60; background: #fff;">
+        <h4><i class="fas fa-envelope-open-text"></i> Notifications for You</h4>
+        <div id="student-notices" style="text-align: left; padding: 10px; font-size: 0.95rem;">
+            <p style="color: #888;">Enter your Roll No and click 'Fetch Performance' to see messages relevant to your course.</p>
+        </div>
+    </div>
 </section>
 <!-- 12. STUDENT PORTAL (VIEW ONLY) -->
 <!-- 12. STUDENT PORTAL (VIEW ONLY) -->
@@ -1402,58 +1411,50 @@
 
 
 <!-- STANDALONE MESSAGE HUB -->
-<!-- MESSAGE CORNER - FULL SYSTEM -->
 <section id="message-corner" class="content-section">
     <div class="card" style="border-top: 5px solid #000; background: #fff;">
         <h2 style="text-decoration: none; margin-bottom: 20px;"><i class="fas fa-comments"></i> Message Hub</h2>
         
-        <!-- OWNER ONLY CONTROLS -->
-        <div id="owner-console-buttons" style="display: flex; gap: 15px; justify-content: center; margin-bottom: 25px;">
-            <button class="btn-fetch" style="background: #1877F2; flex: 1;" onclick="prepareOwnerBox('Teacher')">
-                <i class="fas fa-chalkboard-teacher"></i> TO THE TEACHERS
-            </button>
-            <button class="btn-fetch" style="background: #27ae60; flex: 1;" onclick="prepareOwnerBox('Student')">
-                <i class="fas fa-user-graduate"></i> TO THE STUDENTS
-            </button>
+        <!-- TARGET BUTTONS -->
+        <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 25px;">
+            <button class="btn-fetch" style="background: #1877F2; flex: 1;" onclick="prepareOwnerBox('Teacher')">TO THE TEACHERS</button>
+            <button class="btn-fetch" style="background: #27ae60; flex: 1;" onclick="prepareOwnerBox('Student')">TO THE STUDENTS</button>
         </div>
 
-        <!-- MESSAGE BOX (Appears on click) -->
+        <!-- INPUT AREA -->
         <div id="owner-msg-box" style="display: none; border: 3px solid #000; border-radius: 15px; padding: 25px; background: #f9f9f9; text-align: left;">
-            <h3 id="target-header" style="color: #ff0000; text-decoration: underline; margin-bottom: 15px;">Target: ...</h3>
-            
+            <h3 id="target-header" style="color: #ff0000; margin-bottom: 15px;">Target: ...</h3>
             <div class="form-grid" style="margin-bottom: 15px;">
                 <div class="input-group">
-                    <label>Select Subject / Group</label>
+                    <label>Relevant Subject</label>
                     <select id="msg-sub-tag">
                         <option value="General">General / All</option>
-                        <option>Mathematics</option>
-                        <option>Physics</option>
-                        <option>Chemistry</option>
-                        <option>Biology</option>
-                        <option>Accounts</option>
-                        <option>English</option>
+                        <option>Mathematics</option><option>Physics</option><option>Chemistry</option>
+                        <option>Biology</option><option>Accounts</option>
                     </select>
                 </div>
                 <div class="input-group">
-                    <label>Logged Institute ID</label>
-                    <input type="text" id="msg-inst-display" readonly style="background: #eee; font-weight: bold;">
+                    <label>Institute ID</label>
+                    <input type="text" id="msg-inst-display" readonly style="background: #eee;">
                 </div>
             </div>
-
-            <label style="font-weight: bold;">Message Content:</label>
-            <textarea id="msg-body-text" rows="5" style="width: 100%; padding: 10px; border: 2px solid #000; border-radius: 10px; font-family: 'Times New Roman'; font-size: 1.1rem;" placeholder="Write your message here..."></textarea>
-
+            <textarea id="msg-body-text" rows="5" style="width: 100%; padding: 10px; border: 2px solid #000; border-radius: 10px;" placeholder="Type message here..."></textarea>
             <div class="button-row" style="margin-top: 20px;">
-                <button class="btn-add" style="background: #000; color: #fff; width: 120px;" onclick="sendFinalMessage()">SEND</button>
-                <button class="btn-edit" style="background: #666; color: #fff; width: 120px;" onclick="clearMsgBox()">CLEAR</button>
-                <button class="btn-fetch" style="background: #f39c12; color: #fff; width: 120px;" onclick="restoreLastMessages()">RESTORE</button>
+                <button class="btn-add" style="background: #000;" onclick="sendFinalMessage()">SEND</button>
+                <button class="btn-edit" style="background: #666;" onclick="document.getElementById('msg-body-text').value=''">CLEAR</button>
+                <button class="btn-fetch" style="background: #f39c12;" onclick="restoreLastMessages()">RESTORE</button>
             </div>
         </div>
 
-        <!-- RESTORE LIST -->
-        <div id="restore-log-area" style="display: none; margin-top: 30px; border-top: 2px dashed #000; padding-top: 20px;">
-            <h4 style="text-align: left;">Recently Sent Messages:</h4>
-            <div id="restore-items-list" style="text-align: left;"></div>
+        <!-- OUTBOX (Verification Area) -->
+        <div style="margin-top: 30px; border-top: 3px solid #000; padding-top: 20px;">
+            <button class="btn-fetch" style="background: #6c757d; width: 100%;" onclick="fetchOwnerOutbox()">VERIFY SENT MESSAGES (OUTBOX)</button>
+            <div id="outbox-area" style="display: none; margin-top: 15px;">
+                <table style="width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #000;">
+                    <thead><tr style="background: #eee;"><th style="padding:10px; border:1px solid #000;">To</th><th style="padding:10px; border:1px solid #000;">Subject</th><th style="padding:10px; border:1px solid #000;">Message</th></tr></thead>
+                    <tbody id="outbox-list"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 </section>
@@ -3905,89 +3906,94 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let currentTarget = ""; // Global to track Teacher vs Student
 
-// 1. Prepare the Box
-/* --- MESSAGE HUB GLOBAL LOGIC --- */
-var activeMsgTarget = ""; 
+var activeMsgTarget = "";
 
-// This function is called by the Sidebar button
-function msgEngine(tab) {
-    showSection('message-corner');
-    console.log("Message Corner Loaded");
-}
+// Sidebar Switcher
+function msgEngine(tab) { showSection('message-corner'); }
 
-// 1. Prepare Box (TO TEACHER / TO STUDENT)
-function prepareOwnerBox(targetType) {
-    // Safety check for Institute ID
-    if (!sessionInstID) {
-        alert("Please login as Owner first to access this feature.");
-        return;
-    }
-
-    activeMsgTarget = targetType;
+// OWNER LOGIC
+function prepareOwnerBox(target) {
+    activeMsgTarget = target;
     document.getElementById('owner-msg-box').style.display = 'block';
-    document.getElementById('target-header').innerText = "Target Audience: " + targetType + "s";
+    document.getElementById('target-header').innerText = "Target Audience: " + target + "s";
     document.getElementById('msg-inst-display').value = sessionInstID;
-    
-    // Auto scroll to the box
-    document.getElementById('owner-msg-box').scrollIntoView({ behavior: 'smooth' });
 }
 
-// 2. SEND MESSAGE
 async function sendFinalMessage() {
     const content = document.getElementById('msg-body-text').value.trim();
     const subject = document.getElementById('msg-sub-tag').value;
-
-    if (!content) return alert("Error: Message body cannot be empty!");
-
+    if (!content) return alert("Message is empty!");
     const { error } = await db.from('messages').insert([{
-        institute_id: sessionInstID,
-        sender_name: sessionUserName,
-        sender_role: "Owner",
-        message_type: activeMsgTarget, // "Teacher" or "Student"
-        target_subject: subject,
-        content: content,
-        created_at: new Date()
+        institute_id: sessionInstID, sender_name: sessionUserName,
+        sender_role: "Owner", message_type: activeMsgTarget,
+        target_subject: subject, content: content
     }]);
+    if (error) alert("Error: " + error.message);
+    else { alert("Sent!"); document.getElementById('msg-body-text').value = ""; }
+}
 
-    if (error) {
-        alert("Database Error: " + error.message);
-    } else {
-        alert("SUCCESS: Message sent to all " + activeMsgTarget + "s in " + subject);
-        document.getElementById('msg-body-text').value = ""; // Clear after success
+async function fetchOwnerOutbox() {
+    const { data } = await db.from('messages').select('*').eq('institute_id', sessionInstID).order('created_at', { ascending: false });
+    if (data) {
+        document.getElementById('outbox-area').style.display = 'block';
+        document.getElementById('outbox-list').innerHTML = data.map(m => `
+            <tr><td style="padding:10px; border:1px solid #000;">${m.message_type}</td>
+            <td style="padding:10px; border:1px solid #000;">${m.target_subject}</td>
+            <td style="padding:10px; border:1px solid #000;">${m.content}</td></tr>`).join('');
     }
 }
 
-// 3. CLEAR MESSAGE
-function clearMsgBox() {
-    document.getElementById('msg-body-text').value = "";
-    console.log("Box Cleared");
+// STUDENT PORTAL LOGIC
+async function fetchStudentPortalData() {
+    const roll = document.getElementById('portal-roll-input').value.trim();
+    const monthVal = document.getElementById('portal-month-input').value;
+    if (!roll || !monthVal) return alert("Fill all fields");
+
+    try {
+        const { data: student } = await db.from('students').select('*').eq('roll_number', roll).single();
+        if (!student) throw new Error("Roll No not found");
+
+        document.getElementById('portal-display-area').style.display = 'block';
+        document.getElementById('p-name').innerText = student.full_name;
+        document.getElementById('p-course').innerText = student.course;
+        document.getElementById('p-paid').innerText = "₹ " + student.paid_amount;
+        document.getElementById('p-pending').innerText = "₹ " + student.pending_amount;
+
+        // FETCH MESSAGES RELEVANT TO THIS STUDENT
+        fetchStudentMessages(student.course);
+
+    } catch (err) { alert(err.message); }
 }
 
-// 4. RESTORE MESSAGE (Fetch last 5 history)
-async function restoreLastMessages() {
-    const listDiv = document.getElementById('restore-items-list');
-    const logArea = document.getElementById('restore-log-area');
+async function fetchStudentMessages(course) {
+    const noticeDiv = document.getElementById('student-notices');
+    const { data } = await db.from('messages')
+        .select('*').eq('institute_id', sessionInstID).eq('message_type', 'Student')
+        .or(`target_subject.eq.General,target_subject.eq.${course}`)
+        .order('created_at', { ascending: false });
 
+    if (data && data.length > 0) {
+        noticeDiv.innerHTML = data.map(m => `
+            <div style="background: #f0fff4; padding: 10px; border-bottom: 1px solid #27ae60; margin-bottom: 5px;">
+                <b style="color: #27ae60;">[${m.target_subject}]</b> ${m.content}
+            </div>`).join('');
+    } else { noticeDiv.innerHTML = "No messages for your course."; }
+}
+async function fetchOwnerOutbox() {
     const { data, error } = await db.from('messages')
         .select('*')
         .eq('institute_id', sessionInstID)
-        .eq('sender_role', 'Owner')
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .order('created_at', { ascending: false });
 
-    if (error) return alert("Restore failed: " + error.message);
-
-    if (data && data.length > 0) {
-        logArea.style.display = 'block';
-        listDiv.innerHTML = data.map(m => `
-            <div style="background: #fff; border: 1px solid #000; padding: 10px; margin-bottom: 10px; border-radius: 8px;">
-                <b style="color: blue;">Sent to ${m.message_type}s (${m.target_subject}):</b><br>
-                <span>${m.content}</span>
-                <div style="font-size: 0.7rem; color: #888; margin-top: 5px;">${new Date(m.created_at).toLocaleString()}</div>
-            </div>
+    if (data) {
+        document.getElementById('outbox-area').style.display = 'block';
+        document.getElementById('outbox-list').innerHTML = data.map(m => `
+            <tr>
+                <td style="padding: 10px; border: 1px solid #000;">${m.message_type}s</td>
+                <td style="padding: 10px; border: 1px solid #000;">${m.target_subject}</td>
+                <td style="padding: 10px; border: 1px solid #000;">${m.content}</td>
+            </tr>
         `).join('');
-    } else {
-        alert("No message history found for your Institute ID.");
     }
 }
     </script>
