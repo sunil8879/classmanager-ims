@@ -455,7 +455,7 @@
 <button class="nav-tab" onclick="showSection('exam-mod')"><i class="fas fa-file-signature"></i> Exam Management</button>
 <button class="nav-tab" onclick="showSection('t-attn-mod')"><i class="fas fa-user-check"></i> Teacher Attendance</button>
 <button class="nav-tab" onclick="showSection('allocation-mod')"><i class="fas fa-link"></i> Student Allocation</button>
-<button class="nav-tab" onclick="showSection('message-corner'); syncRoleAndBox();"><i class="fas fa-comments"></i> Message Corner</button>
+<button class="nav-tab" onclick="showSection('message-corner'); msgEngine('General');"><i class="fas fa-comments"></i> Message Corner</button>
         </aside>
 
         <main class="content" id="main-content">
@@ -1401,38 +1401,39 @@
 
 
 
+<!-- STANDALONE MESSAGE HUB -->
 <section id="message-corner" class="content-section">
     <div class="card">
-        <h3><i class="fas fa-paper-plane"></i> Message Corner</h3>
-        <div style="display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center;">
-            <button class="btn-fetch" style="font-size: 0.8rem; padding: 8px;" onclick="setMsgTab('OwnerToTeacher')">Owner ➔ Teachers</button>
-            <button class="btn-fetch" style="font-size: 0.8rem; padding: 8px;" onclick="setMsgTab('TeacherToStudent')">Teacher ➔ Students</button>
-            <button class="btn-fetch" style="font-size: 0.8rem; padding: 8px;" onclick="setMsgTab('General')">General</button>
+        <h3><i class="fas fa-comments"></i> Message Hub</h3>
+        
+        <!-- Tab Selectors -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn-fetch" onclick="msgEngine('OwnerToTeacher')">Owner ➔ Staff</button>
+            <button class="btn-fetch" onclick="msgEngine('TeacherToStudent')">Staff ➔ Students</button>
+            <button class="btn-fetch" onclick="msgEngine('General')">General</button>
         </div>
 
-        <div id="msg-input-box" style="background: #f0fffb; padding: 15px; border-radius: 10px; border: 1px solid #7FFFD4; margin-bottom: 20px;">
-            <h4 id="msg-mode-label" style="text-decoration: none !important;">Posting to: General</h4>
-            <div class="form-grid" style="grid-template-columns: 1fr;">
-                <select id="msg-cat"><option value="All">All Subjects</option><option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option></select>
-                <textarea id="msg-text" placeholder="Type your message..." rows="2" style="width: 100%; margin-top: 10px;"></textarea>
-            </div>
-            <button class="btn-add" style="width: 100%; margin-top: 10px;" onclick="submitMessage()">SEND</button>
+        <!-- Posting Area (Hidden by default, shown by Engine) -->
+        <div id="msg-post-box" style="display:none; background: #f0fffb; padding: 15px; border-radius: 10px; border: 2px solid #7FFFD4; margin-bottom: 20px;">
+            <h4 id="msg-label" style="text-decoration:none !important; color:#000;">Post to: General</h4>
+            <select id="msg-subject-pick" style="width:100%; margin-bottom:10px;">
+                <option value="All">All Subjects</option>
+                <option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option>
+            </select>
+            <textarea id="msg-input-text" placeholder="Write your message..." rows="2" style="width:100%;"></textarea>
+            <button class="btn-add" style="width:100%; margin-top:10px;" onclick="sendNow()">POST MESSAGE</button>
         </div>
 
-
-
-
-
-
-<div style="display: flex; gap: 10px; margin-bottom: 10px; justify-content: flex-end;">
-    <button class="btn-edit" style="background: #666; font-size: 0.7rem; padding: 5px 10px;" onclick="clearChatDisplay()">CLEAR VIEW</button>
-    <button class="btn-fetch" style="background: #1877F2; font-size: 0.7rem; padding: 5px 10px;" onclick="refreshMessages()">RESTORE ALL</button>
-</div>
-
-        <div id="msg-list" style="max-height: 350px; overflow-y: auto; background: white; border-radius: 10px; border: 1px solid #ddd; padding: 10px;">
-            <!-- Messages appear here -->
+        <!-- History Display -->
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <span style="font-weight: bold;">Message History:</span>
+            <button onclick="document.getElementById('msg-board').innerHTML=''" style="border:none; background:none; color:red; cursor:pointer; font-size:0.8rem;">Clear Screen</button>
+        </div>
+        <div id="msg-board" style="max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 10px;">
+            <!-- Messages load here -->
         </div>
     </div>
+
 </section>
         </main>
     </div>
@@ -3880,85 +3881,83 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-// --- NEW STRAIGHTFORWARD LOGIC ---
-var msgTab = "General";
-var myRole = ""; 
-var mySub = "";
+// Global State for the Hub
+var currentHubTab = "General";
+var hubRole = "";
+var hubSub = "";
 
-async function syncRoleAndBox() {
+async function msgEngine(tabName) {
+    currentHubTab = tabName;
+    var board = document.getElementById('msg-board');
+    var postBox = document.getElementById('msg-post-box');
+    var label = document.getElementById('msg-label');
+    
+    board.innerHTML = "<p style='text-align:center;'>Verifying access...</p>";
+    
+    // 1. IDENTITY VERIFICATION (Ensures it works in Incognito/Mobile)
     const { data: { user } } = await db.auth.getUser();
-    const { data: p } = await db.from('profiles').select('role, subject_taught, course').eq('id', user.id).single();
+    if(!user) return alert("Session expired. Please login again.");
     
-    myRole = p.role;
-    mySub = p.subject_taught || p.course || "All";
+    const { data: p } = await db.from('profiles').select('role, subject_taught').eq('id', user.id).single();
+    hubRole = p.role;
+    hubSub = p.subject_taught || "All";
+
+    // 2. PERMISSION LOGIC (Straightforward)
+    label.innerText = "Post to: " + tabName;
     
-    setMsgTab("General"); 
-}
-
-function setMsgTab(mode) {
-    msgTab = mode;
-    document.getElementById('msg-mode-label').innerText = "Mode: " + mode;
-    var box = document.getElementById('msg-input-box');
-
-    if (mode === "General") {
-        box.style.display = "block";
-    } else if (mode === "OwnerToTeacher") {
-        box.style.display = (myRole === "Owner") ? "block" : "none";
-    } else if (mode === "TeacherToStudent") {
-        box.style.display = (myRole === "Teacher") ? "block" : "none";
+    if (tabName === "General") {
+        postBox.style.display = "block";
+    } else if (tabName === "OwnerToTeacher") {
+        postBox.style.display = (hubRole === "Owner") ? "block" : "none";
+    } else if (tabName === "TeacherToStudent") {
+        postBox.style.display = (hubRole === "Teacher") ? "block" : "none";
     }
-    refreshMessages();
-}
 
-async function refreshMessages() {
-    var list = document.getElementById('msg-list');
-    list.innerHTML = "Loading...";
-
-    var { data: msgs } = await db.from('messages')
+    // 3. FETCH DATA
+    const { data: records } = await db.from('messages')
         .select('*')
         .eq('institute_id', sessionInstID)
-        .eq('message_type', msgTab)
+        .eq('message_type', tabName)
         .order('created_at', { ascending: false });
 
+    // 4. DRAW LIST with Subject Filtering
     var html = "";
-    if (msgs) {
-        for (var i = 0; i < msgs.length; i++) {
-            var m = msgs[i];
-            if (myRole === "Owner" || m.target_subject === "All" || m.target_subject === mySub) {
-                html += '<div style="border-bottom:1px solid #eee; padding:10px;">';
+    if (records) {
+        for (var i = 0; i < records.length; i++) {
+            var m = records[i];
+            // Security: Math teachers only see Math + All
+            if (hubRole === "Owner" || m.target_subject === "All" || m.target_subject === hubSub) {
+                html += '<div style="border-bottom:1px solid #eee; padding:10px; text-align:left;">';
                 html += '<small style="color:#1877F2;"><b>' + m.sender_name + '</b> (' + m.sender_role + ')</small>';
-                html += '<p style="margin:5px 0; font-weight:500;">' + m.content + '</p>';
-                html += '<span style="font-size:0.7rem; background:#7FFFD4; padding:2px 5px; border-radius:3px;">' + m.target_subject + '</span>';
+                html += '<p style="margin:5px 0;">' + m.content + '</p>';
+                html += '<small style="background:#7FFFD4; padding:2px 5px; border-radius:3px;">' + m.target_subject + '</small>';
                 html += '</div>';
             }
         }
     }
-    list.innerHTML = html || "No messages found.";
+    board.innerHTML = html || "<p style='text-align:center;color:gray;padding:20px;'>No messages here.</p>";
 }
 
-// THE UPDATED SEND LOGIC (Uses new variable names)
-async function submitMessage() {
-    const text = document.getElementById('msg-text').value;
-    if(!text) return alert("Empty message");
+async function sendNow() {
+    var txt = document.getElementById('msg-input-text').value;
+    var sub = document.getElementById('msg-subject-pick').value;
+    if(!txt) return alert("Type something!");
 
-    await db.from('messages').insert([{
+    const { error } = await db.from('messages').insert([{
         institute_id: sessionInstID,
         sender_name: sessionUserName,
-        sender_role: myRole, // Updated
-        message_type: msgTab, // Updated
-        target_subject: document.getElementById('msg-cat').value,
-        content: text
+        sender_role: hubRole,
+        message_type: currentHubTab,
+        target_subject: sub,
+        content: txt
     }]);
 
-    document.getElementById('msg-text').value = "";
-    refreshMessages();
+    if(error) alert(error.message);
+    else {
+        document.getElementById('msg-input-text').value = "";
+        msgEngine(currentHubTab); // Refresh
+    }
 }
-
-// THE CLEAR VIEW LOGIC (Keep this)
-function clearChatDisplay() {
-    document.getElementById('msg-list').innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>View cleared. Click RESTORE ALL to see history.</p>";
-}
-
 
 
 
