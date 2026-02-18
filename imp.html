@@ -2939,90 +2939,88 @@ function calculateAvgScore() {
 
 // 2. Fetch and Calculate All Data
 async function fetchPerformanceData() {
-    const mobile = document.getElementById('perf-fetch-mobile').value;
-    if(!mobile) return alert("Please enter mobile number");
+    // 1. Get Roll Number from input
+    const inputRoll = document.getElementById('perf-fetch-mobile').value.trim().toUpperCase();
+    if (!inputRoll) return alert("Please enter a Student Roll Number");
 
-    // A. Fetch Basic & Extended Data
-    const { data: student } = await db.from('students').select('*').eq('mobile', mobile)
- .eq('institute_id', sessionInstID)
-.single();
-    if (!student) return alert("Student not found.");
+    if (!sessionInstID) return alert("Login required to load Institute ID");
 
-    const { data: details } = await db.from('student_details').select('*').eq('student_id', student.id).single();
-    
-    // B. Fetch Attendance for this month
-    const now = new Date();
-    const dayOfMonth = now.getDate();
-    const monthYear = `${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()}`; // e.g. "February 2026"
-    
-    const { count: absentCount } = await db.from('attendance')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', student.user_id) // Assuming user_id is linked
-        .eq('status', 'Absent')
-        .eq('month_year', monthYear);
+    try {
+        // 2. Fetch Student Basic Info (Name, Course, etc.)
+        const { data: student, error: stuErr } = await db
+            .from('students')
+            .select('full_name, course, admission_date, id')
+            .eq('roll_number', inputRoll)
+            .eq('institute_id', sessionInstID)
+            .maybeSingle();
 
-    // C. Fetch Saved Performance (if any)
-    const { data: perfSaved } = await db.from('performance_tracking').select('*').eq('student_id', student.id).single();
+        if (stuErr || !student) return alert("Student not found in your records.");
 
-    // D. Calculations
-    const daysAbsent = absentCount || 0;
-    const attendancePct = (((dayOfMonth - daysAbsent) / dayOfMonth) * 100).toFixed(2);
+        // 3. Fetch Aggregate Exam Data (CONNECTING TO EXAM TABLE)
+        const { data: examRecords, error: examErr } = await db
+            .from('exam')
+            .select('marks_obtained, total_marks, percentage')
+            .eq('roll_number', inputRoll)
+            .eq('institute_id', sessionInstID);
 
-    // E. Populate UI
-    document.getElementById('perf-today').value = now.toLocaleDateString();
-    document.getElementById('perf-name').value = student.full_name;
-    document.getElementById('perf-roll').value = details ? details.roll_number : "Not Assigned";
-    document.getElementById('perf-course').value = student.course;
-    document.getElementById('perf-joining').value = student.admission_date;
-    document.getElementById('perf-duration').value = details ? details.course_duration : "N/A";
-    
-    document.getElementById('perf-absent').innerText = daysAbsent;
-    document.getElementById('perf-attendance-pct').innerText = attendancePct + "%";
+        if (examErr) throw examErr;
 
-    if (perfSaved) {
-        document.getElementById('perf-marks').value = perfSaved.total_marks_secured;
-        document.getElementById('perf-exam-count').value = perfSaved.total_exams;
-        document.getElementById('perf-teacher').value = perfSaved.teacher_name;
-        calculateAvgScore();
+        // 4. Calculate real-time stats
+        let totalObtained = 0;
+        let examCount = 0;
+        let avgPercent = 0;
+
+        if (examRecords && examRecords.length > 0) {
+            examCount = examRecords.length;
+            totalObtained = examRecords.reduce((sum, rec) => sum + (parseFloat(rec.marks_obtained) || 0), 0);
+            const totalPossible = examRecords.reduce((sum, rec) => sum + (parseFloat(rec.total_marks) || 0), 0);
+            avgPercent = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
+        }
+
+        // 5. Populate UI Fields
+        const now = new Date();
+        document.getElementById('perf-today').value = now.toLocaleDateString();
+        document.getElementById('perf-name').value = student.full_name;
+        document.getElementById('perf-roll').value = inputRoll;
+        document.getElementById('perf-course').value = student.course || "N/A";
+        document.getElementById('perf-joining').value = student.admission_date || "N/A";
+        
+        // Update the Performance specific fields
+        document.getElementById('perf-marks').value = totalObtained;
+        document.getElementById('perf-exam-count').value = examCount;
+        document.getElementById('perf-avg-display').value = avgPercent.toFixed(2) + "%";
+
+        // Show the report area
+        document.getElementById('performance-report-area').style.display = 'block';
+        alert(`Performance data synced from ${examCount} exam records!`);
+
+    } catch (err) {
+        console.error("Performance Fetch Error:", err);
+        alert("Error connecting tables: " + err.message);
     }
-
-    document.getElementById('performance-report-area').style.display = 'block';
 }
-
 // 3. Save performance to database
 async function savePerformanceData() {
-    const mobile = document.getElementById('perf-fetch-mobile').value;
-    if (!mobile) return alert("Please fetch a student first.");
+    const roll = document.getElementById('perf-roll').value;
+    if (!roll) return alert("Please fetch a student first.");
 
-    // 1. Get the student ID
-    const { data: student, error: stuErr } = await db.from('students').select('id').eq('mobile', mobile).single();
-    if (stuErr || !student) return alert("Student not found.");
-
-    // 2. Prepare the data
     const updateData = {
- institute_id: sessionInstID,
-        student_id: student.id,
+        institute_id: sessionInstID,
+        roll_number: roll,
         total_marks_secured: parseFloat(document.getElementById('perf-marks').value) || 0,
         total_exams: parseInt(document.getElementById('perf-exam-count').value) || 0,
         teacher_name: document.getElementById('perf-teacher').value,
-        updated_at: new Date().toISOString() // Use ISO string for Supabase timestamps
+        updated_at: new Date().toISOString()
     };
 
-    // 3. Perform Upsert (This will now work because of the Unique Constraint)
+    // Upsert using roll_number and institute_id as the unique combo
     const { error } = await db
         .from('performance_tracking')
-        .upsert(updateData, { 
-            onConflict: 'student_id' 
-        });
+        .upsert(updateData, { onConflict: 'roll_number, institute_id' });
 
-    if (error) {
-        console.error("Supabase Error:", error);
-        alert("Error saving: " + error.message);
-    } else {
-        alert("Performance record updated successfully!");
-    }
+    if (error) alert("Save Error: " + error.message);
+    else alert("Overall Performance Record Updated!");
 }
-
 
 
 /* ==========================================
