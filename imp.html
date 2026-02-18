@@ -3899,11 +3899,18 @@ async function initMessageCorner() {
 
 function setMsgTab(type) {
     msgActiveTab = type;
-    document.getElementById('msg-mode-label').innerText = "Posting to: " + type;
+    document.getElementById('msg-mode-label').innerText = "Mode: " + type;
     
-    // UI Rule: Only Owners can post in OwnerToTeacher
-    document.getElementById('msg-input-box').style.display = 
-        (type === "OwnerToTeacher" && loggedRole !== "Owner") ? "none" : "block";
+    const inputBox = document.getElementById('msg-input-box');
+
+    // --- PERMISSION LOGIC: WHO CAN SEND? ---
+    if (type === "OwnerToTeacher" && loggedRole !== "Owner") {
+        inputBox.style.display = "none"; // Non-owners can't send here
+    } else if (type === "TeacherToStudent" && loggedRole !== "Teacher") {
+        inputBox.style.display = "none"; // Non-teachers can't send here
+    } else {
+        inputBox.style.display = "block"; // Everyone can send in General (or permitted roles in their tabs)
+    }
         
     refreshMessages();
 }
@@ -3926,37 +3933,46 @@ async function submitMessage() {
 }
 
 async function refreshMessages() {
+    const display = document.getElementById('msg-list');
+
+    // --- PRIVACY LOGIC: WHO CAN VIEW? ---
+    // Prevent Students from even seeing the list in Owner-Teacher private tab
+    if (msgActiveTab === "OwnerToTeacher" && loggedRole === "Student") {
+        display.innerHTML = "<p style='color:red;text-align:center;padding:10px;'>ACCESS DENIED: Private Staff Channel.</p>";
+        return;
+    }
+
     const { data: msgs } = await db.from('messages')
         .select('*')
         .eq('institute_id', sessionInstID)
         .eq('message_type', msgActiveTab)
         .order('created_at', { ascending: false });
 
-    const display = document.getElementById('msg-list');
-    
-    // FILTERING: Show only relevant subject messages
+    if(!msgs || !msgs.length) {
+        display.innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>No messages in this category yet.</p>";
+        return;
+    }
+
+    // SUBJECT FILTERING: Only show relevant subject messages to Teachers/Students
+    // (Owners see all subjects)
     const filtered = msgs.filter(m => {
-        if (m.target_subject === "All" || m.target_subject === loggedSubject) return true;
-        if (loggedRole === "Owner") return true; // Owner sees everything
+        if (loggedRole === "Owner" || m.target_subject === "All" || m.target_subject === loggedSubject) return true;
         return false;
     });
 
     if(!filtered.length) {
-        display.innerHTML = "<p style='color:gray;text-align:center;'>No messages here.</p>";
+        display.innerHTML = "<p style='color:gray;text-align:center;padding:20px;'>No messages matching your subject.</p>";
         return;
     }
 
     display.innerHTML = filtered.map(m => `
         <div style="border-bottom: 1px solid #eee; padding: 10px; text-align: left;">
-            <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role}) • ${new Date(m.created_at).toLocaleTimeString()}</small>
-            <p style="margin: 5px 0;">${m.content}</p>
-            <span style="font-size:0.7rem; background:#7FFFD4; padding:2px 5px; border-radius:3px;">${m.target_subject}</span>
+            <small style="color:#1877F2;"><b>${m.sender_name}</b> (${m.sender_role}) • ${new Date(m.created_at).toLocaleDateString()} ${new Date(m.created_at).toLocaleTimeString()}</small>
+            <p style="margin: 5px 0; font-weight: 500;">${m.content}</p>
+            <span style="font-size:0.7rem; background:#f0f0f0; border:1px solid #ccc; padding:2px 5px; border-radius:3px;">Subject: ${m.target_subject}</span>
         </div>
     `).join('');
 }
-
-
-
 
 
 
