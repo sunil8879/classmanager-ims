@@ -1741,6 +1741,36 @@ if (!sessionInstID || sessionInstID === "") {
         if (detailError) {
             alert("Error in secondary details: " + detailError.message);
         } else {
+
+
+
+
+
+
+
+// --- NEW LOGIC: Log the initial payment into Payment History ---
+    if (parseFloat(stuData.paid_amount) > 0) {
+        const payDate = stuData.admission_date;
+        const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        await db.from('payment_history').insert([{
+            institute_id: sessionInstID,
+            student_id: newStu[0].id,
+            roll_number: roll,
+            amount: stuData.paid_amount,
+            payment_date: payDate,
+            month_year: monthYearStr
+        }]);
+    }
+    // --- End of New Logic ---
+
+
+
+
+
+
+    alert("SUCCESS! Student " + stuData.full_name + " saved with Roll No: " + roll);
+    clearStudentForm();
             alert("SUCCESS! Student " + stuData.full_name + " saved with Roll No: " + roll);
             clearStudentForm();
         }
