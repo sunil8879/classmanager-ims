@@ -4134,6 +4134,10 @@ async function fetchStudentMessages(course) {
    PDF GENERATOR LOGIC (STUDENT & TEACHER)
    ========================================== */
 
+/* ==========================================
+   PDF GENERATOR LOGIC (STUDENT & TEACHER)
+   ========================================== */
+
 function generateStudentReceipt() {
     // 1. Grab data from Fee Form
     const name = document.getElementById('fee-name').value;
@@ -4146,6 +4150,9 @@ function generateStudentReceipt() {
     if(!name || !amt) return alert("Please fetch student details and enter 'Amount Now Paying' first.");
 
     // 2. Fill the Template
+    // THIS IS THE LINE THAT ADDS YOUR INSTITUTE ID TO THE PDF
+    document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
+
     document.getElementById('pdf-report-title').innerText = "OFFICIAL FEE RECEIPT";
     document.getElementById('pdf-date').innerText = date;
     document.getElementById('pdf-number').innerText = "REC-" + Math.floor(1000 + Math.random() * 9000);
@@ -4178,6 +4185,9 @@ function generateTeacherPayslip() {
     if(!name || !salary) return alert("Please fetch teacher details first.");
 
     // 2. Fill the Template
+    // THIS IS THE LINE THAT ADDS YOUR INSTITUTE ID TO THE PDF
+    document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
+
     document.getElementById('pdf-report-title').innerText = "MONTHLY SALARY PAYSLIP";
     document.getElementById('pdf-date').innerText = date;
     document.getElementById('pdf-number').innerText = "PAY-" + Math.floor(1000 + Math.random() * 9000);
@@ -4210,40 +4220,73 @@ if ('serviceWorker' in navigator) {
 <button id="pwa-install-btn" style="display: none;">
     <i class="fas fa-download"></i> INSTALL APP
 </button>
-<!-- HIDDEN PDF TEMPLATES -->
+
+
+
+<!-- HIDDEN PDF TEMPLATES FOR STUDENT RECEIPT & TEACHER PAYSLIP -->
 <div style="display: none;">
-    <div id="pdf-template" style="padding: 30px; font-family: 'Times New Roman', serif; width: 700px; border: 10px double #000;">
+    <div id="pdf-template" style="padding: 30px; font-family: 'Times New Roman', serif; width: 700px; border: 10px double #000; background: #fff; color: #000;">
         <center>
-            <h1 id="pdf-inst-name" style="margin:0; color:#007bff;">CLASS MANAGER IMS</h1>
-            <p id="pdf-inst-tagline" style="font-style: italic;">Track Right, Grow Bright</p>
-            <hr>
-            <h2 id="pdf-report-title" style="text-decoration: underline;">FEE RECEIPT</h2>
+            <h1 id="pdf-inst-name" style="margin:0; color:#007bff; font-size: 28px;">CLASS MANAGER - IMS</h1>
+            
+            <!-- This line displays the logged-in owner's Institute ID -->
+            <p style="margin:5px 0; font-weight:bold; font-size: 16px;">Institute ID: <span id="pdf-display-inst-id"></span></p> 
+            
+            <p id="pdf-inst-tagline" style="font-style: italic; margin: 0;">Track Right, Grow Bright.</p>
+            <hr style="border: 1px solid #000; margin: 15px 0;">
+            <h2 id="pdf-report-title" style="text-decoration: underline; margin-bottom: 20px;">FEE RECEIPT</h2>
         </center>
 
-        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 16px;">
             <p><b>Date:</b> <span id="pdf-date"></span></p>
             <p><b>Receipt No:</b> <span id="pdf-number"></span></p>
         </div>
 
-        <table style="width: 100%; margin-top: 20px; border-collapse: collapse;" border="1">
-            <tr><th style="padding: 10px; text-align: left; width: 40%;">Description</th><th style="padding: 10px; text-align: left;">Details</th></tr>
-            <tr><td style="padding: 10px;">Name</td><td style="padding: 10px;" id="pdf-main-name"></td></tr>
-            <tr><td style="padding: 10px;">ID / Roll No</td><td style="padding: 10px;" id="pdf-main-id"></td></tr>
-            <tr><td style="padding: 10px;">Subject / Course</td><td style="padding: 10px;" id="pdf-main-sub"></td></tr>
-            <tr><td style="padding: 10px; font-weight: bold;">Amount Paid</td><td style="padding: 10px; font-weight: bold;" id="pdf-main-amt"></td></tr>
-            <tr><td style="padding: 10px;">Balance Remaining</td><td style="padding: 10px;" id="pdf-main-bal"></td></tr>
+        <table style="width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 16px;" border="1">
+            <thead>
+                <tr style="background: #f2f2f2;">
+                    <th style="padding: 12px; text-align: left; width: 40%;">Description</th>
+                    <th style="padding: 12px; text-align: left;">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 12px;">Name</td>
+                    <td style="padding: 12px;" id="pdf-main-name"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px;">Roll Number / ID</td>
+                    <td style="padding: 12px;" id="pdf-main-id"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px;">Subject / Course</td>
+                    <td style="padding: 12px;" id="pdf-main-sub"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px; font-weight: bold;">Amount Received</td>
+                    <td style="padding: 12px; font-weight: bold;" id="pdf-main-amt"></td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px;">Outstanding Balance</td>
+                    <td style="padding: 12px;" id="pdf-main-bal"></td>
+                </tr>
+            </tbody>
         </table>
 
-        <div style="margin-top: 50px; display: flex; justify-content: space-between;">
-            <div style="text-align: center;"><br><p>_________________</p><p>Student/Staff Signature</p></div>
-            <div style="text-align: center;">
-                <p style="color:blue; font-weight: bold;">OFFICIALLY VERIFIED</p>
-                <p>_________________</p>
-                <p>Authorized Signatory</p>
+        <div style="margin-top: 60px; display: flex; justify-content: space-between; font-size: 16px;">
+            <div style="text-align: center; width: 200px;">
+                <br>
+                <p style="border-top: 1px solid #000; padding-top: 5px;">Student/Staff Signature</p>
+            </div>
+            <div style="text-align: center; width: 200px;">
+                <p style="color:blue; font-weight: bold; margin-bottom: 30px;">OFFICIALLY VERIFIED</p>
+                <p style="border-top: 1px solid #000; padding-top: 5px;">Authorized Signatory</p>
             </div>
         </div>
-        <center style="margin-top: 30px; font-size: 0.8rem; color: #666;">
-            <p>This is a computer-generated document. No signature is required.</p>
+
+        <center style="margin-top: 40px; font-size: 12px; color: #666;">
+            <p>This is a computer-generated document issued by ClassManager IMS.</p>
+            <p>For any queries, please contact the institute office using the Institute ID provided above.</p>
         </center>
     </div>
 </div>
