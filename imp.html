@@ -986,6 +986,7 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
                     <p>Total Fees Collection (Auto): <b id="disp-auto-fees" style="color: blue;">₹ 0.00</b></p>
+<p>Inventory Income (Auto): <b id="disp-auto-inv" style="color: #673ab7;">₹ 0.00</b></p>
                     <p>Total Expenses: <b id="disp-total-exp" style="color: red;">₹ 0.00</b></p>
                 </div>
                 <div style="text-align: right; border-left: 1px solid #ccc; padding-left: 20px;">
@@ -3242,25 +3243,31 @@ async function fetchAutoFees() {
     
     document.getElementById('disp-auto-fees').innerText = "₹ " + total.toFixed(2);
     calculateFinancials(); 
+fetchAutoInventory(); // ADD THIS LINE
 }
 // 2. FORMULA CALCULATION
 function calculateFinancials() {
-    // Pull the fee collection from the label we just updated
+    // Pull the TWO auto values (Fees + Inventory)
     const fees = parseFloat(document.getElementById('disp-auto-fees').innerText.replace(/[₹, ]/g, '')) || 0;
+    const inventory = parseFloat(document.getElementById('disp-auto-inv').innerText.replace(/[₹, ]/g, '')) || 0;
+    
+    // Manual "Other Income" box (we can keep it 0 or ignore it)
     const otherInc = parseFloat(document.getElementById('exp-income').value) || 0;
     
     const expenses = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'];
     const totalExp = expenses.reduce((sum, id) => sum + (parseFloat(document.getElementById(id).value) || 0), 0);
 
-    const netIncome = (fees + otherInc) - totalExp;
+    // NEW FORMULA: Fees + Inventory + Other - Expenses
+    const netIncome = (fees + inventory + otherInc) - totalExp;
 
     document.getElementById('disp-total-exp').innerText = "₹ " + totalExp.toFixed(2);
     document.getElementById('disp-total-income').innerText = "₹ " + netIncome.toFixed(2);
     document.getElementById('disp-total-income').style.color = netIncome >= 0 ? "green" : "red";
     
-    let ratio = (fees + otherInc) > 0 ? (totalExp / (fees + otherInc)) * 100 : 0;
+    let ratio = (fees + inventory + otherInc) > 0 ? (totalExp / (fees + inventory + otherInc)) * 100 : 0;
     document.getElementById('disp-ratio').innerText = ratio.toFixed(1) + "%";
 }
+
 
 // 3. SAVE TO SUPABASE
 async function saveExpenses() {
@@ -3327,6 +3334,7 @@ async function fetchSavedExpense() {
     }
     
     calculateFinancials();
+fetchAutoInventory(); // ADD THIS LINE
 }
 
 function clearExpenseForm() {
@@ -5034,6 +5042,36 @@ async function loadHomeInventoryStats() {
     
     // Update the new Home Page card
     document.getElementById('home-total-inventory').innerText = "₹ " + totalInv.toLocaleString('en-IN');
+}
+
+
+
+
+
+/* --- EXPENSE SECTION: AUTO-PULL INVENTORY SALES --- */
+async function fetchAutoInventory() {
+    const monthVal = document.getElementById('exp-month-year').value; // e.g., "2026-02"
+    if (!monthVal || !sessionInstID) return;
+
+    // Calculate start and end of that specific month
+    const year = monthVal.split('-')[0];
+    const month = monthVal.split('-')[1];
+    const startDate = `${year}-${month}-01T00:00:00Z`;
+    const endDate = `${year}-${month}-31T23:59:59Z`;
+
+    const { data, error } = await db.from('inventory_sales')
+        .select('total_paid')
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate);
+
+    const total = data ? data.reduce((sum, p) => sum + (Number(p.total_paid) || 0), 0) : 0;
+    
+    // Update the NEW label we just created
+    document.getElementById('disp-auto-inv').innerText = "₹ " + total.toFixed(2);
+    
+    // Trigger math update
+    calculateFinancials();
 }
     </script>
 <script>
