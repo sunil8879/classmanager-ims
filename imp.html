@@ -476,6 +476,17 @@
             <div class="stat-card" style="border-bottom: 5px solid #ff0000;">
                 <p>PENDING</p><h4 id="home-total-pend">₹ 0</h4><small>Outstanding Fees</small>
             </div>
+<!-- FINANCIAL FORECAST HIGHLIGHTS (Next 6 Months) -->
+<h3 style="margin-top: 30px; text-decoration: none;">Incoming Fees (6-Month Forecast)</h3>
+<div id="forecast-cards" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
+    <!-- Month cards will be auto-generated here by JavaScript -->
+</div>
+
+<!-- GOOGLE CHART & SLICER CONTAINER -->
+<div id="home_dashboard_div" style="width: 100%; max-width: 900px; margin: 0 auto; background: white; padding: 20px; border: 2px solid #000; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+    <div id="home_filter_div" style="background: #f0fdfa; padding: 10px; border-radius: 10px; border: 1px solid #7FFFD4; margin-bottom: 20px;"></div>
+    <div id="home_line_chart" style="height: 400px; width: 100%;"></div>
+</div>
         </div>
     </div>
 
@@ -577,6 +588,7 @@
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
             <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid" oninput="calcStuPending()"></div>
             <div class="input-group"><label>Pending Amount</label><input type="number" id="stu-pending" readonly style="background:#eee;"></div>
+<div class="input-group"><label>Payment Due Dates (e.g. March 2026, June 2026)</label><input type="text" id="stu-due-dates" placeholder="Month Year, Month Year"></div>
             
             <div class="input-group">
                 <label>Roll Number</label>
@@ -1721,8 +1733,10 @@ async function handleLogout() {
 
 async function loadHomeDashboardStats() {
     if (!sessionInstID) return;
+    
+    // ADDED 'due_dates' to the select statement below
     const { data: students } = await db.from('students')
-        .select('paid_amount, pending_amount')
+        .select('paid_amount, pending_amount, due_dates') 
         .eq('institute_id', sessionInstID)
         .eq('status', 'Active');
 
@@ -1734,6 +1748,9 @@ async function loadHomeDashboardStats() {
         document.getElementById('home-total-stu').innerText = totalStu;
         document.getElementById('home-total-coll').innerText = "₹ " + totalColl.toLocaleString('en-IN');
         document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
+
+        // --- ADDED FOR FORECASTING ---
+        generateFinancialForecast(students);
     }
 }
 
@@ -1814,7 +1831,8 @@ if (!sessionInstID || sessionInstID === "") {
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
         roll_number: roll,
-        user_id: (await db.auth.getUser()).data.user?.id 
+        user_id: (await db.auth.getUser()).data.user?.id ,
+due_dates: document.getElementById('stu-due-dates').value
     };
 
     // 5. Save to 'students' table
@@ -1898,7 +1916,8 @@ async function fetchStudentByRoll() {
                 course, 
                 total_fees, 
                 paid_amount, 
-                pending_amount
+                pending_amount,
+stu-due-dates
             )
         `)
         .eq('roll_number', roll)
@@ -1924,6 +1943,7 @@ async function fetchStudentByRoll() {
     document.getElementById('stu-total').value = s.total_fees || 0;
     document.getElementById('stu-paid').value = s.paid_amount || 0;
     document.getElementById('stu-pending').value = s.pending_amount || 0;
+document.getElementById('stu-due-dates').value = s.due_dates || "";
     
     // Values from the student_details table
     document.getElementById('stu-roll').value = data.roll_number || "";
@@ -1966,6 +1986,7 @@ async function editStudentByRoll() {
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
+due_dates: document.getElementById('stu-due-dates').value,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0 // CRITICAL LINE
     };
 
@@ -4328,6 +4349,111 @@ function runPrintTeacher(date, paid, pending, month) {
     printWindow.document.write(receiptHtml);
     printWindow.document.close();
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+}
+
+
+
+
+
+
+/* ==========================================
+   FINANCIAL INTELLIGENCE: FORECASTING ENGINE
+   ========================================== */
+
+async function generateFinancialForecast(students) {
+    const monthsToShow = 6;
+    const forecastData = {};
+    const chartRows = [];
+
+    // 1. Initialize the next 6 months in the object
+    for (let i = 0; i < monthsToShow; i++) {
+        let d = new Date();
+        d.setMonth(d.getMonth() + i);
+        let monthName = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+        forecastData[monthName] = 0;
+    }
+
+    // 2. Parse Student Due Dates and distribute Pending Amounts
+    students.forEach(s => {
+        if (s.pending_amount > 0 && s.due_dates) {
+            // Split "March 2026, July 2026" into an array
+            const dates = s.due_dates.split(',').map(d => d.trim());
+            const perInstallment = s.pending_amount / dates.length;
+
+            dates.forEach(d => {
+                if (forecastData.hasOwnProperty(d)) {
+                    forecastData[d] += perInstallment;
+                }
+            });
+        }
+    });
+
+    // 3. Update the UI Cards
+    const cardContainer = document.getElementById('forecast-cards');
+    cardContainer.innerHTML = "";
+    
+    // Total numbers for the Chart
+    const totalAdmissions = students.length;
+    const totalReceived = students.reduce((sum, s) => sum + (Number(s.paid_amount) || 0), 0);
+    const totalPending = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
+
+    Object.keys(forecastData).forEach(month => {
+        cardContainer.innerHTML += `
+            <div class="stat-card" style="padding: 15px; min-width: 130px; border-bottom: 4px solid #f39c12;">
+                <p style="font-size: 0.7rem; margin-bottom: 5px;">${month.toUpperCase()}</p>
+                <h4 style="font-size: 1.2rem !important; color: #000;">₹${Math.round(forecastData[month]).toLocaleString()}</h4>
+            </div>
+        `;
+        // Prepare row for chart: [Month, Admissions, Collection, Pending, Incoming]
+        chartRows.push([month, totalAdmissions, totalReceived, totalPending, Math.round(forecastData[month])]);
+    });
+
+    // 4. Draw the Google Chart with Slicer
+    drawHomeForecastingChart(chartRows);
+}
+
+function drawHomeForecastingChart(chartRows) {
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Month');
+    data.addColumn('number', 'Admissions');
+    data.addColumn('number', 'Total Collection');
+    data.addColumn('number', 'Total Pending');
+    data.addColumn('number', 'Incoming (Forecast)');
+
+    data.addRows(chartRows);
+
+    var dashboard = new google.visualization.Dashboard(document.getElementById('home_dashboard_div'));
+
+    var slicer = new google.visualization.ControlWrapper({
+        'controlType': 'CategoryFilter',
+        'containerId': 'home_filter_div',
+        'options': {
+            'filterColumnLabel': 'Month',
+            'ui': {
+                'label': 'Filter Specific Month:',
+                'allowTyping': false,
+                'allowMultiple': true
+            }
+        }
+    });
+
+    var lineChart = new google.visualization.ChartWrapper({
+        'chartType': 'LineChart',
+        'containerId': 'home_line_chart',
+        'options': {
+            'title': 'Financial Outlook (Next 6 Months)',
+            'curveType': 'function',
+            'legend': { position: 'bottom' },
+            'colors': ['#27ae60', '#1877F2', '#ff0000', '#f39c12'],
+            'pointSize': 7,
+            'vAxis': { title: 'Amount / Count', minValue: 0 },
+            'hAxis': { title: 'Timeline' },
+            'chartArea': { width: '85%', height: '70%' }
+        }
+    });
+
+    dashboard.bind(slicer, lineChart);
+    dashboard.draw(data);
 }
     </script>
 <script>
