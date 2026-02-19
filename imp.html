@@ -2972,29 +2972,23 @@ async function fetchAutoFees() {
     const monthVal = document.getElementById('exp-month-year').value; 
     if (!monthVal || !sessionInstID) return;
 
-    // Format: "February 2026"
+    // 1. Get the month name exactly how the database stores it
     const dateObj = new Date(monthVal + "-01");
-const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }).trim();
+    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // THE MAGIC LINK:
-    // We fetch amounts from history, but the "!inner" part forces 
-    // it to only count students who are 'Active' in the master table.
+    // 2. Simple Query: Just get all amounts for this month and institute
+    // We removed the "!inner status" check because it was causing the 8,000 mismatch
     const { data, error } = await db
         .from('payment_history')
-        .select(`
-            amount,
-            students!inner ( status )
-        `)
+        .select('amount')
         .eq('institute_id', sessionInstID)
-        .eq('month_year', targetMonthYear)
-        .eq('students.status', 'Active');
+        .ilike('month_year', `%${targetMonthYear.trim()}%`); // ilike is safer than eq
 
     if (error) {
-        console.error("Link Error:", error.message);
+        console.error("Fetch Error:", error.message);
         return;
     }
 
-    // Sum up the verified amounts
     const total = data ? data.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
     
     document.getElementById('disp-auto-fees').innerText = "₹ " + total.toFixed(2);
