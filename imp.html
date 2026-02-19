@@ -460,7 +460,7 @@
 <button class="nav-tab" onclick="showSection('calendar-mod')"><i class="fas fa-calendar-alt"></i> Academic Calendar</button>
 <button class="nav-tab" onclick="showSection('alumni-mod')"><i class="fas fa-user-graduate"></i> Alumni Section</button>
 <button class="nav-tab" onclick="showSection('inventory-mod')"><i class="fas fa-boxes"></i> Inventory Manager</button>
-<button class="nav-tab" onclick="showSection('biz-summary')"><i class="fas fa-chart-pie"></i> Business Summary</button>
+
         </aside>
 
         <main class="content" id="main-content">
@@ -983,20 +983,12 @@
 </div>
         </div>
 
-        <div class="stat-card" style="background: #eefbff; margin-top: 20px; text-align: left;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div>
-                    <p>Total Fees Collection (Auto): <b id="disp-auto-fees" style="color: blue;">₹ 0.00</b></p>
-<p>Inventory Sales (Auto): <b id="disp-auto-inv" style="color: #673ab7;">₹ 0.00</b></p>
-                    <p>Total Expenses: <b id="disp-total-exp" style="color: red;">₹ 0.00</b></p>
-                </div>
-                <div style="text-align: right; border-left: 1px solid #ccc; padding-left: 20px;">
-                    <h4 style="color: green;">TOTAL INCOME: <span id="disp-total-income">₹ 0.00</span></h4>
-                    <p>Cost to Income Ratio: <b id="disp-ratio">0%</b></p>
-                </div>
-            </div>
-        </div>
-
+     <div class="stat-card" style="background: #fff8f8; margin-top: 20px; text-align: left; border: 1px solid #ff0000;">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
+        <h4 style="color: #ff0000; margin: 0; text-decoration: none;">TOTAL MONTHLY EXPENSES: <span id="disp-total-exp">₹ 0.00</span></h4>
+        <p style="margin: 0; font-size: 0.85rem; color: #666;">* Based on manual entries below</p>
+    </div>
+</div>
         <div class="button-row">
            <button class="btn-add" onclick="saveExpenses()">ADD RECORD</button>
            <button class="btn-fetch" onclick="fetchSavedExpense()">FETCH (by Month)</button>
@@ -1621,53 +1613,7 @@
 </section>
 
 
-<!-- MONTHLY BUSINESS SUMMARY SECTION -->
-<section id="biz-summary" class="content-section">
-    <div class="card" style="border-top: 5px solid #1abc9c; max-width: 1000px;">
-        <h2 style="text-decoration: none;"><i class="fas fa-file-invoice-dollar"></i> Monthly Business Summary</h2>
-        
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid #ddd;">
-            <label style="font-weight: bold;">Select Month & Year to Generate Report:</label>
-            <input type="month" id="biz-calendar" onchange="loadBusinessSummary()" style="width: 250px; margin-top: 10px;">
-        </div>
 
-        <div id="biz-report-area" style="display: none; text-align: left;">
-            <div class="dashboard-stats" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-                <div class="stat-card" style="border-bottom: 5px solid blue;"><p>TOTAL FEES</p><h4 id="biz-fees">₹ 0</h4></div>
-                <div class="stat-card" style="border-bottom: 5px solid #673ab7;"><p>INVENTORY SALES</p><h4 id="biz-inv">₹ 0</h4></div>
-                <div class="stat-card" style="border-bottom: 5px solid red;"><p>TOTAL EXPENSES</p><h4 id="biz-exp">₹ 0</h4></div>
-                <div class="stat-card" style="border-bottom: 5px solid green;"><p>GROSS PROFIT</p><h4 id="biz-profit">₹ 0</h4></div>
-            </div>
-
-            <div class="form-grid" style="margin-top: 30px; gap: 15px;">
-                <div class="card" style="margin:0; padding: 15px; background: #fff8f8; border: 1px solid #ff0000;">
-                    <h4 style="font-size: 1rem; text-decoration: none; color: #ff0000;"><i class="fas fa-star"></i> Top 3 Courses (Enrollment)</h4>
-                    <ul id="top-courses" style="list-style: none; padding: 0; font-size: 0.9rem;"></ul>
-                </div>
-                <div class="card" style="margin:0; padding: 15px; background: #f0fff4; border: 1px solid #27ae60;">
-                    <h4 style="font-size: 1rem; text-decoration: none; color: #27ae60;"><i class="fas fa-chalkboard-teacher"></i> Top 3 Teachers (Ratings)</h4>
-                    <ul id="top-teachers-rating" style="list-style: none; padding: 0; font-size: 0.9rem;"></ul>
-                </div>
-                <div class="card" style="margin:0; padding: 15px; background: #f0faff; border: 1px solid #007bff;">
-                    <h4 style="font-size: 1rem; text-decoration: none; color: #007bff;"><i class="fas fa-user-check"></i> Top 3 Teachers (Attn %)</h4>
-                    <ul id="top-teachers-attn" style="list-style: none; padding: 0; font-size: 0.9rem;"></ul>
-                </div>
-                <div class="card" style="margin:0; padding: 15px; background: #fffdf0; border: 1px solid #f1c40f;">
-                    <h4 style="font-size: 1rem; text-decoration: none; color: #f39c12;"><i class="fas fa-trophy"></i> Top 3 Students (Exam %)</h4>
-                    <ul id="top-students-results" style="list-style: none; padding: 0; font-size: 0.9rem;"></ul>
-                </div>
-                <div class="card" style="margin:0; padding: 15px; background: #f4f4f4; border: 1px solid #333;">
-                    <h4 style="font-size: 1rem; text-decoration: none;"><i class="fas fa-running"></i> Top 3 Students (Attn %)</h4>
-                    <ul id="top-students-attn" style="list-style: none; padding: 0; font-size: 0.9rem;"></ul>
-                </div>
-               <div class="card" style="margin:0; padding: 15px; background: #ffffff; border: 2px solid #333; color: #000;">
-    <h4 style="font-size: 1rem; text-decoration: none; color: #000;"><i class="fas fa-calendar-check"></i> Best Month of Year</h4>
-    <p id="top-month-year" style="font-weight: bold; margin-top: 10px; color: #ff0000; font-size: 1.2rem;"></p>
-</div>
-            </div>
-        </div>
-    </div>
-</section>
         </main>
     </div>
 
@@ -3297,29 +3243,18 @@ fetchAutoInventory(); // ADD THIS LINE
 }
 // 2. FORMULA CALCULATION
 function calculateFinancials() {
-    // 1. Get Auto Fees (The 21,000)
-    const feesText = document.getElementById('disp-auto-fees').innerText;
-    const fees = parseFloat(feesText.replace(/[₹, ]/g, '')) || 0;
-    
-    // 2. Get Auto Inventory (The new one)
-    const invText = document.getElementById('disp-auto-inv').innerText;
-    const inventory = parseFloat(invText.replace(/[₹, ]/g, '')) || 0;
-    
-    // 3. Get Manual Expenses
+    // 1. Define the list of expense input IDs
     const expenses = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'];
-    const totalExp = expenses.reduce((sum, id) => sum + (parseFloat(document.getElementById(id).value) || 0), 0);
-
-    // 4. Calculate Net
-    const netIncome = (fees + inventory) - totalExp;
-
-    document.getElementById('disp-total-exp').innerText = "₹ " + totalExp.toFixed(2);
-    document.getElementById('disp-total-income').innerText = "₹ " + netIncome.toFixed(2);
-    document.getElementById('disp-total-income').style.color = netIncome >= 0 ? "green" : "red";
     
-    let ratio = (fees + inventory) > 0 ? (totalExp / (fees + inventory)) * 100 : 0;
-    document.getElementById('disp-ratio').innerText = ratio.toFixed(1) + "%";
-}
+    // 2. Sum up all the manual input boxes
+    const totalExp = expenses.reduce((sum, id) => {
+        const input = document.getElementById(id);
+        return sum + (input ? parseFloat(input.value) || 0 : 0);
+    }, 0);
 
+    // 3. Display the Total in the Red box
+    document.getElementById('disp-total-exp').innerText = "₹ " + totalExp.toLocaleString('en-IN', {minimumFractionDigits: 2});
+}
 
 // 3. SAVE TO SUPABASE
 async function saveExpenses() {
@@ -3356,15 +3291,7 @@ async function fetchSavedExpense() {
     const monthYear = document.getElementById('exp-month-year').value;
     if (!monthYear) return alert("Select Month & Year to fetch.");
 
-    // 1. Get Auto Fees (Student Fees)
-    fetchAutoFees(); 
-
-    // 2. NEW: Get real-time Inventory Income (Calculated from sales table)
-    const realTimeInvIncome = await calculateInventoryIncome(monthYear);
-    document.getElementById('exp-income').value = realTimeInvIncome.toFixed(2);
-
-    // 3. Get the manual expense records (Rent, Elec, etc.)
-    const { data } = await db.from('expenses')
+    const { data, error } = await db.from('expenses')
         .select('*')
         .eq('month_year', monthYear)
         .eq('institute_id', sessionInstID)
@@ -3378,17 +3305,15 @@ async function fetchSavedExpense() {
         document.getElementById('exp-a-sal').value = data.admin_salary || 0;
         document.getElementById('exp-mark').value = data.marketing || 0;
         document.getElementById('exp-other').value = data.other_exp || 0;
-        // We IGNORE data.other_income from the DB and use our calculated realTimeInvIncome
+        alert("Expense records loaded!");
     } else {
-        // Reset manual boxes if month is new
         ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other']
         .forEach(id => document.getElementById(id).value = 0);
     }
     
+    // Recalculate the red box total
     calculateFinancials();
-fetchAutoInventory(); // ADD THIS LINE
 }
-
 function clearExpenseForm() {
     const inputs = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other','exp-income'];
     inputs.forEach(id => document.getElementById(id).value = 0);
@@ -5168,125 +5093,7 @@ async function fetchAutoInventory() {
 
 
 
-/* ==========================================
-   MONTHLY BUSINESS SUMMARY LOGIC
-   ========================================== */
 
-/* ==========================================
-   FINAL BUSINESS SUMMARY ENGINE (FIXED)
-   ========================================== */
-
-/* ==========================================
-   FINAL BUSINESS SUMMARY ENGINE (REPAIR VERSION)
-   ========================================== */
-
-async function loadBusinessSummary() {
-    const monthInput = document.getElementById('biz-calendar').value; // e.g. "2026-02"
-    if (!monthInput) return;
-
-    const dateObj = new Date(monthInput + "-01");
-    const formattedMonthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }); 
-    const currentYear = monthInput.split('-')[0];
-
-    document.getElementById('biz-report-area').style.display = 'block';
-
-    // 1. FETCH ALL DATA
-    const [feesRes, invRes, expRes, courseRes, tchRatRes, stuExamRes, yrEnrolRes, tchAttnRes] = await Promise.all([
-        db.from('payment_history').select('amount').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
-        db.from('inventory_sales').select('total_paid').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
-        db.from('expenses').select('*').eq('month_year', monthInput).eq('institute_id', sessionInstID).maybeSingle(),
-        db.from('students').select('course').eq('institute_id', sessionInstID).eq('status', 'Active'),
-        db.from('teacher_details').select('teacher_name, rating').eq('institute_id', sessionInstID).order('rating', {ascending: false}).limit(3),
-        db.from('exam').select('full_name, percentage, exam_date').eq('institute_id', sessionInstID).order('percentage', {ascending: false}),
-        db.from('students').select('admission_date').eq('institute_id', sessionInstID),
-        db.from('teachers_attendance').select('teacher_id, full_name, status, attendance_date').eq('institute_id', sessionInstID)
-    ]);
-
-    // 2. REVENUE CALCULATIONS
-    const totalFees = feesRes.data ? feesRes.data.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
-    const totalInv = invRes.data ? invRes.data.reduce((s, r) => s + (parseFloat(r.total_paid) || 0), 0) : 0;
-    let totalExp = 0;
-    if (expRes.data) {
-        const e = expRes.data;
-        totalExp = (parseFloat(e.rent)||0) + (parseFloat(e.electricity)||0) + (parseFloat(e.maintenance)||0) + (parseFloat(e.teacher_salary)||0) + (parseFloat(e.admin_salary)||0) + (parseFloat(e.marketing)||0) + (parseFloat(e.other_exp)||0);
-    }
-    document.getElementById('biz-fees').innerText = "₹ " + totalFees.toLocaleString();
-    document.getElementById('biz-inv').innerText = "₹ " + totalInv.toLocaleString();
-    document.getElementById('biz-exp').innerText = "₹ " + totalExp.toLocaleString();
-    document.getElementById('biz-profit').innerText = "₹ " + (totalFees + totalInv - totalExp).toLocaleString();
-
-    // 3. ITEM 5 & 6 (COURSES & TEACHER RATINGS)
-    const cMap = {}; courseRes.data?.forEach(s => { cMap[s.course] = (cMap[s.course] || 0) + 1; });
-    const topC = Object.entries(cMap).sort((a,b) => b[1] - a[1]).slice(0, 3);
-    document.getElementById('top-courses').innerHTML = topC.map((c, i) => `<li>${i+1}. ${c[0]} (${c[1]})</li>`).join('') || "<li>No data</li>";
-    document.getElementById('top-teachers-rating').innerHTML = tchRatRes.data?.map((t, i) => `<li>${i+1}. ${t.teacher_name} (⭐ ${t.rating})</li>`).join('') || "<li>No data</li>";
-
-    // 4. ITEM 8: TOP STUDENTS (EXAMS) - Filtered by JS to avoid DB date errors
-    const filteredExams = stuExamRes.data?.filter(ex => ex.exam_date && ex.exam_date.startsWith(monthInput)) || [];
-    if(filteredExams.length > 0) {
-        document.getElementById('top-students-results').innerHTML = filteredExams.slice(0, 3).map((s, i) => `<li>${i+1}. ${s.full_name} (${Math.round(s.percentage)}%)</li>`).join('');
-    } else {
-        document.getElementById('top-students-results').innerHTML = "<li>No exams found for " + monthInput + "</li>";
-    }
-
-    // 5. ITEM 10: BEST MONTH OF YEAR
-    const currentYearRecords = yrEnrolRes.data?.filter(s => s.admission_date && s.admission_date.startsWith(currentYear)) || [];
-    if(currentYearRecords.length > 0) {
-        const mMap = {};
-        currentYearRecords.forEach(s => {
-            const m = new Date(s.admission_date).toLocaleString('default', { month: 'long' });
-            mMap[m] = (mMap[m] || 0) + 1;
-        });
-        const best = Object.entries(mMap).sort((a,b) => b[1] - a[1])[0];
-        document.getElementById('top-month-year').innerText = best ? `${best[0]} (${best[1]} Enrols)` : "N/A";
-    } else {
-        document.getElementById('top-month-year').innerText = "No Enrolments in " + currentYear;
-    }
-
-    // 6. ITEM 7: TOP TEACHERS (ATTENDANCE) - Filtered by JS
-    const filteredTchAttn = tchAttnRes.data?.filter(a => a.attendance_date && a.attendance_date.startsWith(monthInput)) || [];
-    if (filteredTchAttn.length > 0) {
-        const tAttnMap = {};
-        filteredTchAttn.forEach(a => {
-            if (!tAttnMap[a.teacher_id]) tAttnMap[a.teacher_id] = { n: a.full_name, p: 0, t: 0 };
-            tAttnMap[a.teacher_id].t++;
-            if (a.status === 'Present') tAttnMap[a.teacher_id].p++;
-        });
-        const tSorted = Object.values(tAttnMap).map(v => ({n: v.n, pct: (v.p/v.t)*100})).sort((a,b) => b.pct - a.pct).slice(0, 3);
-        document.getElementById('top-teachers-attn').innerHTML = tSorted.map((t, i) => `<li>${i+1}. ${t.n} (${Math.round(t.pct)}%)</li>`).join('');
-    } else {
-        document.getElementById('top-teachers-attn').innerHTML = "<li>No attendance logs found</li>";
-    }
-
-    // Call Item 9
-    loadBizAttendanceAnalytics(monthInput);
-}
-
-async function loadBizAttendanceAnalytics(prefixMonth) {
-    // 1. ITEM 9: TOP STUDENTS (ATTENDANCE)
-    const { data: stuAttn } = await db.from('attendance').select('roll_number, status, attendance_date').eq('institute_id', sessionInstID);
-    
-    // Filter for current month using JS prefix check
-    const monthlyAttn = stuAttn?.filter(a => a.attendance_date && a.attendance_date.startsWith(prefixMonth)) || [];
-
-    if (monthlyAttn.length > 0) {
-        const sAttnMap = {};
-        monthlyAttn.forEach(a => {
-            if (!sAttnMap[a.roll_number]) sAttnMap[a.roll_number] = { p: 0, t: 0 };
-            sAttnMap[a.roll_number].t++;
-            if (a.status === 'Present') sAttnMap[a.roll_number].p++;
-        });
-        const sSorted = Object.keys(sAttnMap).map(r => ({ r, pct: (sAttnMap[r].p/sAttnMap[r].t)*100 })).sort((a,b) => b.pct - a.pct).slice(0, 3);
-        
-        const results = await Promise.all(sSorted.map(async (item) => {
-            const { data } = await db.from('students').select('full_name').eq('roll_number', item.r).eq('institute_id', sessionInstID).maybeSingle();
-            return { name: data ? data.full_name : item.r, pct: item.pct };
-        }));
-        document.getElementById('top-students-attn').innerHTML = results.map((s, i) => `<li>${i+1}. ${s.name} (${Math.round(s.pct)}%)</li>`).join('');
-    } else {
-        document.getElementById('top-students-attn').innerHTML = "<li>No student attendance found</li>";
-    }
-}
     </script>
 <script>
 if ('serviceWorker' in navigator) {
