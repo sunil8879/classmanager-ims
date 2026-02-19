@@ -4875,12 +4875,13 @@ async function processInventorySale() {
         student_roll: roll,
         student_name: document.getElementById('inv-stu-name').value,
         course_name: document.getElementById('inv-stu-course').value,
+		month_year: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
         items_bought: itemsStr,
         total_paid: total,
         remarks: document.getElementById('inv-remarks').value
+};
 
-month_year: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
-    };
+    
 
     const { error } = await db.from('inventory_sales').insert([saleData]);
     if(error) alert(error.message);
