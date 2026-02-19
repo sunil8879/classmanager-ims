@@ -458,6 +458,7 @@
 <button class="nav-tab" onclick="showSection('allocation-mod')"><i class="fas fa-link"></i> Student Allocation</button>
 <button class="nav-tab" onclick="showSection('message-corner'); msgEngine('General');"><i class="fas fa-comments"></i> Message Corner</button>
 <button class="nav-tab" onclick="showSection('calendar-mod')"><i class="fas fa-calendar-alt"></i> Academic Calendar</button>
+<button class="nav-tab" onclick="showSection('alumni-mod')"><i class="fas fa-user-graduate"></i> Alumni Section</button>
         </aside>
 
         <main class="content" id="main-content">
@@ -1493,6 +1494,44 @@
         <h3><i class="fas fa-calendar-day"></i> Upcoming Dates</h3>
         <div id="calendar-list" style="text-align: left; margin-top: 15px;">
             <p style="color: #888; text-align: center;">Loading calendar...</p>
+        </div>
+    </div>
+</section>
+
+
+
+
+
+<!-- ALUMNI & PLACEMENT SECTION -->
+<section id="alumni-mod" class="content-section">
+    <div class="card" style="border-top: 5px solid #673ab7;">
+        <h3><i class="fas fa-award"></i> Alumni & Placement Tracker</h3>
+        <p style="font-size: 0.8rem; color: #666; margin-bottom: 20px;">Note: Only students whose status is NOT 'Active' can be added here.</p>
+        
+        <div class="form-grid">
+            <div class="input-group">
+                <label>Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="al-roll" placeholder="IMS-XXXX">
+                    <button class="btn-fetch" onclick="fetchStudentForAlumni()" style="padding: 5px 10px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="input-group"><label>Full Name</label><input type="text" id="al-name" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Course Enrolled</label><input type="text" id="al-course" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Enrollment Date</label><input type="text" id="al-enroll" readonly style="background:#eee;"></div>
+            
+            <div class="input-group"><label>Name of College</label><input type="text" id="al-college" placeholder="Higher Education Institute"></div>
+            <div class="input-group"><label>Stream</label><input type="text" id="al-stream" placeholder="e.g. Science, Commerce"></div>
+            <div class="input-group"><label>Name of Company</label><input type="text" id="al-company" placeholder="Workplace"></div>
+            <div class="input-group"><label>Designation</label><input type="text" id="al-designation" placeholder="Job Role"></div>
+            <div class="input-group"><label>Annual Salary / Package</label><input type="number" id="al-salary" placeholder="Amount"></div>
+        </div>
+
+        <div class="button-row">
+            <button class="btn-add" onclick="addAlumni()">ADD ALUMNI</button>
+            <button class="btn-edit" onclick="editAlumni()">EDIT (Roll No)</button>
+            <button class="btn-fetch" onclick="fetchSavedAlumni()">FETCH SAVED</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearAlumniForm()">CLEAR</button>
         </div>
     </div>
 </section>
@@ -4454,6 +4493,118 @@ function drawHomeForecastingChart(chartRows) {
 
     dashboard.bind(slicer, lineChart);
     dashboard.draw(data);
+}
+
+
+
+
+/* ==========================================
+   ALUMNI & PLACEMENT TRACKER LOGIC
+   ========================================== */
+
+// 1. Fetch Student from Master Table and Check Status
+async function fetchStudentForAlumni() {
+    const roll = document.getElementById('al-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Please enter a Roll Number");
+
+    const { data: student, error } = await db.from('students')
+        .select('full_name, course, admission_date, status')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if(error || !student) return alert("Student not found in admission records.");
+
+    // CONDITION: Cannot add ACTIVE students
+    if(student.status === 'Active') {
+        alert("ERROR: This student is currently 'Active'. You can only add students to Alumni section once their course is Closed or Graduated.");
+        clearAlumniForm();
+        return;
+    }
+
+    // Autopopulate fields
+    document.getElementById('al-name').value = student.full_name;
+    document.getElementById('al-course').value = student.course;
+    
+    // Format enrollment date to Month Year
+    const enrollDate = new Date(student.admission_date).toLocaleString('default', { month: 'long', year: 'numeric' });
+    document.getElementById('al-enroll').value = enrollDate;
+    
+    alert("Record found for " + student.full_name + ". You may now fill placement details.");
+}
+
+// 2. Add Alumni Record
+async function addAlumni() {
+    const roll = document.getElementById('al-roll').value.toUpperCase();
+    const name = document.getElementById('al-name').value;
+    
+    if(!roll || !name) return alert("Please fetch student details first.");
+
+    const alumniData = {
+        institute_id: sessionInstID,
+        roll_number: roll,
+        full_name: name,
+        course_enrolled: document.getElementById('al-course').value,
+        enrollment_month_year: document.getElementById('al-enroll').value,
+        college_name: document.getElementById('al-college').value,
+        stream: document.getElementById('al-stream').value,
+        company_name: document.getElementById('al-company').value,
+        designation: document.getElementById('al-designation').value,
+        salary: parseFloat(document.getElementById('al-salary').value) || 0
+    };
+
+    const { error } = await db.from('alumni_tracker').insert([alumniData]);
+    if(error) {
+        if(error.code === "23505") alert("Error: An alumni record for this Roll Number already exists.");
+        else alert("Save Error: " + error.message);
+    } else {
+        alert("Success! Alumni record for " + name + " saved.");
+        clearAlumniForm();
+    }
+}
+
+// 3. Edit Alumni Record
+async function editAlumni() {
+    const roll = document.getElementById('al-roll').value.toUpperCase();
+    if(!roll) return alert("Enter Roll Number to edit.");
+
+    const updateData = {
+        college_name: document.getElementById('al-college').value,
+        stream: document.getElementById('al-stream').value,
+        company_name: document.getElementById('al-company').value,
+        designation: document.getElementById('al-designation').value,
+        salary: parseFloat(document.getElementById('al-salary').value) || 0
+    };
+
+    const { error } = await db.from('alumni_tracker').update(updateData).eq('roll_number', roll).eq('institute_id', sessionInstID);
+    if(error) alert("Update Error: " + error.message);
+    else alert("Success: Placement details updated for " + roll);
+}
+
+// 4. Fetch Saved Alumni Record
+async function fetchSavedAlumni() {
+    const roll = document.getElementById('al-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Enter Roll Number to fetch saved record.");
+
+    const { data, error } = await db.from('alumni_tracker').select('*').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    
+    if(error || !data) return alert("No saved alumni record found for this roll number.");
+
+    document.getElementById('al-name').value = data.full_name;
+    document.getElementById('al-course').value = data.course_enrolled;
+    document.getElementById('al-enroll').value = data.enrollment_month_year;
+    document.getElementById('al-college').value = data.college_name;
+    document.getElementById('al-stream').value = data.stream;
+    document.getElementById('al-company').value = data.company_name;
+    document.getElementById('al-designation').value = data.designation;
+    document.getElementById('al-salary').value = data.salary;
+    
+    alert("Saved record loaded!");
+}
+
+function clearAlumniForm() {
+    const ids = ['al-roll','al-name','al-course','al-enroll','al-college','al-stream','al-company','al-designation','al-salary'];
+    ids.forEach(id => document.getElementById(id).value = "");
 }
     </script>
 <script>
