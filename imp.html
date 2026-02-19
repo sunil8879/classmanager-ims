@@ -464,31 +464,25 @@
             <!-- DEFAULT HOME PAGE -->
            <!-- DEFAULT HOME PAGE -->
             <section id="home" class="content-section active">
-    <!-- 1. DISPLAY THIS ONLY FOR LOGGED-IN OWNERS -->
+    <!-- 1. LOGGED-IN VIEW -->
     <div id="home-user-view" style="display: none; width: 100%;">
         <div class="dashboard-stats" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px;">
-            <div class="stat-card" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; border: 1px solid #000; min-width: 200px; border-bottom: 5px solid #27ae60;">
-                <p style="font-weight: bold; color: #666; margin-bottom: 10px;">ADMISSIONS</p>
-                <h4 id="home-total-stu" style="font-size: 2.5rem; margin: 0; color: #000;">0</h4>
-                <small>Active Students</small>
+            <div class="stat-card" style="border-bottom: 5px solid #27ae60;">
+                <p>ADMISSIONS</p><h4 id="home-total-stu">0</h4><small>Active Students</small>
             </div>
-            <div class="stat-card" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; border: 1px solid #000; min-width: 200px; border-bottom: 5px solid #1877F2;">
-                <p style="font-weight: bold; color: #666; margin-bottom: 10px;">COLLECTION</p>
-                <h4 id="home-total-coll" style="font-size: 2.5rem; margin: 0; color: #000;">₹ 0</h4>
-                <small>Total Received</small>
+            <div class="stat-card" style="border-bottom: 5px solid #1877F2;">
+                <p>COLLECTION</p><h4 id="home-total-coll">₹ 0</h4><small>Total Received</small>
             </div>
-            <div class="stat-card" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; border: 1px solid #000; min-width: 200px; border-bottom: 5px solid #ff0000;">
-                <p style="font-weight: bold; color: #666; margin-bottom: 10px;">PENDING</p>
-                <h4 id="home-total-pend" style="font-size: 2.5rem; margin: 0; color: #ff0000;">₹ 0</h4>
-                <small>Outstanding Fees</small>
+            <div class="stat-card" style="border-bottom: 5px solid #ff0000;">
+                <p>PENDING</p><h4 id="home-total-pend">₹ 0</h4><small>Outstanding Fees</small>
             </div>
         </div>
     </div>
 
-    <!-- 2. DISPLAY THIS FOR VISITORS (YOUR ORIGINAL CONTENT) -->
+    <!-- 2. VISITOR VIEW -->
     <div id="home-visitor-view">
         <div class="card">
-            <h2 class="hero-title" style="color: white; text-decoration: none;">Still managing your institute manually?</h2>
+            <h2 style="color: white; text-decoration: none;">Still managing your institute manually?</h2>
             <ul class="bullet-list">
                 <li>Tracking fees in notebooks?</li>
                 <li>Forgetting pending payments?</li>
@@ -498,13 +492,7 @@
             <span class="solve-text">ClassManager solves all this.</span>
         </div>
     </div>
-
-    <!-- The rest of your "Features" list stays here below -->
-    <hr style="margin: 40px 0; border: 1px solid rgba(0,0,0,0.1);">
-    <h2 style="font-size: 2.2rem; margin-bottom: 30px;">Everything you need to manage your institute</h2>
-    <!-- ... (rest of your feature-grid code) ... -->
 </section>
-
           <!-- 1. LOGIN SYSTEM -->
 
 <section id="login" class="content-section">
@@ -608,82 +596,64 @@
     </div>
 </section>
 <!-- 3. FEE MANAGEMENT -->
-<!-- 3. FEE MANAGEMENT -->
 <section id="fee" class="content-section">
     <!-- Part 1: FEE DETAILS -->
     <div class="card" style="margin-bottom: 30px;">
         <h3>1. FEE DETAILS</h3>
         <div class="form-grid">
             <div class="input-group"><label>Date Today</label><input type="date" id="fee-today"></div>
-         <div class="input-group">
-    <label>Roll Number</label>
-    <div style="display: flex; gap: 5px;">
-        <input type="text" id="fee-roll" placeholder="IMS-2026-XXXX">
-        <button type="button" onclick="fetchFeeByRoll()" style="background: #007bff; color: white; border: 1px solid #000; border-radius: 5px; padding: 0 10px; cursor: pointer;">
-            <i class="fas fa-search"></i>
-        </button>
-    </div>
-</div>
-            <div class="input-group"><label>Full Name</label><input type="text" id="fee-name" placeholder="Initial + Surname"></div>
+            <div class="input-group">
+                <label>Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="fee-roll" placeholder="IMS-2026-XXXX">
+                    <button type="button" onclick="fetchFeeByRoll()" style="background: #007bff; color: white; border: 1px solid #000; border-radius: 5px; padding: 0 10px; cursor: pointer;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <div class="input-group"><label>Full Name</label><input type="text" id="fee-name"></div>
             <div class="input-group"><label>Date of Joining</label><input type="date" id="fee-join-date"></div>
             <div class="input-group"><label>Course Name</label><input type="text" id="fee-course" readonly style="background:#eee;"></div>
             <div class="input-group"><label>Total Fees</label><input type="number" id="fee-total"></div>
             <div class="input-group"><label>Previously Paid</label><input type="number" id="fee-prev-paid" readonly style="background:#eee;"></div>
             <div class="input-group"><label>Amount Now Paying</label><input type="number" id="fee-paid-now" oninput="calcPendingFee()"></div>
             <div class="input-group"><label>Pending Fees</label><input type="number" id="fee-pending" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Due Dates</label><input type="text" id="fee-due-dates" placeholder="March 2026, July 2026"></div>
-            <div class="input-group">
-                <label>Status</label>
-                <select id="fee-status"><option value="Active">Active</option><option value="Closed">Closed</option></select>
-            </div>
+            <div class="input-group"><label>Due Dates</label><input type="text" id="fee-due-dates"></div>
+            <div class="input-group"><label>Status</label><select id="fee-status"><option value="Active">Active</option><option value="Closed">Closed</option></select></div>
         </div>
-       <!-- CLEAN BUTTON ROW -->
-<div class="button-row" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-    <button class="btn-fetch" style="width: auto; padding: 10px 20px;" onclick="fetchFeeByRoll()">FETCH</button>
-    <button class="btn-add" style="width: auto; padding: 10px 20px;" onclick="saveFeeUpdate()">ADD PAYMENT</button>
-    <button class="btn-fetch" style="width: auto; padding: 10px 20px; background:#673ab7;" onclick="showReceiptHistory()">VIEW RECEIPTS</button>
-</div>
 
-<!-- COMPACT HISTORY LIST (Initially Hidden) -->
-<div id="receipt-history-list" style="display:none; margin: 20px auto; max-width: 400px; background:#fff; border: 1px solid #000; padding: 10px; border-radius: 8px;">
-    <p style="font-weight:bold; margin-bottom:10px; font-size: 14px; color: #000;">Payment History:</p>
-    <div id="history-links-container" style="max-height: 150px; overflow-y: auto; font-size: 13px;"></div>
-</div>
-</div>
-       
+        <div class="button-row">
+            <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH</button>
+            <button class="btn-add" onclick="saveFeeUpdate()">ADD PAYMENT</button>
+            <button class="btn-fetch" style="background:#673ab7;" onclick="showReceiptHistory()">VIEW RECEIPTS</button>
+        </div>
 
+        <div id="receipt-history-list" style="display:none; margin: 20px auto; max-width: 400px; background:#fff; border: 1px solid #000; padding: 10px; border-radius: 8px;">
+            <p style="font-weight:bold; margin-bottom:10px; font-size: 14px; color: #000;">Payment History:</p>
+            <div id="history-links-container" style="max-height: 150px; overflow-y: auto; font-size: 13px;"></div>
+        </div>
 
-
-<!-- START: UPI QR Generator Area -->
-<div id="upi-qr-area" style="display: none; margin-top: 30px; padding: 20px; background: #fff; border-radius: 15px; border: 2px solid #000; text-align: center;">
-    <h4 style="color: #000; margin-bottom: 15px;">Scan to Pay Fees</h4>
-    <div id="qr-container" style="background: #fff; padding: 10px; display: inline-block; border-radius: 10px; border: 1px solid #ddd;">
-        <img id="upi-qr-img" src="" alt="UPI QR Code" style="width: 200px; height: 200px;">
-    </div>
-    <p style="margin-top: 10px; font-weight: bold; color: #1877F2;">Amount: ₹ <span id="disp-qr-amt">0</span></p>
-    <p style="font-size: 0.8rem; color: #666;">Generated for: <span id="disp-qr-name">Student</span></p>
-</div>
-
-<div class="button-row" style="margin-top: 15px;">
-    <button class="btn-add" style="background: #1877F2; width: 100%;" onclick="generateUPIQR()">
-        <i class="fas fa-qrcode"></i> GENERATE PAYMENT QR
-    </button>
-</div>
-<!-- END: UPI QR Generator Area -->
+        <!-- UPI QR -->
+        <div id="upi-qr-area" style="display: none; margin-top: 30px; padding: 20px; background: #fff; border-radius: 15px; border: 2px solid #000; text-align: center;">
+            <h4 style="color: #000; margin-bottom: 15px;">Scan to Pay Fees</h4>
+            <div id="qr-container" style="background: #fff; padding: 10px; display: inline-block; border-radius: 10px; border: 1px solid #ddd;">
+                <img id="upi-qr-img" src="" alt="UPI QR Code" style="width: 200px; height: 200px;">
+            </div>
+            <p style="margin-top: 10px; font-weight: bold; color: #1877F2;">Amount: ₹ <span id="disp-qr-amt">0</span></p>
+            <button class="btn-add" style="background: #1877F2; width: 100%; margin-top:10px;" onclick="generateUPIQR()"><i class="fas fa-qrcode"></i> GENERATE PAYMENT QR</button>
+        </div>
     </div>
 
     <!-- Part 2: FEES PORTAL -->
     <div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
         <h3>2. FEES PORTAL</h3>
         <div class="form-grid">
-            <div class="input-group"><label>Filter Month & Year (Calendar)</label><input type="month" id="portal-calendar" onchange="loadFeesPortal()"></div>
-            <div class="input-group"><label>Select Year for Collection</label><input type="number" id="portal-year" value="2026" onchange="loadFeesPortal()"></div>
+            <div class="input-group"><label>Filter Month & Year</label><input type="month" id="portal-calendar" onchange="loadFeesPortal()"></div>
+            <div class="input-group"><label>Select Year</label><input type="number" id="portal-year" value="2026" onchange="loadFeesPortal()"></div>
         </div>
         <div class="dashboard-stats">
             <div class="stat-card"><p>Active Students</p><h4 id="stat-active-count">0</h4></div>
             <div class="stat-card"><p>Total Received</p><h4 id="stat-total-received">₹ 0</h4></div>
             <div class="stat-card"><p>Total Pending</p><h4 id="stat-total-pending" style="color:red;">₹ 0</h4></div>
-            <div class="stat-card"><p id="yearly-label">Yearly Collection</p><h4 id="stat-yearly" style="color:green;">₹ 0</h4></div>
+            <div class="stat-card" style="border-bottom: 5px solid green;"><p id="yearly-label">Yearly Collection</p><h4 id="stat-yearly">₹ 0</h4></div>
         </div>
     </div>
 
@@ -691,11 +661,11 @@
     <div class="card">
         <h3>3. PAYMENT LOG</h3>
         <div class="form-grid">
-            <div class="input-group"><label>Select Month (Calendar)</label><input type="month" id="log-calendar"></div>
-            <div class="input-group"><label>Student Roll Number</label><input type="text" id="log-roll" placeholder="IMS-XXXX"></div>
+            <div class="input-group"><label>Select Month</label><input type="month" id="log-calendar"></div>
+            <div class="input-group"><label>Roll Number</label><input type="text" id="log-roll" placeholder="IMS-XXXX"></div>
             <button class="btn-fetch" style="margin-top:25px;" onclick="fetchPaymentLog()">View Payments</button>
         </div>
-        <div id="log-result" style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px;">
+        <div id="log-result" style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px; color: #000;">
             <i>Select month and roll number to view history.</i>
         </div>
     </div>
@@ -904,43 +874,26 @@
 <section id="reminder" class="content-section">
     <div class="card" style="border-top-color: #f39c12;">
         <h3><i class="fas fa-bell"></i> Fee Reminder Dashboard</h3>
-        
-        <!-- Year Filter -->
         <div class="input-group" style="max-width: 250px; margin-bottom: 20px;">
             <label>Select Admission Year</label>
             <input type="number" id="remind-year" value="2026" onchange="loadFeeReminders()">
         </div>
-
         <div class="dashboard-stats">
-            <div class="stat-card" style="border-bottom-color: #e74c3c;">
-                <p>Total Pending Fees (<span class="display-year">2026</span>)</p>
-                <h4 id="remind-total-amt" style="color: #e74c3c;">₹ 0</h4>
-            </div>
-            <div class="stat-card" style="border-bottom-color: #f39c12;">
-                <p>Pending Students (<span class="display-year">2026</span>)</p>
-                <h4 id="remind-stu-count">0</h4>
-            </div>
+            <div class="stat-card" style="border-bottom-color: #e74c3c;"><p>Total Pending</p><h4 id="remind-total-amt" style="color: #e74c3c;">₹ 0</h4></div>
+            <div class="stat-card" style="border-bottom-color: #f39c12;"><p>Pending Students</p><h4 id="remind-stu-count">0</h4></div>
         </div>
     </div>
 
     <div class="card" style="margin-top: 20px;">
-        <h3><i class="fas fa-list-ul"></i> Active Students with Pending Fees</h3>
-        <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">List shows only "Active" students with a balance > ₹0.</p>
-        
+        <h3>Active Students with Pending Fees</h3>
         <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 600px; color: #000;">
                 <thead>
                     <tr style="background: #f4f7f6; text-align: left; border-bottom: 2px solid #ddd;">
-                        <th style="padding: 12px;">Roll Number</th>
-                        <th style="padding: 12px;">Student Name</th>
-                        <th style="padding: 12px;">Mobile</th>
-                        <th style="padding: 12px;">Pending Amount</th>
-                        <th style="padding: 12px;">Action</th>
+                        <th>Roll Number</th><th>Student Name</th><th>Mobile</th><th>Pending</th><th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="reminder-table-body">
-                    <!-- Dynamic Rows Here -->
-                </tbody>
+                <tbody id="reminder-table-body"></tbody>
             </table>
         </div>
     </div>
