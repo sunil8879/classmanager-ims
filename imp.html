@@ -1545,75 +1545,65 @@
 
 
 <!-- INVENTORY MANAGER SECTION -->
+<!-- INVENTORY MANAGER SECTION -->
 <section id="inventory-mod" class="content-section">
-    <div class="card" style="border-top: 5px solid #2c3e50;">
-        <h3><i class="fas fa-archive"></i> Inventory & Stationery Tracker</h3>
+    <div class="card" style="border-top: 5px solid #2c3e50; max-width: 1100px;">
+        <h3><i class="fas fa-boxes"></i> Inventory & Stationery Manager</h3>
         
-        <div class="form-grid">
-            <!-- Stock Details -->
-            <div class="input-group">
-                <label>Item Name</label>
-                <select id="inv-item-name">
-                    <optgroup label="Books">
-                        <option>Algebra</option><option>Geometry</option><option>Physics</option><option>Chemistry</option><option>Biology</option>
-                        <option>History</option><option>Geography</option><option>Spoken English</option><option>English Grammar</option>
-                        <option>Economics</option><option>Accounting</option><option>Drawing</option><option>JEE</option><option>NEET</option>
-                        <option>French</option><option>Spanish</option><option>German</option>
-                    </optgroup>
-                    <option>Uniforms</option><option>Bags</option><option>Calendars</option><option>Others</option>
-                </select>
-            </div>
-            <div class="input-group"><label>Current Stock Level</label><input type="number" id="inv-stock" oninput="calcInvMath()"></div>
-            <div class="input-group"><label>Items Sold (Qty)</label><input type="number" id="inv-sold" oninput="calcInvMath()"></div>
-            <div class="input-group"><label>Price Per Item</label><input type="number" id="inv-price" oninput="calcInvMath()"></div>
-            <div class="input-group"><label>Total Income</label><input type="number" id="inv-income" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Remaining Balance</label><input type="number" id="inv-balance" readonly style="background:#eee;"></div>
-            <div class="input-group">
-                <label>Vendor Name</label>
-                <div style="display: flex; gap: 5px;">
-                    <input type="text" id="inv-vendor" placeholder="Supplier Name">
-                    <a id="vendor-wa-btn" href="https://wa.me/910000000000" target="_blank" style="background:#25D366; color:white; padding:10px; border-radius:5px;"><i class="fab fa-whatsapp"></i></a>
-                </div>
-            </div>
-
-            <!-- Student Linking -->
-            <hr style="grid-column: 1/-1; margin: 10px 0;">
-            <div class="input-group">
-                <label>Student Roll No</label>
-                <div style="display: flex; gap: 5px;">
-                    <input type="text" id="inv-stu-roll" placeholder="IMS-XXXX">
-                    <button class="btn-fetch" onclick="fetchStudentForInv()" style="padding: 5px 10px;"><i class="fas fa-search"></i></button>
-                </div>
-            </div>
-            <div class="input-group"><label>Full Name</label><input type="text" id="inv-stu-name" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Course Name</label><input type="text" id="inv-stu-course" readonly style="background:#eee;"></div>
-            
-            <div class="input-group" style="grid-column: 1/-1;">
-                <label>Items Bought (Check all that apply)</label>
-                <div id="inv-checkbox-group" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; text-align: left; background: #fff; padding: 10px; border: 1px solid #000; border-radius: 8px;">
-                    <!-- Added dynamically or hardcoded -->
-                    <label><input type="checkbox" value="Book"> Book</label>
-                    <label><input type="checkbox" value="Uniform"> Uniform</label>
-                    <label><input type="checkbox" value="Bag"> Bag</label>
-                    <label><input type="checkbox" value="Calendar"> Calendar</label>
-                </div>
-            </div>
-
-            <div class="input-group"><label>Total Price Paid</label><input type="number" id="inv-paid"></div>
-            <div class="input-group"><label>Remarks</label><input type="text" id="inv-remarks"></div>
+        <!-- STEP 1: Manage Catalog -->
+        <div style="text-align: left; margin-bottom: 20px;">
+            <button class="btn-fetch" onclick="toggleInventoryGrid()" style="background: #34495e;">
+                <i class="fas fa-edit"></i> UPDATE STOCK & PRICES
+            </button>
         </div>
 
-        <div class="button-row">
-            <button class="btn-add" onclick="addInventoryRecord()">ADD RECORD</button>
-            <button class="btn-fetch" onclick="fetchInventoryByRoll()">FETCH (Roll No)</button>
-            <button class="btn-edit" onclick="editInventoryByRoll()">EDIT (Roll No)</button>
-            <button class="btn-edit" style="background:#666;" onclick="clearInvForm()">CLEAR</button>
+        <div id="inventory-grid-container" style="display:none; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 15px; border: 1px solid #ddd; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead style="background: #eee;">
+                    <tr>
+                        <th style="padding: 10px; border: 1px solid #ccc;">Select</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">Item Name</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">Stock Level</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">Item Price</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">Vendors (A-E)</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-items-body">
+                    <!-- Rows generated by JS -->
+                </tbody>
+            </table>
+            <div class="button-row" style="margin-top: 15px;">
+                <button class="btn-add" onclick="saveInventoryMaster()">SAVE UPDATED CATALOG</button>
+            </div>
         </div>
 
-        <!-- LOW STOCK ALERT AREA -->
-        <div id="low-stock-alert" style="display:none; margin-top: 25px; padding: 15px; background: #ffeded; border: 2px solid #ff0000; border-radius: 10px; color: #ff0000; font-weight: bold; text-align: center;">
-            <i class="fas fa-exclamation-triangle"></i> WARNING: LOW STOCK ALERT! <br>
-            <span id="low-stock-list" style="font-size: 0.9rem;"></span>
+        <!-- STEP 2: Sales Section -->
+        <div class="card" style="background: #fff; border: 1px solid #000; padding: 20px; margin: 0;">
+            <h4><i class="fas fa-shopping-cart"></i> Student Purchase Entry</h4>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Student Roll Number</label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="inv-stu-roll" placeholder="IMS-XXXX">
+                        <button class="btn-fetch" onclick="fetchStudentForInv()" style="padding: 5px 10px;"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+                <div class="input-group"><label>Full Name</label><input type="text" id="inv-stu-name" readonly style="background:#eee;"></div>
+                <div class="input-group"><label>Course</label><input type="text" id="inv-stu-course" readonly style="background:#eee;"></div>
+                <div class="input-group"><label>Total Amount to Pay</label><input type="number" id="inv-total-calc" readonly style="background:#eee; font-weight: bold; color: green;"></div>
+                <div class="input-group" style="grid-column: 1/-1;"><label>Remarks</label><input type="text" id="inv-remarks"></div>
+            </div>
+
+            <div class="button-row">
+                <button class="btn-add" style="background: #27ae60;" onclick="processInventorySale()">ADD SALE RECORD</button>
+                <button class="btn-fetch" onclick="fetchInventorySale()">FETCH (Roll No)</button>
+                <button class="btn-edit" style="background:#666;" onclick="clearInventoryUI()">CLEAR</button>
+            </div>
+        </div>
+
+        <!-- LOW STOCK WARNING -->
+        <div id="low-stock-alert" style="display:none; margin-top: 20px; padding: 15px; background: #fff; border: 2px solid #ff0000; border-radius: 10px; color: #ff0000; font-weight: bold;">
+            <i class="fas fa-exclamation-circle"></i> LOW STOCK WARNING: <span id="low-stock-items"></span>
         </div>
     </div>
 </section>
@@ -4708,118 +4698,156 @@ function clearAlumniForm() {
    INVENTORY & STATIONERY TRACKER LOGIC
    ========================================== */
 
-function calcInvMath() {
-    const stock = parseInt(document.getElementById('inv-stock').value) || 0;
-    const sold = parseInt(document.getElementById('inv-sold').value) || 0;
-    const price = parseFloat(document.getElementById('inv-price').value) || 0;
+/* ==========================================
+   INVENTORY MANAGER: GRID & VENDOR LOGIC
+   ========================================== */
 
-    document.getElementById('inv-income').value = (sold * price).toFixed(2);
-    document.getElementById('inv-balance').value = stock - sold;
-    
-    checkLowStockUI(stock - sold);
+const INVENTORY_ITEMS = [
+    'Algebra','Geometry','Physics','Chemistry','Biology','History','Geography','Spoken English',
+    'English Grammar','Economics','Accounting','Drawing','JEE','NEET','French','Spanish','German',
+    'Uniforms','Bags','Calendars','Others'
+];
+
+// Initialize Grid on Load
+function initInventoryGrid() {
+    const tbody = document.getElementById('inventory-items-body');
+    tbody.innerHTML = INVENTORY_ITEMS.map(item => {
+        const id = item.replace(/\s+/g, '-').toLowerCase();
+        return `
+            <tr id="row-${id}">
+                <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                    <input type="checkbox" class="inv-check" data-item="${item}" onchange="calculateInvTotal()">
+                </td>
+                <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold;">${item}</td>
+                <td style="padding: 10px; border: 1px solid #ccc;">
+                    <input type="number" class="inv-stock-val" style="width: 70px;" placeholder="Stock" oninput="checkLowStockGlobal()">
+                </td>
+                <td style="padding: 10px; border: 1px solid #ccc;">
+                    <input type="number" class="inv-price-val" style="width: 70px;" placeholder="Price" oninput="calculateInvTotal()">
+                </td>
+                <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                    ${['A','B','C','D','E'].map(v => `
+                        <a href="https://wa.me/910000000000?text=Order:${item}" target="_blank" 
+                           style="text-decoration:none; margin: 0 2px; font-size: 0.7rem; background: #25D366; color: white; padding: 3px 6px; border-radius: 3px;">
+                           ${v} <i class="fab fa-whatsapp"></i>
+                        </a>
+                    `).join('')}
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
-function checkLowStockUI(balance) {
+function toggleInventoryGrid() {
+    const grid = document.getElementById('inventory-grid-container');
+    grid.style.display = grid.style.display === 'none' ? 'block' : 'none';
+    if(grid.style.display === 'block') loadMasterInventory();
+}
+
+function calculateInvTotal() {
+    let total = 0;
+    document.querySelectorAll('.inv-check:checked').forEach(cb => {
+        const row = cb.closest('tr');
+        const price = parseFloat(row.querySelector('.inv-price-val').value) || 0;
+        total += price;
+    });
+    document.getElementById('inv-total-calc').value = total.toFixed(2);
+}
+
+// Check for stock < 10 across all rows
+function checkLowStockGlobal() {
+    let lowItems = [];
+    document.querySelectorAll('#inventory-items-body tr').forEach(row => {
+        const name = row.querySelector('.inv-check').dataset.item;
+        const stock = parseInt(row.querySelector('.inv-stock-val').value) || 0;
+        if(stock > 0 && stock < 10) lowItems.push(name);
+    });
+
     const alertBox = document.getElementById('low-stock-alert');
-    if (balance > 0 && balance < 10) {
+    if(lowItems.length > 0) {
         alertBox.style.display = 'block';
-        document.getElementById('low-stock-list').innerText = "Current item balance is less than 10 units. Please reorder soon.";
+        document.getElementById('low-stock-items').innerText = lowItems.join(', ') + " are running low!";
     } else {
         alertBox.style.display = 'none';
     }
 }
 
-async function fetchStudentForInv() {
-    const roll = document.getElementById('inv-stu-roll').value.toUpperCase();
-    const { data } = await db.from('students').select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-    if (data) {
-        document.getElementById('inv-stu-name').value = data.full_name;
-        document.getElementById('inv-stu-course').value = data.course;
-    } else alert("Student not found.");
+// SAVE THE PRICES & STOCK TO SUPABASE
+async function saveInventoryMaster() {
+    const updates = [];
+    document.querySelectorAll('#inventory-items-body tr').forEach(row => {
+        const name = row.querySelector('.inv-check').dataset.item;
+        const stock = parseInt(row.querySelector('.inv-stock-val').value) || 0;
+        const price = parseFloat(row.querySelector('.inv-price-val').value) || 0;
+
+        updates.push({
+            institute_id: sessionInstID,
+            item_name: name,
+            current_stock: stock,
+            item_price: price
+        });
+    });
+
+    const { error } = await db.from('inventory_master').upsert(updates, { onConflict: 'institute_id, item_name' });
+    if(error) alert(error.message); else alert("Catalog and Master Stock updated!");
 }
 
-async function addInventoryRecord() {
-    const checkboxes = document.querySelectorAll('#inv-checkbox-group input[type="checkbox"]:checked');
-    const itemsBought = Array.from(checkboxes).map(cb => cb.value).join(', ');
-
-    const invData = {
-        institute_id: sessionInstID,
-        item_name: document.getElementById('inv-item-name').value,
-        current_stock_level: parseInt(document.getElementById('inv-stock').value),
-        items_sold: parseInt(document.getElementById('inv-sold').value),
-        item_price: parseFloat(document.getElementById('inv-price').value),
-        total_income: parseFloat(document.getElementById('inv-income').value),
-        balance_stock: parseInt(document.getElementById('inv-balance').value),
-        vendor_name: document.getElementById('inv-vendor').value,
-        student_roll: document.getElementById('inv-stu-roll').value.toUpperCase(),
-        student_name: document.getElementById('inv-stu-name').value,
-        course_name: document.getElementById('inv-stu-course').value,
-        items_bought_list: itemsBought,
-        total_price_paid: parseFloat(document.getElementById('inv-paid').value),
-        remarks: document.getElementById('inv-remarks').value
-    };
-
-    const { error } = await db.from('inventory_tracker').insert([invData]);
-
-    if (error) alert(error.message);
-    else {
-        alert("Inventory Record Added Successfully!");
-        // AUTOMATION: Add to Expense Tracker's "Other Income"
-        syncToOtherIncome(invData.total_price_paid);
-        clearInvForm();
+async function loadMasterInventory() {
+    const { data } = await db.from('inventory_master').select('*').eq('institute_id', sessionInstID);
+    if(data) {
+        data.forEach(item => {
+            const id = item.item_name.replace(/\s+/g, '-').toLowerCase();
+            const row = document.getElementById(`row-${id}`);
+            if(row) {
+                row.querySelector('.inv-stock-val').value = item.current_stock;
+                row.querySelector('.inv-price-val').value = item.item_price;
+            }
+        });
+        checkLowStockGlobal();
     }
 }
 
-async function syncToOtherIncome(amount) {
-    const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
-    const { data: existing } = await db.from('expenses').select('other_income').eq('month_year', currentMonth).eq('institute_id', sessionInstID).maybeSingle();
-    
-    let newTotal = amount;
-    if(existing) newTotal = (parseFloat(existing.other_income) || 0) + amount;
+// PROCESS SALE
+async function processInventorySale() {
+    const roll = document.getElementById('inv-stu-roll').value;
+    const items = Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => cb.dataset.item).join(', ');
+    const total = parseFloat(document.getElementById('inv-total-calc').value);
 
-    await db.from('expenses').upsert({
+    if(!roll || !items) return alert("Select student and items first!");
+
+    const saleData = {
         institute_id: sessionInstID,
-        month_year: currentMonth,
-        other_income: newTotal
-    }, { onConflict: 'institute_id, month_year' });
-}
-
-async function fetchInventoryByRoll() {
-    const roll = document.getElementById('inv-stu-roll').value.toUpperCase();
-    const { data, error } = await db.from('inventory_tracker').select('*').eq('student_roll', roll).eq('institute_id', sessionInstID).maybeSingle();
-    if(data) {
-        document.getElementById('inv-item-name').value = data.item_name;
-        document.getElementById('inv-stock').value = data.current_stock_level;
-        document.getElementById('inv-sold').value = data.items_sold;
-        document.getElementById('inv-price').value = data.item_price;
-        document.getElementById('inv-income').value = data.total_income;
-        document.getElementById('inv-balance').value = data.balance_stock;
-        document.getElementById('inv-vendor').value = data.vendor_name;
-        document.getElementById('inv-stu-name').value = data.student_name;
-        document.getElementById('inv-stu-course').value = data.course_name;
-        document.getElementById('inv-paid').value = data.total_price_paid;
-        document.getElementById('inv-remarks').value = data.remarks;
-        checkLowStockUI(data.balance_stock);
-        alert("Record Loaded.");
-    } else alert("No record found.");
-}
-
-async function editInventoryByRoll() {
-    const roll = document.getElementById('inv-stu-roll').value.toUpperCase();
-    const updateData = {
-        items_sold: parseInt(document.getElementById('inv-sold').value),
-        total_income: parseFloat(document.getElementById('inv-income').value),
-        balance_stock: parseInt(document.getElementById('inv-balance').value),
-        total_price_paid: parseFloat(document.getElementById('inv-paid').value),
+        student_roll: roll,
+        student_name: document.getElementById('inv-stu-name').value,
+        course_name: document.getElementById('inv-stu-course').value,
+        items_bought: items,
+        total_paid: total,
         remarks: document.getElementById('inv-remarks').value
     };
-    const { error } = await db.from('inventory_tracker').update(updateData).eq('student_roll', roll).eq('institute_id', sessionInstID);
-    if(error) alert(error.message); else alert("Inventory record updated.");
+
+    const { error } = await db.from('inventory_sales').insert([saleData]);
+    if(error) alert(error.message);
+    else {
+        // Update master stock (Deduct 1 from each checked item)
+        await deductStock(Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => cb.dataset.item));
+        // Sync to "Other Income" in Expense Tracker
+        syncToOtherIncome(total);
+        alert("Sale Recorded & Stock Deducted!");
+        clearInventoryUI();
+    }
 }
 
-function clearInvForm() {
-    ['inv-stock','inv-sold','inv-price','inv-income','inv-balance','inv-vendor','inv-stu-roll','inv-stu-name','inv-stu-course','inv-paid','inv-remarks'].forEach(id => document.getElementById(id).value = "");
+async function deductStock(itemList) {
+    for(let item of itemList) {
+        const { data } = await db.from('inventory_master').select('current_stock').eq('item_name', item).eq('institute_id', sessionInstID).single();
+        if(data) {
+            await db.from('inventory_master').update({ current_stock: data.current_stock - 1 }).eq('item_name', item).eq('institute_id', sessionInstID);
+        }
+    }
 }
+
+// Finally, call init in your script load section
+initInventoryGrid();
     </script>
 <script>
 if ('serviceWorker' in navigator) {
