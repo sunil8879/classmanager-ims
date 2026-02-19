@@ -2974,7 +2974,7 @@ async function fetchAutoFees() {
 
     // Format: "February 2026"
     const dateObj = new Date(monthVal + "-01");
-    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }).trim();
 
     // THE MAGIC LINK:
     // We fetch amounts from history, but the "!inner" part forces 
