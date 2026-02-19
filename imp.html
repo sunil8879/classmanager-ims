@@ -478,6 +478,12 @@
             <div class="stat-card" style="border-bottom: 5px solid #ff0000;">
                 <p>PENDING</p><h4 id="home-total-pend">₹ 0</h4><small>Outstanding Fees</small>
             </div>
+<!-- ADDED: INVENTORY INCOME CARD -->
+<div class="stat-card" style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; border: 1px solid #000; min-width: 200px; border-bottom: 5px solid #673ab7;">
+    <p style="font-weight: bold; color: #666; margin-bottom: 10px;">INVENTORY INCOME</p>
+    <h4 id="home-total-inventory" style="font-size: 2.5rem; margin: 0; color: #000;">₹ 0</h4>
+    <small>Current Month Sales</small>
+</div>
 <!-- FINANCIAL FORECAST HIGHLIGHTS (Next 6 Months) -->
 <h3 style="margin-top: 30px; text-decoration: none;">Incoming Fees (6-Month Forecast)</h3>
 <div id="forecast-cards" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
@@ -1863,6 +1869,7 @@ async function loadHomeDashboardStats() {
         document.getElementById('home-total-stu').innerText = totalStu;
         document.getElementById('home-total-coll').innerText = "₹ " + totalColl.toLocaleString('en-IN');
         document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
+loadHomeInventoryStats();
 
         // --- ADDED FOR FORECASTING ---
         generateFinancialForecast(students);
@@ -4999,6 +5006,34 @@ async function calculateInventoryIncome(monthYear) {
 
     // Sum up all the 'total_paid' values for that month
     return data.reduce((sum, record) => sum + (parseFloat(record.total_paid) || 0), 0);
+}
+
+
+
+/* --- HOME PAGE: REAL-TIME INVENTORY SUM --- */
+async function loadHomeInventoryStats() {
+    if (!sessionInstID) return;
+
+    // Get the start and end of the current month
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+    const { data, error } = await db.from('inventory_sales')
+        .select('total_paid')
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startOfMonth)
+        .lte('created_at', endOfMonth);
+
+    if (error) {
+        console.error("Home Inventory Error:", error.message);
+        return;
+    }
+
+    const totalInv = data ? data.reduce((sum, item) => sum + (parseFloat(item.total_paid) || 0), 0) : 0;
+    
+    // Update the new Home Page card
+    document.getElementById('home-total-inventory').innerText = "₹ " + totalInv.toLocaleString('en-IN');
 }
     </script>
 <script>
