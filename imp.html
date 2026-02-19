@@ -4906,6 +4906,38 @@ async function fetchStudentForInv() {
         alert("No student found with Roll No: " + roll);
     }
 }
+
+
+
+
+/* --- MINIMAL FIX: FINANCIAL SYNC FOR INVENTORY --- */
+async function syncToOtherIncome(amount) {
+    // 1. Get the current Month (YYYY-MM)
+    const currentMonth = new Date().toISOString().substring(0, 7); 
+    
+    // 2. Check if a record for this month already exists in expenses
+    const { data: existing } = await db.from('expenses')
+        .select('other_income')
+        .eq('month_year', currentMonth)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+    
+    let newTotal = parseFloat(amount) || 0;
+    
+    // 3. If record exists, add the new sale amount to existing "Other Income"
+    if(existing) {
+        newTotal = (parseFloat(existing.other_income) || 0) + parseFloat(amount);
+    }
+
+    // 4. Update the Expenses table
+    const { error } = await db.from('expenses').upsert({
+        institute_id: sessionInstID,
+        month_year: currentMonth,
+        other_income: newTotal
+    }, { onConflict: 'institute_id, month_year' });
+
+    if (error) console.warn("Expense sync failed, but sale was recorded:", error.message);
+}
     </script>
 <script>
 if ('serviceWorker' in navigator) {
