@@ -4205,6 +4205,7 @@ function runPrint(date, amt, type) {
     const balance = (type === 'Student') ? document.getElementById('fee-pending').value : "Salary Logged";
 
     // 2. Create the Receipt Content (Clean HTML)
+// 2. Create the Receipt Content (Clean HTML with Logo)
     const receiptHtml = `
         <html>
         <head>
@@ -4212,7 +4213,11 @@ function runPrint(date, amt, type) {
             <style>
                 body { font-family: 'Times New Roman', serif; padding: 40px; color: black; }
                 .container { border: 2px solid black; padding: 30px; width: 600px; margin: auto; }
-                .header { text-align: center; border-bottom: 2px solid black; margin-bottom: 20px; }
+                .header { text-align: center; border-bottom: 2px solid black; margin-bottom: 20px; padding-bottom: 10px; }
+                
+                /* Logo Styling */
+                .logo { width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px; }
+                
                 .row { display: flex; justify-content: space-between; margin: 10px 0; font-size: 18px; }
                 .amount-box { border: 3px solid black; padding: 20px; text-align: center; margin: 30px 0; background: #eee; }
                 .footer { margin-top: 60px; display: flex; justify-content: space-between; }
@@ -4222,10 +4227,18 @@ function runPrint(date, amt, type) {
         <body>
             <div class="container">
                 <div class="header">
+                    <!-- LOGO INSERTED HERE -->
+                    <img src="icon-192x192.png" class="logo" alt="Institute Logo">
+                    
                     <h1 style="margin:0;">FEE RECEIPT</h1>
-                    <p><b>Institute ID:</b> ${instID}</p>
+                    <p style="margin:5px 0;"><b>Institute ID:</b> ${instID}</p>
                 </div>
-                <div class="row"><span><b>Date:</b> ${date}</span> <span><b>No:</b> ${Math.floor(Math.random()*9000)+1000}</span></div>
+                
+                <div class="row">
+                    <span><b>Date:</b> ${date}</span> 
+                    <span><b>No:</b> ${Math.floor(Math.random()*9000)+1000}</span>
+                </div>
+                
                 <div class="row"><span><b>Name:</b> ${name}</span></div>
                 <div class="row"><span><b>Roll/ID:</b> ${id}</span></div>
                 <div class="row"><span><b>Course:</b> ${course}</span></div>
