@@ -641,9 +641,19 @@
         <div class="button-row">
             <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH Details</button>
             <button class="btn-add" onclick="saveFeeUpdate()">ADD Payment</button>
-<button class="btn-fetch" style="background:#673ab7;" onclick="generateStudentReceipt()">
-    <i class="fas fa-file-pdf"></i> RECEIPT
-</button>
+<!-- RECEIPT ACTION -->
+
+    <button class="btn-fetch" style="background:#673ab7; width: 100%;" onclick="showReceiptHistory()">
+        <i class="fas fa-history"></i> VIEW PREVIOUS RECEIPTS (PDF)
+    </button>
+
+<!-- This area will stay hidden until the button is clicked -->
+<div id="receipt-history-list" style="display:none; margin-top:20px; padding:15px; background:#fff; border:1px solid #000; border-radius:10px;">
+    <h4 style="text-decoration: none; margin-bottom: 10px;">Select a Payment to Print:</h4>
+    <div id="history-links-container">
+        <!-- Links will be generated here by JavaScript -->
+    </div>
+</div>
         </div>
 
 
@@ -1070,11 +1080,22 @@
         <div class="button-row">
             <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
             <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
-<button class="btn-fetch" style="background:#673ab7;" onclick="generateTeacherPayslip()">
-    <i class="fas fa-file-pdf"></i> PAYSLIP
-</button>
-        </div>
+<!-- PAYSLIP ACTION -->
+
+    <button class="btn-fetch" style="background:#673ab7; width: 100%;" onclick="showPayslipHistory()">
+        <i class="fas fa-history"></i> VIEW PREVIOUS PAYSLIPS (PDF)
+    </button>
+
+
+<!-- This area stays hidden until the button is clicked -->
+<div id="payslip-history-list" style="display:none; margin-top:20px; padding:15px; background:#fff; border:1px solid #000; border-radius:10px;">
+    <h4 style="text-decoration: none; margin-bottom: 10px; color: #000;">Select a Month to Print Payslip:</h4>
+    <div id="teacher-history-links-container">
+        <!-- History links will appear here -->
     </div>
+</div>
+        </div>
+
 	
 	
 	<!-- STUDENT NOTICE BOARD -->
@@ -4140,74 +4161,164 @@ async function fetchStudentMessages(course) {
    PDF GENERATOR LOGIC (STUDENT & TEACHER)
    ========================================== */
 
-function generateStudentReceipt() {
-    // 1. Grab data from Fee Form
+/* ==========================================
+   ADVANCED RECEIPT SYSTEM (HISTORY BASED)
+   ========================================== */
+
+// 1. Function to show the list of previous payments
+async function showReceiptHistory() {
+    const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter and Fetch a Roll Number first.");
+
+    // Fetch history from Supabase
+    const { data: history, error } = await db.from('payment_history')
+        .select('*')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .order('payment_date', { ascending: false });
+
+    const container = document.getElementById('history-links-container');
+    const listArea = document.getElementById('receipt-history-list');
+
+    if (error || !history || history.length === 0) {
+        return alert("No payment history found for this student.");
+    }
+
+    // Build the list of links
+    container.innerHTML = history.map(row => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+            <span><b>Date:</b> ${row.payment_date} — <b>Amount:</b> ₹${row.amount}</span>
+            <button onclick="preparePDFFromHistory('${row.payment_date}', ${row.amount})" 
+                    style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">
+                <i class="fas fa-file-pdf"></i> Generate PDF
+            </button>
+        </div>
+    `).join('');
+
+    listArea.style.display = 'block';
+    listArea.scrollIntoView({ behavior: 'smooth' });
+}
+
+// 2. Function to fill the template using data from the selected history row
+function preparePDFFromHistory(payDate, payAmount) {
+    // Grab general info from the screen (Name, Course, etc.)
     const name = document.getElementById('fee-name').value;
     const roll = document.getElementById('fee-roll').value;
-    const amt = document.getElementById('fee-paid-now').value;
-    const bal = document.getElementById('fee-pending').value;
     const course = document.getElementById('fee-course').value;
-    const date = document.getElementById('fee-today').value;
+    const totalFees = document.getElementById('fee-total').value;
+    
+    // Calculate a "Snapshot" of balance at that time (Approximate)
+    // For a simple receipt, we show current pending or just the payment details
+    const currentPending = document.getElementById('fee-pending').value;
 
-    if(!name || !amt) return alert("Please fetch student details and enter 'Amount Now Paying' first.");
+    if(!name) return alert("Student name missing. Please fetch details again.");
 
-    // 2. Fill the Template
-    // THIS IS THE LINE THAT ADDS YOUR INSTITUTE ID TO THE PDF
+    // FILL THE HIDDEN TEMPLATE
     document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
-
     document.getElementById('pdf-report-title').innerText = "OFFICIAL FEE RECEIPT";
-    document.getElementById('pdf-date').innerText = date;
+    document.getElementById('pdf-date').innerText = payDate;
     document.getElementById('pdf-number').innerText = "REC-" + Math.floor(1000 + Math.random() * 9000);
+    
     document.getElementById('pdf-main-name').innerText = name;
     document.getElementById('pdf-main-id').innerText = roll;
     document.getElementById('pdf-main-sub').innerText = course;
-    document.getElementById('pdf-main-amt').innerText = "₹ " + amt;
-    document.getElementById('pdf-main-bal').innerText = "₹ " + bal;
+    
+    // CRITICAL: Set the Amount Paid specifically to the one from History
+    document.getElementById('pdf-main-amt').innerText = "₹ " + payAmount;
+    document.getElementById('pdf-main-bal').innerText = "₹ " + currentPending;
 
-    // 3. Convert to PDF
+    // GENERATE THE PDF
     const element = document.getElementById('pdf-template');
     const opt = {
         margin: 0.5,
-        filename: `Receipt_${roll}.pdf`,
+        filename: `Receipt_${roll}_${payDate}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2 },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
+
     html2pdf().set(opt).from(element).save();
 }
 
-function generateTeacherPayslip() {
-    // 1. Grab data from Teacher Form
+
+
+
+
+
+/* ==========================================
+   TEACHER PAYSLIP SYSTEM (HISTORY BASED)
+   ========================================== */
+
+// 1. Function to show the list of previous salary payments
+async function showPayslipHistory() {
+    const tchId = document.getElementById('tch-id').value.trim().toUpperCase();
+    if (!tchId) return alert("Please enter and Fetch a Teacher ID first.");
+
+    // Fetch salary history from Supabase
+    // We look for a table called 'teacher_payments'
+    const { data: history, error } = await db.from('teacher_payments')
+        .select('*')
+        .eq('teacher_id', tchId)
+        .eq('institute_id', sessionInstID)
+        .order('payment_date', { ascending: false });
+
+    const container = document.getElementById('teacher-history-links-container');
+    const listArea = document.getElementById('payslip-history-list');
+
+    if (error || !history || history.length === 0) {
+        return alert("No salary payment records found for this teacher. Make sure you have logged a payment first.");
+    }
+
+    // Build the list of Payslip links
+    container.innerHTML = history.map(row => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; color: #000;">
+            <span><b>Month:</b> ${row.month_year} — <b>Amount Paid:</b> ₹${row.amount}</span>
+            <button onclick="prepareTeacherPDFFromHistory('${row.month_year}', ${row.amount}, '${row.payment_date}')" 
+                    style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">
+                <i class="fas fa-file-pdf"></i> Generate Payslip
+            </button>
+        </div>
+    `).join('');
+
+    listArea.style.display = 'block';
+    listArea.scrollIntoView({ behavior: 'smooth' });
+}
+
+// 2. Function to fill the PDF template for Teachers
+function prepareTeacherPDFFromHistory(payMonth, payAmount, exactDate) {
+    // Grab general info from the Teacher fields on screen
     const name = document.getElementById('tch-name').value;
     const id = document.getElementById('tch-id').value;
     const sub = document.getElementById('tch-subject').value;
-    const salary = document.getElementById('tch-salary').value;
-    const date = new Date().toISOString().split('T')[0];
 
-    if(!name || !salary) return alert("Please fetch teacher details first.");
+    if(!name) return alert("Teacher details missing. Please fetch teacher again.");
 
-    // 2. Fill the Template
-    // THIS IS THE LINE THAT ADDS YOUR INSTITUTE ID TO THE PDF
+    // FILL THE HIDDEN TEMPLATE (We reuse the same template as students)
     document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
-
     document.getElementById('pdf-report-title').innerText = "MONTHLY SALARY PAYSLIP";
-    document.getElementById('pdf-date').innerText = date;
+    
+    // We use the Month/Year as the primary date
+    document.getElementById('pdf-date').innerText = payMonth; 
     document.getElementById('pdf-number').innerText = "PAY-" + Math.floor(1000 + Math.random() * 9000);
+    
     document.getElementById('pdf-main-name').innerText = name;
     document.getElementById('pdf-main-id').innerText = id;
     document.getElementById('pdf-main-sub').innerText = sub;
-    document.getElementById('pdf-main-amt').innerText = "₹ " + salary;
-    document.getElementById('pdf-main-bal').innerText = "N/A (Full Payment)";
+    
+    // Set the specific Salary Amount from the selected history record
+    document.getElementById('pdf-main-amt').innerText = "₹ " + payAmount;
+    document.getElementById('pdf-main-bal').innerText = "Payment Status: FULLY PAID";
 
-    // 3. Convert to PDF
+    // GENERATE THE PDF
     const element = document.getElementById('pdf-template');
     const opt = {
         margin: 0.5,
-        filename: `Payslip_${id}.pdf`,
+        filename: `Payslip_${id}_${payMonth}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2 },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
+
     html2pdf().set(opt).from(element).save();
 }
     </script>
