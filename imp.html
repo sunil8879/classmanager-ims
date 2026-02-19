@@ -5250,7 +5250,7 @@ const mCounts = {}; yrEnrolRes.data?.forEach(s => { const m = new Date(s.admissi
 const best = Object.entries(mCounts).sort((a,b) => b[1] - a[1])[0];
 document.getElementById('top-month-year').innerText = best ? `${best[0]} (${best[1]} Enrols)` : "N/A";
 
-
+}
 
 async function loadBizAttendanceAnalytics(prefixMonth) {
     // 1. Fetch all student attendance for the selected month and institute
