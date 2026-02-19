@@ -1422,44 +1422,61 @@
 
 
 <!-- STANDALONE MESSAGE HUB -->
+<!-- STANDALONE MESSAGE HUB - UPDATED FOR GROUPS -->
 <section id="message-corner" class="content-section">
     <div class="card" style="border-top: 5px solid #25D366; background: #fff;">
         <h2 style="text-decoration: none; color: #000;"><i class="fab fa-whatsapp"></i> Quick Connect Hub</h2>
-        <p style="margin-bottom: 25px; color: #666;">Select a recipient to open a direct WhatsApp chat.</p>
+        <p style="margin-bottom: 25px; color: #666;">Select a category to find contacts and open direct WhatsApp chats.</p>
 
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
             
-            <!-- 1. MESSAGE OWNER -->
-            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
-                <h4 style="text-decoration: none;"><i class="fas fa-user-tie"></i> For Teachers/Students</h4>
-                <p style="font-size: 0.8rem; margin-bottom: 10px;">Send a message to the Institute Owner.</p>
+            <!-- 1. MESSAGE OWNER (Kept as is) -->
+            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9; display: flex; flex-direction: column;">
+                <h4 style="text-decoration: none;"><i class="fas fa-user-tie"></i> Message the Owner</h4>
+                <p style="font-size: 0.8rem; margin-bottom: auto; color: #666; padding-bottom: 10px;">Direct contact for urgent administrative matters.</p>
                 <button class="btn-add" style="background: #25D366; width: 100%; border: none;" onclick="connectToOwner()">
-                    <i class="fab fa-whatsapp"></i> MESSAGE OWNER
+                    <i class="fab fa-whatsapp"></i> CONTACT OWNER
                 </button>
             </div>
 
-            <!-- 2. MESSAGE TEACHER -->
+            <!-- 2. MESSAGE TEACHERS (By Subject) -->
             <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
-                <h4 style="text-decoration: none;"><i class="fas fa-chalkboard-teacher"></i> For Owner/Students</h4>
-                <input type="text" id="wa-teacher-id" placeholder="Enter Teacher ID (e.g. TCH-1234)" style="width: 100%; margin-bottom: 10px;">
-                <button class="btn-add" style="background: #128C7E; width: 100%; border: none;" onclick="connectToTeacher()">
-                    <i class="fab fa-whatsapp"></i> MESSAGE TEACHER
+                <h4 style="text-decoration: none;"><i class="fas fa-chalkboard-teacher"></i> Message Teachers</h4>
+                <select id="wa-teacher-subject" style="width: 100%; margin-bottom: 10px; border: 1px solid #25D366;">
+                    <option value="All">All Subjects</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="History">History</option>
+                    <option value="Geography">Geography</option>
+                </select>
+                <button class="btn-add" style="background: #128C7E; width: 100%; border: none;" onclick="fetchTeachersBySubject()">
+                    <i class="fas fa-search"></i> FIND TEACHERS
                 </button>
             </div>
 
-            <!-- 3. MESSAGE STUDENT -->
+            <!-- 3. MESSAGE STUDENTS (By Course) -->
             <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
-                <h4 style="text-decoration: none;"><i class="fas fa-user-graduate"></i> For Owner/Teachers</h4>
-                <input type="text" id="wa-student-roll" placeholder="Enter Student Roll No" style="width: 100%; margin-bottom: 10px;">
-                <button class="btn-add" style="background: #075E54; width: 100%; border: none;" onclick="connectToStudent()">
-                    <i class="fab fa-whatsapp"></i> MESSAGE STUDENT
+                <h4 style="text-decoration: none;"><i class="fas fa-user-graduate"></i> Message Students</h4>
+                <select id="wa-student-course" style="width: 100%; margin-bottom: 10px; border: 1px solid #25D366;">
+                    <option value="All">All Courses</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="History">History</option>
+                    <option value="Geography">Geography</option>
+                </select>
+                <button class="btn-add" style="background: #075E54; width: 100%; border: none;" onclick="fetchStudentsByCourse()">
+                    <i class="fas fa-search"></i> FIND STUDENTS
                 </button>
             </div>
+        </div>
 
+        <!-- RESULTS AREA -->
+        <div id="wa-results-area" style="display: none; margin-top: 30px; border-top: 2px dashed #ccc; padding-top: 20px; text-align: left;">
+            <h4 id="wa-results-title">Contacts:</h4>
+            <div id="wa-contact-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
+                <!-- Result cards will appear here -->
+            </div>
         </div>
     </div>
 </section>
-
 
 <section id="calendar-mod" class="content-section">
     <!-- OWNER: Add Event -->
@@ -4022,59 +4039,83 @@ let currentTarget = ""; // Global to track Teacher vs Student
 /* --- WHATSAPP HUB LOGIC --- */
 
 // 1. Connect to OWNER
+/* --- FINAL REPLACED WHATSAPP HUB LOGIC --- */
+
+// Helper: This builds the list of people below the buttons
+function displayWAContacts(list, type) {
+    const area = document.getElementById('wa-results-area');
+    const container = document.getElementById('wa-contact-list');
+    const title = document.getElementById('wa-results-title');
+    
+    container.innerHTML = "";
+    area.style.display = "block";
+    title.innerText = `Found ${list.length} ${type}(s)`;
+
+    if (list.length === 0) {
+        container.innerHTML = `<p style="color:red; padding: 10px;">No contacts found matching this selection.</p>`;
+        return;
+    }
+
+    list.forEach(person => {
+        const name = person.teacher_name || person.full_name;
+        const mobile = person.mobile;
+        const info = person.subject_taught || person.course;
+
+        container.innerHTML += `
+            <div style="background: white; border: 1px solid #000; padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 4px 4px 0px rgba(0,0,0,0.1);">
+                <div style="text-align: left;">
+                    <b style="font-size: 1rem; color: #000;">${name}</b><br>
+                    <small style="color: #666;">${info}</small>
+                </div>
+                <a href="https://wa.me/91${mobile}?text=${encodeURIComponent('Hello, message from Institute Owner.')}" 
+                   target="_blank" 
+                   style="background: #25D366; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; border: 1px solid #000;">
+                    <i class="fab fa-whatsapp"></i>
+                </a>
+            </div>
+        `;
+    });
+    area.scrollIntoView({ behavior: 'smooth' });
+}
+
+// 1. Connect to OWNER
 async function connectToOwner() {
-    // Fetches the Owner's mobile from the profiles table
-    const { data, error } = await db.from('profiles')
-        .select('mobile_number')
-        .eq('institute_id', sessionInstID)
-        .eq('role', 'Owner')
-        .single();
+    const { data } = await db.from('profiles')
+        .select('mobile_number').eq('institute_id', sessionInstID).eq('role', 'Owner').single();
 
     if (data && data.mobile_number) {
-        const msg = encodeURIComponent("Hello, I am contacting you from the ClassManager Portal.");
-        window.open(`https://wa.me/91${data.mobile_number}?text=${msg}`, '_blank');
+        window.open(`https://wa.me/91${data.mobile_number}?text=Hello Owner, contacting you via IMS.`, '_blank');
     } else {
-        alert("Owner's contact number not found in database.");
+        alert("Owner's mobile number is not registered in the system.");
     }
 }
 
-// 2. Connect to TEACHER
-async function connectToTeacher() {
-    const tid = document.getElementById('wa-teacher-id').value.toUpperCase().trim();
-    if (!tid) return alert("Please enter a Teacher ID.");
-
-    const { data } = await db.from('teacher_details')
-        .select('mobile, teacher_name')
-        .eq('id', tid)
-        .eq('institute_id', sessionInstID)
-        .single();
-
-    if (data && data.mobile) {
-        const msg = encodeURIComponent(`Hello ${data.teacher_name}, this is from ${sessionUserName} regarding the institute.`);
-        window.open(`https://wa.me/91${data.mobile}?text=${msg}`, '_blank');
-    } else {
-        alert("Teacher ID not found or WhatsApp number is not registered.");
+// 2. Message TEACHERS by Subject
+async function fetchTeachersBySubject() {
+    const subject = document.getElementById('wa-teacher-subject').value;
+    let query = db.from('teacher_details').select('teacher_name, mobile, subject_taught').eq('institute_id', sessionInstID);
+    
+    if (subject !== "All") {
+        query = query.eq('subject_taught', subject);
     }
+
+    const { data, error } = await query;
+    if (error) return alert("Database Error: " + error.message);
+    displayWAContacts(data, "Teacher");
 }
 
-// 3. Connect to STUDENT
-async function connectToStudent() {
-    const roll = document.getElementById('wa-student-roll').value.toUpperCase().trim();
-    if (!roll) return alert("Please enter a Student Roll Number.");
-
-    // Fetches mobile from the students table
-    const { data, error } = await db.from('students')
-        .select('mobile, full_name')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID)
-        .single();
-
-    if (data && data.mobile) {
-        const msg = encodeURIComponent(`Hello ${data.full_name}, this is regarding your classes at the institute.`);
-        window.open(`https://wa.me/91${data.mobile}?text=${msg}`, '_blank');
-    } else {
-        alert("Student Roll Number not found.");
+// 3. Message STUDENTS by Course
+async function fetchStudentsByCourse() {
+    const course = document.getElementById('wa-student-course').value;
+    let query = db.from('students').select('full_name, mobile, course').eq('institute_id', sessionInstID).eq('status', 'Active');
+    
+    if (course !== "All") {
+        query = query.eq('course', course);
     }
+
+    const { data, error } = await query;
+    if (error) return alert("Database Error: " + error.message);
+    displayWAContacts(data, "Student");
 }
     </script>
 <script>
