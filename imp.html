@@ -4150,22 +4150,49 @@ async function showReceiptHistory() {
 
 // --- SHOW HISTORY FOR TEACHERS ---
 async function showPayslipHistory() {
+    // 1. Get the Teacher ID from the input field
     const tid = document.getElementById('tch-id').value.trim().toUpperCase();
-    if (!tid) return alert("Fetch teacher details first!");
+    
+    if (!tid) {
+        return alert("Please FETCH teacher details first so I know whose payslips to look for!");
+    }
 
-    const { data: history } = await db.from('payment_history').select('*')
-        .eq('roll_number', tid).eq('institute_id', sessionInstID).order('payment_date', { ascending: false });
+    // 2. Fetch records from the TEACHER_PAYMENTS table (Not the student one)
+    const { data: history, error } = await db.from('teacher_payments')
+        .select('*')
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID)
+        .order('payment_date', { ascending: false });
 
-    if (!history || history.length === 0) return alert("No salary logs found.");
+    // 3. Handle Errors or Empty Data
+    if (error) {
+        console.error("Fetch Error:", error.message);
+        return alert("Error loading records: " + error.message);
+    }
 
-    document.getElementById('payslip-history-list').style.display = 'block';
+    if (!history || history.length === 0) {
+        return alert("No salary records found for ID: " + tid + ". Did you 'LOG SALARY' yet?");
+    }
+
+    // 4. Show the list and clear old data
+    const listArea = document.getElementById('payslip-history-list');
     const container = document.getElementById('teacher-history-links-container');
-    container.innerHTML = history.map(row => `
-        <div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #eee; align-items:center; color:#000;">
-            <span>${row.month_year} (₹${row.amount})</span>
-            <button onclick="runPrint('${row.payment_date}', '${row.amount}', 'Teacher')" style="background:green; color:white; border:none; padding:3px 8px; border-radius:3px; cursor:pointer;">PRINT</button>
-        </div>
-    `).join('');
+    
+    listArea.style.display = 'block';
+    container.innerHTML = ""; // Clear old list
+
+    // 5. Generate the clickable links for the Payslips
+    history.forEach(row => {
+        container.innerHTML += `
+            <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #ddd; align-items:center; color:#000;">
+                <span><b>${row.month_year}</b>: ₹${row.amount_paid}</span>
+                <button onclick="runPrintTeacher('${row.payment_date}', '${row.amount_paid}', '${row.pending_amount}', '${row.month_year}')" 
+                        style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
+                    <i class="fas fa-print"></i> PRINT
+                </button>
+            </div>
+        `;
+    });
 }
 
 // --- FINAL PRINT COMMAND ---
@@ -4242,6 +4269,65 @@ function runPrint(date, amt, type) {
         printWindow.print();
         printWindow.close();
     }, 500);
+}
+
+
+
+
+
+function runPrintTeacher(date, paid, pending, month) {
+    const instID = sessionInstID || "N/A";
+    const name = document.getElementById('tch-name').value;
+    const id = document.getElementById('tch-id').value;
+    const sub = document.getElementById('tch-subject').value;
+
+    const receiptHtml = `
+        <html>
+        <head>
+            <title>Payslip_${id}</title>
+            <style>
+                body { font-family: serif; padding: 40px; color: black; }
+                .container { border: 2px solid black; padding: 30px; width: 600px; margin: auto; }
+                .header { text-align: center; border-bottom: 2px solid black; margin-bottom: 20px; }
+                .logo { width: 80px; height: 80px; margin-bottom: 10px; }
+                .row { display: flex; justify-content: space-between; margin: 10px 0; font-size: 18px; }
+                .amount-box { border: 3px solid black; padding: 20px; text-align: center; margin: 30px 0; background: #eee; }
+                .sign-row { margin-top: 60px; display: flex; justify-content: space-between; }
+                .sign-box { border-top: 1px solid black; width: 200px; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <img src="icon-192x192.png" class="logo">
+                    <h1 style="margin:0;">SALARY PAYSLIP</h1>
+                    <p><b>Institute ID:</b> ${instID}</p>
+                    <p>For Month: <b>${month}</b></p>
+                </div>
+                <div class="row"><span><b>Date:</b> ${date}</span> <span><b>No:</b> ${Math.floor(Math.random()*9000)+1000}</span></div>
+                <div class="row"><b>Name:</b> ${name}</div>
+                <div class="row"><b>ID:</b> ${id}</div>
+                <div class="row"><b>Subject:</b> ${sub}</div>
+                
+                <div class="amount-box">
+                    <h2 style="margin:0;">AMOUNT PAID: ₹ ${paid}</h2>
+                </div>
+                
+                <div class="row"><b>Balance Pending:</b> ₹ ${pending}</div>
+                
+                <div class="sign-row">
+                    <div class="sign-box">Staff Signature</div>
+                    <div class="sign-box">Authorized Signatory</div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=800');
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
 }
     </script>
 <script>
