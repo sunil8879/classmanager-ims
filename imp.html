@@ -983,11 +983,10 @@
 </div>
         </div>
 
-     <div class="stat-card" style="background: #fff8f8; margin-top: 20px; text-align: left; border: 1px solid #ff0000;">
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
-        <h4 style="color: #ff0000; margin: 0; text-decoration: none;">TOTAL MONTHLY EXPENSES: <span id="disp-total-exp">₹ 0.00</span></h4>
-        <p style="margin: 0; font-size: 0.85rem; color: #666;">* Based on manual entries below</p>
-    </div>
+   <div class="stat-card" style="background: #fff8f8; margin-top: 20px; text-align: left; border: 1px solid #ff0000;">
+    <h4 style="color: #ff0000; margin: 0; text-decoration: none;">
+        TOTAL MONTHLY EXPENSES: <span id="disp-total-exp">₹ 0.00</span>
+    </h4>
 </div>
         <div class="button-row">
            <button class="btn-add" onclick="saveExpenses()">ADD RECORD</button>
@@ -3208,61 +3207,31 @@ async function fetchLead() {
    ========================================== */
 
 // 1. AUTO-POPULATE Fees from Payment History
+// This function is now only for background data if needed, 
+// it will no longer try to update the Expenses UI.
 async function fetchAutoFees() {
-    const monthVal = document.getElementById('exp-month-year').value; 
-    if (!monthVal || !sessionInstID) return;
-
-    // Format: "February 2026"
-    const dateObj = new Date(monthVal + "-01");
-    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-    // THE MAGIC LINK:
-    // We fetch amounts from history, but the "!inner" part forces 
-    // it to only count students who are 'Active' in the master table.
-    const { data, error } = await db
-        .from('payment_history')
-        .select(`
-            amount,
-            students!inner ( status )
-        `)
-        .eq('institute_id', sessionInstID)
-        .eq('month_year', targetMonthYear)
-        .eq('students.status', 'Active');
-
-    if (error) {
-        console.error("Link Error:", error.message);
-        return;
-    }
-
-    // Sum up the verified amounts
-    const total = data ? data.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
-    
-    document.getElementById('disp-auto-fees').innerText = "₹ " + total.toFixed(2);
-    calculateFinancials(); 
-fetchAutoInventory(); // ADD THIS LINE
+    console.log("Expenses UI is now Expense-only. Skipping auto-fees update.");
+    return 0; 
 }
 // 2. FORMULA CALCULATION
 function calculateFinancials() {
-    // 1. Define the list of expense input IDs
-    const expenses = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'];
+    const ids = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'];
     
-    // 2. Sum up all the manual input boxes
-    const totalExp = expenses.reduce((sum, id) => {
-        const input = document.getElementById(id);
-        return sum + (input ? parseFloat(input.value) || 0 : 0);
+    const totalExp = ids.reduce((sum, id) => {
+        const el = document.getElementById(id);
+        return sum + (el ? parseFloat(el.value) || 0 : 0);
     }, 0);
 
-    // 3. Display the Total in the Red box
-    document.getElementById('disp-total-exp').innerText = "₹ " + totalExp.toLocaleString('en-IN', {minimumFractionDigits: 2});
+    const display = document.getElementById('disp-total-exp');
+    if (display) {
+        display.innerText = "₹ " + totalExp.toLocaleString('en-IN', {minimumFractionDigits: 2});
+    }
 }
 
 // 3. SAVE TO SUPABASE
 async function saveExpenses() {
     const monthYear = document.getElementById('exp-month-year').value;
     if (!monthYear) return alert("Select Month & Year first.");
-
-    // IMPORTANT: Grab the number currently in the box (which was loaded by FETCH)
-    const incomeFromBox = parseFloat(document.getElementById('exp-income').value) || 0;
 
     const dataObj = {
         institute_id: sessionInstID,
@@ -3274,16 +3243,20 @@ async function saveExpenses() {
         admin_salary: parseFloat(document.getElementById('exp-a-sal').value) || 0,
         marketing: parseFloat(document.getElementById('exp-mark').value) || 0,
         other_exp: parseFloat(document.getElementById('exp-other').value) || 0,
-        other_income: incomeFromBox, // This ensures the Inventory money is kept!
-        auto_fees_collected: parseFloat(document.getElementById('disp-auto-fees').innerText.replace(/[₹, ]/g, '')) || 0,
-        total_expenses: parseFloat(document.getElementById('disp-total-exp').innerText.replace(/[₹, ]/g, '')),
-        total_income_net: parseFloat(document.getElementById('disp-total-income').innerText.replace(/[₹, ]/g, '')),
-        cost_income_ratio: parseFloat(document.getElementById('disp-ratio').innerText)
+        // We set these to 0 as we are no longer tracking them in this table
+        other_income: 0,
+        auto_fees_collected: 0,
+        // Save only the total expenses
+        total_expenses: parseFloat(document.getElementById('disp-total-exp').innerText.replace(/[₹, ]/g, '')) || 0
     };
 
     const { error } = await db.from('expenses').upsert(dataObj, { onConflict: 'institute_id, month_year' });
-    if (error) alert(error.message);
-    else alert("Record Saved!");
+    
+    if (error) {
+        alert("Save Error: " + error.message);
+    } else {
+        alert("Expense record for " + monthYear + " saved successfully!");
+    }
 }
 // 4. FETCH SAVED DATA
 // 4. FETCH SAVED DATA
@@ -3305,13 +3278,11 @@ async function fetchSavedExpense() {
         document.getElementById('exp-a-sal').value = data.admin_salary || 0;
         document.getElementById('exp-mark').value = data.marketing || 0;
         document.getElementById('exp-other').value = data.other_exp || 0;
-        alert("Expense records loaded!");
     } else {
-        ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other']
-        .forEach(id => document.getElementById(id).value = 0);
+        ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'].forEach(id => {
+            document.getElementById(id).value = 0;
+        });
     }
-    
-    // Recalculate the red box total
     calculateFinancials();
 }
 function clearExpenseForm() {
