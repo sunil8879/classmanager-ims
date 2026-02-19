@@ -6,8 +6,7 @@
 <!-- Supabase JS Library CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-<!-- PDF GENERATOR LIBRARY -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <title>Class Manager - IMS</title>
     <!-- PWA Setup -->
     <meta name="theme-color" content="#007bff">
@@ -4197,52 +4196,66 @@ async function showPayslipHistory() {
 }
 
 // --- FINAL PRINT COMMAND ---
-async function runPrint(date, amt, type) {
-    const template = document.getElementById('pdf-template');
+function runPrint(date, amt, type) {
+    // 1. Get Data
+    const instID = sessionInstID || "N/A";
+    const name = (type === 'Student') ? document.getElementById('fee-name').value : document.getElementById('tch-name').value;
+    const id = (type === 'Student') ? document.getElementById('fee-roll').value : document.getElementById('tch-id').value;
+    const course = (type === 'Student') ? document.getElementById('fee-course').value : document.getElementById('tch-subject').value;
+    const balance = (type === 'Student') ? document.getElementById('fee-pending').value : "Salary Logged";
+
+    // 2. Create the Receipt Content (Clean HTML)
+    const receiptHtml = `
+        <html>
+        <head>
+            <title>Receipt_${id}</title>
+            <style>
+                body { font-family: 'Times New Roman', serif; padding: 40px; color: black; }
+                .container { border: 2px solid black; padding: 30px; width: 600px; margin: auto; }
+                .header { text-align: center; border-bottom: 2px solid black; margin-bottom: 20px; }
+                .row { display: flex; justify-content: space-between; margin: 10px 0; font-size: 18px; }
+                .amount-box { border: 3px solid black; padding: 20px; text-align: center; margin: 30px 0; background: #eee; }
+                .footer { margin-top: 60px; display: flex; justify-content: space-between; }
+                .sign { border-top: 1px solid black; width: 200px; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1 style="margin:0;">FEE RECEIPT</h1>
+                    <p><b>Institute ID:</b> ${instID}</p>
+                </div>
+                <div class="row"><span><b>Date:</b> ${date}</span> <span><b>No:</b> ${Math.floor(Math.random()*9000)+1000}</span></div>
+                <div class="row"><span><b>Name:</b> ${name}</span></div>
+                <div class="row"><span><b>Roll/ID:</b> ${id}</span></div>
+                <div class="row"><span><b>Course:</b> ${course}</span></div>
+                
+                <div class="amount-box">
+                    <h2 style="margin:0; font-size: 32px;">AMOUNT PAID: ₹ ${amt}</h2>
+                </div>
+                
+                <div class="row"><span><b>Outstanding Balance:</b> ₹ ${balance}</span></div>
+                
+                <div class="footer">
+                    <div class="sign">Receiver Signature</div>
+                    <div class="sign">Authorized Signatory</div>
+                </div>
+                <p style="text-align:center; margin-top:30px; font-size:12px;">Computer Generated Official Document</p>
+            </div>
+        </body>
+        </html>
+    `;
+
+    // 3. Open New Window and Print
+    const printWindow = window.open('', '_blank', 'width=800,height=800');
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
     
-    // 1. Fill the data
-    document.getElementById('pdf-display-inst-id').innerText = sessionInstID || "N/A";
-    document.getElementById('pdf-date').innerText = date;
-    document.getElementById('pdf-main-amt').innerText = amt;
-
-    if (type === 'Student') {
-        document.getElementById('pdf-main-name').innerText = document.getElementById('fee-name').value;
-        document.getElementById('pdf-main-id').innerText = document.getElementById('fee-roll').value;
-        document.getElementById('pdf-main-sub').innerText = document.getElementById('fee-course').value;
-        document.getElementById('pdf-main-bal').innerText = document.getElementById('fee-pending').value;
-    } else {
-        document.getElementById('pdf-main-name').innerText = document.getElementById('tch-name').value;
-        document.getElementById('pdf-main-id').innerText = document.getElementById('tch-id').value;
-        document.getElementById('pdf-main-sub').innerText = document.getElementById('tch-subject').value;
-        document.getElementById('pdf-main-bal').innerText = "Salary Record";
-    }
-
-    // 2. MAKE TEMPORARILY VISIBLE (This stops the blank PDF error)
-    template.style.display = 'block';
-
-    // 3. Set Options
-    const options = {
-        margin: 0.5,
-        filename: type + '_Receipt_' + date + '.pdf',
-        html2canvas: { 
-            scale: 2, 
-            useCORS: true, 
-            letterRendering: true,
-            backgroundColor: "#ffffff" 
-        },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    // 4. Generate the PDF
-    try {
-        await html2pdf().set(options).from(template).save();
-    } catch (err) {
-        console.error("PDF Error:", err);
-        alert("Failed to generate PDF. Check console.");
-    } finally {
-        // 5. HIDE TEMPLATE AGAIN
-        template.style.display = 'none';
-    }
+    // Give it a tiny moment to load, then print
+    printWindow.setTimeout(function() {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
 }
     </script>
 <script>
@@ -4257,35 +4270,5 @@ if ('serviceWorker' in navigator) {
     <i class="fas fa-download"></i> INSTALL APP
 </button>
 
-
-
-
-<!-- THE PDF TEMPLATE -->
-<div id="pdf-template" style="display: none; width: 700px; padding: 50px; background: white !important; color: black !important; font-family: 'Times New Roman', Times, serif;">
-    <div style="text-align: center; border-bottom: 3px solid black; padding-bottom: 20px; margin-bottom: 20px;">
-        <h1 style="margin: 0; font-size: 35px; color: black !important;">FEE RECEIPT</h1>
-        <p style="margin: 10px 0; font-size: 18px; color: black !important;"><b>Institute ID:</b> <span id="pdf-display-inst-id"></span></p>
-    </div>
-
-    <div style="font-size: 20px; color: black !important; line-height: 1.6;">
-        <p><b>Date:</b> <span id="pdf-date"></span></p>
-        <p><b>Name:</b> <span id="pdf-main-name"></span></p>
-        <p><b>Roll Number:</b> <span id="pdf-main-id"></span></p>
-        <p><b>Course:</b> <span id="pdf-main-sub"></span></p>
-    </div>
-
-    <div style="margin: 40px 0; padding: 30px; border: 5px solid black; text-align: center; background: #eeeeee !important;">
-        <h2 style="margin: 0; font-size: 40px; color: black !important;">PAID: ₹ <span id="pdf-main-amt"></span></h2>
-    </div>
-
-    <div style="font-size: 20px; color: black !important;">
-        <p><b>Balance Remaining:</b> ₹ <span id="pdf-main-bal"></span></p>
-    </div>
-
-    <div style="margin-top: 100px; display: flex; justify-content: space-between; color: black !important;">
-        <div style="border-top: 2px solid black; width: 200px; text-align: center; padding-top: 5px;">Receiver Signature</div>
-        <div style="border-top: 2px solid black; width: 200px; text-align: center; padding-top: 5px;">Authorised Signatory</div>
-    </div>
-</div>
 </body>
 </html>
