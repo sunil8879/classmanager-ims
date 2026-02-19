@@ -1422,88 +1422,60 @@
 
 
 <!-- STANDALONE MESSAGE HUB -->
-<!-- STANDALONE MESSAGE HUB - UPDATED FOR GROUPS -->
+<!-- STANDALONE MESSAGE HUB - FINAL COMBINED VERSION -->
 <section id="message-corner" class="content-section">
     <div class="card" style="border-top: 5px solid #25D366; background: #fff;">
         <h2 style="text-decoration: none; color: #000;"><i class="fab fa-whatsapp"></i> Quick Connect Hub</h2>
-        <p style="margin-bottom: 25px; color: #666;">Select a category to find contacts and open direct WhatsApp chats.</p>
-
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-            
-            <!-- 1. MESSAGE OWNER (Kept as is) -->
-            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9; display: flex; flex-direction: column;">
-                <h4 style="text-decoration: none;"><i class="fas fa-user-tie"></i> Message the Owner</h4>
-                <p style="font-size: 0.8rem; margin-bottom: auto; color: #666; padding-bottom: 10px;">Direct contact for urgent administrative matters.</p>
-                <button class="btn-add" style="background: #25D366; width: 100%; border: none;" onclick="connectToOwner()">
-                    <i class="fab fa-whatsapp"></i> CONTACT OWNER
-                </button>
+        
+        <!-- ROW 1: DIRECT & FILTERED SEARCH -->
+        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <div style="padding: 15px; border: 2px solid #000; border-radius: 10px; background: #f9f9f9;">
+                <h4><i class="fas fa-user-tie"></i> Owner</h4>
+                <button class="btn-add" style="background: #25D366; width: 100%; border: none; margin-top:10px;" onclick="connectToOwner()">CHAT WITH OWNER</button>
             </div>
 
-            <!-- 2. MESSAGE TEACHERS (By Subject) -->
-            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
-                <h4 style="text-decoration: none;"><i class="fas fa-chalkboard-teacher"></i> Message Teachers</h4>
-                <select id="wa-teacher-subject" style="width: 100%; margin-bottom: 10px; border: 1px solid #25D366;">
-                    <option value="All">All Subjects</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="History">History</option>
-                    <option value="Geography">Geography</option>
-                </select>
-                <button class="btn-add" style="background: #128C7E; width: 100%; border: none;" onclick="fetchTeachersBySubject()">
-                    <i class="fas fa-search"></i> FIND TEACHERS
-                </button>
+            <div style="padding: 15px; border: 2px solid #000; border-radius: 10px; background: #f9f9f9;">
+                <h4><i class="fas fa-chalkboard-teacher"></i> Teachers</h4>
+                <select id="wa-teacher-subject" style="width: 100%; margin: 5px 0;"><option value="All">All Staff</option><option>Mathematics</option><option>History</option><option>Geography</option></select>
+                <button class="btn-add" style="background: #128C7E; width: 100%; border: none;" onclick="fetchTeachersBySubject()">FIND TEACHERS</button>
             </div>
 
-            <!-- 3. MESSAGE STUDENTS (By Course) -->
-            <div style="padding: 20px; border: 2px solid #000; border-radius: 15px; background: #f9f9f9;">
-                <h4 style="text-decoration: none;"><i class="fas fa-user-graduate"></i> Message Students</h4>
-                <select id="wa-student-course" style="width: 100%; margin-bottom: 10px; border: 1px solid #25D366;">
-                    <option value="All">All Courses</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="History">History</option>
-                    <option value="Geography">Geography</option>
-                </select>
-                <button class="btn-add" style="background: #075E54; width: 100%; border: none;" onclick="fetchStudentsByCourse()">
-                    <i class="fas fa-search"></i> FIND STUDENTS
-                </button>
-            </div>
-
-
-<!-- ADD THIS: Bulk Messaging Buttons -->
-<div style="margin-top: 20px; display: flex; gap: 15px; flex-direction: column;">
-    <button class="btn-fetch" style="background: #000; color: #fff; width: 100%; border: 2px solid #25D366;" onclick="bulkTeachersWA()">
-        <i class="fas fa-users-cog"></i> BULK MESSAGE TO ALL TEACHERS
-    </button>
-    <button class="btn-fetch" style="background: #000; color: #fff; width: 100%; border: 2px solid #25D366;" onclick="bulkStudentsWA()">
-        <i class="fas fa-users"></i> BULK MESSAGE TO ALL STUDENTS
-    </button>
-</div>
-
-
-
-<!-- ADD THIS: The Bulk Message Editor -->
-<div id="bulk-editor-area" style="display: none; margin-top: 20px; padding: 20px; border: 3px solid #25D366; border-radius: 15px; background: #fff;">
-    <h4 style="color: #000; text-decoration: none;">Bulk Message Composer</h4>
-    <p style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">Type your message below. It will be pre-filled for everyone in the list.</p>
-    
-    <textarea id="bulk-msg-content" rows="4" style="width: 100%; border: 2px solid #000; border-radius: 10px; padding: 10px; font-family: 'Times New Roman';" placeholder="Type your announcement here..."></textarea>
-    
-    <div class="button-row" style="margin-top: 15px;">
-        <button id="btn-process-bulk" class="btn-add" style="background: #25D366; width: 100%;" onclick="processBulkNow()">
-            <i class="fas fa-magic"></i> PREPARE FAST-SEND LIST
-        </button>
-    </div>
-</div>
-        </div>
-
-        <!-- RESULTS AREA -->
-        <div id="wa-results-area" style="display: none; margin-top: 30px; border-top: 2px dashed #ccc; padding-top: 20px; text-align: left;">
-            <h4 id="wa-results-title">Contacts:</h4>
-            <div id="wa-contact-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
-                <!-- Result cards will appear here -->
+            <div style="padding: 15px; border: 2px solid #000; border-radius: 10px; background: #f9f9f9;">
+                <h4><i class="fas fa-user-graduate"></i> Students</h4>
+                <select id="wa-student-course" style="width: 100%; margin: 5px 0;"><option value="All">All Students</option><option>Mathematics</option><option>History</option><option>Geography</option></select>
+                <button class="btn-add" style="background: #075E54; width: 100%; border: none;" onclick="fetchStudentsByCourse()">FIND STUDENTS</button>
             </div>
         </div>
+
+        <!-- ROW 2: GROUP BROADCAST (For 500+ Students) -->
+        <div style="margin-top: 25px; padding: 20px; border: 2px solid #000; border-radius: 15px; background: #fff8e1;">
+            <h4 style="text-decoration: underline;">Global Broadcast Links</h4>
+            <div class="form-grid">
+                <input type="text" id="link-group-teachers" placeholder="Teacher Group Link">
+                <input type="text" id="link-group-students" placeholder="Student Group Link">
+            </div>
+            <div class="button-row" style="margin-top: 15px;">
+                <button class="btn-fetch" style="background: #000;" onclick="saveGroupLinks()">SAVE LINKS</button>
+                <button class="btn-add" style="background: #25D366;" onclick="broadcastToGroup('Teacher')">OPEN TEACHER GROUP</button>
+                <button class="btn-add" style="background: #25D366;" onclick="broadcastToGroup('Student')">OPEN STUDENT GROUP</button>
+            </div>
+        </div>
+
+        <!-- ROW 3: INTERNAL NOTICE BOARD (Sends to Student Portals) -->
+        <div style="margin-top: 25px; padding: 20px; border: 2px solid #000; border-radius: 15px; background: #fff8f8; border-top: 5px solid #ff0000;">
+            <h4><i class="fas fa-bullhorn"></i> Official Portal Notice Board</h4>
+            <div class="form-grid">
+                <select id="notice-subject" style="border: 1px solid #ff0000;"><option value="General">All Batches</option><option>Mathematics</option><option>History</option><option>Geography</option></select>
+                <textarea id="notice-text" placeholder="Type message to appear in Student Portal..." rows="2"></textarea>
+            </div>
+            <button class="btn-add" style="background: #ff0000; width: 100%; margin-top: 10px;" onclick="sendInternalNotice()">POST TO PORTALS</button>
+        </div>
+
+        <!-- RESULTS LIST -->
+        <div id="wa-results-area" style="display: none; margin-top: 30px; border-top: 2px dashed #ccc; padding-top: 20px;"><div id="wa-contact-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;"></div></div>
     </div>
 </section>
+
 
 <section id="calendar-mod" class="content-section">
     <!-- OWNER: Add Event -->
@@ -3437,6 +3409,8 @@ if (monthVal < student.admission_date.substring(0, 7)) return alert("NOT AVAILAB
         document.getElementById('p-present').innerText = presentDays;
         document.getElementById('p-absent').innerText = absentDays;
 
+if(student.course) fetchStudentMessages(student.course); 
+
         // Performance & Teacher Info
         if (performance) {
             const marks = parseFloat(performance.total_marks_secured) || 0;
@@ -4063,193 +4037,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let currentTarget = ""; // Global to track Teacher vs Student
 
-/* --- WHATSAPP HUB LOGIC --- */
+/* ==========================================
+   FINAL WHATSAPP BULK LOGIC
+   ========================================== */
 
-// 1. Connect to OWNER
-/* --- FINAL REPLACED WHATSAPP HUB LOGIC --- */
-
-// Helper: This builds the list of people below the buttons
-function displayWAContacts(list, type) {
-    const area = document.getElementById('wa-results-area');
-    const container = document.getElementById('wa-contact-list');
-    const title = document.getElementById('wa-results-title');
-    
-    container.innerHTML = "";
-    area.style.display = "block";
-    title.innerText = `Found ${list.length} ${type}(s)`;
-
-    if (list.length === 0) {
-        container.innerHTML = `<p style="color:red; padding: 10px;">No contacts found matching this selection.</p>`;
-        return;
-    }
-
-    list.forEach(person => {
-        const name = person.teacher_name || person.full_name;
-        const mobile = person.mobile;
-        const info = person.subject_taught || person.course;
-
-        container.innerHTML += `
-            <div style="background: white; border: 1px solid #000; padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 4px 4px 0px rgba(0,0,0,0.1);">
-                <div style="text-align: left;">
-                    <b style="font-size: 1rem; color: #000;">${name}</b><br>
-                    <small style="color: #666;">${info}</small>
-                </div>
-                <a href="https://wa.me/91${mobile}?text=${encodeURIComponent('Hello, message from Institute Owner.')}" 
-                   target="_blank" 
-                   style="background: #25D366; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; border: 1px solid #000;">
-                    <i class="fab fa-whatsapp"></i>
-                </a>
-            </div>
-        `;
-    });
-    area.scrollIntoView({ behavior: 'smooth' });
+/* --- COMPLETE MESSAGING ENGINE --- */
+function msgEngine(tab) {
+    showSection('message-corner');
+    document.getElementById('link-group-teachers').value = localStorage.getItem('wa_teachers_group') || "";
+    document.getElementById('link-group-students').value = localStorage.getItem('wa_students_group') || "";
 }
 
-// 1. Connect to OWNER
 async function connectToOwner() {
-    const { data } = await db.from('profiles')
-        .select('mobile_number').eq('institute_id', sessionInstID).eq('role', 'Owner').single();
-
-    if (data && data.mobile_number) {
-        window.open(`https://wa.me/91${data.mobile_number}?text=Hello Owner, contacting you via IMS.`, '_blank');
-    } else {
-        alert("Owner's mobile number is not registered in the system.");
-    }
+    const { data } = await db.from('profiles').select('mobile_number').eq('institute_id', sessionInstID).eq('role', 'Owner').single();
+    if (data?.mobile_number) window.open(`https://wa.me/91${data.mobile_number}`, '_blank');
+    else alert("Owner number not found.");
 }
 
-// 2. Message TEACHERS by Subject
 async function fetchTeachersBySubject() {
-    const subject = document.getElementById('wa-teacher-subject').value;
+    const sub = document.getElementById('wa-teacher-subject').value;
     let query = db.from('teacher_details').select('teacher_name, mobile, subject_taught').eq('institute_id', sessionInstID);
-    
-    if (subject !== "All") {
-        query = query.eq('subject_taught', subject);
-    }
-
-    const { data, error } = await query;
-    if (error) return alert("Database Error: " + error.message);
-    displayWAContacts(data, "Teacher");
+    if (sub !== "All") query = query.eq('subject_taught', sub);
+    const { data } = await query;
+    displayWAContactList(data);
 }
 
-// 3. Message STUDENTS by Course
 async function fetchStudentsByCourse() {
-    const course = document.getElementById('wa-student-course').value;
+    const crs = document.getElementById('wa-student-course').value;
     let query = db.from('students').select('full_name, mobile, course').eq('institute_id', sessionInstID).eq('status', 'Active');
-    
-    if (course !== "All") {
-        query = query.eq('course', course);
-    }
-
-    const { data, error } = await query;
-    if (error) return alert("Database Error: " + error.message);
-    displayWAContacts(data, "Student");
+    if (crs !== "All") query = query.eq('course', crs);
+    const { data } = await query;
+    displayWAContactList(data);
 }
 
-
-
-// ADD THIS: Fetch ALL Teachers for this Institute
-async function bulkTeachersWA() {
-    if (!sessionInstID) return alert("Please login first.");
-    
-    const { data, error } = await db.from('teacher_details')
-        .select('teacher_name, mobile, subject_taught')
-        .eq('institute_id', sessionInstID);
-
-    if (error) return alert("Error: " + error.message);
-    
-    // Reuse your existing display function to show every teacher
-    displayWAContacts(data, "All Staff Teacher");
-}
-
-// ADD THIS: Fetch ALL Active Students for this Institute
-async function bulkStudentsWA() {
-    if (!sessionInstID) return alert("Please login first.");
-
-    const { data, error } = await db.from('students')
-        .select('full_name, mobile, course')
-        .eq('institute_id', sessionInstID)
-        .eq('status', 'Active');
-
-    if (error) return alert("Error: " + error.message);
-
-    // Reuse your existing display function to show every student
-    displayWAContacts(data, "All Active Student");
-}
-
-
-
-let currentBulkType = ""; // To track if we are sending to Teachers or Students
-
-// 1. Show the Editor when "Bulk" buttons are clicked
-async function bulkTeachersWA() {
-    currentBulkType = "Teacher";
-    document.getElementById('bulk-editor-area').style.display = 'block';
-    document.getElementById('bulk-editor-area').scrollIntoView({ behavior: 'smooth' });
-}
-
-async function bulkStudentsWA() {
-    currentBulkType = "Student";
-    document.getElementById('bulk-editor-area').style.display = 'block';
-    document.getElementById('bulk-editor-area').scrollIntoView({ behavior: 'smooth' });
-}
-
-// 2. The Logic to generate the list with your "One Message"
-async function processBulkNow() {
-    const msgText = document.getElementById('bulk-msg-content').value.trim();
-    if (!msgText) return alert("Please type a message first!");
-
-    let data = [];
-    let error = null;
-
-    if (currentBulkType === "Teacher") {
-        const res = await db.from('teacher_details').select('teacher_name, mobile, subject_taught').eq('institute_id', sessionInstID);
-        data = res.data;
-        error = res.error;
-    } else {
-        const res = await db.from('students').select('full_name, mobile, course').eq('institute_id', sessionInstID).eq('status', 'Active');
-        data = res.data;
-        error = res.error;
-    }
-
-    if (error) return alert("Error fetching data: " + error.message);
-
-    // Now, we use the display function but we PASS the message to it
-    displayBulkWAContacts(data, currentBulkType, msgText);
-}
-
-// 3. Helper to show the contacts with the PRE-FILLED message
-function displayBulkWAContacts(list, type, message) {
+function displayWAContactList(list) {
     const area = document.getElementById('wa-results-area');
     const container = document.getElementById('wa-contact-list');
-    const title = document.getElementById('wa-results-title');
-    
-    container.innerHTML = "";
-    area.style.display = "block";
-    title.innerText = `Ready to Send to ${list.length} ${type}s`;
-
-    const encodedMsg = encodeURIComponent(message);
-
-    list.forEach(person => {
-        const name = person.teacher_name || person.full_name;
-        const mobile = person.mobile;
-
-        container.innerHTML += `
-            <div style="background: #f0fdf4; border: 1px solid #25D366; padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <div style="text-align: left;">
-                    <b style="color: #000;">${name}</b>
-                </div>
-                <a href="https://wa.me/91${mobile}?text=${encodedMsg}" 
-                   target="_blank" 
-                   onclick="this.parentElement.style.opacity='0.4';"
-                   style="background: #25D366; color: white; padding: 8px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 0.8rem;">
-                    SEND NOW
-                </a>
-            </div>
-        `;
+    container.innerHTML = ""; area.style.display = "block";
+    if (!list || list.length === 0) return container.innerHTML = "<p>No contacts found.</p>";
+    list.forEach(p => {
+        const name = p.teacher_name || p.full_name;
+        container.innerHTML += `<div style="background:#fff; border:1px solid #000; padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:bold;">${name}</span><a href="https://wa.me/91${p.mobile}" target="_blank" style="background:#25D366; color:white; padding:5px 10px; border-radius:5px; text-decoration:none; font-size:0.8rem;">CHAT</a></div>`;
     });
-    
-    alert("List Prepared! Click 'SEND NOW' for each person. The message is already pre-typed for you.");
     area.scrollIntoView({ behavior: 'smooth' });
+}
+
+function saveGroupLinks() {
+    localStorage.setItem('wa_teachers_group', document.getElementById('link-group-teachers').value);
+    localStorage.setItem('wa_students_group', document.getElementById('link-group-students').value);
+    alert("Links Saved!");
+}
+
+function broadcastToGroup(target) {
+    const link = (target === 'Teacher') ? localStorage.getItem('wa_teachers_group') : localStorage.getItem('wa_students_group');
+    if (!link) return alert("Save link first!");
+    window.open(link, '_blank');
+}
+
+async function sendInternalNotice() {
+    const text = document.getElementById('notice-text').value.trim();
+    const sub = document.getElementById('notice-subject').value;
+    if(!text) return alert("Empty message!");
+    const { error } = await db.from('messages').insert([{ institute_id: sessionInstID, sender_name: sessionUserName, sender_role: "Owner", message_type: "Student", target_subject: sub, content: text }]);
+    if(error) alert(error.message); else { alert("Notice Published!"); document.getElementById('notice-text').value = ""; }
+}
+
+async function fetchStudentMessages(course) {
+    const noticeDiv = document.getElementById('student-notices');
+    const { data } = await db.from('messages').select('*').eq('institute_id', sessionInstID).eq('message_type', 'Student').or(`target_subject.eq.General,target_subject.eq.${course}`).order('created_at', { ascending: false });
+    if (data && data.length > 0) {
+        noticeDiv.innerHTML = data.map(m => `<div style="background:#f0fff4; padding:10px; border-bottom:1px solid #27ae60; margin-bottom:5px; border-radius:5px;"><b style="color:#27ae60;">[${m.target_subject}]</b> ${m.content}</div>`).join('');
+    } else noticeDiv.innerHTML = "No new batch notices.";
 }
     </script>
 <script>
