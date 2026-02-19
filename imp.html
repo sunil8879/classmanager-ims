@@ -638,19 +638,17 @@
                 <select id="fee-status"><option value="Active">Active</option><option value="Closed">Closed</option></select>
             </div>
         </div>
-        <div class="button-row">
-            <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH Details</button>
-            <button class="btn-add" onclick="saveFeeUpdate()">ADD Payment</button>
-<!-- RECEIPT ACTION -->
+       <!-- CLEAN BUTTON ROW -->
+<div class="button-row" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+    <button class="btn-fetch" style="width: auto; padding: 10px 20px;" onclick="fetchFeeByRoll()">FETCH</button>
+    <button class="btn-add" style="width: auto; padding: 10px 20px;" onclick="saveFeeUpdate()">ADD PAYMENT</button>
+    <button class="btn-fetch" style="width: auto; padding: 10px 20px; background:#673ab7;" onclick="showReceiptHistory()">VIEW RECEIPTS</button>
+</div>
 
- <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH</button>
-    <button class="btn-add" onclick="saveFeeUpdate()">ADD PAYMENT</button>
-    <button class="btn-fetch" style="background:#673ab7;" onclick="showReceiptHistory()">VIEW RECEIPTS</button>
-
-<!-- This area will stay hidden until the button is clicked -->
-<div id="receipt-history-list" style="display:none; margin: 20px auto; max-width: 500px; padding:10px; background:#fff; border:2px solid #000; border-radius:10px; text-align: left;">
-    <p style="font-weight:bold; border-bottom:1px solid #000; margin-bottom:10px;">Select Date to Print Receipt:</p>
-    <div id="history-links-container" style="max-height: 200px; overflow-y: auto;"></div>
+<!-- COMPACT HISTORY LIST (Initially Hidden) -->
+<div id="receipt-history-list" style="display:none; margin: 20px auto; max-width: 400px; background:#fff; border: 1px solid #000; padding: 10px; border-radius: 8px;">
+    <p style="font-weight:bold; margin-bottom:10px; font-size: 14px; color: #000;">Payment History:</p>
+    <div id="history-links-container" style="max-height: 150px; overflow-y: auto; font-size: 13px;"></div>
 </div>
 </div>
        
@@ -1076,21 +1074,17 @@
 
 <!-- ... the </div> for form-grid follows -->
         </div>
-        <div class="button-row">
-            <button class="btn-add" onclick="addTeacherDetails()">ADD Teacher</button>
-            <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
-<!-- PAYSLIP ACTION -->
-
- <button class="btn-add" onclick="addTeacherDetails()">ADD TEACHER</button>
-    <button class="btn-fetch" onclick="fetchTeacher()">FETCH</button>
-    <button class="btn-fetch" style="background:#673ab7;" onclick="showPayslipHistory()">VIEW PAYSLIPS</button>
-
-<!-- This area stays hidden until the button is clicked -->
-<div id="payslip-history-list" style="display:none; margin: 20px auto; max-width: 500px; padding:10px; background:#fff; border:2px solid #000; border-radius:10px; text-align: left;">
-    <p style="font-weight:bold; border-bottom:1px solid #000; margin-bottom:10px;">Select Month to Print Payslip:</p>
-    <div id="teacher-history-links-container" style="max-height: 200px; overflow-y: auto;"></div>
+       <div class="button-row" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+    <button class="btn-add" style="width: auto; padding: 10px 20px;" onclick="addTeacherDetails()">ADD TEACHER</button>
+    <button class="btn-fetch" style="width: auto; padding: 10px 20px;" onclick="fetchTeacher()">FETCH</button>
+    <button class="btn-fetch" style="width: auto; padding: 10px 20px; background:#673ab7;" onclick="showPayslipHistory()">VIEW PAYSLIPS</button>
 </div>
-        </div>
+
+<div id="payslip-history-list" style="display:none; margin: 20px auto; max-width: 400px; background:#fff; border: 1px solid #000; padding: 10px; border-radius: 8px;">
+    <p style="font-weight:bold; margin-bottom:10px; font-size: 14px; color: #000;">Salary Records:</p>
+    <div id="teacher-history-links-container" style="max-height: 150px; overflow-y: auto; font-size: 13px;"></div>
+</div>
+</div>
 
 	
 	
@@ -4162,52 +4156,53 @@ async function fetchStudentMessages(course) {
    ========================================== */
 
 // --- STUDENT HISTORY & PDF ---
+// --- SHOW HISTORY FOR STUDENTS ---
 async function showReceiptHistory() {
     const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
-    if (!roll) return alert("Enter Roll Number first!");
-
+    if (!roll) return alert("Fetch student details first!");
+    
     const { data: history } = await db.from('payment_history').select('*')
         .eq('roll_number', roll).eq('institute_id', sessionInstID).order('payment_date', { ascending: false });
 
     if (!history || history.length === 0) return alert("No history found.");
-
+    
     document.getElementById('receipt-history-list').style.display = 'block';
     const container = document.getElementById('history-links-container');
     container.innerHTML = history.map(row => `
-        <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #ddd; align-items:center;">
-            <span>${row.payment_date} - <b>₹${row.amount}</b></span>
-            <button onclick="printFinalPDF('${row.payment_date}', '${row.amount}', 'Student')" style="background:green; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">PRINT</button>
+        <div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #eee; align-items:center; color:#000;">
+            <span>${row.payment_date} (₹${row.amount})</span>
+            <button onclick="runPrint('${row.payment_date}', '${row.amount}', 'Student')" style="background:green; color:white; border:none; padding:3px 8px; border-radius:3px; cursor:pointer;">PRINT</button>
         </div>
     `).join('');
 }
 
-// --- TEACHER HISTORY & PDF ---
+// --- SHOW HISTORY FOR TEACHERS ---
 async function showPayslipHistory() {
     const tid = document.getElementById('tch-id').value.trim().toUpperCase();
-    if (!tid) return alert("Enter Teacher ID first!");
+    if (!tid) return alert("Fetch teacher details first!");
 
-    // Checks teachers_attendance or payment table (Assuming history exists)
     const { data: history } = await db.from('payment_history').select('*')
         .eq('roll_number', tid).eq('institute_id', sessionInstID).order('payment_date', { ascending: false });
 
-    if (!history || history.length === 0) return alert("No salary history found.");
+    if (!history || history.length === 0) return alert("No salary logs found.");
 
     document.getElementById('payslip-history-list').style.display = 'block';
     const container = document.getElementById('teacher-history-links-container');
     container.innerHTML = history.map(row => `
-        <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #ddd; align-items:center;">
-            <span>${row.month_year} - <b>₹${row.amount}</b></span>
-            <button onclick="printFinalPDF('${row.payment_date}', '${row.amount}', 'Teacher')" style="background:green; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">PRINT</button>
+        <div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #eee; align-items:center; color:#000;">
+            <span>${row.month_year} (₹${row.amount})</span>
+            <button onclick="runPrint('${row.payment_date}', '${row.amount}', 'Teacher')" style="background:green; color:white; border:none; padding:3px 8px; border-radius:3px; cursor:pointer;">PRINT</button>
         </div>
     `).join('');
 }
 
-// --- UNIVERSAL PRINT FUNCTION ---
-function printFinalPDF(date, amount, type) {
+// --- FINAL PRINT COMMAND ---
+function runPrint(date, amt, type) {
+    // Fill the Template
     document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
     document.getElementById('pdf-date').innerText = date;
-    document.getElementById('pdf-number').innerText = Math.floor(100000 + Math.random() * 900000);
-    document.getElementById('pdf-main-amt').innerText = amount;
+    document.getElementById('pdf-number').innerText = Math.floor(Math.random() * 90000) + 10000;
+    document.getElementById('pdf-main-amt').innerText = amt;
 
     if (type === 'Student') {
         document.getElementById('pdf-main-name').innerText = document.getElementById('fee-name').value;
@@ -4218,13 +4213,16 @@ function printFinalPDF(date, amount, type) {
         document.getElementById('pdf-main-name').innerText = document.getElementById('tch-name').value;
         document.getElementById('pdf-main-id').innerText = document.getElementById('tch-id').value;
         document.getElementById('pdf-main-sub').innerText = document.getElementById('tch-subject').value;
-        document.getElementById('pdf-main-bal').innerText = "0.00 (Salary)";
+        document.getElementById('pdf-main-bal').innerText = "Salary - 0.00";
     }
 
+    // Generate PDF
     const element = document.getElementById('pdf-template');
     html2pdf().from(element).set({
         margin: 0.5,
         filename: type + '_Receipt_' + date + '.pdf',
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 2, logging: false },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     }).save();
 }
@@ -4244,33 +4242,38 @@ if ('serviceWorker' in navigator) {
 
 
 <!-- HIDDEN PDF TEMPLATES FOR STUDENT RECEIPT & TEACHER PAYSLIP -->
-<div style="display: none;">
-    <div id="pdf-template" style="padding: 40px; font-family: 'Times New Roman', serif; width: 750px; border: 5px solid #000; background: #fff; color: #000;">
+<!-- OFF-SCREEN PDF TEMPLATE -->
+<div style="position: absolute; left: -9999px; top: 0;">
+    <div id="pdf-template" style="padding: 40px; font-family: 'Times New Roman', serif; width: 700px; background: white; color: black;">
         <center>
-            <h1 style="margin:0; font-size: 32px; color: #000;">OFFICIAL RECEIPT</h1>
-            <p style="margin:5px 0; font-weight:bold;">Institute ID: <span id="pdf-display-inst-id"></span></p>
+            <h1 style="margin:0; font-size: 30px;">OFFICIAL RECEIPT</h1>
+            <p style="font-weight:bold; margin: 5px 0;">Institute ID: <span id="pdf-display-inst-id"></span></p>
             <hr style="border: 1px solid #000;">
         </center>
 
-        <table style="width: 100%; margin-top: 20px; font-size: 18px; line-height: 2;">
+        <table style="width: 100%; margin-top: 20px; font-size: 18px;">
             <tr>
                 <td><b>Date:</b> <span id="pdf-date"></span></td>
-                <td style="text-align: right;"><b>No:</b> <span id="pdf-number"></span></td>
+                <td style="text-align: right;"><b>Receipt No:</b> <span id="pdf-number"></span></td>
             </tr>
-            <tr><td><b>Name:</b> <span id="pdf-main-name"></span></td></tr>
-            <tr><td><b>ID/Roll No:</b> <span id="pdf-main-id"></span></td></tr>
-            <tr><td><b>Course/Subject:</b> <span id="pdf-main-sub"></span></td></tr>
         </table>
 
-        <div style="margin: 30px 0; padding: 20px; border: 2px solid #000; background: #f9f9f9; text-align: center;">
-            <h2 style="margin:0; font-size: 28px;">AMOUNT PAID: ₹ <span id="pdf-main-amt">0.00</span></h2>
+        <div style="margin-top: 20px; font-size: 18px; line-height: 1.8;">
+            <p><b>Name:</b> <span id="pdf-main-name"></span></p>
+            <p><b>ID / Roll No:</b> <span id="pdf-main-id"></span></p>
+            <p><b>Subject / Course:</b> <span id="pdf-main-sub"></span></p>
         </div>
 
-        <p style="font-size: 18px;"><b>Remaining Balance:</b> ₹ <span id="pdf-main-bal">0.00</span></p>
+        <!-- THE AMOUNT SECTION -->
+        <div style="margin: 30px 0; padding: 20px; border: 2px solid #000; text-align: center;">
+            <h2 style="margin:0; font-size: 32px;">AMOUNT PAID: ₹ <span id="pdf-main-amt"></span></h2>
+        </div>
+
+        <p style="font-size: 18px;"><b>Outstanding Balance:</b> ₹ <span id="pdf-main-bal"></span></p>
 
         <div style="margin-top: 80px; display: flex; justify-content: space-between;">
-            <div style="text-align: center; width: 200px; border-top: 1px solid #000;">Receiver Signature</div>
-            <div style="text-align: center; width: 200px; border-top: 1px solid #000;">Authorized Signatory</div>
+            <div style="border-top: 1px solid #000; width: 200px; text-align: center;">Receiver Signature</div>
+            <div style="border-top: 1px solid #000; width: 200px; text-align: center;">Authorized Signatory</div>
         </div>
     </div>
 </div>
