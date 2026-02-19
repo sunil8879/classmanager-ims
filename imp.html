@@ -1660,10 +1660,10 @@
                     <h4 style="font-size: 1rem; text-decoration: none;"><i class="fas fa-running"></i> Top 3 Students (Attn %)</h4>
                     <ul id="top-students-attn" style="list-style: none; padding: 0; font-size: 0.9rem;"></ul>
                 </div>
-                <div class="card" style="margin:0; padding: 15px; background: #000; color: #fff;">
-                    <h4 style="font-size: 1rem; text-decoration: none; color: #7FFFD4;"><i class="fas fa-calendar-check"></i> Best Month of Year</h4>
-                    <p id="top-month-year" style="font-weight: bold; margin-top: 10px;"></p>
-                </div>
+               <div class="card" style="margin:0; padding: 15px; background: #ffffff; border: 2px solid #333; color: #000;">
+    <h4 style="font-size: 1rem; text-decoration: none; color: #000;"><i class="fas fa-calendar-check"></i> Best Month of Year</h4>
+    <p id="top-month-year" style="font-weight: bold; margin-top: 10px; color: #ff0000; font-size: 1.2rem;"></p>
+</div>
             </div>
         </div>
     </div>
@@ -5173,29 +5173,30 @@ async function fetchAutoInventory() {
    ========================================== */
 
 async function loadBusinessSummary() {
-    const monthVal = document.getElementById('biz-calendar').value;
-    if (!monthVal) return;
+    const monthInput = document.getElementById('biz-calendar').value; // e.g. "2026-02"
+    if (!monthInput) return;
 
-    // 1. Prepare Formats
-    const dateObj = new Date(monthVal + "-01");
-    const nameMonth = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }); // "February 2026"
-    const prefixMonth = monthVal; // "2026-02"
-    const currentYear = monthVal.split('-')[0];
+    // 1. FORMAT DATE LANGUAGE
+    const dateObj = new Date(monthInput + "-01");
+    // This creates "February 2026" - EXACTLY what your Fee logic uses
+    const formattedMonthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }); 
+    const currentYear = monthInput.split('-')[0];
 
     document.getElementById('biz-report-area').style.display = 'block';
 
-    // 2. RUN ALL QUERIES AT ONCE
+    // 2. FETCH DATA (Using the working Fee Logic for everything)
     const [feesRes, invRes, expRes, courseRes, tchRatRes, stuExamRes, yrEnrolRes] = await Promise.all([
-        db.from('payment_history').select('amount').eq('month_year', nameMonth).eq('institute_id', sessionInstID),
-        db.from('inventory_sales').select('total_paid').like('created_at', `${prefixMonth}%`).eq('institute_id', sessionInstID),
-        db.from('expenses').select('*').eq('month_year', prefixMonth).eq('institute_id', sessionInstID).maybeSingle(),
+        db.from('payment_history').select('amount').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
+        // We now search Inventory by the exact same text month name
+        db.from('inventory_sales').select('total_paid').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
+        db.from('expenses').select('*').eq('month_year', monthInput).eq('institute_id', sessionInstID).maybeSingle(),
         db.from('students').select('course').eq('institute_id', sessionInstID).eq('status', 'Active'),
         db.from('teacher_details').select('teacher_name, rating').eq('institute_id', sessionInstID).order('rating', {ascending: false}).limit(3),
-        db.from('exam').select('full_name, percentage').eq('institute_id', sessionInstID).like('exam_date', `${prefixMonth}%`).order('percentage', {ascending: false}).limit(3),
+        db.from('exam').select('full_name, percentage').eq('institute_id', sessionInstID).like('exam_date', `${monthInput}%`).order('percentage', {ascending: false}).limit(3),
         db.from('students').select('admission_date').eq('institute_id', sessionInstID).like('admission_date', `${currentYear}%`)
     ]);
 
-    // 3. CALC MONEY
+    // 3. MONEY CALCULATION
     const totalFees = feesRes.data ? feesRes.data.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
     const totalInv = invRes.data ? invRes.data.reduce((s, r) => s + (parseFloat(r.total_paid) || 0), 0) : 0;
     
@@ -5205,6 +5206,7 @@ async function loadBusinessSummary() {
         totalExp = (parseFloat(e.rent)||0) + (parseFloat(e.electricity)||0) + (parseFloat(e.maintenance)||0) + (parseFloat(e.teacher_salary)||0) + (parseFloat(e.admin_salary)||0) + (parseFloat(e.marketing)||0) + (parseFloat(e.other_exp)||0);
     }
 
+    // UPDATE UI
     document.getElementById('biz-fees').innerText = "₹ " + totalFees.toLocaleString();
     document.getElementById('biz-inv').innerText = "₹ " + totalInv.toLocaleString();
     document.getElementById('biz-exp').innerText = "₹ " + totalExp.toLocaleString();
@@ -5212,49 +5214,35 @@ async function loadBusinessSummary() {
 
     // 4. TOP 3 COURSES
     const courseCounts = {};
-    courseRes.data.forEach(s => { courseCounts[s.course] = (courseCounts[s.course] || 0) + 1; });
-    const topCourses = Object.entries(courseCounts).sort((a,b) => b[1] - a[1]).slice(0, 3);
-    document.getElementById('top-courses').innerHTML = topCourses.map((c, i) => `<li>${i+1}. ${c[0]} (${c[1]})</li>`).join('');
+    if(courseRes.data) {
+        courseRes.data.forEach(s => { courseCounts[s.course] = (courseCounts[s.course] || 0) + 1; });
+        const topCourses = Object.entries(courseCounts).sort((a,b) => b[1] - a[1]).slice(0, 3);
+        document.getElementById('top-courses').innerHTML = topCourses.map((c, i) => `<li>${i+1}. ${c[0]} (${c[1]})</li>`).join('');
+    }
 
     // 5. TOP 3 TEACHERS (Rating)
-    document.getElementById('top-teachers-rating').innerHTML = tchRatRes.data.map((t, i) => `<li>${i+1}. ${t.teacher_name} (⭐ ${t.rating})</li>`).join('');
+    if(tchRatRes.data) {
+        document.getElementById('top-teachers-rating').innerHTML = tchRatRes.data.map((t, i) => `<li>${i+1}. ${t.teacher_name} (⭐ ${t.rating})</li>`).join('');
+    }
 
     // 6. TOP 3 STUDENTS (Results)
-    document.getElementById('top-students-results').innerHTML = stuExamRes.data.map((s, i) => `<li>${i+1}. ${s.full_name} (${s.percentage}%)</li>`).join('');
-
-    // 7. BEST MONTH OF YEAR
-    const monthCounts = {};
-    yrEnrolRes.data.forEach(s => {
-        const m = new Date(s.admission_date).toLocaleString('default', { month: 'long' });
-        monthCounts[m] = (monthCounts[m] || 0) + 1;
-    });
-    const bestMonth = Object.entries(monthCounts).sort((a,b) => b[1] - a[1])[0];
-    document.getElementById('top-month-year').innerText = bestMonth ? `${bestMonth[0]} (${bestMonth[1]} Admissions)` : "N/A";
-    
-    // Call deeper analytics (Attendance)
-    loadBizAttendanceAnalytics(prefixMonth);
-}
-
-async function loadBizAttendanceAnalytics(prefixMonth) {
-    // Top Students by Attn %
-    const { data: stuAttn } = await db.from('attendance').select('roll_number, status').like('attendance_date', `${prefixMonth}%`).eq('institute_id', sessionInstID);
-    
-    if (stuAttn && stuAttn.length > 0) {
-        const studentMap = {};
-        stuAttn.forEach(a => {
-            if (!studentMap[a.roll_number]) studentMap[a.roll_number] = { p: 0, t: 0 };
-            studentMap[a.roll_number].t++;
-            if (a.status === 'Present') studentMap[a.roll_number].p++;
-        });
-
-        const topStuArr = [];
-        for (let roll in studentMap) {
-            const { data: s } = await db.from('students').select('full_name').eq('roll_number', roll).single();
-            topStuArr.push({ name: s ? s.full_name : roll, pct: (studentMap[roll].p / studentMap[roll].t) * 100 });
-        }
-        const top3StuAttn = topStuArr.sort((a,b) => b.pct - a.pct).slice(0, 3);
-        document.getElementById('top-students-attn').innerHTML = top3StuAttn.map((s, i) => `<li>${i+1}. ${s.name} (${s.pct.toFixed(0)}%)</li>`).join('');
+    if(stuExamRes.data) {
+        document.getElementById('top-students-results').innerHTML = stuExamRes.data.map((s, i) => `<li>${i+1}. ${s.full_name} (${s.percentage}%)</li>`).join('');
     }
+
+    // 7. BEST MONTH CALCULATION (Fixing the visibility/logic)
+    const monthCounts = {};
+    if(yrEnrolRes.data) {
+        yrEnrolRes.data.forEach(s => {
+            const m = new Date(s.admission_date).toLocaleString('default', { month: 'long' });
+            monthCounts[m] = (monthCounts[m] || 0) + 1;
+        });
+        const bestMonth = Object.entries(monthCounts).sort((a,b) => b[1] - a[1])[0];
+        document.getElementById('top-month-year').innerText = bestMonth ? `${bestMonth[0]} (${bestMonth[1]} Admissions)` : "No Admissions Yet";
+    }
+
+    // Load Attendance
+    loadBizAttendanceAnalytics(monthInput);
 }
     </script>
 <script>
