@@ -1029,6 +1029,9 @@
        <div class="button-row" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
     <button class="btn-add" style="width: auto; padding: 10px 20px;" onclick="addTeacherDetails()">ADD TEACHER</button>
     <button class="btn-fetch" style="width: auto; padding: 10px 20px;" onclick="fetchTeacher()">FETCH</button>
+<button class="btn-add" style="background: #27ae60; width: auto; padding: 10px 20px;" onclick="saveTeacherPayment()">
+    <i class="fas fa-hand-holding-usd"></i> LOG SALARY PAYMENT
+</button>
     <button class="btn-fetch" style="width: auto; padding: 10px 20px; background:#673ab7;" onclick="showPayslipHistory()">VIEW PAYSLIPS</button>
 </div>
 
@@ -4091,7 +4094,24 @@ async function fetchStudentMessages(course) {
 }
 
 
+async function saveTeacherPayment() {
+    const data = {
+        institute_id: sessionInstID,
+        teacher_id: document.getElementById('tch-id').value.toUpperCase(),
+        full_name: document.getElementById('tch-name').value,
+        subject_taught: document.getElementById('tch-subject').value,
+        joining_date: document.getElementById('tch-join').value,
+        amount_paid: parseFloat(prompt("Enter Amount Paid Today:")) || 0,
+        pending_amount: parseFloat(prompt("Enter Remaining Balance (if any):")) || 0,
+        month_year: new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
+    };
 
+    if(!data.teacher_id || !data.amount_paid) return alert("Teacher ID and Amount are required!");
+
+    const { error } = await db.from('teacher_payments').insert([data]);
+    if(error) alert(error.message);
+    else alert("Payment Logged Successfully!");
+}
 
 
 
