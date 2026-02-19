@@ -1871,7 +1871,8 @@ if (!sessionInstID || sessionInstID === "") {
 
 
 // --- NEW LOGIC: Log the initial payment into Payment History ---
-    if (parseFloat(stuData.paid_amount) > 0) {
+/*
+  if (parseFloat(stuData.paid_amount) > 0) {
         const payDate = stuData.admission_date;
         const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
         
@@ -1884,6 +1885,7 @@ if (!sessionInstID || sessionInstID === "") {
             month_year: monthYearStr
         }]);
     }
+*/
     // --- End of New Logic ---
 
 
@@ -2120,7 +2122,8 @@ async function saveFeeUpdate() {
     if (upError) return alert("Student Update Failed: " + upError.message);
 
     // 5. INSERT INTO PAYMENT HISTORY (STAMP WITH INSTITUTE ID)
-    const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+/*   
+ const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
     const { error: histError } = await db.from('payment_history').insert([{
         institute_id: sessionInstID, // Crucial for multi-tenant isolation
         student_id: detail.student_id,
@@ -2140,6 +2143,15 @@ async function saveFeeUpdate() {
         if (typeof loadFeesPortal === "function") loadFeesPortal();
     }
 }
+*/
+
+// Add these lines below the commented block to keep the UI working
+alert("SUCCESS: Payment Recorded!");
+fetchFeeByRoll();
+if (typeof loadFeesPortal === "function") loadFeesPortal();
+
+
+
 
 async function loadFeesPortal() {
     const year = document.getElementById('portal-year').value || "2026";
