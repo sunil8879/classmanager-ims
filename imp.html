@@ -970,10 +970,7 @@
         <h3><i class="fas fa-wallet"></i> Monthly Expense & Income Tracker</h3>
 
 
-<!-- Add this at the top of your Expense section card -->
-<button class="btn-fetch" style="background: #E67E22; width: 100%; margin-bottom: 20px; border: 2px solid #000;" onclick="reconcilePayments()">
-    <i class="fas fa-sync-alt"></i> SYNC PAYMENTS (FIX 19,000 ➔ 32,000)
-</button>
+
         
         <!-- CALENDAR HEADER -->
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px;">
@@ -3200,53 +3197,7 @@ function clearExpenseForm() {
     calculateFinancials();
 }
 
-async function reconcilePayments() {
-    alert("Reconciling... This will match your Expense total to your Dashboard total.");
 
-    // 1. Get all active students for your institute
-    const { data: students, error: stuErr } = await db.from('students')
-        .select('id, roll_number, full_name, paid_amount, admission_date')
-        .eq('institute_id', sessionInstID);
-
-    if (stuErr) return alert("Error fetching students.");
-
-    let totalFixed = 0;
-
-    for (const s of students) {
-        // 2. Sum up all payments recorded in history for this specific student
-        const { data: history } = await db.from('payment_history')
-            .select('amount')
-            .eq('roll_number', s.roll_number)
-            .eq('institute_id', sessionInstID);
-
-        const recordedSum = history ? history.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
-
-        // 3. Compare with what the Student Table says
-        const currentPaid = parseFloat(s.paid_amount) || 0;
-
-        if (currentPaid > recordedSum) {
-            // We found a gap! Calculate the missing amount
-            const gap = currentPaid - recordedSum;
-
-            // 4. Insert an 'Adjustment' entry into history to fix the total
-            const dateObj = new Date(s.admission_date + "T00:00:00");
-            const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-            await db.from('payment_history').insert([{
-                institute_id: sessionInstID,
-                student_id: s.id,
-                roll_number: s.roll_number,
-                amount: gap,
-                payment_date: s.admission_date, // Log it on their admission date
-                month_year: monthYearStr
-            }]);
-            totalFixed += gap;
-        }
-    }
-
-    alert("Sync Successful! Added ₹" + totalFixed + " to your history records. Your Expenses and Dashboard will now match.");
-    fetchAutoFees(); // Refresh the numbers on the screen
-}
 /* ==========================================
    11. TEACHER PORTAL (Admin Side)
    ========================================== */
