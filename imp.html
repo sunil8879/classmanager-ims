@@ -968,9 +968,6 @@
 <section id="expense" class="content-section">
     <div class="card" style="border-top-color: #ff0000;">
         <h3><i class="fas fa-wallet"></i> Monthly Expense & Income Tracker</h3>
-
-
-
         
         <!-- CALENDAR HEADER -->
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px;">
@@ -1864,8 +1861,14 @@ if (!sessionInstID || sessionInstID === "") {
             alert("Error in secondary details: " + detailError.message);
         } else {
 
+
+
+
+
+
+
 // --- NEW LOGIC: Log the initial payment into Payment History ---
-  if (parseFloat(stuData.paid_amount) > 0) {
+    if (parseFloat(stuData.paid_amount) > 0) {
         const payDate = stuData.admission_date;
         const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
         
@@ -1878,7 +1881,6 @@ if (!sessionInstID || sessionInstID === "") {
             month_year: monthYearStr
         }]);
     }
-
     // --- End of New Logic ---
 
 
@@ -2115,8 +2117,7 @@ async function saveFeeUpdate() {
     if (upError) return alert("Student Update Failed: " + upError.message);
 
     // 5. INSERT INTO PAYMENT HISTORY (STAMP WITH INSTITUTE ID)
-   
- const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+    const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
     const { error: histError } = await db.from('payment_history').insert([{
         institute_id: sessionInstID, // Crucial for multi-tenant isolation
         student_id: detail.student_id,
@@ -2136,9 +2137,6 @@ async function saveFeeUpdate() {
         if (typeof loadFeesPortal === "function") loadFeesPortal();
     }
 }
-
-
-
 
 async function loadFeesPortal() {
     const year = document.getElementById('portal-year').value || "2026";
@@ -3095,34 +3093,29 @@ async function fetchLead() {
 
 // 1. AUTO-POPULATE Fees from Payment History
 async function fetchAutoFees() {
-    const monthVal = document.getElementById('exp-month-year').value; 
+    const monthVal = document.getElementById('exp-month-year').value; // e.g. "2026-02"
     if (!monthVal || !sessionInstID) return;
 
-    // Format: "February 2026"
+    // 1. Convert "2026-02" to "February 2026" to match Payment History format
     const dateObj = new Date(monthVal + "-01");
     const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // THE MAGIC LINK:
-    // We fetch amounts from history, but the "!inner" part forces 
-    // it to only count students who are 'Active' in the master table.
+    // 2. Fetch ONLY payments belonging to THIS institute for THIS month
     const { data, error } = await db
         .from('payment_history')
-        .select(`
-            amount,
-            students!inner ( status )
-        `)
-        .eq('institute_id', sessionInstID)
-        .eq('month_year', targetMonthYear)
-        .eq('students.status', 'Active');
+        .select('amount')
+        .eq('institute_id', sessionInstID) 
+        .eq('month_year', targetMonthYear);
 
     if (error) {
         console.error("Link Error:", error.message);
         return;
     }
 
-    // Sum up the verified amounts
+    // 3. Sum up the amounts
     const total = data ? data.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
     
+    // 4. Update UI and trigger math
     document.getElementById('disp-auto-fees').innerText = "₹ " + total.toFixed(2);
     calculateFinancials(); 
 }
@@ -3200,8 +3193,6 @@ function clearExpenseForm() {
     inputs.forEach(id => document.getElementById(id).value = 0);
     calculateFinancials();
 }
-
-
 /* ==========================================
    11. TEACHER PORTAL (Admin Side)
    ========================================== */
