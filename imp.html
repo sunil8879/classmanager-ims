@@ -970,7 +970,10 @@
             <div class="input-group"><label>Admin Salaries</label><input type="number" id="exp-a-sal" value="0" oninput="calculateFinancials()"></div>
             <div class="input-group"><label>Marketing</label><input type="number" id="exp-mark" value="0" oninput="calculateFinancials()"></div>
             <div class="input-group"><label>Other Expenses</label><input type="number" id="exp-other" value="0" oninput="calculateFinancials()"></div>
-            <div class="input-group"><label>Other Income</label><input type="number" id="exp-income" value="0" oninput="calculateFinancials()"></div>
+      <div class="input-group">
+    <label>Other Income (From Inventory)</label>
+    <input type="number" id="exp-income" value="0" readonly style="background: #eee; font-weight: bold; color: green;">
+</div>
         </div>
 
         <div class="stat-card" style="background: #eefbff; margin-top: 20px; text-align: left;">
@@ -4930,32 +4933,26 @@ async function fetchStudentForInv() {
 
 /* --- MINIMAL FIX: FINANCIAL SYNC FOR INVENTORY --- */
 async function syncToOtherIncome(amount) {
-    const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
+    const currentMonth = new Date().toISOString().substring(0, 7); 
     
-    // 1. Get existing data
     const { data: existing } = await db.from('expenses')
         .select('other_income')
         .eq('month_year', currentMonth)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
     
-    let newTotal = parseFloat(amount) || 0;
-    if(existing) newTotal = (parseFloat(existing.other_income) || 0) + parseFloat(amount);
+    let newTotal = (existing ? parseFloat(existing.other_income) : 0) + parseFloat(amount);
 
-    // 2. Save to Database
     await db.from('expenses').upsert({
         institute_id: sessionInstID,
         month_year: currentMonth,
         other_income: newTotal
     }, { onConflict: 'institute_id, month_year' });
 
-    // --- UI REFRESH FIX ---
-    const expMonthInput = document.getElementById('exp-month-year').value;
-    // If the Expense tab is currently looking at the same month, update the box immediately
-    if (expMonthInput === currentMonth) {
+    // AUTO-POPULATE LIVE: Update the locked box if the user has the Expense tab open
+    if (document.getElementById('exp-month-year').value === currentMonth) {
         document.getElementById('exp-income').value = newTotal.toFixed(2);
-        // Recalculate the Total Income and Ratio on the Expense page
-        if(typeof calculateFinancials === 'function') calculateFinancials();
+        calculateFinancials(); // Recalculate totals immediately
     }
 }
     </script>
