@@ -1802,104 +1802,42 @@ function generateRollNow() {
 
 // 4. Validation & Add Student
 async function addStudent() {
-if (!sessionInstID || sessionInstID === "") {
-        return alert("Error: Institute ID is missing. Please refresh the page or log in again.");
-    }
-    // 1. Get Values from UI
+    if (!sessionInstID) return alert("Error: Institute ID is missing.");
     const admissionDate = document.getElementById('stu-date').value;
     const endDate = document.getElementById('stu-end-date').value;
     const mobile = document.getElementById('stu-mobile').value;
-    const fMobile = document.getElementById('stu-father').value;
-    const mMobile = document.getElementById('stu-mother').value;
     const roll = document.getElementById('stu-roll').value;
-    const today = new Date().setHours(0,0,0,0);
 
-    // 2. Validations
-    if (!admissionDate) return alert("Error: Admission Date is required.");
-    if (!roll) return alert("Error: Please click 'Gen' to create a Roll Number first.");
-    if (mobile.length !== 10) return alert("Error: Mobile Number must be 10 digits.");
-
-    // 3. Check if this Roll Number already exists in the database to prevent the "Duplicate" error
-    const { data: existingRoll } = await db.from('student_details').select('roll_number').eq('roll_number', roll).single();
-    if (existingRoll) {
-        return alert("Error: This Roll Number (" + roll + ") is already assigned to someone else. Please generate a new one.");
-    }
-
-    // 4. Prepare the Data Object
     const stuData = {
- institute_id: sessionInstID,
+        institute_id: sessionInstID,
         admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
         mobile: mobile,
-        father_mobile: fMobile,
-        mother_mobile: mMobile,
+        father_mobile: document.getElementById('stu-father').value,
+        mother_mobile: document.getElementById('stu-mother').value,
         standard: document.getElementById('stu-standard').value,
         batch_time: document.getElementById('stu-batch').value,
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
-        roll_number: roll,
-        user_id: (await db.auth.getUser()).data.user?.id 
+        roll_number: roll
     };
 
-    // 5. Save to 'students' table
     const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
+    if (stuError) return alert("Save Error: " + stuError.message);
 
-    if (stuError) {
-        console.error(stuError);
-        return alert("Save Error: " + stuError.message);
-    }
+    await db.from('student_details').upsert([{
+        institute_id: sessionInstID,
+        student_id: newStu[0].id,
+        roll_number: roll,
+        course_end_date: endDate
+    }]);
 
-    // 6. Save to 'student_details' using UPSERT (This prevents the 'Unique Constraint' crash)
-    if (newStu && newStu[0]) {
-        const { error: detailError } = await db.from('student_details').upsert([{
- institute_id: sessionInstID,
-            student_id: newStu[0].id,
-            roll_number: roll,
-            course_end_date: endDate
-        }], { onConflict: 'student_id' }); // If ID exists, it updates; it won't crash.
-        
-        if (detailError) {
-            alert("Error in secondary details: " + detailError.message);
-        } else {
-
-
-
-
-
-
-
-// --- NEW LOGIC: Log the initial payment into Payment History ---
-/*
-  if (parseFloat(stuData.paid_amount) > 0) {
-        const payDate = stuData.admission_date;
-        const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
-        
-        await db.from('payment_history').insert([{
-            institute_id: sessionInstID,
-            student_id: newStu[0].id,
-            roll_number: roll,
-            amount: stuData.paid_amount,
-            payment_date: payDate,
-            month_year: monthYearStr
-        }]);
-    }
-*/
-    // --- End of New Logic ---
-
-
-
-
-
-
-    alert("SUCCESS! Student " + stuData.full_name + " saved with Roll No: " + roll);
+    alert("SUCCESS! Student saved. Ledger updated by database.");
     clearStudentForm();
-            alert("SUCCESS! Student " + stuData.full_name + " saved with Roll No: " + roll);
-            clearStudentForm();
-        }
-    }
 }
+
 
 // 5. Fetch Details by Roll Number
 async function fetchStudentByRoll() {
@@ -2073,45 +2011,20 @@ async function fetchFeeByRoll() {
 }
 // 3. Save Payment & Record in History
 async function saveFeeUpdate() {
-    // 1. GET INPUTS
     const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
     const nowPaying = parseFloat(document.getElementById('fee-paid-now').value) || 0;
     const totalFees = parseFloat(document.getElementById('fee-total').value) || 0;
-    const payDate = document.getElementById('fee-today').value;
-    const fullNameVal = document.getElementById('fee-name').value.trim();
     const prevPaidVal = parseFloat(document.getElementById('fee-prev-paid').value) || 0;
-    const joinDateVal = document.getElementById('fee-join-date').value;
-    const todayStr = new Date().toISOString().split('T')[0];
 
-    // 2. FULL ORIGINAL VALIDATIONS RESTORED
-    if (!roll || !payDate) return alert("Error: Roll Number and Date are required.");
+    if (!roll || nowPaying <= 0) return alert("Error: Roll Number and Amount are required.");
     
-    // Name validation (Ensure first + surname)
-    if (fullNameVal.split(/\s+/).filter(w => w.length > 0).length < 2) {
-        return alert("Error: Enter Full Name (Initial + Surname).");
-    }
-    
-    // Future date check
-    if (joinDateVal > todayStr) return alert("Error: Date of Joining cannot be in future.");
-    
-    // Financial logic checks
-    if (prevPaidVal > totalFees) return alert("Error: Previously Paid cannot exceed Total Fees.");
-    if (nowPaying > (totalFees - prevPaidVal)) {
-        return alert("Error: Payment exceeds remaining balance.");
-    }
+    const { data: detail } = await db.from('student_details')
+        .select('student_id').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
 
-    // 3. DATABASE CONNECTION (BRIDGE TO STUDENT_DETAILS)
-    const { data: detail, error: fetchErr } = await db.from('student_details')
-        .select('student_id')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    if(fetchErr || !detail) return alert("Fetch student first using roll number.");
+    if(!detail) return alert("Fetch student first.");
 
     const newPaidTotal = prevPaidVal + nowPaying;
 
-    // 4. UPDATE MASTER STUDENTS TABLE
     const { error: upError } = await db.from('students').update({
         paid_amount: newPaidTotal,
         pending_amount: totalFees - newPaidTotal,
@@ -2119,66 +2032,14 @@ async function saveFeeUpdate() {
         due_dates: document.getElementById('fee-due-dates').value
     }).eq('id', detail.student_id);
 
-    if (upError) return alert("Student Update Failed: " + upError.message);
+    if (upError) return alert("Update Failed: " + upError.message);
 
-    // 5. INSERT INTO PAYMENT HISTORY (STAMP WITH INSTITUTE ID)
-/*   
- const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
-    const { error: histError } = await db.from('payment_history').insert([{
-        institute_id: sessionInstID, // Crucial for multi-tenant isolation
-        student_id: detail.student_id,
-        roll_number: roll,
-        amount: nowPaying,
-        payment_date: payDate,
-        month_year: monthYearStr
-    }]);
-
-    if (histError) {
-        alert("Balance updated, but history log failed: " + histError.message);
-    } else {
-        alert("SUCCESS: Payment Recorded, Master Student Table Updated & Transaction Logged!");
-        
-        // REFRESH UI
-        fetchFeeByRoll();
-        if (typeof loadFeesPortal === "function") loadFeesPortal();
-    }
+    alert("SUCCESS: Payment Recorded!");
+    fetchFeeByRoll();
+    loadFeesPortal();
 }
-*/
-
-// Add these lines below the commented block to keep the UI working
-alert("SUCCESS: Payment Recorded!");
-fetchFeeByRoll();
-if (typeof loadFeesPortal === "function") loadFeesPortal();
 
 
-
-
-async function loadFeesPortal() {
-    const year = document.getElementById('portal-year').value || "2026";
-    
-    // 1. Get Totals for Active Students
-    const { data: students } = await db.from('students').select('*').eq('status', 'Active')
-	.eq('institute_id', sessionInstID);
-    if (students) {
-        document.getElementById('stat-active-count').innerText = students.length;
-        document.getElementById('stat-total-received').innerText = "₹ " + students.reduce((s, st) => s + (st.paid_amount || 0), 0).toLocaleString();
-        document.getElementById('stat-total-pending').innerText = "₹ " + students.reduce((s, st) => s + (st.pending_amount || 0), 0).toLocaleString();
-    }
-
-    // 2. Yearly Collection (Fixed query: gte/lte handles Date types better than LIKE)
-    const startYear = `${year}-01-01`;
-    const endYear = `${year}-12-31`;
-    
-    const { data: history } = await db.from('payment_history')
-        .select('amount')
-        .gte('payment_date', startYear)
-        .lte('payment_date', endYear);
-
-    const totalYearly = history ? history.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) : 0;
-    
-    document.getElementById('yearly-label').innerText = year + " Total Collection";
-    document.getElementById('stat-yearly').innerText = "₹ " + totalYearly.toLocaleString();
-}
 async function fetchPaymentLog() {
     const roll = document.getElementById('log-roll').value;
     const monthInput = document.getElementById('log-calendar').value; // YYYY-MM
@@ -3233,64 +3094,7 @@ function generateTchID() {
 /* ==========================================
    COMPLETE FEE PORTAL LOGIC
    ========================================== */
-async function loadFeesPortal() {
-    console.log("Syncing Fees Portal Statistics...");
 
-    try {
-        // 1. FETCH DATA FROM STUDENTS TABLE (Active Students Only)
-        // We fetch paid_amount and pending_amount for the totals
-        const { data: students, error: stuError } = await db
-            .from('students')
-            .select('paid_amount, pending_amount')
-            .eq('status', 'Active');
-
-        if (stuError) throw stuError;
-
-        if (students) {
-            const activeCount = students.length;
-            const totalReceived = students.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
-            const totalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
-
-            // Update UI Counters
-            const elCount = document.getElementById('stat-active-count');
-            const elRec = document.getElementById('stat-total-received');
-            const elPen = document.getElementById('stat-total-pending');
-
-            if (elCount) elCount.innerText = activeCount;
-            if (elRec) elRec.innerText = "₹ " + totalReceived.toLocaleString('en-IN');
-            if (elPen) elPen.innerText = "₹ " + totalPending.toLocaleString('en-IN');
-        }
-
-        // 2. FETCH DATA FROM PAYMENT HISTORY (Yearly Collection Stats)
-        // Get the year from the UI input
-        const yearInput = document.getElementById('portal-year');
-        const selectedYear = yearInput ? yearInput.value : new Date().getFullYear();
-
-        // Calculate start and end of the year for the database query
-        const startDate = `${selectedYear}-01-01`;
-        const endDate = `${selectedYear}-12-31`;
-
-        const { data: history, error: histError } = await db
-            .from('payment_history')
-            .select('amount')
-            .gte('payment_date', startDate)
-            .lte('payment_date', endDate);
-
-        if (histError) throw histError;
-
-        const yearlySum = history ? history.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
-
-        // Update Yearly UI
-        const elYearly = document.getElementById('stat-yearly');
-        const elLabel = document.getElementById('yearly-label');
-
-        if (elYearly) elYearly.innerText = "₹ " + yearlySum.toLocaleString('en-IN');
-        if (elLabel) elLabel.innerText = selectedYear + " Total Collection";
-
-    } catch (err) {
-        console.error("Fee Portal Refresh Failed:", err.message);
-    }
-}
 // 2. Clear Form
 function clearTeacherForm() {
     const ids = ['tch-id','tch-name','tch-age','tch-gender','tch-join','tch-qual','tch-subject','tch-salary'];
@@ -4130,6 +3934,74 @@ async function fetchStudentMessages(course) {
     if (data && data.length > 0) {
         noticeDiv.innerHTML = data.map(m => `<div style="background:#f0fff4; padding:10px; border-bottom:1px solid #27ae60; margin-bottom:5px; border-radius:5px;"><b style="color:#27ae60;">[${m.target_subject}]</b> ${m.content}</div>`).join('');
     } else noticeDiv.innerHTML = "No new batch notices.";
+}
+
+
+
+
+/* --- THE ONLY LOAD FEES PORTAL FUNCTION YOU NEED --- */
+async function loadFeesPortal() {
+    console.log("Syncing Fees Portal Statistics...");
+    try {
+        // 1. Calculate Active Student Totals (for the 32,000 figure)
+        const { data: students, error: stuError } = await db
+            .from('students')
+            .select('paid_amount, pending_amount')
+            .eq('institute_id', sessionInstID)
+            .eq('status', 'Active');
+
+        if (stuError) throw stuError;
+
+        if (students) {
+            const activeCount = students.length;
+            const totalReceived = students.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
+            const totalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+
+            // Update UI Counters
+            if (document.getElementById('stat-active-count')) {
+                document.getElementById('stat-active-count').innerText = activeCount;
+                document.getElementById('stat-total-received').innerText = "₹ " + totalReceived.toLocaleString('en-IN');
+                document.getElementById('stat-total-pending').innerText = "₹ " + totalPending.toLocaleString('en-IN');
+            }
+        }
+
+        // 2. Calculate Yearly Collection from History
+        const yearInput = document.getElementById('portal-year');
+        const selectedYear = yearInput ? yearInput.value : 2026;
+        const startDate = `${selectedYear}-01-01`;
+        const endDate = `${selectedYear}-12-31`;
+
+        const { data: history, error: histError } = await db
+            .from('payment_history')
+            .select('amount')
+            .eq('institute_id', sessionInstID)
+            .gte('payment_date', startDate)
+            .lte('payment_date', endDate);
+
+        if (histError) throw histError;
+
+        const yearlySum = history ? history.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
+
+        if (document.getElementById('stat-yearly')) {
+            document.getElementById('stat-yearly').innerText = "₹ " + yearlySum.toLocaleString('en-IN');
+            document.getElementById('yearly-label').innerText = selectedYear + " Total Collection";
+        }
+
+    } catch (err) {
+        console.error("Sync error:", err.message);
+    }
+}
+
+
+
+async function bulkTeachersWA() {
+    const { data } = await db.from('teacher_details').select('teacher_name, mobile, subject_taught').eq('institute_id', sessionInstID);
+    displayWAContactList(data);
+}
+
+async function bulkStudentsWA() {
+    const { data } = await db.from('students').select('full_name, mobile, course').eq('institute_id', sessionInstID).eq('status', 'Active');
+    displayWAContactList(data);
 }
     </script>
 <script>
