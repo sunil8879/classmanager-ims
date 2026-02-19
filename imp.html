@@ -4721,10 +4721,12 @@ function initInventoryGrid() {
                 </td>
                 <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold; color: #000;">${item}</td>
                 <td style="padding: 10px; border: 1px solid #ccc;">
-                    <input type="number" class="inv-stock-val" style="width: 70px;" placeholder="Stock" oninput="checkLowStockGlobal()">
+                    <!-- PERMANENTLY DISABLED -->
+                    <input type="number" class="inv-stock-val" style="width: 70px; background: #f0f0f0; border: none; text-align: center; font-weight: bold;" disabled>
                 </td>
                 <td style="padding: 10px; border: 1px solid #ccc;">
-                    <input type="number" class="inv-price-val" style="width: 70px;" placeholder="Price" oninput="calculateInvTotal()">
+                    <!-- PERMANENTLY DISABLED -->
+                    <input type="number" class="inv-price-val" style="width: 70px; background: #f0f0f0; border: none; text-align: center; font-weight: bold;" disabled>
                 </td>
                 <td style="padding: 10px; border: 1px solid #ccc;">
                     <input type="number" class="inv-qty-val" style="width: 60px;" value="1" min="1" oninput="calculateInvTotal()">
@@ -4743,8 +4745,11 @@ function initInventoryGrid() {
 }
 function toggleInventoryGrid() {
     const grid = document.getElementById('inventory-grid-container');
-    grid.style.display = grid.style.display === 'none' ? 'block' : 'none';
-    if(grid.style.display === 'block') loadMasterInventory();
+    const isOpening = grid.style.display === 'none';
+    grid.style.display = isOpening ? 'block' : 'none';
+    
+    // Simply load the data from Supabase into the locked fields
+    if(isOpening) loadMasterInventory();
 }
 
 function calculateInvTotal() {
@@ -4860,6 +4865,7 @@ async function processInventorySale() {
         syncToOtherIncome(total);
         alert("Sale Recorded & " + itemsStr + " deducted from stock!");
         clearInventoryUI();
+loadMasterInventory(); 
     }
 }
 
