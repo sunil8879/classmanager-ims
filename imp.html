@@ -3096,29 +3096,34 @@ async function fetchLead() {
 
 // 1. AUTO-POPULATE Fees from Payment History
 async function fetchAutoFees() {
-    const monthVal = document.getElementById('exp-month-year').value; // e.g. "2026-02"
+    const monthVal = document.getElementById('exp-month-year').value; 
     if (!monthVal || !sessionInstID) return;
 
-    // 1. Convert "2026-02" to "February 2026" to match Payment History format
+    // Format: "February 2026"
     const dateObj = new Date(monthVal + "-01");
     const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // 2. Fetch ONLY payments belonging to THIS institute for THIS month
+    // THE MAGIC LINK:
+    // We fetch amounts from history, but the "!inner" part forces 
+    // it to only count students who are 'Active' in the master table.
     const { data, error } = await db
         .from('payment_history')
-        .select('amount')
-        .eq('institute_id', sessionInstID) 
-        .eq('month_year', targetMonthYear);
+        .select(`
+            amount,
+            students!inner ( status )
+        `)
+        .eq('institute_id', sessionInstID)
+        .eq('month_year', targetMonthYear)
+        .eq('students.status', 'Active');
 
     if (error) {
         console.error("Link Error:", error.message);
         return;
     }
 
-    // 3. Sum up the amounts
+    // Sum up the verified amounts
     const total = data ? data.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
     
-    // 4. Update UI and trigger math
     document.getElementById('disp-auto-fees').innerText = "₹ " + total.toFixed(2);
     calculateFinancials(); 
 }
