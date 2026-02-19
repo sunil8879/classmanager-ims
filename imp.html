@@ -5176,8 +5176,12 @@ async function fetchAutoInventory() {
    FINAL BUSINESS SUMMARY ENGINE (FIXED)
    ========================================== */
 
+/* ==========================================
+   FINAL BUSINESS SUMMARY ENGINE (REPAIR VERSION)
+   ========================================== */
+
 async function loadBusinessSummary() {
-    const monthInput = document.getElementById('biz-calendar').value; // "2026-02"
+    const monthInput = document.getElementById('biz-calendar').value; // e.g. "2026-02"
     if (!monthInput) return;
 
     const dateObj = new Date(monthInput + "-01");
@@ -5186,16 +5190,16 @@ async function loadBusinessSummary() {
 
     document.getElementById('biz-report-area').style.display = 'block';
 
-    // 1. FETCH ALL 8 DATA SOURCES
+    // 1. FETCH ALL DATA
     const [feesRes, invRes, expRes, courseRes, tchRatRes, stuExamRes, yrEnrolRes, tchAttnRes] = await Promise.all([
         db.from('payment_history').select('amount').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
         db.from('inventory_sales').select('total_paid').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
         db.from('expenses').select('*').eq('month_year', monthInput).eq('institute_id', sessionInstID).maybeSingle(),
         db.from('students').select('course').eq('institute_id', sessionInstID).eq('status', 'Active'),
         db.from('teacher_details').select('teacher_name, rating').eq('institute_id', sessionInstID).order('rating', {ascending: false}).limit(3),
-        db.from('exam').select('full_name, percentage').eq('institute_id', sessionInstID).like('exam_date', `${monthInput}%`).order('percentage', {ascending: false}).limit(3),
-        db.from('students').select('admission_date').eq('institute_id', sessionInstID).like('admission_date', `${currentYear}%`),
-        db.from('teachers_attendance').select('teacher_id, full_name, status').like('attendance_date', `${monthInput}%`).eq('institute_id', sessionInstID)
+        db.from('exam').select('full_name, percentage, exam_date').eq('institute_id', sessionInstID).order('percentage', {ascending: false}),
+        db.from('students').select('admission_date').eq('institute_id', sessionInstID),
+        db.from('teachers_attendance').select('teacher_id, full_name, status, attendance_date').eq('institute_id', sessionInstID)
     ]);
 
     // 2. REVENUE CALCULATIONS
@@ -5211,38 +5215,39 @@ async function loadBusinessSummary() {
     document.getElementById('biz-exp').innerText = "₹ " + totalExp.toLocaleString();
     document.getElementById('biz-profit').innerText = "₹ " + (totalFees + totalInv - totalExp).toLocaleString();
 
-    // 3. ITEM 5: TOP COURSES
+    // 3. ITEM 5 & 6 (COURSES & TEACHER RATINGS)
     const cMap = {}; courseRes.data?.forEach(s => { cMap[s.course] = (cMap[s.course] || 0) + 1; });
     const topC = Object.entries(cMap).sort((a,b) => b[1] - a[1]).slice(0, 3);
     document.getElementById('top-courses').innerHTML = topC.map((c, i) => `<li>${i+1}. ${c[0]} (${c[1]})</li>`).join('') || "<li>No data</li>";
-
-    // 4. ITEM 6: TOP TEACHERS (RATING)
     document.getElementById('top-teachers-rating').innerHTML = tchRatRes.data?.map((t, i) => `<li>${i+1}. ${t.teacher_name} (⭐ ${t.rating})</li>`).join('') || "<li>No data</li>";
 
-    // 5. ITEM 8: TOP STUDENTS (EXAM RESULTS)
-    if(stuExamRes.data && stuExamRes.data.length > 0) {
-        document.getElementById('top-students-results').innerHTML = stuExamRes.data.map((s, i) => `<li>${i+1}. ${s.full_name} (${Math.round(s.percentage)}%)</li>`).join('');
+    // 4. ITEM 8: TOP STUDENTS (EXAMS) - Filtered by JS to avoid DB date errors
+    const filteredExams = stuExamRes.data?.filter(ex => ex.exam_date && ex.exam_date.startsWith(monthInput)) || [];
+    if(filteredExams.length > 0) {
+        document.getElementById('top-students-results').innerHTML = filteredExams.slice(0, 3).map((s, i) => `<li>${i+1}. ${s.full_name} (${Math.round(s.percentage)}%)</li>`).join('');
     } else {
-        document.getElementById('top-students-results').innerHTML = "<li>No exams this month</li>";
+        document.getElementById('top-students-results').innerHTML = "<li>No exams found for " + monthInput + "</li>";
     }
 
-    // 6. ITEM 10: BEST MONTH OF YEAR
-    if(yrEnrolRes.data && yrEnrolRes.data.length > 0) {
+    // 5. ITEM 10: BEST MONTH OF YEAR
+    const currentYearRecords = yrEnrolRes.data?.filter(s => s.admission_date && s.admission_date.startsWith(currentYear)) || [];
+    if(currentYearRecords.length > 0) {
         const mMap = {};
-        yrEnrolRes.data.forEach(s => {
+        currentYearRecords.forEach(s => {
             const m = new Date(s.admission_date).toLocaleString('default', { month: 'long' });
             mMap[m] = (mMap[m] || 0) + 1;
         });
         const best = Object.entries(mMap).sort((a,b) => b[1] - a[1])[0];
         document.getElementById('top-month-year').innerText = best ? `${best[0]} (${best[1]} Enrols)` : "N/A";
     } else {
-        document.getElementById('top-month-year').innerText = "N/A";
+        document.getElementById('top-month-year').innerText = "No Enrolments in " + currentYear;
     }
 
-    // 7. ITEM 7: TOP TEACHERS (ATTENDANCE)
-    if (tchAttnRes.data && tchAttnRes.data.length > 0) {
+    // 6. ITEM 7: TOP TEACHERS (ATTENDANCE) - Filtered by JS
+    const filteredTchAttn = tchAttnRes.data?.filter(a => a.attendance_date && a.attendance_date.startsWith(monthInput)) || [];
+    if (filteredTchAttn.length > 0) {
         const tAttnMap = {};
-        tchAttnRes.data.forEach(a => {
+        filteredTchAttn.forEach(a => {
             if (!tAttnMap[a.teacher_id]) tAttnMap[a.teacher_id] = { n: a.full_name, p: 0, t: 0 };
             tAttnMap[a.teacher_id].t++;
             if (a.status === 'Present') tAttnMap[a.teacher_id].p++;
@@ -5250,34 +5255,36 @@ async function loadBusinessSummary() {
         const tSorted = Object.values(tAttnMap).map(v => ({n: v.n, pct: (v.p/v.t)*100})).sort((a,b) => b.pct - a.pct).slice(0, 3);
         document.getElementById('top-teachers-attn').innerHTML = tSorted.map((t, i) => `<li>${i+1}. ${t.n} (${Math.round(t.pct)}%)</li>`).join('');
     } else {
-        document.getElementById('top-teachers-attn').innerHTML = "<li>No teacher attendance marked</li>";
+        document.getElementById('top-teachers-attn').innerHTML = "<li>No attendance logs found</li>";
     }
 
-    // Call helper for Item 9
+    // Call Item 9
     loadBizAttendanceAnalytics(monthInput);
 }
 
 async function loadBizAttendanceAnalytics(prefixMonth) {
-    // ITEM 9: TOP STUDENTS (ATTENDANCE)
-    const { data: stuAttn } = await db.from('attendance').select('roll_number, status').like('attendance_date', `${prefixMonth}%`).eq('institute_id', sessionInstID);
+    // 1. ITEM 9: TOP STUDENTS (ATTENDANCE)
+    const { data: stuAttn } = await db.from('attendance').select('roll_number, status, attendance_date').eq('institute_id', sessionInstID);
     
-    if (stuAttn && stuAttn.length > 0) {
+    // Filter for current month using JS prefix check
+    const monthlyAttn = stuAttn?.filter(a => a.attendance_date && a.attendance_date.startsWith(prefixMonth)) || [];
+
+    if (monthlyAttn.length > 0) {
         const sAttnMap = {};
-        stuAttn.forEach(a => {
+        monthlyAttn.forEach(a => {
             if (!sAttnMap[a.roll_number]) sAttnMap[a.roll_number] = { p: 0, t: 0 };
             sAttnMap[a.roll_number].t++;
             if (a.status === 'Present') sAttnMap[a.roll_number].p++;
         });
         const sSorted = Object.keys(sAttnMap).map(r => ({ r, pct: (sAttnMap[r].p/sAttnMap[r].t)*100 })).sort((a,b) => b.pct - a.pct).slice(0, 3);
         
-        // Fetch Names and Update UI
         const results = await Promise.all(sSorted.map(async (item) => {
             const { data } = await db.from('students').select('full_name').eq('roll_number', item.r).eq('institute_id', sessionInstID).maybeSingle();
             return { name: data ? data.full_name : item.r, pct: item.pct };
         }));
         document.getElementById('top-students-attn').innerHTML = results.map((s, i) => `<li>${i+1}. ${s.name} (${Math.round(s.pct)}%)</li>`).join('');
     } else {
-        document.getElementById('top-students-attn').innerHTML = "<li>No student attendance marked</li>";
+        document.getElementById('top-students-attn').innerHTML = "<li>No student attendance found</li>";
     }
 }
     </script>
