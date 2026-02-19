@@ -5172,133 +5172,113 @@ async function fetchAutoInventory() {
    MONTHLY BUSINESS SUMMARY LOGIC
    ========================================== */
 
+/* ==========================================
+   FINAL BUSINESS SUMMARY ENGINE (FIXED)
+   ========================================== */
+
 async function loadBusinessSummary() {
-    const monthInput = document.getElementById('biz-calendar').value; // e.g. "2026-02"
+    const monthInput = document.getElementById('biz-calendar').value; // "2026-02"
     if (!monthInput) return;
 
-    // 1. FORMAT DATE LANGUAGE
     const dateObj = new Date(monthInput + "-01");
-    // This creates "February 2026" - EXACTLY what your Fee logic uses
     const formattedMonthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }); 
     const currentYear = monthInput.split('-')[0];
 
     document.getElementById('biz-report-area').style.display = 'block';
 
-    // 2. FETCH DATA (Using the working Fee Logic for everything)
-const [feesRes, invRes, expRes, courseRes, tchRatRes, stuExamRes, yrEnrolRes, tchAttnRes] = await Promise.all([
-    db.from('payment_history').select('amount').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
-    db.from('inventory_sales').select('total_paid').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
-    db.from('expenses').select('*').eq('month_year', monthInput).eq('institute_id', sessionInstID).maybeSingle(),
-    db.from('students').select('course').eq('institute_id', sessionInstID).eq('status', 'Active'),
-    db.from('teacher_details').select('teacher_name, rating').eq('institute_id', sessionInstID).order('rating', {ascending: false}).limit(3),
-    db.from('exam').select('full_name, percentage').eq('institute_id', sessionInstID).like('exam_date', `${monthInput}%`).order('percentage', {ascending: false}).limit(3),
-    db.from('students').select('admission_date').eq('institute_id', sessionInstID).like('admission_date', `${currentYear}%`),
-    db.from('teachers_attendance').select('teacher_id, full_name, status').like('attendance_date', `${monthInput}%`).eq('institute_id', sessionInstID)
-]);
+    // 1. FETCH ALL 8 DATA SOURCES
+    const [feesRes, invRes, expRes, courseRes, tchRatRes, stuExamRes, yrEnrolRes, tchAttnRes] = await Promise.all([
+        db.from('payment_history').select('amount').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
+        db.from('inventory_sales').select('total_paid').eq('month_year', formattedMonthName).eq('institute_id', sessionInstID),
+        db.from('expenses').select('*').eq('month_year', monthInput).eq('institute_id', sessionInstID).maybeSingle(),
+        db.from('students').select('course').eq('institute_id', sessionInstID).eq('status', 'Active'),
+        db.from('teacher_details').select('teacher_name, rating').eq('institute_id', sessionInstID).order('rating', {ascending: false}).limit(3),
+        db.from('exam').select('full_name, percentage').eq('institute_id', sessionInstID).like('exam_date', `${monthInput}%`).order('percentage', {ascending: false}).limit(3),
+        db.from('students').select('admission_date').eq('institute_id', sessionInstID).like('admission_date', `${currentYear}%`),
+        db.from('teachers_attendance').select('teacher_id, full_name, status').like('attendance_date', `${monthInput}%`).eq('institute_id', sessionInstID)
+    ]);
 
-    // 3. MONEY CALCULATION
+    // 2. REVENUE CALCULATIONS
     const totalFees = feesRes.data ? feesRes.data.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
     const totalInv = invRes.data ? invRes.data.reduce((s, r) => s + (parseFloat(r.total_paid) || 0), 0) : 0;
-    
     let totalExp = 0;
     if (expRes.data) {
         const e = expRes.data;
         totalExp = (parseFloat(e.rent)||0) + (parseFloat(e.electricity)||0) + (parseFloat(e.maintenance)||0) + (parseFloat(e.teacher_salary)||0) + (parseFloat(e.admin_salary)||0) + (parseFloat(e.marketing)||0) + (parseFloat(e.other_exp)||0);
     }
-
-    // UPDATE UI
     document.getElementById('biz-fees').innerText = "₹ " + totalFees.toLocaleString();
     document.getElementById('biz-inv').innerText = "₹ " + totalInv.toLocaleString();
     document.getElementById('biz-exp').innerText = "₹ " + totalExp.toLocaleString();
     document.getElementById('biz-profit').innerText = "₹ " + (totalFees + totalInv - totalExp).toLocaleString();
 
-    // 4. TOP 3 COURSES
-    const courseCounts = {};
-    if(courseRes.data) {
-        courseRes.data.forEach(s => { courseCounts[s.course] = (courseCounts[s.course] || 0) + 1; });
-        const topCourses = Object.entries(courseCounts).sort((a,b) => b[1] - a[1]).slice(0, 3);
-        document.getElementById('top-courses').innerHTML = topCourses.map((c, i) => `<li>${i+1}. ${c[0]} (${c[1]})</li>`).join('');
+    // 3. ITEM 5: TOP COURSES
+    const cMap = {}; courseRes.data?.forEach(s => { cMap[s.course] = (cMap[s.course] || 0) + 1; });
+    const topC = Object.entries(cMap).sort((a,b) => b[1] - a[1]).slice(0, 3);
+    document.getElementById('top-courses').innerHTML = topC.map((c, i) => `<li>${i+1}. ${c[0]} (${c[1]})</li>`).join('') || "<li>No data</li>";
+
+    // 4. ITEM 6: TOP TEACHERS (RATING)
+    document.getElementById('top-teachers-rating').innerHTML = tchRatRes.data?.map((t, i) => `<li>${i+1}. ${t.teacher_name} (⭐ ${t.rating})</li>`).join('') || "<li>No data</li>";
+
+    // 5. ITEM 8: TOP STUDENTS (EXAM RESULTS)
+    if(stuExamRes.data && stuExamRes.data.length > 0) {
+        document.getElementById('top-students-results').innerHTML = stuExamRes.data.map((s, i) => `<li>${i+1}. ${s.full_name} (${Math.round(s.percentage)}%)</li>`).join('');
+    } else {
+        document.getElementById('top-students-results').innerHTML = "<li>No exams this month</li>";
     }
 
-    // 5. TOP 3 TEACHERS (Rating)
-    if(tchRatRes.data) {
-        document.getElementById('top-teachers-rating').innerHTML = tchRatRes.data.map((t, i) => `<li>${i+1}. ${t.teacher_name} (⭐ ${t.rating})</li>`).join('');
-    }
-
-    // 6. TOP 3 STUDENTS (Results)
-    if(stuExamRes.data) {
-        document.getElementById('top-students-results').innerHTML = stuExamRes.data.map((s, i) => `<li>${i+1}. ${s.full_name} (${s.percentage}%)</li>`).join('');
-    }
-
-    // 7. BEST MONTH CALCULATION (Fixing the visibility/logic)
-    const monthCounts = {};
-    if(yrEnrolRes.data) {
+    // 6. ITEM 10: BEST MONTH OF YEAR
+    if(yrEnrolRes.data && yrEnrolRes.data.length > 0) {
+        const mMap = {};
         yrEnrolRes.data.forEach(s => {
             const m = new Date(s.admission_date).toLocaleString('default', { month: 'long' });
-            monthCounts[m] = (monthCounts[m] || 0) + 1;
+            mMap[m] = (mMap[m] || 0) + 1;
         });
-        const bestMonth = Object.entries(monthCounts).sort((a,b) => b[1] - a[1])[0];
-        document.getElementById('top-month-year').innerText = bestMonth ? `${bestMonth[0]} (${bestMonth[1]} Admissions)` : "No Admissions Yet";
+        const best = Object.entries(mMap).sort((a,b) => b[1] - a[1])[0];
+        document.getElementById('top-month-year').innerText = best ? `${best[0]} (${best[1]} Enrols)` : "N/A";
+    } else {
+        document.getElementById('top-month-year').innerText = "N/A";
     }
 
+    // 7. ITEM 7: TOP TEACHERS (ATTENDANCE)
+    if (tchAttnRes.data && tchAttnRes.data.length > 0) {
+        const tAttnMap = {};
+        tchAttnRes.data.forEach(a => {
+            if (!tAttnMap[a.teacher_id]) tAttnMap[a.teacher_id] = { n: a.full_name, p: 0, t: 0 };
+            tAttnMap[a.teacher_id].t++;
+            if (a.status === 'Present') tAttnMap[a.teacher_id].p++;
+        });
+        const tSorted = Object.values(tAttnMap).map(v => ({n: v.n, pct: (v.p/v.t)*100})).sort((a,b) => b.pct - a.pct).slice(0, 3);
+        document.getElementById('top-teachers-attn').innerHTML = tSorted.map((t, i) => `<li>${i+1}. ${t.n} (${Math.round(t.pct)}%)</li>`).join('');
+    } else {
+        document.getElementById('top-teachers-attn').innerHTML = "<li>No teacher attendance marked</li>";
+    }
 
-// ITEM 8
-document.getElementById('top-students-results').innerHTML = (stuExamRes.data?.length > 0) ? stuExamRes.data.map((s, i) => `<li>${i+1}. ${s.full_name} (${Math.round(s.percentage)}%)</li>`).join('') : "<li>No records</li>";
-
-// ITEM 10
-const mCounts = {}; yrEnrolRes.data?.forEach(s => { const m = new Date(s.admission_date).toLocaleString('default', { month: 'long' }); mCounts[m] = (mCounts[m] || 0) + 1; });
-const best = Object.entries(mCounts).sort((a,b) => b[1] - a[1])[0];
-document.getElementById('top-month-year').innerText = best ? `${best[0]} (${best[1]} Enrols)` : "N/A";
-
+    // Call helper for Item 9
+    loadBizAttendanceAnalytics(monthInput);
 }
 
 async function loadBizAttendanceAnalytics(prefixMonth) {
-    // 1. Fetch all student attendance for the selected month and institute
-    const { data: stuAttn } = await db.from('attendance')
-        .select('roll_number, status')
-        .like('attendance_date', `${prefixMonth}%`)
-        .eq('institute_id', sessionInstID);
-
-    const listContainer = document.getElementById('top-students-attn');
+    // ITEM 9: TOP STUDENTS (ATTENDANCE)
+    const { data: stuAttn } = await db.from('attendance').select('roll_number, status').like('attendance_date', `${prefixMonth}%`).eq('institute_id', sessionInstID);
     
-    // Safety check if no data exists
-    if (!stuAttn || stuAttn.length === 0) {
-        listContainer.innerHTML = "<li>No student records found.</li>";
-        return;
-    }
-
-    // 2. Calculate Present Days vs Total Days for each student
-    const sMap = {};
-    stuAttn.forEach(a => {
-        if (!sMap[a.roll_number]) sMap[a.roll_number] = { present: 0, total: 0 };
-        sMap[a.roll_number].total++;
-        if (a.status === 'Present') sMap[a.roll_number].present++;
-    });
-
-    // 3. Convert map to array, calculate percentage, and sort for Top 3
-    const stuRanking = Object.keys(sMap).map(roll => ({
-        roll: roll,
-        pct: (sMap[roll].present / sMap[roll].total) * 100
-    })).sort((a, b) => b.pct - a.pct).slice(0, 3);
-
-    // 4. Fetch the real names for these Roll Numbers to satisfy the "Give Names" requirement
-    const finalDisplayList = await Promise.all(stuRanking.map(async (item) => {
-        const { data: sInfo } = await db.from('students')
-            .select('full_name')
-            .eq('roll_number', item.roll)
-            .eq('institute_id', sessionInstID)
-            .maybeSingle();
+    if (stuAttn && stuAttn.length > 0) {
+        const sAttnMap = {};
+        stuAttn.forEach(a => {
+            if (!sAttnMap[a.roll_number]) sAttnMap[a.roll_number] = { p: 0, t: 0 };
+            sAttnMap[a.roll_number].t++;
+            if (a.status === 'Present') sAttnMap[a.roll_number].p++;
+        });
+        const sSorted = Object.keys(sAttnMap).map(r => ({ r, pct: (sAttnMap[r].p/sAttnMap[r].t)*100 })).sort((a,b) => b.pct - a.pct).slice(0, 3);
         
-        return {
-            name: sInfo ? sInfo.full_name : item.roll, // Fallback to roll number if name not found
-            pct: item.pct
-        };
-    }));
-
-    // 5. Update the UI List (Item 9)
-    listContainer.innerHTML = finalDisplayList.map((s, i) => 
-        `<li>${i + 1}. ${s.name} (${Math.round(s.pct)}%)</li>`
-    ).join('');
+        // Fetch Names and Update UI
+        const results = await Promise.all(sSorted.map(async (item) => {
+            const { data } = await db.from('students').select('full_name').eq('roll_number', item.r).eq('institute_id', sessionInstID).maybeSingle();
+            return { name: data ? data.full_name : item.r, pct: item.pct };
+        }));
+        document.getElementById('top-students-attn').innerHTML = results.map((s, i) => `<li>${i+1}. ${s.name} (${Math.round(s.pct)}%)</li>`).join('');
+    } else {
+        document.getElementById('top-students-attn').innerHTML = "<li>No student attendance marked</li>";
+    }
 }
     </script>
 <script>
