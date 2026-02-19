@@ -4198,10 +4198,9 @@ async function showPayslipHistory() {
 
 // --- FINAL PRINT COMMAND ---
 function runPrint(date, amt, type) {
-    // Fill the Template
-    document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
+    // 1. Fill data
+    document.getElementById('pdf-display-inst-id').innerText = sessionInstID || "N/A";
     document.getElementById('pdf-date').innerText = date;
-    document.getElementById('pdf-number').innerText = Math.floor(Math.random() * 90000) + 10000;
     document.getElementById('pdf-main-amt').innerText = amt;
 
     if (type === 'Student') {
@@ -4213,18 +4212,25 @@ function runPrint(date, amt, type) {
         document.getElementById('pdf-main-name').innerText = document.getElementById('tch-name').value;
         document.getElementById('pdf-main-id').innerText = document.getElementById('tch-id').value;
         document.getElementById('pdf-main-sub').innerText = document.getElementById('tch-subject').value;
-        document.getElementById('pdf-main-bal').innerText = "Salary - 0.00";
+        document.getElementById('pdf-main-bal').innerText = "0.00";
     }
 
-    // Generate PDF
+    // 2. Minimal PDF Logic
     const element = document.getElementById('pdf-template');
-    html2pdf().from(element).set({
+    
+    const options = {
         margin: 0.5,
-        filename: type + '_Receipt_' + date + '.pdf',
-        image: { type: 'jpeg', quality: 1 },
-        html2canvas: { scale: 2, logging: false },
+        filename: type + '_Receipt.pdf',
+        html2canvas: { 
+            scale: 2, 
+            backgroundColor: '#ffffff', // Forces white background
+            useCORS: true 
+        },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    }).save();
+    };
+
+    // Run the generator
+    html2pdf().set(options).from(element).save();
 }
     </script>
 <script>
@@ -4243,38 +4249,30 @@ if ('serviceWorker' in navigator) {
 
 <!-- HIDDEN PDF TEMPLATES FOR STUDENT RECEIPT & TEACHER PAYSLIP -->
 <!-- OFF-SCREEN PDF TEMPLATE -->
-<div style="position: absolute; left: -9999px; top: 0;">
-    <div id="pdf-template" style="padding: 40px; font-family: 'Times New Roman', serif; width: 700px; background: white; color: black;">
-        <center>
-            <h1 style="margin:0; font-size: 30px;">OFFICIAL RECEIPT</h1>
-            <p style="font-weight:bold; margin: 5px 0;">Institute ID: <span id="pdf-display-inst-id"></span></p>
-            <hr style="border: 1px solid #000;">
-        </center>
 
-        <table style="width: 100%; margin-top: 20px; font-size: 18px;">
-            <tr>
-                <td><b>Date:</b> <span id="pdf-date"></span></td>
-                <td style="text-align: right;"><b>Receipt No:</b> <span id="pdf-number"></span></td>
-            </tr>
-        </table>
+   <!-- THE PDF TEMPLATE (MINIMAL & FIXED) -->
+<div id="pdf-template" style="position: fixed; top: 0; left: 0; width: 700px; padding: 40px; background: white; color: black !important; opacity: 0; z-index: -1; font-family: serif;">
+    <div style="text-align: center; border-bottom: 2px solid black; padding-bottom: 10px;">
+        <h1 style="margin:0; font-size: 28px;">FEE RECEIPT</h1>
+        <p style="margin:5px 0;"><b>Institute ID:</b> <span id="pdf-display-inst-id"></span></p>
+    </div>
 
-        <div style="margin-top: 20px; font-size: 18px; line-height: 1.8;">
-            <p><b>Name:</b> <span id="pdf-main-name"></span></p>
-            <p><b>ID / Roll No:</b> <span id="pdf-main-id"></span></p>
-            <p><b>Subject / Course:</b> <span id="pdf-main-sub"></span></p>
-        </div>
+    <div style="margin-top: 20px; font-size: 18px;">
+        <p><b>Date:</b> <span id="pdf-date"></span></p>
+        <p><b>Name:</b> <span id="pdf-main-name"></span></p>
+        <p><b>Roll No:</b> <span id="pdf-main-id"></span></p>
+    </div>
 
-        <!-- THE AMOUNT SECTION -->
-        <div style="margin: 30px 0; padding: 20px; border: 2px solid #000; text-align: center;">
-            <h2 style="margin:0; font-size: 32px;">AMOUNT PAID: ₹ <span id="pdf-main-amt"></span></h2>
-        </div>
+    <div style="margin: 30px 0; padding: 20px; border: 3px solid black; text-align: center;">
+        <h2 style="margin:0; font-size: 30px;">AMOUNT PAID: ₹ <span id="pdf-main-amt"></span></h2>
+    </div>
 
-        <p style="font-size: 18px;"><b>Outstanding Balance:</b> ₹ <span id="pdf-main-bal"></span></p>
+    <p style="font-size: 18px;"><b>Course:</b> <span id="pdf-main-sub"></span></p>
+    <p style="font-size: 18px;"><b>Balance:</b> ₹ <span id="pdf-main-bal"></span></p>
 
-        <div style="margin-top: 80px; display: flex; justify-content: space-between;">
-            <div style="border-top: 1px solid #000; width: 200px; text-align: center;">Receiver Signature</div>
-            <div style="border-top: 1px solid #000; width: 200px; text-align: center;">Authorized Signatory</div>
-        </div>
+    <div style="margin-top: 50px; display: flex; justify-content: space-between;">
+        <p style="border-top: 1px solid black; width: 200px; text-align: center;">Sign</p>
+        <p style="border-top: 1px solid black; width: 200px; text-align: center;">Authorized</p>
     </div>
 </div>
 </body>
