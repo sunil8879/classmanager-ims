@@ -3260,11 +3260,11 @@ async function saveExpenses() {
     const monthYear = document.getElementById('exp-month-year').value;
     if (!monthYear) return alert("Select Month & Year first.");
 
-    const fees = parseFloat(document.getElementById('disp-auto-fees').innerText.replace(/[₹, ]/g, '')) || 0;
-    const otherInc = parseFloat(document.getElementById('exp-income').value) || 0;
+    // IMPORTANT: Grab the number currently in the box (which was loaded by FETCH)
+    const incomeFromBox = parseFloat(document.getElementById('exp-income').value) || 0;
 
     const dataObj = {
- institute_id: sessionInstID,
+        institute_id: sessionInstID,
         month_year: monthYear,
         rent: parseFloat(document.getElementById('exp-rent').value) || 0,
         electricity: parseFloat(document.getElementById('exp-elec').value) || 0,
@@ -3273,18 +3273,17 @@ async function saveExpenses() {
         admin_salary: parseFloat(document.getElementById('exp-a-sal').value) || 0,
         marketing: parseFloat(document.getElementById('exp-mark').value) || 0,
         other_exp: parseFloat(document.getElementById('exp-other').value) || 0,
-        other_income: otherInc,
-        auto_fees_collected: fees,
+        other_income: incomeFromBox, // This ensures the Inventory money is kept!
+        auto_fees_collected: parseFloat(document.getElementById('disp-auto-fees').innerText.replace(/[₹, ]/g, '')) || 0,
         total_expenses: parseFloat(document.getElementById('disp-total-exp').innerText.replace(/[₹, ]/g, '')),
         total_income_net: parseFloat(document.getElementById('disp-total-income').innerText.replace(/[₹, ]/g, '')),
         cost_income_ratio: parseFloat(document.getElementById('disp-ratio').innerText)
     };
 
-    const { error } = await db.from('expenses').upsert([dataObj]);
-    if (error) alert("Save Error: " + error.message);
-    else alert("Financial record for " + monthYear + " saved successfully!");
+    const { error } = await db.from('expenses').upsert(dataObj, { onConflict: 'institute_id, month_year' });
+    if (error) alert(error.message);
+    else alert("Record Saved!");
 }
-
 // 4. FETCH SAVED DATA
 // 4. FETCH SAVED DATA
 async function fetchSavedExpense() {
@@ -4933,26 +4932,44 @@ async function fetchStudentForInv() {
 
 /* --- MINIMAL FIX: FINANCIAL SYNC FOR INVENTORY --- */
 async function syncToOtherIncome(amount) {
-    const currentMonth = new Date().toISOString().substring(0, 7); 
-    
+    const currentMonth = new Date().toISOString().substring(0, 7); // "2026-02"
+    const saleAmount = Number(amount) || 0;
+
+    console.log("Attempting to sync Inventory Sale:", saleAmount, "for Institute:", sessionInstID);
+
+    if (!sessionInstID) {
+        console.error("Sync Failed: sessionInstID is missing!");
+        return;
+    }
+
+    // 1. Fetch current total from DB
     const { data: existing } = await db.from('expenses')
         .select('other_income')
         .eq('month_year', currentMonth)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
     
-    let newTotal = (existing ? parseFloat(existing.other_income) : 0) + parseFloat(amount);
+    const dbTotal = existing ? Number(existing.other_income) : 0;
+    const newTotal = dbTotal + saleAmount;
 
-    await db.from('expenses').upsert({
+    // 2. Upsert (Save or Update)
+    const { error } = await db.from('expenses').upsert({
         institute_id: sessionInstID,
         month_year: currentMonth,
         other_income: newTotal
     }, { onConflict: 'institute_id, month_year' });
 
-    // AUTO-POPULATE LIVE: Update the locked box if the user has the Expense tab open
-    if (document.getElementById('exp-month-year').value === currentMonth) {
-        document.getElementById('exp-income').value = newTotal.toFixed(2);
-        calculateFinancials(); // Recalculate totals immediately
+    if (error) {
+        console.error("Supabase Save Error:", error.message);
+    } else {
+        console.log("Success! New Other Income Total in Supabase:", newTotal);
+        
+        // 3. Update the UI box immediately if user is looking at this month
+        const activeMonth = document.getElementById('exp-month-year').value;
+        if (activeMonth === currentMonth) {
+            document.getElementById('exp-income').value = newTotal;
+            if(typeof calculateFinancials === 'function') calculateFinancials();
+        }
     }
 }
     </script>
