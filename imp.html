@@ -643,18 +643,17 @@
             <button class="btn-add" onclick="saveFeeUpdate()">ADD Payment</button>
 <!-- RECEIPT ACTION -->
 
-    <button class="btn-fetch" style="background:#673ab7; width: 100%;" onclick="showReceiptHistory()">
-        <i class="fas fa-history"></i> VIEW PREVIOUS RECEIPTS (PDF)
-    </button>
+ <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH</button>
+    <button class="btn-add" onclick="saveFeeUpdate()">ADD PAYMENT</button>
+    <button class="btn-fetch" style="background:#673ab7;" onclick="showReceiptHistory()">VIEW RECEIPTS</button>
 
 <!-- This area will stay hidden until the button is clicked -->
-<div id="receipt-history-list" style="display:none; margin-top:20px; padding:15px; background:#fff; border:1px solid #000; border-radius:10px;">
-    <h4 style="text-decoration: none; margin-bottom: 10px;">Select a Payment to Print:</h4>
-    <div id="history-links-container">
-        <!-- Links will be generated here by JavaScript -->
-    </div>
+<div id="receipt-history-list" style="display:none; margin: 20px auto; max-width: 500px; padding:10px; background:#fff; border:2px solid #000; border-radius:10px; text-align: left;">
+    <p style="font-weight:bold; border-bottom:1px solid #000; margin-bottom:10px;">Select Date to Print Receipt:</p>
+    <div id="history-links-container" style="max-height: 200px; overflow-y: auto;"></div>
 </div>
-        </div>
+</div>
+       
 
 
 
@@ -1082,17 +1081,14 @@
             <button class="btn-fetch" onclick="fetchTeacher()">FETCH (ID)</button>
 <!-- PAYSLIP ACTION -->
 
-    <button class="btn-fetch" style="background:#673ab7; width: 100%;" onclick="showPayslipHistory()">
-        <i class="fas fa-history"></i> VIEW PREVIOUS PAYSLIPS (PDF)
-    </button>
-
+ <button class="btn-add" onclick="addTeacherDetails()">ADD TEACHER</button>
+    <button class="btn-fetch" onclick="fetchTeacher()">FETCH</button>
+    <button class="btn-fetch" style="background:#673ab7;" onclick="showPayslipHistory()">VIEW PAYSLIPS</button>
 
 <!-- This area stays hidden until the button is clicked -->
-<div id="payslip-history-list" style="display:none; margin-top:20px; padding:15px; background:#fff; border:1px solid #000; border-radius:10px;">
-    <h4 style="text-decoration: none; margin-bottom: 10px; color: #000;">Select a Month to Print Payslip:</h4>
-    <div id="teacher-history-links-container">
-        <!-- History links will appear here -->
-    </div>
+<div id="payslip-history-list" style="display:none; margin: 20px auto; max-width: 500px; padding:10px; background:#fff; border:2px solid #000; border-radius:10px; text-align: left;">
+    <p style="font-weight:bold; border-bottom:1px solid #000; margin-bottom:10px;">Select Month to Print Payslip:</p>
+    <div id="teacher-history-links-container" style="max-height: 200px; overflow-y: auto;"></div>
 </div>
         </div>
 
@@ -4165,161 +4161,72 @@ async function fetchStudentMessages(course) {
    ADVANCED RECEIPT SYSTEM (HISTORY BASED)
    ========================================== */
 
-// 1. Function to show the list of previous payments
+// --- STUDENT HISTORY & PDF ---
 async function showReceiptHistory() {
     const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
-    if (!roll) return alert("Please enter and Fetch a Roll Number first.");
+    if (!roll) return alert("Enter Roll Number first!");
 
-    // Fetch history from Supabase
-    const { data: history, error } = await db.from('payment_history')
-        .select('*')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID)
-        .order('payment_date', { ascending: false });
+    const { data: history } = await db.from('payment_history').select('*')
+        .eq('roll_number', roll).eq('institute_id', sessionInstID).order('payment_date', { ascending: false });
 
+    if (!history || history.length === 0) return alert("No history found.");
+
+    document.getElementById('receipt-history-list').style.display = 'block';
     const container = document.getElementById('history-links-container');
-    const listArea = document.getElementById('receipt-history-list');
-
-    if (error || !history || history.length === 0) {
-        return alert("No payment history found for this student.");
-    }
-
-    // Build the list of links
     container.innerHTML = history.map(row => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
-            <span><b>Date:</b> ${row.payment_date} — <b>Amount:</b> ₹${row.amount}</span>
-            <button onclick="preparePDFFromHistory('${row.payment_date}', ${row.amount})" 
-                    style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">
-                <i class="fas fa-file-pdf"></i> Generate PDF
-            </button>
+        <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #ddd; align-items:center;">
+            <span>${row.payment_date} - <b>₹${row.amount}</b></span>
+            <button onclick="printFinalPDF('${row.payment_date}', '${row.amount}', 'Student')" style="background:green; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">PRINT</button>
         </div>
     `).join('');
-
-    listArea.style.display = 'block';
-    listArea.scrollIntoView({ behavior: 'smooth' });
 }
 
-// 2. Function to fill the template using data from the selected history row
-function preparePDFFromHistory(payDate, payAmount) {
-    // Grab general info from the screen (Name, Course, etc.)
-    const name = document.getElementById('fee-name').value;
-    const roll = document.getElementById('fee-roll').value;
-    const course = document.getElementById('fee-course').value;
-    const totalFees = document.getElementById('fee-total').value;
-    
-    // Calculate a "Snapshot" of balance at that time (Approximate)
-    // For a simple receipt, we show current pending or just the payment details
-    const currentPending = document.getElementById('fee-pending').value;
-
-    if(!name) return alert("Student name missing. Please fetch details again.");
-
-    // FILL THE HIDDEN TEMPLATE
-    document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
-    document.getElementById('pdf-report-title').innerText = "OFFICIAL FEE RECEIPT";
-    document.getElementById('pdf-date').innerText = payDate;
-    document.getElementById('pdf-number').innerText = "REC-" + Math.floor(1000 + Math.random() * 9000);
-    
-    document.getElementById('pdf-main-name').innerText = name;
-    document.getElementById('pdf-main-id').innerText = roll;
-    document.getElementById('pdf-main-sub').innerText = course;
-    
-    // CRITICAL: Set the Amount Paid specifically to the one from History
-    document.getElementById('pdf-main-amt').innerText = "₹ " + payAmount;
-    document.getElementById('pdf-main-bal').innerText = "₹ " + currentPending;
-
-    // GENERATE THE PDF
-    const element = document.getElementById('pdf-template');
-    const opt = {
-        margin: 0.5,
-        filename: `Receipt_${roll}_${payDate}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    html2pdf().set(opt).from(element).save();
-}
-
-
-
-
-
-
-/* ==========================================
-   TEACHER PAYSLIP SYSTEM (HISTORY BASED)
-   ========================================== */
-
-// 1. Function to show the list of previous salary payments
+// --- TEACHER HISTORY & PDF ---
 async function showPayslipHistory() {
-    const tchId = document.getElementById('tch-id').value.trim().toUpperCase();
-    if (!tchId) return alert("Please enter and Fetch a Teacher ID first.");
+    const tid = document.getElementById('tch-id').value.trim().toUpperCase();
+    if (!tid) return alert("Enter Teacher ID first!");
 
-    // Fetch salary history from Supabase
-    // We look for a table called 'teacher_payments'
-    const { data: history, error } = await db.from('teacher_payments')
-        .select('*')
-        .eq('teacher_id', tchId)
-        .eq('institute_id', sessionInstID)
-        .order('payment_date', { ascending: false });
+    // Checks teachers_attendance or payment table (Assuming history exists)
+    const { data: history } = await db.from('payment_history').select('*')
+        .eq('roll_number', tid).eq('institute_id', sessionInstID).order('payment_date', { ascending: false });
 
+    if (!history || history.length === 0) return alert("No salary history found.");
+
+    document.getElementById('payslip-history-list').style.display = 'block';
     const container = document.getElementById('teacher-history-links-container');
-    const listArea = document.getElementById('payslip-history-list');
-
-    if (error || !history || history.length === 0) {
-        return alert("No salary payment records found for this teacher. Make sure you have logged a payment first.");
-    }
-
-    // Build the list of Payslip links
     container.innerHTML = history.map(row => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; color: #000;">
-            <span><b>Month:</b> ${row.month_year} — <b>Amount Paid:</b> ₹${row.amount}</span>
-            <button onclick="prepareTeacherPDFFromHistory('${row.month_year}', ${row.amount}, '${row.payment_date}')" 
-                    style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">
-                <i class="fas fa-file-pdf"></i> Generate Payslip
-            </button>
+        <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #ddd; align-items:center;">
+            <span>${row.month_year} - <b>₹${row.amount}</b></span>
+            <button onclick="printFinalPDF('${row.payment_date}', '${row.amount}', 'Teacher')" style="background:green; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">PRINT</button>
         </div>
     `).join('');
-
-    listArea.style.display = 'block';
-    listArea.scrollIntoView({ behavior: 'smooth' });
 }
 
-// 2. Function to fill the PDF template for Teachers
-function prepareTeacherPDFFromHistory(payMonth, payAmount, exactDate) {
-    // Grab general info from the Teacher fields on screen
-    const name = document.getElementById('tch-name').value;
-    const id = document.getElementById('tch-id').value;
-    const sub = document.getElementById('tch-subject').value;
-
-    if(!name) return alert("Teacher details missing. Please fetch teacher again.");
-
-    // FILL THE HIDDEN TEMPLATE (We reuse the same template as students)
+// --- UNIVERSAL PRINT FUNCTION ---
+function printFinalPDF(date, amount, type) {
     document.getElementById('pdf-display-inst-id').innerText = sessionInstID;
-    document.getElementById('pdf-report-title').innerText = "MONTHLY SALARY PAYSLIP";
-    
-    // We use the Month/Year as the primary date
-    document.getElementById('pdf-date').innerText = payMonth; 
-    document.getElementById('pdf-number').innerText = "PAY-" + Math.floor(1000 + Math.random() * 9000);
-    
-    document.getElementById('pdf-main-name').innerText = name;
-    document.getElementById('pdf-main-id').innerText = id;
-    document.getElementById('pdf-main-sub').innerText = sub;
-    
-    // Set the specific Salary Amount from the selected history record
-    document.getElementById('pdf-main-amt').innerText = "₹ " + payAmount;
-    document.getElementById('pdf-main-bal').innerText = "Payment Status: FULLY PAID";
+    document.getElementById('pdf-date').innerText = date;
+    document.getElementById('pdf-number').innerText = Math.floor(100000 + Math.random() * 900000);
+    document.getElementById('pdf-main-amt').innerText = amount;
 
-    // GENERATE THE PDF
+    if (type === 'Student') {
+        document.getElementById('pdf-main-name').innerText = document.getElementById('fee-name').value;
+        document.getElementById('pdf-main-id').innerText = document.getElementById('fee-roll').value;
+        document.getElementById('pdf-main-sub').innerText = document.getElementById('fee-course').value;
+        document.getElementById('pdf-main-bal').innerText = document.getElementById('fee-pending').value;
+    } else {
+        document.getElementById('pdf-main-name').innerText = document.getElementById('tch-name').value;
+        document.getElementById('pdf-main-id').innerText = document.getElementById('tch-id').value;
+        document.getElementById('pdf-main-sub').innerText = document.getElementById('tch-subject').value;
+        document.getElementById('pdf-main-bal').innerText = "0.00 (Salary)";
+    }
+
     const element = document.getElementById('pdf-template');
-    const opt = {
+    html2pdf().from(element).set({
         margin: 0.5,
-        filename: `Payslip_${id}_${payMonth}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
+        filename: type + '_Receipt_' + date + '.pdf',
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    html2pdf().set(opt).from(element).save();
+    }).save();
 }
     </script>
 <script>
@@ -4338,69 +4245,33 @@ if ('serviceWorker' in navigator) {
 
 <!-- HIDDEN PDF TEMPLATES FOR STUDENT RECEIPT & TEACHER PAYSLIP -->
 <div style="display: none;">
-    <div id="pdf-template" style="padding: 30px; font-family: 'Times New Roman', serif; width: 700px; border: 10px double #000; background: #fff; color: #000;">
+    <div id="pdf-template" style="padding: 40px; font-family: 'Times New Roman', serif; width: 750px; border: 5px solid #000; background: #fff; color: #000;">
         <center>
-            <h1 id="pdf-inst-name" style="margin:0; color:#007bff; font-size: 28px;">CLASS MANAGER - IMS</h1>
-            
-            <!-- This line displays the logged-in owner's Institute ID -->
-            <p style="margin:5px 0; font-weight:bold; font-size: 16px;">Institute ID: <span id="pdf-display-inst-id"></span></p> 
-            
-            <p id="pdf-inst-tagline" style="font-style: italic; margin: 0;">Track Right, Grow Bright.</p>
-            <hr style="border: 1px solid #000; margin: 15px 0;">
-            <h2 id="pdf-report-title" style="text-decoration: underline; margin-bottom: 20px;">FEE RECEIPT</h2>
+            <h1 style="margin:0; font-size: 32px; color: #000;">OFFICIAL RECEIPT</h1>
+            <p style="margin:5px 0; font-weight:bold;">Institute ID: <span id="pdf-display-inst-id"></span></p>
+            <hr style="border: 1px solid #000;">
         </center>
 
-        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 16px;">
-            <p><b>Date:</b> <span id="pdf-date"></span></p>
-            <p><b>Receipt No:</b> <span id="pdf-number"></span></p>
-        </div>
-
-        <table style="width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 16px;" border="1">
-            <thead>
-                <tr style="background: #f2f2f2;">
-                    <th style="padding: 12px; text-align: left; width: 40%;">Description</th>
-                    <th style="padding: 12px; text-align: left;">Details</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="padding: 12px;">Name</td>
-                    <td style="padding: 12px;" id="pdf-main-name"></td>
-                </tr>
-                <tr>
-                    <td style="padding: 12px;">Roll Number / ID</td>
-                    <td style="padding: 12px;" id="pdf-main-id"></td>
-                </tr>
-                <tr>
-                    <td style="padding: 12px;">Subject / Course</td>
-                    <td style="padding: 12px;" id="pdf-main-sub"></td>
-                </tr>
-                <tr>
-                    <td style="padding: 12px; font-weight: bold;">Amount Received</td>
-                    <td style="padding: 12px; font-weight: bold;" id="pdf-main-amt"></td>
-                </tr>
-                <tr>
-                    <td style="padding: 12px;">Outstanding Balance</td>
-                    <td style="padding: 12px;" id="pdf-main-bal"></td>
-                </tr>
-            </tbody>
+        <table style="width: 100%; margin-top: 20px; font-size: 18px; line-height: 2;">
+            <tr>
+                <td><b>Date:</b> <span id="pdf-date"></span></td>
+                <td style="text-align: right;"><b>No:</b> <span id="pdf-number"></span></td>
+            </tr>
+            <tr><td><b>Name:</b> <span id="pdf-main-name"></span></td></tr>
+            <tr><td><b>ID/Roll No:</b> <span id="pdf-main-id"></span></td></tr>
+            <tr><td><b>Course/Subject:</b> <span id="pdf-main-sub"></span></td></tr>
         </table>
 
-        <div style="margin-top: 60px; display: flex; justify-content: space-between; font-size: 16px;">
-            <div style="text-align: center; width: 200px;">
-                <br>
-                <p style="border-top: 1px solid #000; padding-top: 5px;">Student/Staff Signature</p>
-            </div>
-            <div style="text-align: center; width: 200px;">
-                <p style="color:blue; font-weight: bold; margin-bottom: 30px;">OFFICIALLY VERIFIED</p>
-                <p style="border-top: 1px solid #000; padding-top: 5px;">Authorized Signatory</p>
-            </div>
+        <div style="margin: 30px 0; padding: 20px; border: 2px solid #000; background: #f9f9f9; text-align: center;">
+            <h2 style="margin:0; font-size: 28px;">AMOUNT PAID: ₹ <span id="pdf-main-amt">0.00</span></h2>
         </div>
 
-        <center style="margin-top: 40px; font-size: 12px; color: #666;">
-            <p>This is a computer-generated document issued by ClassManager IMS.</p>
-            <p>For any queries, please contact the institute office using the Institute ID provided above.</p>
-        </center>
+        <p style="font-size: 18px;"><b>Remaining Balance:</b> ₹ <span id="pdf-main-bal">0.00</span></p>
+
+        <div style="margin-top: 80px; display: flex; justify-content: space-between;">
+            <div style="text-align: center; width: 200px; border-top: 1px solid #000;">Receiver Signature</div>
+            <div style="text-align: center; width: 200px; border-top: 1px solid #000;">Authorized Signatory</div>
+        </div>
     </div>
 </div>
 </body>
