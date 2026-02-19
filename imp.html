@@ -1466,6 +1466,17 @@
                     <i class="fas fa-search"></i> FIND STUDENTS
                 </button>
             </div>
+
+
+<!-- ADD THIS: Bulk Messaging Buttons -->
+<div style="margin-top: 20px; display: flex; gap: 15px; flex-direction: column;">
+    <button class="btn-fetch" style="background: #000; color: #fff; width: 100%; border: 2px solid #25D366;" onclick="bulkTeachersWA()">
+        <i class="fas fa-users-cog"></i> BULK MESSAGE TO ALL TEACHERS
+    </button>
+    <button class="btn-fetch" style="background: #000; color: #fff; width: 100%; border: 2px solid #25D366;" onclick="bulkStudentsWA()">
+        <i class="fas fa-users"></i> BULK MESSAGE TO ALL STUDENTS
+    </button>
+</div>
         </div>
 
         <!-- RESULTS AREA -->
@@ -4116,6 +4127,37 @@ async function fetchStudentsByCourse() {
     const { data, error } = await query;
     if (error) return alert("Database Error: " + error.message);
     displayWAContacts(data, "Student");
+}
+
+
+
+// ADD THIS: Fetch ALL Teachers for this Institute
+async function bulkTeachersWA() {
+    if (!sessionInstID) return alert("Please login first.");
+    
+    const { data, error } = await db.from('teacher_details')
+        .select('teacher_name, mobile, subject_taught')
+        .eq('institute_id', sessionInstID);
+
+    if (error) return alert("Error: " + error.message);
+    
+    // Reuse your existing display function to show every teacher
+    displayWAContacts(data, "All Staff Teacher");
+}
+
+// ADD THIS: Fetch ALL Active Students for this Institute
+async function bulkStudentsWA() {
+    if (!sessionInstID) return alert("Please login first.");
+
+    const { data, error } = await db.from('students')
+        .select('full_name, mobile, course')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    if (error) return alert("Error: " + error.message);
+
+    // Reuse your existing display function to show every student
+    displayWAContacts(data, "All Active Student");
 }
     </script>
 <script>
