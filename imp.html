@@ -2969,26 +2969,27 @@ async function fetchLead() {
 
 // 1. AUTO-POPULATE Fees from Payment History
 async function fetchAutoFees() {
-    const monthVal = document.getElementById('exp-month-year').value; 
-    if (!monthVal || !sessionInstID) return;
+    const monthInput = document.getElementById('exp-month-year').value; // e.g., "2026-02"
+    if (!monthInput || !sessionInstID) return;
 
-    // 1. Get the month name exactly how the database stores it
-    const dateObj = new Date(monthVal + "-01");
-    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+    // 1. Calculate the first and last day of the selected month
+    const startDate = monthInput + "-01";
+    const endDate = monthInput + "-31"; // Postgres handles -31 correctly even for Feb
 
-    // 2. Simple Query: Just get all amounts for this month and institute
-    // We removed the "!inner status" check because it was causing the 8,000 mismatch
+    // 2. Fetch all payments received BETWEEN these dates for your Institute
     const { data, error } = await db
         .from('payment_history')
         .select('amount')
         .eq('institute_id', sessionInstID)
-        .ilike('month_year', `%${targetMonthYear.trim()}%`); // ilike is safer than eq
+        .gte('payment_date', startDate)
+        .lte('payment_date', endDate);
 
     if (error) {
         console.error("Fetch Error:", error.message);
         return;
     }
 
+    // 3. Sum up every single record found
     const total = data ? data.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
     
     document.getElementById('disp-auto-fees').innerText = "₹ " + total.toFixed(2);
