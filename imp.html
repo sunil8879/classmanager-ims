@@ -3247,17 +3247,19 @@ fetchAutoInventory(); // ADD THIS LINE
 }
 // 2. FORMULA CALCULATION
 function calculateFinancials() {
-    // 1. Get Auto Fees (Blue Label)
-    const fees = parseFloat(document.getElementById('disp-auto-fees').innerText.replace(/[₹, ]/g, '')) || 0;
+    // 1. Get Auto Fees (The 21,000)
+    const feesText = document.getElementById('disp-auto-fees').innerText;
+    const fees = parseFloat(feesText.replace(/[₹, ]/g, '')) || 0;
     
-    // 2. Get Auto Inventory (Purple Label - THE NEW LINK)
-    const inventory = parseFloat(document.getElementById('disp-auto-inv').innerText.replace(/[₹, ]/g, '')) || 0;
+    // 2. Get Auto Inventory (The new one)
+    const invText = document.getElementById('disp-auto-inv').innerText;
+    const inventory = parseFloat(invText.replace(/[₹, ]/g, '')) || 0;
     
-    // 3. Calculate Expenses from manual boxes
+    // 3. Get Manual Expenses
     const expenses = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'];
     const totalExp = expenses.reduce((sum, id) => sum + (parseFloat(document.getElementById(id).value) || 0), 0);
 
-    // 4. THE MASTER FORMULA
+    // 4. Calculate Net
     const netIncome = (fees + inventory) - totalExp;
 
     document.getElementById('disp-total-exp').innerText = "₹ " + totalExp.toFixed(2);
@@ -4876,6 +4878,8 @@ async function processInventorySale() {
         items_bought: itemsStr,
         total_paid: total,
         remarks: document.getElementById('inv-remarks').value
+
+month_year: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
     };
 
     const { error } = await db.from('inventory_sales').insert([saleData]);
@@ -5002,6 +5006,7 @@ async function calculateInventoryIncome(monthYear) {
     const endDate = `${monthYear}-31T23:59:59Z`; // SQL handles the 31st safely
 
     const { data, error } = await db.from('inventory_sales')
+
         .select('total_paid')
         .eq('institute_id', sessionInstID)
         .gte('created_at', startDate)
@@ -5050,30 +5055,33 @@ async function loadHomeInventoryStats() {
 
 /* --- EXPENSE SECTION: AUTO-PULL INVENTORY SALES --- */
 async function fetchAutoInventory() {
-    const monthVal = document.getElementById('exp-month-year').value; // e.g., "2026-02"
-    if (!monthVal || !sessionInstID) return;
+    const monthInput = document.getElementById('exp-month-year').value; // "2026-02"
+    if (!monthInput || !sessionInstID) return;
 
-    // Calculate start and end of that specific month
-    const year = monthVal.split('-')[0];
-    const month = monthVal.split('-')[1];
-    const startDate = `${year}-${month}-01T00:00:00Z`;
-    const endDate = `${year}-${month}-31T23:59:59Z`;
+    // CONVERT "2026-02" to "February 2026" (Exactly like Student Fees)
+    const dateObj = new Date(monthInput + "-01");
+    const formattedMonth = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    console.log("Fetching Inventory for:", formattedMonth);
 
     const { data, error } = await db.from('inventory_sales')
         .select('total_paid')
         .eq('institute_id', sessionInstID)
-        .gte('created_at', startDate)
-        .lte('created_at', endDate);
+        .eq('month_year', formattedMonth); // THE KEY CHANGE: Match by String Name
 
-    const total = data ? data.reduce((sum, p) => sum + (Number(p.total_paid) || 0), 0) : 0;
+    if (error) {
+        console.error("Inventory Fetch Error:", error.message);
+        return;
+    }
+
+    const totalSales = data ? data.reduce((sum, item) => sum + (parseFloat(item.total_paid) || 0), 0) : 0;
     
-    // Update the NEW label we just created
-    document.getElementById('disp-auto-inv').innerText = "₹ " + total.toFixed(2);
+    // Update the UI Label
+    document.getElementById('disp-auto-inv').innerText = "₹ " + totalSales.toFixed(2);
     
-    // Trigger math update
+    // Refresh the master calculation
     calculateFinancials();
 }
-
 
 
 
