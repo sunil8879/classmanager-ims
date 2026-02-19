@@ -2972,27 +2972,27 @@ async function fetchAutoFees() {
     const monthInput = document.getElementById('exp-month-year').value; // e.g., "2026-02"
     if (!monthInput || !sessionInstID) return;
 
-    // 1. Calculate the first and last day of the selected month
-    const startDate = monthInput + "-01";
-    const endDate = monthInput + "-31"; // Postgres handles -31 correctly even for Feb
-
-    // 2. Fetch all payments received BETWEEN these dates for your Institute
+    // 1. Fetch all 'Active' students for YOUR institute
+    // We look at the 'students' table directly because that is your "Final Truth"
     const { data, error } = await db
-        .from('payment_history')
-        .select('amount')
+        .from('students')
+        .select('paid_amount, admission_date')
         .eq('institute_id', sessionInstID)
-        .gte('payment_date', startDate)
-        .lte('payment_date', endDate);
+        .eq('status', 'Active')
+        .ilike('admission_date', `${monthInput}%`); // Matches any date starting with "2026-02"
 
     if (error) {
-        console.error("Fetch Error:", error.message);
+        console.error("Sync Error:", error.message);
         return;
     }
 
-    // 3. Sum up every single record found
-    const total = data ? data.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
+    // 2. Sum the amounts
+    const total = data ? data.reduce((sum, s) => sum + (Number(s.paid_amount) || 0), 0) : 0;
     
+    // 3. Update the UI
     document.getElementById('disp-auto-fees').innerText = "₹ " + total.toFixed(2);
+    
+    // 4. Trigger the profit/loss calculation
     calculateFinancials(); 
 }
 // 2. FORMULA CALCULATION
