@@ -3290,30 +3290,36 @@ async function fetchSavedExpense() {
     const monthYear = document.getElementById('exp-month-year').value;
     if (!monthYear) return alert("Select Month & Year to fetch.");
 
-    // ADDED: .eq('institute_id', sessionInstID) for security and accuracy
-    const { data, error } = await db.from('expenses')
+    // 1. Get Auto Fees (Student Fees)
+    fetchAutoFees(); 
+
+    // 2. NEW: Get real-time Inventory Income (Calculated from sales table)
+    const realTimeInvIncome = await calculateInventoryIncome(monthYear);
+    document.getElementById('exp-income').value = realTimeInvIncome.toFixed(2);
+
+    // 3. Get the manual expense records (Rent, Elec, etc.)
+    const { data } = await db.from('expenses')
         .select('*')
         .eq('month_year', monthYear)
-        .eq('institute_id', sessionInstID) 
-        .maybeSingle(); // Use maybeSingle to handle "not found" gracefully
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
 
-    if (error) return alert("Error fetching data: " + error.message);
-    if (!data) return alert("No saved record found for this month.");
-
-    // Populate the fields
-    document.getElementById('exp-rent').value = data.rent || 0;
-    document.getElementById('exp-elec').value = data.electricity || 0;
-    document.getElementById('exp-maint').value = data.maintenance || 0;
-    document.getElementById('exp-t-sal').value = data.teacher_salary || 0;
-    document.getElementById('exp-a-sal').value = data.admin_salary || 0;
-    document.getElementById('exp-mark').value = data.marketing || 0;
-    document.getElementById('exp-other').value = data.other_exp || 0;
+    if (data) {
+        document.getElementById('exp-rent').value = data.rent || 0;
+        document.getElementById('exp-elec').value = data.electricity || 0;
+        document.getElementById('exp-maint').value = data.maintenance || 0;
+        document.getElementById('exp-t-sal').value = data.teacher_salary || 0;
+        document.getElementById('exp-a-sal').value = data.admin_salary || 0;
+        document.getElementById('exp-mark').value = data.marketing || 0;
+        document.getElementById('exp-other').value = data.other_exp || 0;
+        // We IGNORE data.other_income from the DB and use our calculated realTimeInvIncome
+    } else {
+        // Reset manual boxes if month is new
+        ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other']
+        .forEach(id => document.getElementById(id).value = 0);
+    }
     
-    // This is the field populated by the Inventory Manager
-    document.getElementById('exp-income').value = data.other_income || 0; 
-    
-    // Refresh fees and trigger calculateFinancials()
-    fetchAutoFees(); 
+    calculateFinancials();
 }
 
 function clearExpenseForm() {
@@ -4971,6 +4977,28 @@ async function syncToOtherIncome(amount) {
             if(typeof calculateFinancials === 'function') calculateFinancials();
         }
     }
+}
+
+
+async function calculateInventoryIncome(monthYear) {
+    // monthYear is "2026-02"
+    // We need to filter records where created_at is within this month
+    const startDate = `${monthYear}-01T00:00:00Z`;
+    const endDate = `${monthYear}-31T23:59:59Z`; // SQL handles the 31st safely
+
+    const { data, error } = await db.from('inventory_sales')
+        .select('total_paid')
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate);
+
+    if (error) {
+        console.error("Inventory Sum Error:", error.message);
+        return 0;
+    }
+
+    // Sum up all the 'total_paid' values for that month
+    return data.reduce((sum, record) => sum + (parseFloat(record.total_paid) || 0), 0);
 }
     </script>
 <script>
