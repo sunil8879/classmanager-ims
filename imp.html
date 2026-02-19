@@ -1477,6 +1477,22 @@
         <i class="fas fa-users"></i> BULK MESSAGE TO ALL STUDENTS
     </button>
 </div>
+
+
+
+<!-- ADD THIS: The Bulk Message Editor -->
+<div id="bulk-editor-area" style="display: none; margin-top: 20px; padding: 20px; border: 3px solid #25D366; border-radius: 15px; background: #fff;">
+    <h4 style="color: #000; text-decoration: none;">Bulk Message Composer</h4>
+    <p style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">Type your message below. It will be pre-filled for everyone in the list.</p>
+    
+    <textarea id="bulk-msg-content" rows="4" style="width: 100%; border: 2px solid #000; border-radius: 10px; padding: 10px; font-family: 'Times New Roman';" placeholder="Type your announcement here..."></textarea>
+    
+    <div class="button-row" style="margin-top: 15px;">
+        <button id="btn-process-bulk" class="btn-add" style="background: #25D366; width: 100%;" onclick="processBulkNow()">
+            <i class="fas fa-magic"></i> PREPARE FAST-SEND LIST
+        </button>
+    </div>
+</div>
         </div>
 
         <!-- RESULTS AREA -->
@@ -4158,6 +4174,82 @@ async function bulkStudentsWA() {
 
     // Reuse your existing display function to show every student
     displayWAContacts(data, "All Active Student");
+}
+
+
+
+let currentBulkType = ""; // To track if we are sending to Teachers or Students
+
+// 1. Show the Editor when "Bulk" buttons are clicked
+async function bulkTeachersWA() {
+    currentBulkType = "Teacher";
+    document.getElementById('bulk-editor-area').style.display = 'block';
+    document.getElementById('bulk-editor-area').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function bulkStudentsWA() {
+    currentBulkType = "Student";
+    document.getElementById('bulk-editor-area').style.display = 'block';
+    document.getElementById('bulk-editor-area').scrollIntoView({ behavior: 'smooth' });
+}
+
+// 2. The Logic to generate the list with your "One Message"
+async function processBulkNow() {
+    const msgText = document.getElementById('bulk-msg-content').value.trim();
+    if (!msgText) return alert("Please type a message first!");
+
+    let data = [];
+    let error = null;
+
+    if (currentBulkType === "Teacher") {
+        const res = await db.from('teacher_details').select('teacher_name, mobile, subject_taught').eq('institute_id', sessionInstID);
+        data = res.data;
+        error = res.error;
+    } else {
+        const res = await db.from('students').select('full_name, mobile, course').eq('institute_id', sessionInstID).eq('status', 'Active');
+        data = res.data;
+        error = res.error;
+    }
+
+    if (error) return alert("Error fetching data: " + error.message);
+
+    // Now, we use the display function but we PASS the message to it
+    displayBulkWAContacts(data, currentBulkType, msgText);
+}
+
+// 3. Helper to show the contacts with the PRE-FILLED message
+function displayBulkWAContacts(list, type, message) {
+    const area = document.getElementById('wa-results-area');
+    const container = document.getElementById('wa-contact-list');
+    const title = document.getElementById('wa-results-title');
+    
+    container.innerHTML = "";
+    area.style.display = "block";
+    title.innerText = `Ready to Send to ${list.length} ${type}s`;
+
+    const encodedMsg = encodeURIComponent(message);
+
+    list.forEach(person => {
+        const name = person.teacher_name || person.full_name;
+        const mobile = person.mobile;
+
+        container.innerHTML += `
+            <div style="background: #f0fdf4; border: 1px solid #25D366; padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <div style="text-align: left;">
+                    <b style="color: #000;">${name}</b>
+                </div>
+                <a href="https://wa.me/91${mobile}?text=${encodedMsg}" 
+                   target="_blank" 
+                   onclick="this.parentElement.style.opacity='0.4';"
+                   style="background: #25D366; color: white; padding: 8px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 0.8rem;">
+                    SEND NOW
+                </a>
+            </div>
+        `;
+    });
+    
+    alert("List Prepared! Click 'SEND NOW' for each person. The message is already pre-typed for you.");
+    area.scrollIntoView({ behavior: 'smooth' });
 }
     </script>
 <script>
