@@ -977,10 +977,6 @@
             <div class="input-group"><label>Admin Salaries</label><input type="number" id="exp-a-sal" value="0" oninput="calculateFinancials()"></div>
             <div class="input-group"><label>Marketing</label><input type="number" id="exp-mark" value="0" oninput="calculateFinancials()"></div>
             <div class="input-group"><label>Other Expenses</label><input type="number" id="exp-other" value="0" oninput="calculateFinancials()"></div>
-      <div class="input-group">
-    <label>Other Income (From Inventory)</label>
-    <input type="number" id="exp-income" value="0" readonly style="background: #eee; font-weight: bold; color: green;">
-</div>
         </div>
 
    <div class="stat-card" style="background: #fff8f8; margin-top: 20px; text-align: left; border: 1px solid #ff0000;">
@@ -3215,13 +3211,19 @@ async function fetchAutoFees() {
 }
 // 2. FORMULA CALCULATION
 function calculateFinancials() {
-    const ids = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'];
+    // We only sum the 7 expense types now
+    const expenseIds = [
+        'exp-rent', 'exp-elec', 'exp-maint', 
+        'exp-t-sal', 'exp-a-sal', 'exp-mark', 'exp-other'
+    ];
     
-    const totalExp = ids.reduce((sum, id) => {
+    let totalExp = 0;
+    expenseIds.forEach(id => {
         const el = document.getElementById(id);
-        return sum + (el ? parseFloat(el.value) || 0 : 0);
-    }, 0);
+        if (el) totalExp += (parseFloat(el.value) || 0);
+    });
 
+    // Update the red display box
     const display = document.getElementById('disp-total-exp');
     if (display) {
         display.innerText = "₹ " + totalExp.toLocaleString('en-IN', {minimumFractionDigits: 2});
@@ -3229,37 +3231,7 @@ function calculateFinancials() {
 }
 
 // 3. SAVE TO SUPABASE
-async function saveExpenses() {
-    const monthYear = document.getElementById('exp-month-year').value;
-    if (!monthYear) return alert("Select Month & Year first.");
-
-    const dataObj = {
-        institute_id: sessionInstID,
-        month_year: monthYear,
-        rent: parseFloat(document.getElementById('exp-rent').value) || 0,
-        electricity: parseFloat(document.getElementById('exp-elec').value) || 0,
-        maintenance: parseFloat(document.getElementById('exp-maint').value) || 0,
-        teacher_salary: parseFloat(document.getElementById('exp-t-sal').value) || 0,
-        admin_salary: parseFloat(document.getElementById('exp-a-sal').value) || 0,
-        marketing: parseFloat(document.getElementById('exp-mark').value) || 0,
-        other_exp: parseFloat(document.getElementById('exp-other').value) || 0,
-        // We set these to 0 as we are no longer tracking them in this table
-        other_income: 0,
-        auto_fees_collected: 0,
-        // Save only the total expenses
-        total_expenses: parseFloat(document.getElementById('disp-total-exp').innerText.replace(/[₹, ]/g, '')) || 0
-    };
-
-    const { error } = await db.from('expenses').upsert(dataObj, { onConflict: 'institute_id, month_year' });
-    
-    if (error) {
-        alert("Save Error: " + error.message);
-    } else {
-        alert("Expense record for " + monthYear + " saved successfully!");
-    }
-}
-// 4. FETCH SAVED DATA
-// 4. FETCH SAVED DATA
+// 1. Corrected Fetch (No longer looks for income)
 async function fetchSavedExpense() {
     const monthYear = document.getElementById('exp-month-year').value;
     if (!monthYear) return alert("Select Month & Year to fetch.");
@@ -3278,12 +3250,38 @@ async function fetchSavedExpense() {
         document.getElementById('exp-a-sal').value = data.admin_salary || 0;
         document.getElementById('exp-mark').value = data.marketing || 0;
         document.getElementById('exp-other').value = data.other_exp || 0;
+        alert("Expense records loaded!");
     } else {
-        ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other'].forEach(id => {
-            document.getElementById(id).value = 0;
-        });
+        // Reset to zero if no record found
+        ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other']
+        .forEach(id => document.getElementById(id).value = 0);
     }
     calculateFinancials();
+}
+
+// 2. Corrected Save (No longer saves income)
+async function saveExpenses() {
+    const monthYear = document.getElementById('exp-month-year').value;
+    if (!monthYear) return alert("Select Month & Year first.");
+
+    const dataObj = {
+        institute_id: sessionInstID,
+        month_year: monthYear,
+        rent: parseFloat(document.getElementById('exp-rent').value) || 0,
+        electricity: parseFloat(document.getElementById('exp-elec').value) || 0,
+        maintenance: parseFloat(document.getElementById('exp-maint').value) || 0,
+        teacher_salary: parseFloat(document.getElementById('exp-t-sal').value) || 0,
+        admin_salary: parseFloat(document.getElementById('exp-a-sal').value) || 0,
+        marketing: parseFloat(document.getElementById('exp-mark').value) || 0,
+        other_exp: parseFloat(document.getElementById('exp-other').value) || 0,
+        other_income: 0, // Hardcoded to 0 since we removed it
+        auto_fees_collected: 0, // Hardcoded to 0 since we removed it
+        total_expenses: parseFloat(document.getElementById('disp-total-exp').innerText.replace(/[₹, ]/g, '')) || 0
+    };
+
+    const { error } = await db.from('expenses').upsert(dataObj, { onConflict: 'institute_id, month_year' });
+    if (error) alert("Save Error: " + error.message);
+    else alert("Expense record saved!");
 }
 function clearExpenseForm() {
     const inputs = ['exp-rent','exp-elec','exp-maint','exp-t-sal','exp-a-sal','exp-mark','exp-other','exp-income'];
@@ -4903,46 +4901,12 @@ async function fetchStudentForInv() {
 
 
 /* --- MINIMAL FIX: FINANCIAL SYNC FOR INVENTORY --- */
+/* --- SAFE SYNC: STOPS EXPENSE SECTION CRASHES --- */
 async function syncToOtherIncome(amount) {
-    const currentMonth = new Date().toISOString().substring(0, 7); // "2026-02"
-    const saleAmount = Number(amount) || 0;
-
-    console.log("Attempting to sync Inventory Sale:", saleAmount, "for Institute:", sessionInstID);
-
-    if (!sessionInstID) {
-        console.error("Sync Failed: sessionInstID is missing!");
-        return;
-    }
-
-    // 1. Fetch current total from DB
-    const { data: existing } = await db.from('expenses')
-        .select('other_income')
-        .eq('month_year', currentMonth)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-    
-    const dbTotal = existing ? Number(existing.other_income) : 0;
-    const newTotal = dbTotal + saleAmount;
-
-    // 2. Upsert (Save or Update)
-    const { error } = await db.from('expenses').upsert({
-        institute_id: sessionInstID,
-        month_year: currentMonth,
-        other_income: newTotal
-    }, { onConflict: 'institute_id, month_year' });
-
-    if (error) {
-        console.error("Supabase Save Error:", error.message);
-    } else {
-        console.log("Success! New Other Income Total in Supabase:", newTotal);
-        
-        // 3. Update the UI box immediately if user is looking at this month
-        const activeMonth = document.getElementById('exp-month-year').value;
-        if (activeMonth === currentMonth) {
-            document.getElementById('exp-income').value = newTotal;
-            if(typeof calculateFinancials === 'function') calculateFinancials();
-        }
-    }
+    // We only log the sale to the console now.
+    // The Inventory Income is already being calculated and displayed 
+    // on the HOME PAGE card, so we don't need to force it into the Expense table.
+    console.log("Inventory Sale Recorded: ₹" + amount + ". Home Page stats will update on refresh.");
 }
 
 
