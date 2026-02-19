@@ -636,6 +636,9 @@
         <div class="button-row">
             <button class="btn-fetch" onclick="fetchFeeByRoll()">FETCH</button>
             <button class="btn-add" onclick="saveFeeUpdate()">ADD PAYMENT</button>
+<button class="btn-edit" style="background:#f39c12; width: auto; padding: 10px 20px;" onclick="editFeeRecordByRoll()">
+    <i class="fas fa-user-edit"></i> EDIT (by Roll No)
+</button>
             <button class="btn-fetch" style="background:#673ab7;" onclick="showReceiptHistory()">VIEW RECEIPTS</button>
         </div>
 
@@ -4612,6 +4615,47 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js')
     .then(() => console.log("IMS Service Worker Registered"))
     .catch(err => console.log("Service Worker Failed", err));
+}
+
+
+
+
+
+/* ==========================================
+   FEE SECTION: EDIT STUDENT RECORD
+   ========================================== */
+async function editFeeRecordByRoll() {
+    const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter and FETCH a Roll Number first.");
+
+    // Step 1: Find the internal Student ID
+    const { data: detail, error: fetchErr } = await db.from('student_details')
+        .select('student_id')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (fetchErr || !detail) return alert("Roll number not found. Fetch the details first.");
+
+    // Step 2: Prepare updated data from the UI
+    const updatedData = {
+        full_name: document.getElementById('fee-name').value,
+        course: document.getElementById('fee-course').value,
+        total_fees: parseFloat(document.getElementById('fee-total').value) || 0,
+        status: document.getElementById('fee-status').value, // This is key for Alumni testing
+        due_dates: document.getElementById('fee-due-dates').value
+    };
+
+    // Step 3: Update the Master Students table
+    const { error: updateErr } = await db.from('students')
+        .update(updatedData)
+        .eq('id', detail.student_id);
+
+    if (updateErr) {
+        alert("Update Failed: " + updateErr.message);
+    } else {
+        alert("Success: Record for " + roll + " has been updated in the database.");
+    }
 }
 </script>
 <!-- PWA Install Button -->
