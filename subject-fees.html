@@ -248,7 +248,12 @@
                 const year = now.getFullYear();
                 const month = String(now.getMonth() + 1).padStart(2, '0');
                 const label = now.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
-                return { startDate: `${year}-${month}-01`, endDate: `${year}-${month}-31`, label: label };
+               const lastDay = new Date(year, month, 0).getDate();
+return { 
+    startDate: `${year}-${month}-01`, 
+    endDate: `${year}-${month}-${lastDay}`, 
+    label: label 
+};
             }
 
             const parts = input.trim().toLowerCase().split(/\s+/);
@@ -272,7 +277,12 @@
             const label = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
 
             // Returns a valid date range to prevent the Supabase Operator Error
-            return { startDate: `${yearStr}-${monthNum}-01`, endDate: `${yearStr}-${monthNum}-31`, label: label };
+        const lastDay = new Date(yearStr, monthNum, 0).getDate();
+return { 
+    startDate: `${yearStr}-${monthNum}-01`, 
+    endDate: `${yearStr}-${monthNum}-${lastDay}`, 
+    label: label 
+};
         }
 
         // 4. FETCH AND PROCESS DATA
