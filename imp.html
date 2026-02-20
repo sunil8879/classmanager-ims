@@ -674,11 +674,29 @@
     <h3>2. SUBJECT-WISE FEES PORTAL</h3>
     <div class="form-grid">
         <div class="input-group">
-            <label>Filter Month & Year (Admission Date)</label>
-            <!-- Points to the NEW refresh function -->
-            <input type="month" id="portal-calendar" onchange="refreshSubjectWiseSummary()">
-        </div>
+    <label>Filter by Month & Year</label>
+    <div style="display: flex; gap: 10px;">
+        <select id="portal-month" onchange="refreshSubjectWiseSummary()" style="flex: 1; padding: 10px;">
+            <option value="">Select Month</option>
+            <option value="01">January</option><option value="02">February</option>
+            <option value="03">March</option><option value="04">April</option>
+            <option value="05">May</option><option value="06">June</option>
+            <option value="07">July</option><option value="08">August</option>
+            <option value="09">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+        </select>
+        <select id="portal-year" onchange="refreshSubjectWiseSummary()" style="flex: 1; padding: 10px;">
+            <option value="">Select Year</option>
+            <!-- Generated from 2025 to 2035 for now -->
+            <option value="2025">2025</option><option value="2026">2026</option>
+            <option value="2027">2027</option><option value="2028">2028</option>
+            <option value="2029">2029</option><option value="2030">2030</option>
+            <option value="2031">2031</option><option value="2032">2032</option>
+            <option value="2033">2033</option><option value="2034">2034</option>
+            <option value="2035">2035</option>
+        </select>
     </div>
+</div>
 
     <div style="overflow-x: auto; margin-top: 20px;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
@@ -5146,17 +5164,23 @@ async function refreshSubjectWiseSummary() {
     if (!sessionInstID) return;
 
     const tbody = document.getElementById('portal-table-body');
-    const monthFilter = document.getElementById('portal-calendar').value; // Format: YYYY-MM
     
+    // 1. GET VALUES FROM THE TWO NEW DROPDOWNS
+    const mm = document.getElementById('portal-month').value;
+    const yyyy = document.getElementById('portal-year').value;
+    
+    // 2. CREATE THE FORMAT YYYY-MM (e.g., 2026-02)
+    let monthFilter = (mm && yyyy) ? `${yyyy}-${mm}` : "";
+
     tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Updating Summary...</td></tr>";
 
-    // 1. Fetch Students (Direct connection to Master Table)
+    // 3. FETCH DATA FROM STUDENTS TABLE
     let query = db.from('students')
                 .select('course, total_fees, paid_amount, pending_amount, admission_date')
                 .eq('institute_id', sessionInstID)
                 .eq('status', 'Active');
     
-    // If a month is selected, find all students whose admission date STARTS with that year-month
+    // Catch every student whose admission date starts with the selected Year-Month
     if (monthFilter) {
         query = query.like('admission_date', `${monthFilter}%`);
     }
@@ -5168,7 +5192,7 @@ async function refreshSubjectWiseSummary() {
         return;
     }
 
-    // 2. Group Totals by Subject
+    // 4. GROUP TOTALS BY SUBJECT
     const map = {};
     students.forEach(s => {
         const sub = s.course || "General";
@@ -5178,17 +5202,14 @@ async function refreshSubjectWiseSummary() {
         map[sub].p += parseFloat(s.pending_amount) || 0;
     });
 
-    // 3. Convert to Array and SORT by 'Received' (Falling Order)
+    // 5. CONVERT TO ARRAY AND SORT BY 'RECEIVED' (FALLING ORDER)
     subPortalData = Object.entries(map).map(([name, val]) => ({ name, ...val }));
-    
-    // THE SORTING LOGIC (b.r - a.r makes it falling/descending)
     subPortalData.sort((a, b) => b.r - a.r);
 
-    // Reset to page 1 and render
+    // 6. RESET TO PAGE 1 AND RENDER
     subPortalPage = 1;
     renderSubjectWiseTable();
 }
-
 function renderSubjectWiseTable() {
     const tbody = document.getElementById('portal-table-body');
     const pageInfo = document.getElementById('portal-page-info');
