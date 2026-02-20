@@ -5153,11 +5153,15 @@ async function fetchAutoInventory() {
    ========================================== */
 
 // Global variables for the portal pagination
+/* ==========================================
+   FIXED: SUBJECT-WISE FEES PORTAL LOGIC
+   ========================================== */
+
 let subPortalPage = 1;
 let subPortalData =[];
 const subPortalRowsPerPage = 5;
 
-// 1. Fetch data, group it, sort it, and initiate render
+// 1. Fetch, Group, Sort, and Initiate Render
 async function loadFeesPortal() {
     if (!sessionInstID) return;
 
@@ -5165,7 +5169,6 @@ async function loadFeesPortal() {
     if (tbody) tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px; font-weight:bold;'>Loading data...</td></tr>";
 
     try {
-        // Fetch active students to calculate totals
         const { data: students, error } = await db.from('students')
             .select('course, total_fees, paid_amount, pending_amount, admission_date')
             .eq('institute_id', sessionInstID)
@@ -5173,7 +5176,7 @@ async function loadFeesPortal() {
         
         if (error) throw error;
 
-        const map = {};
+        const map = {}; // Our grouping dictionary
         
         if (students && students.length > 0) {
             students.forEach(s => {
@@ -5182,30 +5185,29 @@ async function loadFeesPortal() {
                 let mYear = "Unknown";
                 if (s.admission_date && s.admission_date.length >= 10) {
                     const d = new Date(s.admission_date);
-                    // Formats to "January 2026", "February 2026", etc.
                     mYear = d.toLocaleString('default', { month: 'long', year: 'numeric' }); 
                 }
 
                 const key = sub + "_" + mYear;
 
-                // Group by Course and Month/Year
+                // THE FIX: We MUST check and assign map, NOT map itself!
                 if (!map) {
                     map = { name: sub, mYear: mYear, t: 0, r: 0, p: 0 };
                 }
                 
+                // Add the amounts to the specific Subject & Month group
                 map.t += parseFloat(s.total_fees) || 0;
                 map.r += parseFloat(s.paid_amount) || 0;
                 map.p += parseFloat(s.pending_amount) || 0;
             });
         }
 
-        // Convert the map to an array
+        // Convert the object dictionary into a clean array
         subPortalData = Object.values(map);
         
-        // Sort descending by Total Received (r)
+        // Sort the array descending by 'r' (Total Received)
         subPortalData.sort((a, b) => b.r - a.r);
 
-        // Reset to page 1 and render
         subPortalPage = 1;
         renderSubjectWiseTable();
 
@@ -5215,7 +5217,7 @@ async function loadFeesPortal() {
     }
 }
 
-// 2. Render strictly 5 items per page based on current page
+// 2. Render 5 Items Per Page
 function renderSubjectWiseTable() {
     const tbody = document.getElementById('portal-table-body');
     const pageInfo = document.getElementById('portal-page-info');
@@ -5224,7 +5226,7 @@ function renderSubjectWiseTable() {
 
     const totalPages = Math.ceil(subPortalData.length / subPortalRowsPerPage) || 1;
     
-    // Safety boundaries for the page number
+    // Safety check for bounds
     if (subPortalPage < 1) subPortalPage = 1;
     if (subPortalPage > totalPages) subPortalPage = totalPages;
 
@@ -5234,22 +5236,22 @@ function renderSubjectWiseTable() {
     if (rows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No Records Found</td></tr>';
     } else {
+        // (item.t || 0) ensures that if data is ever missing, it falls back to 0 without crashing.
         tbody.innerHTML = rows.map(item => `
             <tr style="border-bottom: 1px solid #ddd;">
                 <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
-                <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString('en-IN')}</td>
-                <td style="padding:12px; border:1px solid #000; color:green; font-weight:bold;">₹${item.r.toLocaleString('en-IN')}</td>
-                <td style="padding:12px; border:1px solid #000; color:red; font-weight:bold;">₹${item.p.toLocaleString('en-IN')}</td>
+                <td style="padding:12px; border:1px solid #000;">₹${(item.t || 0).toLocaleString('en-IN')}</td>
+                <td style="padding:12px; border:1px solid #000; color:green; font-weight:bold;">₹${(item.r || 0).toLocaleString('en-IN')}</td>
+                <td style="padding:12px; border:1px solid #000; color:red; font-weight:bold;">₹${(item.p || 0).toLocaleString('en-IN')}</td>
                 <td style="padding:12px; border:1px solid #000;">${item.mYear}</td>
             </tr>
         `).join('');
     }
 
-    // Update pagination label
     pageInfo.innerText = `Page ${subPortalPage} of ${totalPages}`;
 }
 
-// 3. Move Previous / Next correctly
+// 3. Move Previous / Next (Connected directly to your HTML buttons)
 function moveSubjectWisePage(dir) {
     const totalPages = Math.ceil(subPortalData.length / subPortalRowsPerPage) || 1;
     let nextPage = subPortalPage + dir;
