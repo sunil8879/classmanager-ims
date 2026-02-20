@@ -669,12 +669,14 @@
     <!-- Part 2: FEES PORTAL -->
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
+<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
 <div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
-    <h3>2. FEES PORTAL</h3>
+    <h3>2. SUBJECT-WISE FEES PORTAL</h3>
     <div class="form-grid">
         <div class="input-group">
             <label>Filter Month & Year (Admission Date)</label>
-            <input type="month" id="portal-calendar" onchange="loadFeesPortal()">
+            <!-- Points to the NEW refresh function -->
+            <input type="month" id="portal-calendar" onchange="refreshSubjectWiseSummary()">
         </div>
     </div>
 
@@ -682,23 +684,23 @@
         <table style="width: 100%; border-collapse: collapse; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
             <thead style="background: #f2f2f2;">
                 <tr>
-                    <th style="padding: 12px; border: 1px solid #000;">Names of Subjects</th>
+                    <th style="padding: 12px; border: 1px solid #000;">Subject Name</th>
                     <th style="padding: 12px; border: 1px solid #000;">Total Fees</th>
                     <th style="padding: 12px; border: 1px solid #000;">Total Received</th>
                     <th style="padding: 12px; border: 1px solid #000;">Total Pending</th>
                 </tr>
             </thead>
             <tbody id="portal-table-body">
-                <tr><td colspan="4" style="text-align:center; padding:20px;">Select a month or wait for loading...</td></tr>
+                <tr><td colspan="4" style="text-align:center; padding:20px;">Click 'Fee Management' tab or select a month to load data.</td></tr>
             </tbody>
         </table>
     </div>
 
-    <!-- Pagination Controls -->
+    <!-- Pagination Controls pointing to NEW move function -->
     <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; align-items: center;">
-        <button class="btn-fetch" style="padding: 5px 15px;" onclick="changePortalPage(-1)">Previous</button>
+        <button class="btn-fetch" style="padding: 5px 15px;" onclick="moveSubjectWisePage(-1)">Previous</button>
         <span id="portal-page-info" style="font-weight: bold; color: #000;">Page 1</span>
-        <button class="btn-fetch" style="padding: 5px 15px;" onclick="changePortalPage(1)">Next</button>
+        <button class="btn-fetch" style="padding: 5px 15px;" onclick="moveSubjectWisePage(1)">Next</button>
     </div>
 </div>
     <!-- Part 3: PAYMENT LOG -->
@@ -5132,6 +5134,91 @@ async function fetchAutoInventory() {
 
 
 
+
+
+
+/* --- NEW SUBJECT-WISE ANALYTICS ENGINE --- */
+let subPortalPage = 1;
+let subPortalData = [];
+
+async function refreshSubjectWiseSummary() {
+    if (!sessionInstID) return;
+
+    const tbody = document.getElementById('portal-table-body');
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Updating Summary...</td></tr>";
+
+    const monthFilter = document.getElementById('portal-calendar').value;
+    
+    // 1. Fetch Students (Direct connection to Master Table)
+    let query = db.from('students')
+                .select('course, total_fees, paid_amount, pending_amount, admission_date')
+                .eq('institute_id', sessionInstID)
+                .eq('status', 'Active');
+    
+    if (monthFilter) query = query.like('admission_date', `${monthFilter}%`);
+
+    const { data: students, error } = await query;
+
+    if (error || !students) {
+        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; color:red;'>Check internet connection.</td></tr>";
+        return;
+    }
+
+    // 2. Group Totals by Subject
+    const map = {};
+    students.forEach(s => {
+        const sub = s.course || "General";
+        if (!map[sub]) map[sub] = { t: 0, r: 0, p: 0 };
+        map[sub].t += parseFloat(s.total_fees) || 0;
+        map[sub].r += parseFloat(s.paid_amount) || 0;
+        map[sub].p += parseFloat(s.pending_amount) || 0;
+    });
+
+    // 3. Prepare for UI
+    subPortalData = Object.entries(map).map(([name, val]) => ({ name, ...val }));
+    subPortalData.sort((a, b) => a.name.localeCompare(b.name));
+    subPortalPage = 1;
+
+    renderSubjectWiseTable();
+}
+
+function renderSubjectWiseTable() {
+    const tbody = document.getElementById('portal-table-body');
+    const pageInfo = document.getElementById('portal-page-info');
+    
+    if (subPortalData.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>No student records found.</td></tr>";
+        pageInfo.innerText = "Page 1 of 1";
+        return;
+    }
+
+    const start = (subPortalPage - 1) * 5;
+    const rows = subPortalData.slice(start, start + 5);
+    const maxPage = Math.ceil(subPortalData.length / 5);
+
+    tbody.innerHTML = rows.map(item => `
+        <tr style="border-bottom: 1px solid #000;">
+            <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
+            <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000; color:green; font-weight:bold;">₹${item.r.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000; color:red; font-weight:bold;">₹${item.p.toLocaleString('en-IN')}</td>
+        </tr>`).join('');
+
+    pageInfo.innerText = `Page ${subPortalPage} of ${maxPage}`;
+}
+
+function moveSubjectWisePage(dir) {
+    const maxPage = Math.ceil(subPortalData.length / 5);
+    const target = subPortalPage + dir;
+    if (target >= 1 && target <= maxPage) {
+        subPortalPage = target;
+        renderSubjectWiseTable();
+    }
+}
+
+// Ensure the table loads when you enter the Fee tab
+// Add this line inside your showSection('fee') logic or simply call it:
+setTimeout(refreshSubjectWiseSummary, 2000);
 
     </script>
 <script>
