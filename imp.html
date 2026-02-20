@@ -2294,6 +2294,25 @@ async function saveFeeUpdate() {
 /* --- FINAL FIXED FEES PORTAL --- */
 
 
+async function fetchPaymentLog() {
+    const roll = document.getElementById('log-roll').value;
+    const monthInput = document.getElementById('log-calendar').value; // YYYY-MM
+    if(!roll || !monthInput) return alert("Please select Roll Number and Month Calendar.");
+
+    const formattedMonth = new Date(monthInput + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+    const { data, error } = await db.from('payment_history').select('*').eq('roll_number', roll).eq('month_year', formattedMonth);
+
+    const logDiv = document.getElementById('log-result');
+    if (data && data.length > 0) {
+        logDiv.innerHTML = `<strong>Payments for ${formattedMonth}:</strong><br>` + 
+            data.map(p => `<p style="color:green;">✔ ₹${p.amount} on ${p.payment_date}</p>`).join('');
+    } else {
+        logDiv.innerHTML = `<span style="color:red;">No records found for ${formattedMonth}.</span>`;
+    }
+}
+
+
+
 
 
 async function generateUPIQR() {
