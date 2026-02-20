@@ -5150,70 +5150,103 @@ async function fetchAutoInventory() {
 /* ==========================================
    CLEAN & FINAL: SUBJECT-WISE ANALYTICS ENGINE
    ========================================== */
+/* ==========================================
+   CLEAN & FINAL: SUBJECT-WISE ANALYTICS ENGINE
+   ========================================== */
 let subPortalPage = 1;
-let subPortalData = [];
+let subPortalData =[];
 const subRowsPerPage = 5;
 
 // 1. MAIN FETCH FUNCTION
 async function refreshSubjectWiseSummary() {
     if (!sessionInstID) return;
 
+    // Read the values directly from your existing Dropdowns
     const mm = document.getElementById('portal-month').value;
     const yyyy = document.getElementById('portal-year').value;
     const tbody = document.getElementById('portal-table-body');
     
-    // Reset Data & UI
-    subPortalData = [];
-    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Searching Database...</td></tr>";
+    // Reset Data & UI instantly so you don't get stuck looking at old data
+    subPortalData =[];
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px; font-weight:bold;'>Searching Database...</td></tr>";
 
-    // Build strict query
-    let query = db.from('students')
-                .select('course, total_fees, paid_amount, pending_amount, admission_date')
-                .eq('institute_id', sessionInstID)
-                .eq('status', 'Active');
-    
-    // Apply Strict Date Filters
-    if (yyyy && mm) {
-        query = query.like('admission_date', `${yyyy}-${mm}%`); 
-    } else if (yyyy) {
-        query = query.like('admission_date', `${yyyy}%`);    
-    } else if (mm) {
-        query = query.like('admission_date', `%-${mm}-%`);   
-    }
+    try {
+        // Fetch ALL Active students (We do filtering in JS to bypass Supabase date bugs)
+        const { data: students, error } = await db.from('students')
+            .select('course, total_fees, paid_amount, pending_amount, admission_date')
+            .eq('institute_id', sessionInstID)
+            .eq('status', 'Active');
+            
+        if (error) throw error;
 
-    const { data: students, error } = await query;
-    if (error) return console.error("Database Error:", error.message);
+        // Container to hold our calculated totals
+        let courseTotals = {};
 
-    // Grouping Logic
-    if (students && students.length > 0) {
-        const map = {};
-        students.forEach(s => {
-            const subName = s.course || "General/Other";
-            if (!map[subName]) map[subName] = { total: 0, received: 0, pending: 0 };
-            map[subName].total += parseFloat(s.total_fees) || 0;
-            map[subName].received += parseFloat(s.paid_amount) || 0;
-            map[subName].pending += parseFloat(s.pending_amount) || 0;
+        if (students && students.length > 0) {
+            // Safe loop that will not crash
+            for (let i = 0; i < students.length; i++) {
+                let s = students; // <--- Fixed the bug here (students)
+
+                // Safely extract the Year and Month from "YYYY-MM-DD"
+                let stuYear = "";
+                let stuMonth = "";
+                if (s.admission_date && s.admission_date.length >= 10) {
+                    stuYear = s.admission_date.substring(0, 4); // Gets "2026"
+                    stuMonth = s.admission_date.substring(5, 7); // Gets "02"
+                }
+
+                // If a dropdown is selected, check if it matches. If not, SKIP this student.
+                if (yyyy !== "" && yyyy !== stuYear) continue;
+                if (mm !== "" && mm !== stuMonth) continue;
+
+                // Grouping Logic
+                let courseName = s.course || "General/Other";
+
+                // Initialize if it doesn't exist yet
+                if (!courseTotals) {
+                    courseTotals = { total: 0, received: 0, pending: 0 };
+                }
+
+                // Add the money
+                courseTotals.total += parseFloat(s.total_fees) || 0;
+                courseTotals.received += parseFloat(s.paid_amount) || 0;
+                courseTotals.pending += parseFloat(s.pending_amount) || 0;
+            }
+        }
+
+        // Convert our object to an array so the table can read it
+        let keys = Object.keys(courseTotals);
+        for (let i = 0; i < keys.length; i++) {
+            let k = keys;
+            subPortalData.push({
+                name: k,
+                total: courseTotals.total,
+                received: courseTotals.received,
+                pending: courseTotals.pending
+            });
+        }
+
+        // SORT BY RECEIVED (Descending Order: Highest to Lowest)
+        subPortalData.sort(function(a, b) {
+            return b.received - a.received;
         });
 
-        // Convert to Array & SORT BY RECEIVED (Falling Order)
-        subPortalData = Object.entries(map).map(([name, v]) => ({
-            name: name,
-            total: v.total,
-            received: v.received,
-            pending: v.pending
-        })).sort((a, b) => b.received - a.received);
-    }
+        // Always reset to page 1 on new search and render
+        subPortalPage = 1;
+        renderSubjectWiseTable();
 
-    // Always reset to page 1 on search
-    subPortalPage = 1;
-    renderSubjectWiseTable();
+    } catch (err) {
+        console.error("Database or Math Error:", err.message);
+        tbody.innerHTML = `<tr><td colspan='4' style='text-align:center; padding:20px; color:red; font-weight:bold;'>Error: ${err.message}</td></tr>`;
+    }
 }
 
-// 2. RENDERING FUNCTION (Handles 5 rows and "Not Available" message)
+// 2. RENDERING FUNCTION
 function renderSubjectWiseTable() {
     const tbody = document.getElementById('portal-table-body');
     const pageInfo = document.getElementById('portal-page-info');
     
+    // Trigger "DATA NOT FOUND" perfectly if the year/month matches no students
     if (subPortalData.length === 0) {
         tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:30px; color:red; font-weight:bold; font-size:1.2rem;'>NOT AVAILABLE / NO DATA FOUND</td></tr>";
         pageInfo.innerText = "Page 1 of 1";
