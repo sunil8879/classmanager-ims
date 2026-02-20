@@ -681,6 +681,19 @@ if (selectedDate < today) {
         if (!isAuth) return;
     }
 
+// 🔵 Check if student has already booked this teacher 3 times today
+const { data: existingStudentBookings } = await db
+    .from("class_bookings")
+    .select("id")
+    .eq("institute_id", sessionInstID)
+    .eq("teacher_id", teacherId)
+    .eq("student_roll", roll)
+    .eq("booking_date", dateVal);
+
+if (existingStudentBookings.length >= 3) {
+    return alert("You cannot book this teacher more than 3 times in a day.");
+}
+
     // 3️⃣ Check if teacher is already booked at this time
     const { data: existingBooking } = await db
         .from("class_bookings")
