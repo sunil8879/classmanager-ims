@@ -548,11 +548,17 @@ document.getElementById('f-roll').addEventListener('keydown', function(e) {
             }
 
             // Correct time parsing logic
-            const timeParts = time.split('to');
-            const firstPart = timeParts.trim();
-            const hourStr = firstPart.split(':').replace(/^0+/, ''); // Remove leading zeros
-            const amPm = firstPart.includes('PM') ? 'pm' : 'am';
-            const simplifiedTime = `${hourStr} ${amPm}`;
+           // Correct time parsing logic
+const timeParts = time.split('to');
+
+const firstPart = timeParts[0].trim();   // Take only starting time
+const hourMinute = firstPart.split(' ')[0]; // "09:00"
+const amPm = firstPart.includes('PM') ? 'pm' : 'am';
+
+let hourStr = hourMinute.split(':')[0];  // "09"
+hourStr = hourStr.replace(/^0+/, '');    // remove leading zero
+
+const simplifiedTime = `${hourStr} ${amPm}`;
 
             const formattedDate = formatDateReadable(dateVal);
 
