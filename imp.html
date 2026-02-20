@@ -1060,7 +1060,28 @@
 			<!-- Inside <section id="teacher"> inside <div class="form-grid"> -->
 
 <!-- Other inputs like Name, Age, etc are here... -->
-
+<!-- START OF NEW TEACHER FIELDS -->
+<div class="input-group">
+    <label>Gender</label>
+    <select id="tch-gender">
+        <option value="">Select Gender</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+    </select>
+</div>
+<div class="input-group"><label>Email</label><input type="email" id="tch-email" placeholder="Email Address"></div>
+<div class="input-group"><label>Full Address</label><input type="text" id="tch-address" placeholder="Complete Address"></div>
+<div class="input-group"><label>Experience (Years)</label><input type="number" id="tch-exp" placeholder="e.g. 5"></div>
+<div class="input-group"><label>Rating (/5)</label><input type="number" step="0.1" max="5" id="tch-rating" placeholder="e.g. 4.5"></div>
+<div class="input-group">
+    <label>Status</label>
+    <select id="tch-status">
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+    </select>
+</div>
+<!-- END OF NEW TEACHER FIELDS -->
 <div class="input-group" style="grid-column: 1 / -1; width: 100%; max-width: 350px; margin: 15px auto 0; text-align: center;">
     <label style="display: block; margin-bottom: 5px; color: #000; font-weight: bold;">WhatsApp Mobile Number</label>
     <input type="text" id="tch-mobile" placeholder="10-Digit Mobile Number" maxlength="10" style="text-align: center; border: 2px solid #25D366;">
@@ -3399,8 +3420,13 @@ async function loadFeesPortal() {
 }
 // 2. Clear Form
 function clearTeacherForm() {
-    const ids = ['tch-id','tch-name','tch-age','tch-gender','tch-join','tch-qual','tch-subject','tch-salary'];
-    ids.forEach(id => document.getElementById(id).value = "");
+   const ids = ['tch-id','tch-name','tch-age','tch-gender','tch-join','tch-qual','tch-subject','tch-salary','tch-gender','tch-email','tch-address','tch-exp','tch-status','tch-rating','tch-mobile'];
+    ids.forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    let statusEl = document.getElementById('tch-status');
+    if (statusEl) statusEl.value = "Active";
 }
 
 // 3. ADD TEACHER
@@ -3421,7 +3447,13 @@ async function addTeacherDetails() {
         joining_date: document.getElementById('tch-join').value,
         qualification: document.getElementById('tch-qual').value,
         subject_taught: document.getElementById('tch-subject').value,
-        salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0
+        salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0,
+gender: document.getElementById('tch-gender').value,
+        email: document.getElementById('tch-email').value,
+        full_address: document.getElementById('tch-address').value,
+        experience: parseFloat(document.getElementById('tch-exp').value) || 0,
+        rating: parseFloat(document.getElementById('tch-rating').value) || 0,
+        status: document.getElementById('tch-status').value || "Active"
     }]);
 
     if (error) alert("DB Error: " + error.message);
@@ -3450,6 +3482,12 @@ async function fetchTeacher() {
     document.getElementById('tch-qual').value = data.qualification;
     document.getElementById('tch-subject').value = data.subject_taught;
     document.getElementById('tch-salary').value = data.salary_offered;
+document.getElementById('tch-gender').value = data.gender || "";
+    document.getElementById('tch-email').value = data.email || "";
+    document.getElementById('tch-address').value = data.full_address || "";
+    document.getElementById('tch-exp').value = data.experience || "";
+    document.getElementById('tch-rating').value = data.rating || "";
+    document.getElementById('tch-status').value = data.status || "Active";
 
     alert("Details Loaded for " + data.teacher_name);
 }
@@ -3466,7 +3504,14 @@ async function editTeacher() {
         joining_date: document.getElementById('tch-join').value,
         qualification: document.getElementById('tch-qual').value,
         subject_taught: document.getElementById('tch-subject').value,
-        salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0
+        salary_offered: parseFloat(document.getElementById('tch-salary').value) || 0,
+mobile: document.getElementById('tch-mobile').value,
+        gender: document.getElementById('tch-gender').value,
+        email: document.getElementById('tch-email').value,
+        full_address: document.getElementById('tch-address').value,
+        experience: parseFloat(document.getElementById('tch-exp').value) || 0,
+        rating: parseFloat(document.getElementById('tch-rating').value) || 0,
+        status: document.getElementById('tch-status').value || "Active"
     };
 
     const { error } = await db.from('teacher_details').update(tchData).eq('id', id);
