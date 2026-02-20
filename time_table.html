@@ -417,42 +417,39 @@ const DAYS = [
 ];
 
         // --- 2. DATABASE FETCH LOGIC ---
-        async function fetchStudent() {
-            const roll = document.getElementById('f-roll').value.trim().toUpperCase();
+       async function fetchStudent() {
+    const roll = document.getElementById('f-roll').value.trim().toUpperCase();
 
-            if (!roll) {
-                alert("Please enter Student Roll Number.");
-                return;
-            }
-
-            let query = db.from('students').select('full_name, course').eq('roll_number', roll);
-            if (sessionInstID) query = query.eq('institute_id', sessionInstID);
-
-            const { data, error } = await query.limit(1).maybeSingle();
-
-            if (error) {
-                console.error("Fetch Error:", error.message);
-                alert("Database Error: " + error.message);
-                return;
-            }
-
-            if (!data) {
-                alert("Student not found. Please verify the Roll Number.");
-                document.getElementById('f-student-name').value = '';
-                document.getElementById('f-course').value = '';
-                return;
-            }
-
-            document.getElementById('f-student-name').value = data.full_name || '';
-            document.getElementById('f-course').value = data.course || '';
-        }
-
-document.getElementById('f-roll').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        fetchStudent();
+    if (!roll) {
+        alert("Please enter Student Roll Number.");
+        return;
     }
-});
+
+    let query = db.from('students').select('full_name, course').eq('roll_number', roll);
+    if (sessionInstID) query = query.eq('institute_id', sessionInstID);
+
+    const { data, error } = await query.limit(1).maybeSingle();
+
+    if (error) {
+        console.error("Fetch Error:", error.message);
+        alert("Database Error: " + error.message);
+        return;
+    }
+
+    if (!data) {
+        alert("Student not found. Please verify the Roll Number.");
+        document.getElementById('f-student-name').value = '';
+        document.getElementById('f-course').value = '';
+        document.getElementById('f-teacher').innerHTML = '<option value="">Select Teacher</option>';
+        return;
+    }
+
+    document.getElementById('f-student-name').value = data.full_name || '';
+    document.getElementById('f-course').value = data.course || '';
+
+    // ✅ Populate teacher dropdown for this course
+    populateTeachersBySubject(data.course);
+}
 
         async function fetchTeacher() {
             const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
