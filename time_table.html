@@ -558,7 +558,7 @@ const DAYS = [
         }
 
         // --- 3. GRID GENERATOR LOGIC ---
-    async function generateTimeTable() {
+ async function generateTimeTable() {
 
     const dateVal = document.getElementById('f-date').value;
 
@@ -590,6 +590,7 @@ const DAYS = [
 
         const tr = document.createElement('tr');
 
+        // TIME COLUMN
         const tdTime = document.createElement('td');
         tdTime.className = 'time-slot';
         tdTime.innerText = timeStr;
@@ -601,23 +602,15 @@ const DAYS = [
             const cellId = `cell-${rowIndex}-${colIndex}`;
             td.id = cellId;
 
-            // 🔴 Check if this time slot is already booked
+            // 🔴 Check if this slot is booked for this day & time
             const isBooked = bookings?.some(b =>
-                b.time_slot === timeStr
+                b.time_slot === timeStr && b.day === dayStr
             );
 
             if (isBooked) {
-
-                td.innerHTML = `
-                    <span style="color:red; font-weight:bold;">
-                        SLOT BOOKED
-                    </span>
-                `;
-
+                td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
                 td.classList.add("booked-cell");
-
             } else {
-
                 td.innerHTML = `
                     <span class="open-slot">OPEN SLOT</span>
                     <button type="button"
