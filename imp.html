@@ -671,45 +671,34 @@
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
-<div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
+<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
+<div class="card" style="margin-bottom: 30px; border-top-color: #007bff; text-align: center;">
     <h3>2. SUBJECT-WISE FEES PORTAL</h3>
+    <p style="margin-bottom: 20px; color: #555; font-size: 1.1rem;">Access the advanced, standalone analytics portal to view all subject-wise collections.</p>
     
-    <!-- Dynamic Title for Month & Year -->
-    <h4 id="portal-dynamic-title" style="color: #000; text-transform: uppercase; font-size: 1.3rem; margin-bottom: 20px; text-decoration: underline;"></h4>
-    
-    <div class="form-grid">
-        <div class="input-group">
-            <label>Search by Month & Year</label>
-            <div style="display: flex; gap: 5px;">
-                <input type="text" id="portal-search-month" placeholder="e.g. March 2026" onkeyup="if(event.key === 'Enter') refreshSubjectWiseSummary()">
-                <button class="btn-fetch" onclick="refreshSubjectWiseSummary()" style="padding: 5px 15px;"><i class="fas fa-search"></i> Search</button>
-            </div>
-        </div>
-    </div>
-
-    <div style="overflow-x: auto; margin-top: 20px;">
-        <table style="width: 100%; border-collapse: collapse; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
-            <thead style="background: #f2f2f2;">
-                <tr>
-                    <th style="padding: 12px; border: 1px solid #000;">Subject Name</th>
-                    <th style="padding: 12px; border: 1px solid #000;">Total Fees</th>
-                    <th style="padding: 12px; border: 1px solid #000;">Total Received</th>
-                    <th style="padding: 12px; border: 1px solid #000;">Total Pending</th>
-                    <th style="padding: 12px; border: 1px solid #000;">Month & Year</th>
-                </tr>
-            </thead>
-            <tbody id="portal-table-body">
-                <tr><td colspan="5" style="text-align:center; padding:20px;">Loading data...</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Pagination Controls -->
-    <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; align-items: center;">
-        <button class="btn-fetch" style="padding: 5px 15px;" onclick="moveSubjectWisePage(-1)">Previous</button>
-        <span id="portal-page-info" style="font-weight: bold; color: #000;">Page 1</span>
-        <button class="btn-fetch" style="padding: 5px 15px;" onclick="moveSubjectWisePage(1)">Next</button>
-    </div>
+    <!-- 3D Aquamarine Button -->
+    <a href="subject-fees.html" target="_blank" style="
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: #7FFFD4;
+        color: #000;
+        font-weight: 900;
+        font-family: 'Times New Roman', Times, serif;
+        text-decoration: none;
+        padding: 15px 30px;
+        border: 2px solid #000;
+        border-radius: 12px;
+        box-shadow: 0 6px 0px #66ccaa, 0 12px 20px rgba(0,0,0,0.15);
+        transition: all 0.2s ease;
+        font-size: 1.2rem;
+        cursor: pointer;
+    " 
+    onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 10px 0px #66ccaa, 0 18px 25px rgba(0,0,0,0.25)';" 
+    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 0px #66ccaa, 0 12px 20px rgba(0,0,0,0.15)';">
+        <i class="fas fa-external-link-alt"></i> OPEN FEES PORTAL
+    </a>
 </div>
     <!-- Part 3: PAYMENT LOG -->
     <div class="card">
@@ -5151,143 +5140,7 @@ async function fetchAutoInventory() {
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
-let subPortalPage = 1;
-let subPortalData =[];
 
-// Helper function to convert "March 2026" to "2026-03" (Case Insensitive)
-function parseMonthYearString(str) {
-    if (!str) return "";
-    const months = {
-        january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
-        july: "07", august: "08", september: "09", october: "10", november: "11", december: "12",
-        jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
-    };
-    
-    const parts = str.trim().toLowerCase().split(/\s+/);
-    
-    if (parts.length >= 2) {
-        // Using explicit index 0 and 1
-        const cleanMonth = parts.replace(/,/g, '');
-        const cleanYear = parts.replace(/,/g, '');
-        
-        const monthNum = months;
-        if (monthNum && cleanYear.length === 4) {
-            return `${cleanYear}-${monthNum}`;
-        }
-    }
-    return "";
-}
-
-async function refreshSubjectWiseSummary() {
-    if (!sessionInstID) return;
-
-    const tbody = document.getElementById('portal-table-body');
-    const searchVal = document.getElementById('portal-search-month').value.trim();
-    
-    let yyyy_mm = "";
-    let targetDisplayMonth = "";
-
-    // Determine if User Searched or Default to Current Month
-    if (searchVal !== "") {
-        yyyy_mm = parseMonthYearString(searchVal);
-        if (!yyyy_mm) {
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px; color:red;'>Invalid format. Please type like 'March 2026'.</td></tr>";
-            return;
-        }
-        targetDisplayMonth = searchVal.toUpperCase();
-    } else {
-        const now = new Date();
-        const m = (now.getMonth() + 1).toString().padStart(2, '0');
-        const y = now.getFullYear();
-        yyyy_mm = `${y}-${m}`;
-        targetDisplayMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
-    }
-
-    // Set Dynamic Title
-    const dynamicTitle = document.getElementById('portal-dynamic-title');
-    if (dynamicTitle) dynamicTitle.innerText = targetDisplayMonth;
-
-    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>Updating Summary...</td></tr>";
-
-    // 1. Fetch Students
-    let query = db.from('students')
-                .select('course, total_fees, paid_amount, pending_amount')
-                .eq('institute_id', sessionInstID)
-                .eq('status', 'Active')
-                .like('admission_date', `${yyyy_mm}%`); 
-
-    const { data: students, error } = await query;
-
-    if (error) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; color:red;'>Error fetching data.</td></tr>";
-        return;
-    }
-
-    // 2. Group Totals by Subject using a dictionary
-    const dict = {};
-    students.forEach(s => {
-        const sub = s.course || "General";
-        if (!dict) {
-            dict = { t: 0, r: 0, p: 0, my: targetDisplayMonth };
-        }
-        dict.t += parseFloat(s.total_fees) || 0;
-        dict.r += parseFloat(s.paid_amount) || 0;
-        dict.p += parseFloat(s.pending_amount) || 0;
-    });
-
-    // 3. Convert to Array safely and SORT by 'Received' (Descending Order)
-    subPortalData = Object.keys(dict).map(key => {
-        return {
-            name: key,
-            t: dict.t,
-            r: dict.r,
-            p: dict.p,
-            my: dict.my
-        };
-    });
-    
-    subPortalData.sort((a, b) => b.r - a.r);
-
-    // Reset to page 1 and render
-    subPortalPage = 1;
-    renderSubjectWiseTable();
-}
-
-function renderSubjectWiseTable() {
-    const tbody = document.getElementById('portal-table-body');
-    const pageInfo = document.getElementById('portal-page-info');
-    
-    if (subPortalData.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No student records found for this period.</td></tr>";
-        pageInfo.innerText = "Page 1 of 1";
-        return;
-    }
-
-    const start = (subPortalPage - 1) * 5;
-    const rows = subPortalData.slice(start, start + 5);
-    const maxPage = Math.ceil(subPortalData.length / 5);
-
-    // Render columns including the 5th (Month & Year)
-    tbody.innerHTML = rows.map(item => `
-        <tr style="border-bottom: 1px solid #000;">
-            <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
-            <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString('en-IN')}</td>
-            <td style="padding:12px; border:1px solid #000; color: green; font-weight:bold;">₹${item.r.toLocaleString('en-IN')}</td>
-            <td style="padding:12px; border:1px solid #000; color: red; font-weight:bold;">₹${item.p.toLocaleString('en-IN')}</td>
-            <td style="padding:12px; border:1px solid #000; font-size: 0.9rem;">${item.my}</td>
-        </tr>`).join('');
-
-    pageInfo.innerText = `Page ${subPortalPage} of ${maxPage}`;
-}
-
-function moveSubjectWisePage(dir) {
-    const maxPage = Math.ceil(subPortalData.length / 5) || 1;
-    const target = subPortalPage + dir;
-    if (target >= 1 && target <= maxPage) {
-        subPortalPage = target;
-        renderSubjectWiseTable();
-    }
-}
     </script>
 <script>
 if ('serviceWorker' in navigator) {

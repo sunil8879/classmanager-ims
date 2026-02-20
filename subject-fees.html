@@ -74,7 +74,7 @@
             border: 1px dashed #ccc;
         }
 
-        .search-bar input {
+        .search-input-box {
             padding: 12px 20px;
             font-size: 1rem;
             border: 2px solid var(--black);
@@ -84,7 +84,7 @@
             outline: none;
         }
 
-        .search-bar input:focus {
+        .search-input-box:focus {
             border-color: var(--aquamarine);
             box-shadow: 0 0 10px var(--aquamarine);
         }
@@ -177,7 +177,7 @@
 
     <div class="card">
         <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Type month & year (e.g. March 2026)">
+            <input type="text" id="search-input" class="search-input-box" placeholder="Type month & year (e.g. March 2026)">
             <button class="btn-generate" onclick="handleGenerateClick()">
                 <i class="fas fa-bolt"></i> GENERATE
             </button>
@@ -214,16 +214,20 @@
         const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
         let sessionInstID = ""; 
-        let portalData =[];
+        let portalData = new Array();
         let currentPage = 1;
         const rowsPerPage = 5;
 
-        // 2. AUTHENTICATION CHECK (Protects Institute Data)
+        // 2. AUTHENTICATION CHECK
         async function authenticateUser() {
-            const { data: { user } } = await db.auth.getUser();
+            const authResponse = await db.auth.getUser();
+            const user = authResponse.data.user;
+            
             if (user) {
-                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
-                if (profile) sessionInstID = profile.institute_id;
+                const profileResponse = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+                if (profileResponse.data) {
+                    sessionInstID = profileResponse.data.institute_id;
+                }
             }
             
             if (!sessionInstID) {
@@ -234,25 +238,22 @@
             return true;
         }
 
-        // 3. SAFE DATE PARSER (No array indexes used to prevent syntax errors)
+        // 3. SECURE PARSER (Avoids syntax errors caused by chat formatting)
         function parseSearchString(input) {
             if (!input) {
-                // Return current month dynamically
                 const now = new Date();
                 const year = now.getFullYear();
                 const month = String(now.getMonth() + 1).padStart(2, '0');
                 const label = now.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
-                return { dbDate: `${year}-${month}`, label: label };
+                return { startDate: `${year}-${month}-01`, endDate: `${year}-${month}-31`, label: label };
             }
 
             const parts = input.trim().toLowerCase().split(/\s+/);
             if (parts.length < 2) return null;
 
-            // USING DESTRUCTURING: Safely separates the text without or
-            let = parts;
-
-            monthStr = monthStr.replace(/,/g, '');
-            yearStr = yearStr.replace(/,/g, '');
+            // Using .at() completely bypasses the markdown formatting issues
+            let monthStr = parts.at(0).replace(/,/g, '');
+            let yearStr = parts.at(1).replace(/,/g, '');
 
             const dictionary = {
                 january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
@@ -260,17 +261,19 @@
                 jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
             };
 
-            const monthNum = dictionary;
+            // Using Reflect.get bypasses square brackets for object lookups
+            const monthNum = Reflect.get(dictionary, monthStr);
             if (!monthNum || yearStr.length !== 4) return null;
 
             const dateObj = new Date(`${yearStr}-${monthNum}-01`);
             const label = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
 
-            return { dbDate: `${yearStr}-${monthNum}`, label: label };
+            // Returns a valid date range to prevent the Supabase Operator Error
+            return { startDate: `${yearStr}-${monthNum}-01`, endDate: `${yearStr}-${monthNum}-31`, label: label };
         }
 
         // 4. FETCH AND PROCESS DATA
-        async function loadTableData(searchQuery = "") {
+        async function loadTableData(searchQuery) {
             const dateInfo = parseSearchString(searchQuery);
             
             if (!dateInfo) {
@@ -282,19 +285,19 @@
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Loading records...</td></tr>";
 
-            // Query Supabase Students table
+            // FIXED DATABASE QUERY: Using .gte and .lte stops the "date ~~ unknown" Error
             const { data, error } = await db.from('students')
-                .select('course, total_fees, paid_amount, pending_amount')
+                .select('course, total_fees, paid_amount, pending_amount, admission_date')
                 .eq('institute_id', sessionInstID)
                 .eq('status', 'Active')
-                .like('admission_date', `${dateInfo.dbDate}%`);
+                .gte('admission_date', dateInfo.startDate)
+                .lte('admission_date', dateInfo.endDate);
 
             if (error) {
                 tbody.innerHTML = `<tr><td colspan='5' style='text-align: center; color: red;'>Database Error: ${error.message}</td></tr>`;
                 return;
             }
 
-            // Group subjects and calculate sums safely
             const groupedMap = new Map();
 
             data.forEach(student => {
@@ -316,16 +319,15 @@
                 stats.pending += parseFloat(student.pending_amount) || 0;
             });
 
-            // Convert to array and SORT BY RECEIVED DESCENDING
+            // Convert and SORT BY RECEIVED DESCENDING
             portalData = Array.from(groupedMap.values());
             portalData.sort((a, b) => b.received - a.received);
 
-            // Reset page and render
             currentPage = 1;
             renderPagination();
         }
 
-        // 5. RENDER TABLE (5 per page)
+        // 5. RENDER TABLE
         function renderPagination() {
             const tbody = document.getElementById('table-body');
             const info = document.getElementById('page-info');
@@ -376,7 +378,7 @@
         window.onload = async () => {
             const isAuth = await authenticateUser();
             if (isAuth) {
-                // Load current month dynamically (empty search string triggers current month)
+                // Pass empty string to trigger current month natively
                 loadTableData("");
             }
         };
