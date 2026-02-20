@@ -5148,6 +5148,7 @@ async function fetchAutoInventory() {
 /* --- NEW SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
+/* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 let subPortalPage = 1;
 let subPortalData =[];
 
@@ -5160,14 +5161,18 @@ function parseMonthYearString(str) {
         jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
     };
     
+    // Split the text into parts (e.g.)
     const parts = str.trim().toLowerCase().split(/\s+/);
+    
     if (parts.length >= 2) {
-        // Handle cases where comma is used (e.g. "March, 2026")
-        const cleanMonth = parts.replace(//g, '');
-        const cleanYear = parts.replace(//g, '');
+        // Correctly remove commas if user typed "March, 2026"
+        const cleanMonth = parts.replace(/,/g, '');
+        const cleanYear = parts.replace(/,/g, '');
         
         const monthNum = months;
-        if (monthNum && cleanYear.length === 4) return `${cleanYear}-${monthNum}`;
+        if (monthNum && cleanYear.length === 4) {
+            return `${cleanYear}-${monthNum}`;
+        }
     }
     return "";
 }
@@ -5221,7 +5226,10 @@ async function refreshSubjectWiseSummary() {
     const map = {};
     students.forEach(s => {
         const sub = s.course || "General";
-        if (!map) map = { t: 0, r: 0, p: 0, my: targetDisplayMonth };
+        // Fixed mapping initialisation
+        if (!map) {
+            map = { t: 0, r: 0, p: 0, my: targetDisplayMonth };
+        }
         map.t += parseFloat(s.total_fees) || 0;
         map.r += parseFloat(s.paid_amount) || 0;
         map.p += parseFloat(s.pending_amount) || 0;
