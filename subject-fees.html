@@ -181,7 +181,10 @@
             <button class="btn-generate" onclick="handleGenerateClick()">
                 <i class="fas fa-bolt"></i> GENERATE
             </button>
+<input type="date" id="admission_date" name="admission_date" required>
         </div>
+
+
 
         <div style="overflow-x: auto;">
             <table>
@@ -383,5 +386,40 @@
             }
         };
     </script>
+
+
+<script>
+document.querySelector("form").addEventListener("submit", function (e) {
+
+    const dateInput = document.getElementById("fee_date").value;
+
+    // Try creating a real date object
+    const enteredDate = new Date(dateInput);
+    const parts = dateInput.split("-");
+
+    if (parts.length !== 3) {
+        alert("Invalid date format. Use YYYY-MM-DD.");
+        e.preventDefault();
+        return;
+    }
+
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // JS months start from 0
+    const day = parseInt(parts[2]);
+
+    const checkDate = new Date(year, month, day);
+
+    // Check if date is valid
+    if (
+        checkDate.getFullYear() !== year ||
+        checkDate.getMonth() !== month ||
+        checkDate.getDate() !== day
+    ) {
+        alert("Invalid date entered. Please enter a valid calendar date.");
+        e.preventDefault(); // stop form submission
+    }
+
+});
+</script>
 </body>
 </html>
