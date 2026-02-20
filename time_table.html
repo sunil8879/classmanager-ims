@@ -122,12 +122,12 @@
     }
 
     /* Teal Color for Greyed-out (Readonly) Fields */
-    input {
-        background: linear-gradient(135deg, #008080, #40E0D0); /* Gradient Teal */
-        color: #000; /* Black font strictly enforced */
-        border: 2px dashed #000;
-        cursor: not-allowed;
-    }
+input[readonly] {
+    background: linear-gradient(135deg, #008080, #40E0D0); /* Gradient Teal */
+    color: #000; /* Black font strictly enforced */
+    border: 2px dashed #000;
+    cursor: not-allowed;
+}
     
     /* Input placeholder color correction for readability on Teal */
     input::placeholder {
