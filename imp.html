@@ -2292,17 +2292,16 @@ async function saveFeeUpdate() {
    ========================================== */
 
 /* --- CONSOLIDATED FEES PORTAL LOGIC --- */
-async function loadFeesPortal(pageDir = 0) {
+/* --- FINAL FIXED FEES PORTAL --- */
+
+// 1. This function FETCHES the data from Supabase
+async function loadFeesPortal() {
     if (!sessionInstID) return;
 
-    // 1. Update Page Number
-    portalCurrentPage += pageDir;
-    if (portalCurrentPage < 1) portalCurrentPage = 1;
-
+    // Get the Month Filter
     const monthFilter = document.getElementById('portal-calendar').value;
     
-    // 2. Fetch Data (Filtered by YOUR Institute ONLY)
-    // We connect directly to the 'students' table which holds the Master Balance for every course
+    // Fetch from Students Table
     let query = db.from('students')
                 .select('course, total_fees, paid_amount, pending_amount, admission_date')
                 .eq('institute_id', sessionInstID)
@@ -2311,9 +2310,9 @@ async function loadFeesPortal(pageDir = 0) {
     if (monthFilter) query = query.like('admission_date', `${monthFilter}%`);
 
     const { data: students, error } = await query;
-    if (error || !students) return console.error("Portal Error:", error?.message);
+    if (error) return console.error(error);
 
-    // 3. Group by Subject
+    // Group by Subject
     const map = {};
     students.forEach(s => {
         const sub = s.course || "Other";
@@ -2323,17 +2322,23 @@ async function loadFeesPortal(pageDir = 0) {
         map[sub].p += parseFloat(s.pending_amount) || 0;
     });
 
-    const rowsArray = Object.entries(map).map(([name, val]) => ({ name, ...val }));
+    // Save result to global variable and reset to page 1
+    portalDataRows = Object.entries(map).map(([name, val]) => ({ name, ...val }));
+    portalCurrentPage = 1;
+
+    renderPortalTable();
+}
+
+// 2. This function RENDERS the 5 rows on the screen
+function renderPortalTable() {
+    const tbody = document.getElementById('portal-table-body');
+    const pageInfo = document.getElementById('portal-page-info');
     
-    // 4. Handle Pagination (5 rows per page)
-    const maxPage = Math.ceil(rowsArray.length / 5) || 1;
-    if (portalCurrentPage > maxPage) portalCurrentPage = maxPage;
-
+    const maxPage = Math.ceil(portalDataRows.length / 5) || 1;
     const start = (portalCurrentPage - 1) * 5;
-    const paginatedRows = rowsArray.slice(start, start + 5);
+    const rows = portalDataRows.slice(start, start + 5);
 
-    // 5. Update the UI
-    document.getElementById('portal-table-body').innerHTML = paginatedRows.map(item => `
+    tbody.innerHTML = rows.map(item => `
         <tr>
             <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
             <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString()}</td>
@@ -2341,12 +2346,18 @@ async function loadFeesPortal(pageDir = 0) {
             <td style="padding:12px; border:1px solid #000; color:red;">₹${item.p.toLocaleString()}</td>
         </tr>`).join('') || '<tr><td colspan="4" style="text-align:center; padding:20px;">No Records Found</td></tr>';
 
-    document.getElementById('portal-page-info').innerText = `Page ${portalCurrentPage} of ${maxPage}`;
+    pageInfo.innerText = `Page ${portalCurrentPage} of ${maxPage}`;
 }
 
-// Small helper for the Previous/Next buttons
-function changePortalPage(dir) { 
-    loadFeesPortal(dir); 
+// 3. This function makes the PREVIOUS / NEXT buttons work
+function changePortalPage(dir) {
+    const maxPage = Math.ceil(portalDataRows.length / 5) || 1;
+    let nextPage = portalCurrentPage + dir;
+    
+    if (nextPage >= 1 && nextPage <= maxPage) {
+        portalCurrentPage = nextPage;
+        renderPortalTable();
+    }
 }
 async function fetchPaymentLog() {
     const roll = document.getElementById('log-roll').value;
