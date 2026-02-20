@@ -5199,7 +5199,7 @@ async function loadFeesPortal() {
                 // Create a unique identifier for each subject & month combo
                 const key = sub + "_" + mYear;
 
-                // THE REAL FIX: Create the group using the!
+                // THE FIX: Assign directly to the specific key in the dictionary
                 if (!map) {
                     map = { name: sub, mYear: mYear, t: 0, r: 0, p: 0 };
                 }
