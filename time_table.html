@@ -558,8 +558,7 @@ async function bookSlot(day, time, cellId) {
     const course = document.getElementById('f-course').value;
     const teacherSelect = document.getElementById("f-teacher");
     const teacherId = teacherSelect.value;
-    const room = document.getElementById('f-room').value;
-    const floor = document.getElementById('f-floor').value;
+
     const dateVal = document.getElementById('f-date').value;
 
     // 2️⃣ Validation
@@ -602,9 +601,8 @@ if (selectedDate < today) {
             student_roll: roll,
             booking_date: dateVal,
             time_slot: time,
-            course: course,
-            room: room,
-            floor: floor
+            course: course
+        
         })
         .select()
         .single();
