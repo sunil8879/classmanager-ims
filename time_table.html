@@ -11,246 +11,348 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
-<style>
-:root {
-    --gradient-title-top: linear-gradient(135deg, #27AE60, #222222); /* parrot green → black */
-    --gradient-book-btn: linear-gradient(135deg, #40E0D0, #222222); /* turquoise → black */
-    --gradient-days: linear-gradient(135deg, #27AE60, #222222); /* parrot green → black */
-    --gradient-time: linear-gradient(135deg, #3498DB, #222222); /* blue → black */
-    --font-color: #000000;
-}
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800;900&display=swap');
 
-/* GLOBAL STYLES */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: 'Poppins', sans-serif;
-}
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Poppins', sans-serif;
+        color: #000000; /* Black font on the whole page */
+    }
 
-body {
-    background-color: #fdfdfd; /* milky white */
-    color: var(--font-color);
-    padding-bottom: 50px;
-}
+    body {
+        background-color: #ffffff; /* Total white background */
+        padding-bottom: 60px;
+    }
 
-/* HEADER */
-header {
-    background: #ffffff;
-    padding: 25px;
-    text-align: center;
-    margin-bottom: 30px;
-}
+    /* --- TITLE: 3D BOX, AQUAMARINE GRADIENT, TILTED --- */
+    header {
+        text-align: center;
+        padding: 50px 20px 40px;
+        perspective: 1000px;
+    }
 
-header h1 {
-    font-size: 2.5rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    font-family: 'Poppins', sans-serif;
-    color: #000; /* text in black for readability */
-    background: linear-gradient(45deg, #7FFFD4, #40E0D0, #00CED1); /* gradient aquamarine shades */
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    padding: 15px 40px;
-    border-radius: 12px;
-    box-shadow: 4px 4px 12px rgba(0,0,0,0.2);
-    display: inline-block;
-    transform: rotateX(30deg);
-}
+    header h1 {
+        display: inline-block;
+        font-size: 0; /* Hides original HTML text to replace it */
+        background: linear-gradient(135deg, #7FFFD4, #20B2AA); /* Gradient aquamarine */
+        border: 4px solid #000;
+        padding: 20px 40px;
+        border-radius: 15px;
+        /* 3D tilt effect */
+        transform: rotateZ(-2deg) rotateX(15deg) rotateY(-5deg);
+        box-shadow: 10px 10px 0px #000, 15px 15px 25px rgba(0,0,0,0.2);
+        transition: transform 0.4s ease, box-shadow 0.4s ease;
+    }
 
-/* FORM CONTAINER */
-.form-container {
-    width: 90%;
-    max-width: 1200px;
-    margin: 0 auto;
-    border: 2px solid var(--font-color);
-    padding: 25px;
-    border-radius: 10px;
-    background-color: #ffffff;
-    margin-bottom: 30px;
-}
+    header h1:hover {
+        transform: rotateZ(0deg) rotateX(5deg) scale(1.05); /* Lifts up on hover */
+        box-shadow: 15px 15px 0px #000, 20px 20px 30px rgba(0,0,0,0.3);
+    }
 
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 25px;
-}
+    header h1::before {
+        content: "TIME-TABLE GENERATOR - AUTO";
+        font-size: 2.5rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #000000;
+    }
 
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
+    /* --- TOP PORTION: FORM & EQUAL SIZED BOXES --- */
+    .form-container {
+        width: 90%;
+        max-width: 1200px;
+        margin: 0 auto 40px;
+        border: 3px solid #000;
+        padding: 35px;
+        border-radius: 16px;
+        background-color: #ffffff;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        transition: transform 0.3s;
+    }
 
-.input-group label {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
+    .form-container:hover {
+        transform: translateY(-5px); /* Lift effect */
+        box-shadow: 0 15px 30px rgba(0,0,0,0.12);
+    }
 
-input, select {
-    padding: 10px;
-    border: 2px solid var(--font-color);
-    border-radius: 6px;
-    font-size: 1rem;
-    background: #ffffff;
-    color: var(--font-color);
-}
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 25px;
+        margin-bottom: 30px;
+    }
 
-input[readonly] {
-    background-color: #e0e0e0;
-    cursor: not-allowed;
-    color: #555;
-    font-weight: bold;
-}
+    .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
 
-/* FETCH BUTTON */
-.btn-fetch {
-    background: var(--font-color);
-    color: #7FFFD4; /* aquamarine */
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    margin-top: 5px;
-}
+    .input-group label {
+        font-weight: 800;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+    }
 
-/* GENERATE & BOOK BUTTONS */
-.btn-generate, .btn-book {
-    background: var(--gradient-book-btn);
-    color: var(--font-color);
-    border: 3px solid var(--font-color);
-    padding: 12px 25px;
-    font-size: 1.2rem;
-    font-weight: 800;
-    border-radius: 8px;
-    cursor: pointer;
-    width: 100%;
-    transition: transform 0.2s, box-shadow 0.2s;
-    box-shadow: 4px 4px 0px var(--font-color);
-}
+    /* Equal Sized Inputs & Selects */
+    input, select {
+        height: 55px; /* Ensures all boxes are exactly the same height */
+        padding: 10px 15px;
+        border: 2px solid #000;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        background: #ffffff;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
 
-.btn-generate:hover, .btn-book:hover {
-    transform: translateY(-3px);
-    box-shadow: 6px 6px 0px var(--font-color);
-}
+    input:focus, select:focus {
+        outline: none;
+        border-color: #20B2AA;
+        box-shadow: 0 0 0 3px rgba(127, 255, 212, 0.4);
+    }
 
-/* TIMETABLE */
-.timetable-container {
-    width: 95%;
-    margin: 0 auto;
-    display: none; 
-    overflow-x: auto;
-}
+    input:hover:not(), select:hover {
+        transform: translateY(-4px); /* Lift effect */
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    border: 3px solid var(--font-color);
-    text-align: center;
-}
+    /* Teal Color for Greyed-out (Readonly) Fields */
+    input {
+        background: linear-gradient(135deg, #008080, #40E0D0); /* Gradient Teal */
+        color: #000; /* Black font strictly enforced */
+        border: 2px dashed #000;
+        cursor: not-allowed;
+    }
+    
+    /* Input placeholder color correction for readability on Teal */
+    input::placeholder {
+        color: rgba(0, 0, 0, 0.6);
+    }
 
-th, td {
-    border: 2px solid var(--font-color);
-    padding: 15px 10px;
-    min-width: 140px;
-    vertical-align: middle;
-    transition: transform 0.3s, box-shadow 0.3s;
-}
+    /* Fetch Button aligned with inputs */
+    .input-group > div {
+        display: flex;
+        gap: 8px;
+        height: 55px;
+    }
 
-/* TIME COLUMN */
-td.time-slot {
-    background: var(--gradient-time);
-    font-weight: bold;
-    color: var(--font-color);
-    border-radius: 8px;
-}
+    .btn-fetch {
+        height: 100%;
+        background: #f0f0f0;
+        color: #000;
+        border: 2px solid #000;
+        padding: 0 20px;
+        border-radius: 8px;
+        font-weight: 900;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
 
-td.time-slot:hover {
-    transform: translateY(-4px);
-    box-shadow: 3px 3px 12px rgba(0,0,0,0.3);
-}
+    .btn-fetch:hover {
+        transform: translateY(-4px); /* Lift effect */
+        box-shadow: 0 5px 0px #000;
+        background: #7FFFD4;
+    }
 
-/* DAYS */
-th.time-col { background-color: #f0f0f0; width: 150px; }
-th.day-mon, th.day-tue, th.day-wed, th.day-thu, th.day-fri, th.day-sat, th.day-sun {
-    background: var(--gradient-days);
-    color: var(--font-color);
-    border-radius: 8px;
-}
+    /* Main Generate Button */
+    .btn-generate {
+        background: linear-gradient(135deg, #7FFFD4, #20B2AA);
+        color: #000;
+        border: 3px solid #000;
+        padding: 20px;
+        font-size: 1.3rem;
+        font-weight: 900;
+        border-radius: 12px;
+        cursor: pointer;
+        width: 100%;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        box-shadow: 6px 6px 0px #000;
+    }
 
-th.day-mon:hover, th.day-tue:hover, th.day-wed:hover, th.day-thu:hover, th.day-fri:hover, th.day-sat:hover, th.day-sun:hover {
-    transform: translateY(-4px);
-    box-shadow: 3px 3px 12px rgba(0,0,0,0.3);
-}
+    .btn-generate:hover {
+        transform: translate(-3px, -3px);
+        box-shadow: 9px 9px 0px #000;
+    }
 
-/* OPEN/BOOKED SLOTS */
-td .open-slot, td .booked-tag {
-    display: block;
-    margin-bottom: 10px;
-    font-size: 1.1rem;
-    font-weight: 800;
-    background: var(--gradient-book-btn);
-    color: var(--font-color);
-    padding: 4px 8px;
-    border-radius: 4px;
-    box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
-}
+    /* --- BOTTOM HALF: TIMETABLE GRID (NO BLACK BACKGROUNDS/BORDERS) --- */
+    .timetable-container {
+        width: 95%;
+        margin: 0 auto;
+        display: none; 
+        overflow-x: auto;
+        padding: 20px 10px;
+    }
 
-/* MODAL */
-.modal-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 12px;
+        border: none;
+    }
 
-.modal-content {
-    background: #ffffff;
-    padding: 30px;
-    border: 4px solid #7FFFD4;
-    border-radius: 15px;
-    width: 90%;
-    max-width: 600px;
-    text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    position: relative;
-}
+    th, td {
+        border: none; /* NO BLACK BORDERS IN BOTTOM HALF */
+        border-radius: 12px;
+        padding: 20px 15px;
+        text-align: center;
+        vertical-align: middle;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+    }
 
-.modal-content p {
-    font-size: 1.2rem;
-    line-height: 1.8;
-    margin-bottom: 25px;
-}
+    /* Timetable Card Lift Effect */
+    th:hover, td:hover {
+        transform: translateY(-10px) scale(1.03);
+        box-shadow: 0 15px 25px rgba(0,0,0,0.18);
+        z-index: 10;
+    }
 
-.btn-print, .btn-close {
-    background-color: var(--font-color);
-    color: #7FFFD4;
-    border: none;
-    padding: 12px 25px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    border-radius: 6px;
-    cursor: pointer;
-    margin: 5px;
-}
+    /* DAYS: Gradient Parrot Green Only (No Black) */
+    th:not(.time-col) {
+        background: linear-gradient(135deg, #7CFC00, #32CD32);
+        font-weight: 900;
+        font-size: 1.1rem;
+        text-transform: uppercase;
+    }
 
-/* PRINT STYLES */
-@media print {
-    body * { visibility: hidden; }
-    #confirm-modal, #print-area, #print-area * { visibility: visible; }
-    #confirm-modal { position: absolute; top: 0; left: 0; display: block; background: none; }
-    #print-area { position: absolute; top: 0; left: 0; width: 100%; border: none; box-shadow: none; }
-    .no-print { display: none !important; }
-}
+    /* TIME SLOTS: Gradient Modern Blue Only (No Black) */
+    th.time-col, td.time-slot {
+        background: linear-gradient(135deg, #00c6ff, #0072ff);
+        font-weight: 900;
+        font-size: 1.05rem;
+    }
 
-.booked-tag { background: linear-gradient(45deg, #FFFF66, #FFD700); color: #000; }
-.btn-fetch { width: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+    /* Default Empty Cell */
+    td:not(.time-slot) {
+        background-color: #ffffff;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    .open-slot {
+        font-weight: 900;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+        opacity: 0.4;
+    }
+
+    /* BOOK BUTTON: Gradient Turquoise Only (No Black) */
+    .btn-book {
+        background: linear-gradient(135deg, #40E0D0, #00CED1);
+        color: #000;
+        border: none; /* No black border */
+        padding: 12px 25px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 900;
+        font-size: 1rem;
+        text-transform: uppercase;
+        box-shadow: 0 6px 15px rgba(0, 206, 209, 0.4);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        width: 100%;
+    }
+
+    .btn-book:hover {
+        transform: translateY(-5px); /* Lift effect */
+        box-shadow: 0 10px 20px rgba(0, 206, 209, 0.6);
+    }
+
+    /* BOOKED STATE: Gradient Yellow (No Black) */
+    td.booked-cell, td:has(.booked-tag) {
+        background: linear-gradient(135deg, #FFF500, #FFB300) !important;
+    }
+
+    .booked-tag {
+        background: transparent;
+        font-weight: 800;
+        font-size: 0.95rem;
+        margin: 5px 0;
+        padding: 5px;
+        text-align: left;
+        border-bottom: 2px solid rgba(0,0,0,0.1); /* Subtle non-black separator */
+    }
+
+    .booked-tag:last-child {
+        border-bottom: none;
+    }
+
+    /* --- MODAL --- */
+    .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(255, 255, 255, 0.8); /* White overlay instead of black */
+        backdrop-filter: blur(5px);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: #ffffff;
+        padding: 40px;
+        border: 4px solid #000;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 600px;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    .modal-content p {
+        font-size: 1.2rem;
+        line-height: 1.8;
+        margin-bottom: 30px;
+        font-weight: 600;
+    }
+
+    .btn-print, .btn-close {
+        background: #ffffff;
+        border: 3px solid #000;
+        padding: 12px 25px;
+        font-size: 1.1rem;
+        font-weight: 900;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 5px;
+        transition: all 0.3s;
+        text-transform: uppercase;
+    }
+
+    .btn-print:hover { transform: translateY(-4px); box-shadow: 0 5px 0px #000; background: #7FFFD4; }
+    .btn-close:hover { transform: translateY(-4px); box-shadow: 0 5px 0px #000; background: #ff4757; color: #fff;}
+
+    /* --- MOBILE RESPONSIVE --- */
+    @media (max-width: 768px) {
+        header h1 {
+            padding: 15px 20px;
+            transform: rotateZ(0deg) rotateX(0deg); /* Disable extreme 3D to fit screen */
+            box-shadow: 5px 5px 0px #000;
+        }
+        header h1::before {
+            font-size: 1.5rem;
+        }
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+        .form-container {
+            padding: 20px;
+        }
+    }
+
+    @media print {
+        body * { visibility: hidden; }
+        #confirm-modal, #print-area, #print-area * { visibility: visible; }
+        #confirm-modal { position: absolute; top: 0; left: 0; display: block; background: none; }
+        #print-area { position: absolute; top: 0; left: 0; width: 100%; border: none; box-shadow: none; }
+        .no-print { display: none !important; }
+    }
 </style>
 </head>
 <body>
@@ -312,9 +414,6 @@ td .open-slot, td .booked-tag {
                     <option value="03:00 PM to 04:00 PM">03:00 PM to 04:00 PM</option>
                     <option value="04:00 PM to 05:00 PM">04:00 PM to 05:00 PM</option>
                     <option value="05:00 PM to 06:00 PM">05:00 PM to 06:00 PM</option>
-  <option value="06:00 PM to 07:00 PM">06:00 PM to 07:00 PM</option>
-  <option value="07:00 PM to 08:00 PM">07:00 PM to 08:00 PM</option>
-  <option value="08:00 PM to 09:00 PM">08:00 PM to 09:00 PM</option>
                 </select>
             </div>
 
