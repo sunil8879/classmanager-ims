@@ -5147,105 +5147,107 @@ async function fetchAutoInventory() {
 
 
 
-/* --- NEW SUBJECT-WISE ANALYTICS ENGINE --- */
-/* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
-/* --- SIMPLE SUBJECT-WISE PORTAL LOGIC --- */
+/* ==========================================
+   CLEAN & FINAL: SUBJECT-WISE ANALYTICS ENGINE
+   ========================================== */
 let subPortalPage = 1;
 let subPortalData = [];
+const subRowsPerPage = 5;
 
+// 1. MAIN FETCH FUNCTION
 async function refreshSubjectWiseSummary() {
     if (!sessionInstID) return;
 
     const mm = document.getElementById('portal-month').value;
     const yyyy = document.getElementById('portal-year').value;
-    const filter = (mm && yyyy) ? `${yyyy}-${mm}` : "";
-
-    // 1. Fetch from Master Table
-    let query = db.from('students').select('course, total_fees, paid_amount, pending_amount, admission_date')
-                .eq('institute_id', sessionInstID).eq('status', 'Active');
+    const tbody = document.getElementById('portal-table-body');
     
-    if (filter) query = query.like('admission_date', `${filter}%`);
+    // Reset Data & UI
+    subPortalData = [];
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Searching Database...</td></tr>";
 
-    const { data: students } = await query;
-    if (!students) return;
+    // Build strict query
+    let query = db.from('students')
+                .select('course, total_fees, paid_amount, pending_amount, admission_date')
+                .eq('institute_id', sessionInstID)
+                .eq('status', 'Active');
+    
+    // Apply Strict Date Filters
+    if (yyyy && mm) {
+        query = query.like('admission_date', `${yyyy}-${mm}%`); 
+    } else if (yyyy) {
+        query = query.like('admission_date', `${yyyy}%`);    
+    } else if (mm) {
+        query = query.like('admission_date', `%-${mm}-%`);   
+    }
 
-    // 2. Group and Sum
-    const map = {};
-    students.forEach(s => {
-        const name = s.course || "Other";
-        if (!map[name]) map[name] = { t: 0, r: 0, p: 0 };
-        map[name].t += parseFloat(s.total_fees) || 0;
-        map[name].r += parseFloat(s.paid_amount) || 0;
-        map[name].p += parseFloat(s.pending_amount) || 0;
-    });
+    const { data: students, error } = await query;
+    if (error) return console.error("Database Error:", error.message);
 
-    // 3. Sort by Received (Falling)
-    subPortalData = Object.entries(map).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.r - a.r);
+    // Grouping Logic
+    if (students && students.length > 0) {
+        const map = {};
+        students.forEach(s => {
+            const subName = s.course || "General/Other";
+            if (!map[subName]) map[subName] = { total: 0, received: 0, pending: 0 };
+            map[subName].total += parseFloat(s.total_fees) || 0;
+            map[subName].received += parseFloat(s.paid_amount) || 0;
+            map[subName].pending += parseFloat(s.pending_amount) || 0;
+        });
+
+        // Convert to Array & SORT BY RECEIVED (Falling Order)
+        subPortalData = Object.entries(map).map(([name, v]) => ({
+            name: name,
+            total: v.total,
+            received: v.received,
+            pending: v.pending
+        })).sort((a, b) => b.received - a.received);
+    }
+
+    // Always reset to page 1 on search
     subPortalPage = 1;
     renderSubjectWiseTable();
 }
 
-function renderSubjectWiseTable() {
-    const start = (subPortalPage - 1) * 5;
-    const rows = subPortalData.slice(start, start + 5);
-    const max = Math.ceil(subPortalData.length / 5) || 1;
-
-    document.getElementById('portal-table-body').innerHTML = rows.map(item => `
-        <tr style="border-bottom: 1px solid #000;">
-            <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
-            <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString()}</td>
-            <td style="padding:12px; border:1px solid #000; color:green;">₹${item.r.toLocaleString()}</td>
-            <td style="padding:12px; border:1px solid #000; color:red;">₹${item.p.toLocaleString()}</td>
-        </tr>`).join('') || "<tr><td colspan='4' style='text-align:center;'>No Data</td></tr>";
-
-    document.getElementById('portal-page-info').innerText = `Page ${subPortalPage} of ${max}`;
-}
-
-function moveSubjectWisePage(dir) {
-    const max = Math.ceil(subPortalData.length / 5) || 1;
-    let target = subPortalPage + dir;
-    if (target >= 1 && target <= max) {
-        subPortalPage = target;
-        renderSubjectWiseTable();
-    }
-}
+// 2. RENDERING FUNCTION (Handles 5 rows and "Not Available" message)
 function renderSubjectWiseTable() {
     const tbody = document.getElementById('portal-table-body');
     const pageInfo = document.getElementById('portal-page-info');
     
     if (subPortalData.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>No student records found for this period.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:30px; color:red; font-weight:bold; font-size:1.2rem;'>NOT AVAILABLE / NO DATA FOUND</td></tr>";
         pageInfo.innerText = "Page 1 of 1";
         return;
     }
 
-    const start = (subPortalPage - 1) * 5;
-    const rows = subPortalData.slice(start, start + 5);
-    const maxPage = Math.ceil(subPortalData.length / 5);
+    const start = (subPortalPage - 1) * subRowsPerPage;
+    const end = start + subRowsPerPage;
+    const rowsToShow = subPortalData.slice(start, end);
+    const maxPage = Math.ceil(subPortalData.length / subRowsPerPage);
 
-    tbody.innerHTML = rows.map(item => `
+    tbody.innerHTML = rowsToShow.map(item => `
         <tr style="border-bottom: 1px solid #000;">
             <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
-            <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString('en-IN')}</td>
-            <td style="padding:12px; border:1px solid #000; color: green; font-weight:bold;">₹${item.r.toLocaleString('en-IN')}</td>
-            <td style="padding:12px; border:1px solid #000; color: red; font-weight:bold;">₹${item.p.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000;">₹${item.total.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000; color: green; font-weight:bold;">₹${item.received.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000; color: red; font-weight:bold;">₹${item.pending.toLocaleString('en-IN')}</td>
         </tr>`).join('');
 
     pageInfo.innerText = `Page ${subPortalPage} of ${maxPage}`;
 }
 
+// 3. PAGINATION BUTTON LOGIC
 function moveSubjectWisePage(dir) {
-    const maxPage = Math.ceil(subPortalData.length / 5) || 1;
+    const maxPage = Math.ceil(subPortalData.length / subRowsPerPage) || 1;
     const target = subPortalPage + dir;
     if (target >= 1 && target <= maxPage) {
         subPortalPage = target;
         renderSubjectWiseTable();
     }
 }
-// Ensure the table loads when you enter the Fee tab
-// Add this line inside your showSection('fee') logic or simply call it:
-setTimeout(refreshSubjectWiseSummary, 2000);
 
+// Trigger initial load after a short delay to ensure login session is ready
+setTimeout(refreshSubjectWiseSummary, 2500);
     </script>
 <script>
 if ('serviceWorker' in navigator) {
