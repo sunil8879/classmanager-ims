@@ -5150,6 +5150,7 @@ async function fetchAutoInventory() {
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
+/* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 let subPortalPage = 1;
 let subPortalData =[];
 
@@ -5162,11 +5163,10 @@ function parseMonthYearString(str) {
         jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
     };
     
-    // Split the text into parts (e.g.)
     const parts = str.trim().toLowerCase().split(/\s+/);
     
     if (parts.length >= 2) {
-        // Apply replace to the specific array items: parts and parts
+        // Using explicit index 0 and 1
         const cleanMonth = parts.replace(/,/g, '');
         const cleanYear = parts.replace(/,/g, '');
         
@@ -5214,7 +5214,7 @@ async function refreshSubjectWiseSummary() {
                 .select('course, total_fees, paid_amount, pending_amount')
                 .eq('institute_id', sessionInstID)
                 .eq('status', 'Active')
-                .like('admission_date', `${yyyy_mm}%`); // Filters exactly by the evaluated month
+                .like('admission_date', `${yyyy_mm}%`); 
 
     const { data: students, error } = await query;
 
@@ -5223,20 +5223,29 @@ async function refreshSubjectWiseSummary() {
         return;
     }
 
-    // 2. Group Totals by Subject
-    const map = {};
+    // 2. Group Totals by Subject using a dictionary
+    const dict = {};
     students.forEach(s => {
         const sub = s.course || "General";
-        if (!map) {
-            map = { t: 0, r: 0, p: 0, my: targetDisplayMonth };
+        if (!dict) {
+            dict = { t: 0, r: 0, p: 0, my: targetDisplayMonth };
         }
-        map.t += parseFloat(s.total_fees) || 0;
-        map.r += parseFloat(s.paid_amount) || 0;
-        map.p += parseFloat(s.pending_amount) || 0;
+        dict.t += parseFloat(s.total_fees) || 0;
+        dict.r += parseFloat(s.paid_amount) || 0;
+        dict.p += parseFloat(s.pending_amount) || 0;
     });
 
-    // 3. Convert to Array and SORT by 'Received' (Descending Order)
-    subPortalData = Object.entries(map).map(() => ({ name, ...val }));
+    // 3. Convert to Array safely and SORT by 'Received' (Descending Order)
+    subPortalData = Object.keys(dict).map(key => {
+        return {
+            name: key,
+            t: dict.t,
+            r: dict.r,
+            p: dict.p,
+            my: dict.my
+        };
+    });
+    
     subPortalData.sort((a, b) => b.r - a.r);
 
     // Reset to page 1 and render
