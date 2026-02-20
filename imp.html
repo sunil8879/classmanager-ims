@@ -5167,54 +5167,71 @@ async function refreshSubjectWiseSummary() {
     subPortalData =[];
     tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Searching Database...</td></tr>";
 
-    // 1. Fetch ALL active students (Bypasses Supabase Date filtering limits)
-    let query = db.from('students')
-                .select('course, total_fees, paid_amount, pending_amount, admission_date')
-                .eq('institute_id', sessionInstID)
-                .eq('status', 'Active');
-    
-    const { data: students, error } = await query;
-    if (error) return console.error("Database Error:", error.message);
+    try {
+        // 1. Fetch ALL active students for this institute safely
+        const { data: students, error } = await db.from('students')
+            .select('course, total_fees, paid_amount, pending_amount, admission_date')
+            .eq('institute_id', sessionInstID)
+            .eq('status', 'Active');
 
-    // 2. Javascript Memory Filtering & Grouping
-    const map = {};
+        if (error) {
+            console.error("Database Error:", error.message);
+            tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; color:red;'>Database Error</td></tr>";
+            return;
+        }
 
-    if (students && students.length > 0) {
-        students.forEach(s => {
-            // Apply Strict Date Filters via String Extraction
-            if (yyyy || mm) {
-                if (!s.admission_date) return; // Skip if student has no date but a filter is active
+        // 2. Exact Javascript Memory Filtering & Grouping
+        const map = {};
+
+        if (students && students.length > 0) {
+            // Using a standard loop to prevent silent crashes
+            for (let i = 0; i < students.length; i++) {
+                let s = students;
+
+                // A. FILTERING LOGIC
+                if (yyyy || mm) {
+                    if (!s.admission_date) continue; // Skip if student has no date but a filter is active
+                    
+                    const stuYear = s.admission_date.substring(0, 4); // Extracts "2026"
+                    const stuMonth = s.admission_date.substring(5, 7); // Extracts "02"
+
+                    if (yyyy && yyyy !== stuYear) continue; // Skip if Year doesn't match
+                    if (mm && mm !== stuMonth) continue;    // Skip if Month doesn't match
+                }
+
+                // B. GROUPING LOGIC
+                const subName = s.course || "General/Other";
                 
-                const stuYear = s.admission_date.substring(0, 4); // Extracts "2026"
-                const stuMonth = s.admission_date.substring(5, 7); // Extracts "02"
-
-                if (yyyy && yyyy !== stuYear) return; // Skip if Year doesn't match
-                if (mm && mm !== stuMonth) return;    // Skip if Month doesn't match
+                // If this course doesn't exist in our map yet, create it
+                if (!map) {
+                    map = { total: 0, received: 0, pending: 0 };
+                }
+                
+                // Add the values together
+                map.total += parseFloat(s.total_fees) || 0;
+                map.received += parseFloat(s.paid_amount) || 0;
+                map.pending += parseFloat(s.pending_amount) || 0;
             }
+        }
 
-            // Grouping by Course for matched students
-            const subName = s.course || "General/Other";
-            if (!map) {
-                map = { total: 0, received: 0, pending: 0 };
-            }
-            
-            map.total += parseFloat(s.total_fees) || 0;
-            map.received += parseFloat(s.paid_amount) || 0;
-            map.pending += parseFloat(s.pending_amount) || 0;
-        });
-
-        // Convert to Array & SORT BY RECEIVED (Highest collection on top)
+        // 3. Convert mapped object to Array & SORT BY RECEIVED (Highest collection on top)
         subPortalData = Object.entries(map).map(() => ({
-            name: name,
-            total: v.total,
-            received: v.received,
-            pending: v.pending
+            name: courseName,
+            total: values.total,
+            received: values.received,
+            pending: values.pending
         })).sort((a, b) => b.received - a.received);
-    }
 
-    // Always reset to page 1 on search
-    subPortalPage = 1;
-    renderSubjectWiseTable();
+        // Always reset to page 1 on search
+        subPortalPage = 1;
+        
+        // 4. Send to your existing rendering function
+        renderSubjectWiseTable();
+
+    } catch (err) {
+        console.error("Processing Error:", err);
+        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; color:red;'>Error Processing Data</td></tr>";
+    }
 }
 // 2. RENDERING FUNCTION (Handles 5 rows and "Not Available" message)
 function renderSubjectWiseTable() {
