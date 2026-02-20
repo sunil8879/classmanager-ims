@@ -2249,31 +2249,54 @@ async function saveFeeUpdate() {
 
 
 
+/* ==========================================
+   FIXED FEES PORTAL: INSTITUTE-SPECIFIC DATA
+   ========================================== */
 async function loadFeesPortal() {
-    const year = document.getElementById('portal-year').value || "2026";
-    
-    // 1. Get Totals for Active Students
-    const { data: students } = await db.from('students').select('*').eq('status', 'Active')
-	.eq('institute_id', sessionInstID);
-    if (students) {
-        document.getElementById('stat-active-count').innerText = students.length;
-        document.getElementById('stat-total-received').innerText = "₹ " + students.reduce((s, st) => s + (st.paid_amount || 0), 0).toLocaleString();
-        document.getElementById('stat-total-pending').innerText = "₹ " + students.reduce((s, st) => s + (st.pending_amount || 0), 0).toLocaleString();
+    if (!sessionInstID) return; // Don't run if not logged in
+
+    try {
+        // 1. FETCH STUDENTS (Only for THIS Institute)
+        const { data: students, error: stuError } = await db
+            .from('students')
+            .select('paid_amount, pending_amount')
+            .eq('institute_id', sessionInstID) // <--- CRITICAL SECURITY FILTER
+            .eq('status', 'Active');
+
+        if (stuError) throw stuError;
+
+        if (students) {
+            const activeCount = students.length;
+            const totalReceived = students.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
+            const totalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+
+            document.getElementById('stat-active-count').innerText = activeCount;
+            document.getElementById('stat-total-received').innerText = "₹ " + totalReceived.toLocaleString('en-IN');
+            document.getElementById('stat-total-pending').innerText = "₹ " + totalPending.toLocaleString('en-IN');
+        }
+
+        // 2. FETCH YEARLY HISTORY (Only for THIS Institute)
+        const yearInput = document.getElementById('portal-year');
+        const selectedYear = yearInput ? yearInput.value : new Date().getFullYear();
+        const startDate = `${selectedYear}-01-01`;
+        const endDate = `${selectedYear}-12-31`;
+
+        const { data: history, error: histError } = await db
+            .from('payment_history')
+            .select('amount')
+            .eq('institute_id', sessionInstID) // <--- CRITICAL SECURITY FILTER
+            .gte('payment_date', startDate)
+            .lte('payment_date', endDate);
+
+        if (histError) throw histError;
+
+        const yearlySum = history ? history.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
+        document.getElementById('stat-yearly').innerText = "₹ " + yearlySum.toLocaleString('en-IN');
+        document.getElementById('yearly-label').innerText = selectedYear + " Total Collection";
+
+    } catch (err) {
+        console.error("Portal Refresh Failed:", err.message);
     }
-
-    // 2. Yearly Collection (Fixed query: gte/lte handles Date types better than LIKE)
-    const startYear = `${year}-01-01`;
-    const endYear = `${year}-12-31`;
-    
-    const { data: history } = await db.from('payment_history')
-        .select('amount')
-        .gte('payment_date', startYear)
-        .lte('payment_date', endYear);
-
-    const totalYearly = history ? history.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) : 0;
-    
-    document.getElementById('yearly-label').innerText = year + " Total Collection";
-    document.getElementById('stat-yearly').innerText = "₹ " + totalYearly.toLocaleString();
 }
 async function fetchPaymentLog() {
     const roll = document.getElementById('log-roll').value;
@@ -3808,6 +3831,7 @@ function calcExamResult() {
 
 
 async function addExamRecord() {
+const { data: att } = await db.from('attendance').select('status').eq('roll_number', document.getElementById('ex-roll').value.toUpperCase()).eq('attendance_date', document.getElementById('ex-date').value).eq('institute_id', sessionInstID).maybeSingle(); if (att?.status === 'Absent') return alert("ENTRY BLOCKED: Student was marked ABSENT in attendance on this date!");
     if(!sessionInstID) return alert("Login required");
     
     const record = {
@@ -3857,26 +3881,45 @@ async function fetchTeacherForTAttn() {
 
 function triggerTAttn(status) {
     const name = document.getElementById('t-attn-name').value;
-    if(!name) return alert("Fetch Teacher first");
+    const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
+    
+    if(!name || !tid) return alert("Please Fetch a Teacher first!");
+
     const picker = document.getElementById('t-date-picker');
-    picker.showPicker();
-    picker.onchange = async () => {
-        if(!picker.value) return;
-        const monthYear = new Date(picker.value).toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    // 1. CRITICAL FIX: Reset the picker value so 'onchange' fires every time
+    picker.value = ""; 
+
+    // 2. Define what happens when the date is picked
+    picker.onchange = async function() {
+        if(!this.value) return;
+        
+        const selectedDate = this.value;
+        const monthYearStr = new Date(selectedDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+
         const { error } = await db.from('teachers_attendance').insert([{
             institute_id: sessionInstID,
-            teacher_id: document.getElementById('t-attn-id').value.toUpperCase(),
+            teacher_id: tid,
             full_name: name,
-            attendance_date: picker.value,
+            attendance_date: selectedDate,
             status: status,
-            month_year: monthYear
+            month_year: monthYearStr
         }]);
-        if(error) alert(error.message); 
-        else {
-            alert("Teacher marked " + status);
+
+        if(error) {
+            alert("Database Error: " + error.message);
+        } else {
+            // This message will now pop up every single time
+            alert(`SUCCESS: ${name} marked ${status} for ${selectedDate}`);
             document.getElementById('t-attn-status').value = status;
         }
+        
+        // Cleanup the listener to prevent memory leaks
+        this.onchange = null; 
     };
+
+    // 3. Open the calendar
+    picker.showPicker();
 }
 
 async function fetchTeacherHistory() {
