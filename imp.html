@@ -607,6 +607,14 @@
                 </div>
             </div>
             <div class="input-group"><label>Course End Date</label><input type="date" id="stu-end-date"></div>
+<div class="input-group">
+                <label>Status</label>
+                <select id="stu-status">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Closed">Closed</option>
+                </select>
+            </div>
         </div>
         <div class="button-row">
            <button class="btn-add" onclick="addStudent()">ADD Student</button>
@@ -1974,7 +1982,8 @@ if (!sessionInstID || sessionInstID === "") {
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
         roll_number: roll,
         user_id: (await db.auth.getUser()).data.user?.id ,
-due_dates: document.getElementById('stu-due-dates').value
+due_dates: document.getElementById('stu-due-dates').value,
+status: document.getElementById('stu-status').value 
     };
 
     // 5. Save to 'students' table
@@ -2059,7 +2068,8 @@ async function fetchStudentByRoll() {
                 total_fees, 
                 paid_amount, 
                 pending_amount,
-due_dates
+due_dates,
+status
             )
         `)
         .eq('roll_number', roll)
@@ -2086,6 +2096,7 @@ due_dates
     document.getElementById('stu-paid').value = s.paid_amount || 0;
     document.getElementById('stu-pending').value = s.pending_amount || 0;
 document.getElementById('stu-due-dates').value = s.due_dates || "";
+ document.getElementById('stu-status').value = s.status || "Active";
     
     // Values from the student_details table
     document.getElementById('stu-roll').value = data.roll_number || "";
@@ -2129,6 +2140,7 @@ async function editStudentByRoll() {
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
 due_dates: document.getElementById('stu-due-dates').value,
+status: document.getElementById('stu-status').value, 
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0 // CRITICAL LINE
     };
 
