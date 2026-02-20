@@ -667,19 +667,40 @@
     </div>
 
     <!-- Part 2: FEES PORTAL -->
-    <div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
-        <h3>2. FEES PORTAL</h3>
-        <div class="form-grid">
-            <div class="input-group"><label>Filter Month & Year</label><input type="month" id="portal-calendar" onchange="loadFeesPortal()"></div>
-            <div class="input-group"><label>Select Year</label><input type="number" id="portal-year" value="2026" onchange="loadFeesPortal()"></div>
-        </div>
-        <div class="dashboard-stats">
-            <div class="stat-card"><p>Active Students</p><h4 id="stat-active-count">0</h4></div>
-            <div class="stat-card"><p>Total Received</p><h4 id="stat-total-received">₹ 0</h4></div>
-            <div class="stat-card"><p>Total Pending</p><h4 id="stat-total-pending" style="color:red;">₹ 0</h4></div>
-            <div class="stat-card" style="border-bottom: 5px solid green;"><p id="yearly-label">Yearly Collection</p><h4 id="stat-yearly">₹ 0</h4></div>
+<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
+<div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
+    <h3>2. FEES PORTAL</h3>
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Filter Month & Year (Admission Date)</label>
+            <input type="month" id="portal-calendar" onchange="loadFeesPortal()">
         </div>
     </div>
+
+    <!-- The Financial Table -->
+    <div style="overflow-x: auto; margin-top: 20px;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
+            <thead style="background: #f2f2f2;">
+                <tr>
+                    <th style="padding: 12px; border: 1px solid #000;">Names of Subjects</th>
+                    <th style="padding: 12px; border: 1px solid #000;">Total Fees</th>
+                    <th style="padding: 12px; border: 1px solid #000;">Total Received</th>
+                    <th style="padding: 12px; border: 1px solid #000;">Total Pending</th>
+                </tr>
+            </thead>
+            <tbody id="portal-table-body">
+                <!-- Rows injected by JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; align-items: center;">
+        <button class="btn-fetch" style="padding: 5px 15px;" onclick="changePortalPage(-1)">Previous</button>
+        <span id="portal-page-info" style="font-weight: bold; color: #000;">Page 1</span>
+        <button class="btn-fetch" style="padding: 5px 15px;" onclick="changePortalPage(1)">Next</button>
+    </div>
+</div>
 
     <!-- Part 3: PAYMENT LOG -->
     <div class="card">
@@ -1673,6 +1694,15 @@ google.charts.load('current', {'packages':['corechart', 'controls']});
 let sessionInstID = ""; 
 let sessionUserName = "";
 
+
+let portalCurrentPage = 1;
+let portalDataRows = []; // To store the grouped data
+const rowsPerPage = 5;
+
+
+
+
+
 async function checkCurrentSession() {
     const { data: { user } } = await db.auth.getUser();
     if (user) {
@@ -2252,50 +2282,78 @@ async function saveFeeUpdate() {
 /* ==========================================
    FIXED FEES PORTAL: INSTITUTE-SPECIFIC DATA
    ========================================== */
+/* ==========================================
+   FIXED FEES PORTAL: SUBJECT-WISE PAGINATION
+   ========================================== */
 async function loadFeesPortal() {
-    if (!sessionInstID) return; // Don't run if not logged in
+    if (!sessionInstID) return;
 
-    try {
-        // 1. FETCH STUDENTS (Only for THIS Institute)
-        const { data: students, error: stuError } = await db
-            .from('students')
-            .select('paid_amount, pending_amount')
-            .eq('institute_id', sessionInstID) // <--- CRITICAL SECURITY FILTER
-            .eq('status', 'Active');
+    const monthInput = document.getElementById('portal-calendar').value; // YYYY-MM
+    
+    // 1. Fetch Students (Filtered by Institute ID)
+    let query = db.from('students').select('course, total_fees, paid_amount, pending_amount, admission_date').eq('institute_id', sessionInstID).eq('status', 'Active');
+    
+    // 2. Filter by Admission Month if selected
+    if (monthInput) {
+        query = query.like('admission_date', `${monthInput}%`);
+    }
 
-        if (stuError) throw stuError;
+    const { data: students, error } = await query;
+    if (error) return console.error(error);
 
-        if (students) {
-            const activeCount = students.length;
-            const totalReceived = students.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
-            const totalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
-
-            document.getElementById('stat-active-count').innerText = activeCount;
-            document.getElementById('stat-total-received').innerText = "₹ " + totalReceived.toLocaleString('en-IN');
-            document.getElementById('stat-total-pending').innerText = "₹ " + totalPending.toLocaleString('en-IN');
+    // 3. GROUP BY SUBJECT (COURSE)
+    const subjectMap = {};
+    students.forEach(s => {
+        const subject = s.course || "General/Other";
+        if (!subjectMap[subject]) {
+            subjectMap[subject] = { total: 0, received: 0, pending: 0 };
         }
+        subjectMap[subject].total += parseFloat(s.total_fees) || 0;
+        subjectMap[subject].received += parseFloat(s.paid_amount) || 0;
+        subjectMap[subject].pending += parseFloat(s.pending_amount) || 0;
+    });
 
-        // 2. FETCH YEARLY HISTORY (Only for THIS Institute)
-        const yearInput = document.getElementById('portal-year');
-        const selectedYear = yearInput ? yearInput.value : new Date().getFullYear();
-        const startDate = `${selectedYear}-01-01`;
-        const endDate = `${selectedYear}-12-31`;
+    // Convert map to array for pagination
+    portalDataRows = Object.keys(subjectMap).map(sub => ({
+        name: sub,
+        ...subjectMap[sub]
+    }));
 
-        const { data: history, error: histError } = await db
-            .from('payment_history')
-            .select('amount')
-            .eq('institute_id', sessionInstID) // <--- CRITICAL SECURITY FILTER
-            .gte('payment_date', startDate)
-            .lte('payment_date', endDate);
+    portalCurrentPage = 1; // Reset to page 1
+    renderPortalTable();
+}
 
-        if (histError) throw histError;
+function renderPortalTable() {
+    const start = (portalCurrentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+    const paginatedItems = portalDataRows.slice(start, end);
 
-        const yearlySum = history ? history.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) : 0;
-        document.getElementById('stat-yearly').innerText = "₹ " + yearlySum.toLocaleString('en-IN');
-        document.getElementById('yearly-label').innerText = selectedYear + " Total Collection";
+    const tbody = document.getElementById('portal-table-body');
+    tbody.innerHTML = "";
 
-    } catch (err) {
-        console.error("Portal Refresh Failed:", err.message);
+    if (paginatedItems.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='4' style='padding: 20px; text-align: center;'>No active records found for this period.</td></tr>";
+    } else {
+        paginatedItems.forEach(item => {
+            tbody.innerHTML += `
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #000;">${item.name}</td>
+                    <td style="padding: 12px; border: 1px solid #000;">₹${item.total.toLocaleString()}</td>
+                    <td style="padding: 12px; border: 1px solid #000; color: green;">₹${item.received.toLocaleString()}</td>
+                    <td style="padding: 12px; border: 1px solid #000; color: red;">₹${item.pending.toLocaleString()}</td>
+                </tr>`;
+        });
+    }
+
+    document.getElementById('portal-page-info').innerText = `Page ${portalCurrentPage} of ${Math.ceil(portalDataRows.length / rowsPerPage) || 1}`;
+}
+
+function changePortalPage(direction) {
+    const maxPage = Math.ceil(portalDataRows.length / rowsPerPage);
+    const newPage = portalCurrentPage + direction;
+    if (newPage >= 1 && newPage <= maxPage) {
+        portalCurrentPage = newPage;
+        renderPortalTable();
     }
 }
 async function fetchPaymentLog() {
