@@ -5157,6 +5157,10 @@ async function fetchAutoInventory() {
    FIXED: SUBJECT-WISE FEES PORTAL LOGIC
    ========================================== */
 
+/* ==========================================
+   FIXED & FINAL: SUBJECT-WISE FEES PORTAL LOGIC
+   ========================================== */
+
 let subPortalPage = 1;
 let subPortalData =[];
 const subPortalRowsPerPage = 5;
@@ -5188,14 +5192,15 @@ async function loadFeesPortal() {
                     mYear = d.toLocaleString('default', { month: 'long', year: 'numeric' }); 
                 }
 
+                // Create a unique identifier for each subject & month combo
                 const key = sub + "_" + mYear;
 
-                // THE FIX: We MUST check and assign map, NOT map itself!
+                // THE REAL FIX: Create the group using the!
                 if (!map) {
                     map = { name: sub, mYear: mYear, t: 0, r: 0, p: 0 };
                 }
                 
-                // Add the amounts to the specific Subject & Month group
+                // Add the amounts to that specific group
                 map.t += parseFloat(s.total_fees) || 0;
                 map.r += parseFloat(s.paid_amount) || 0;
                 map.p += parseFloat(s.pending_amount) || 0;
@@ -5236,7 +5241,7 @@ function renderSubjectWiseTable() {
     if (rows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No Records Found</td></tr>';
     } else {
-        // (item.t || 0) ensures that if data is ever missing, it falls back to 0 without crashing.
+        // Build the table rows cleanly
         tbody.innerHTML = rows.map(item => `
             <tr style="border-bottom: 1px solid #ddd;">
                 <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
