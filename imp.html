@@ -668,6 +668,7 @@
 
     <!-- Part 2: FEES PORTAL -->
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
+<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
 <div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
     <h3>2. FEES PORTAL</h3>
     <div class="form-grid">
@@ -677,7 +678,6 @@
         </div>
     </div>
 
-    <!-- The Financial Table -->
     <div style="overflow-x: auto; margin-top: 20px;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
             <thead style="background: #f2f2f2;">
@@ -689,7 +689,7 @@
                 </tr>
             </thead>
             <tbody id="portal-table-body">
-                <!-- Rows injected by JS -->
+                <tr><td colspan="4" style="text-align:center; padding:20px;">Select a month or wait for loading...</td></tr>
             </tbody>
         </table>
     </div>
@@ -701,7 +701,6 @@
         <button class="btn-fetch" style="padding: 5px 15px;" onclick="changePortalPage(1)">Next</button>
     </div>
 </div>
-
     <!-- Part 3: PAYMENT LOG -->
     <div class="card">
         <h3>3. PAYMENT LOG</h3>
@@ -2285,26 +2284,35 @@ async function saveFeeUpdate() {
 /* ==========================================
    FIXED FEES PORTAL: SUBJECT-WISE PAGINATION
    ========================================== */
+/* ==========================================
+   FIXED FEES PORTAL: ROBUST VERSION
+   ========================================== */
+/* ==========================================
+   FEES PORTAL: SUBJECT-WISE SUMMARY LOGIC
+   ========================================== */
+
 async function loadFeesPortal() {
     if (!sessionInstID) return;
 
-    const monthInput = document.getElementById('portal-calendar').value; // YYYY-MM
+    const monthInput = document.getElementById('portal-calendar').value; 
     
-    // 1. Fetch Students (Filtered by Institute ID)
-    let query = db.from('students').select('course, total_fees, paid_amount, pending_amount, admission_date').eq('institute_id', sessionInstID).eq('status', 'Active');
+    // 1. Fetch Students (Filtered ONLY to THIS Institute)
+    let query = db.from('students')
+        .select('course, total_fees, paid_amount, pending_amount, admission_date')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
     
-    // 2. Filter by Admission Month if selected
     if (monthInput) {
         query = query.like('admission_date', `${monthInput}%`);
     }
 
     const { data: students, error } = await query;
-    if (error) return console.error(error);
+    if (error) return console.error("Portal Fetch Error:", error.message);
 
-    // 3. GROUP BY SUBJECT (COURSE)
+    // 2. GROUP BY SUBJECT
     const subjectMap = {};
     students.forEach(s => {
-        const subject = s.course || "General/Other";
+        const subject = s.course || "Other";
         if (!subjectMap[subject]) {
             subjectMap[subject] = { total: 0, received: 0, pending: 0 };
         }
@@ -2313,46 +2321,55 @@ async function loadFeesPortal() {
         subjectMap[subject].pending += parseFloat(s.pending_amount) || 0;
     });
 
-    // Convert map to array for pagination
-    portalDataRows = Object.keys(subjectMap).map(sub => ({
-        name: sub,
-        ...subjectMap[sub]
+    // 3. Convert Map to Array for the Table
+    portalDataRows = Object.keys(subjectMap).map(name => ({
+        name: name,
+        ...subjectMap[name]
     }));
 
-    portalCurrentPage = 1; // Reset to page 1
+    // Reset to first page whenever data is reloaded
+    portalCurrentPage = 1; 
     renderPortalTable();
 }
 
 function renderPortalTable() {
-    const start = (portalCurrentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    const paginatedItems = portalDataRows.slice(start, end);
-
     const tbody = document.getElementById('portal-table-body');
-    tbody.innerHTML = "";
-
-    if (paginatedItems.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='4' style='padding: 20px; text-align: center;'>No active records found for this period.</td></tr>";
-    } else {
-        paginatedItems.forEach(item => {
-            tbody.innerHTML += `
-                <tr style="border-bottom: 1px solid #ddd;">
-                    <td style="padding: 12px; border: 1px solid #000;">${item.name}</td>
-                    <td style="padding: 12px; border: 1px solid #000;">₹${item.total.toLocaleString()}</td>
-                    <td style="padding: 12px; border: 1px solid #000; color: green;">₹${item.received.toLocaleString()}</td>
-                    <td style="padding: 12px; border: 1px solid #000; color: red;">₹${item.pending.toLocaleString()}</td>
-                </tr>`;
-        });
+    const pageDisplay = document.getElementById('portal-page-info');
+    
+    if (portalDataRows.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>No records found for this institute.</td></tr>";
+        pageDisplay.innerText = "Page 1 of 1";
+        return;
     }
 
-    document.getElementById('portal-page-info').innerText = `Page ${portalCurrentPage} of ${Math.ceil(portalDataRows.length / rowsPerPage) || 1}`;
+    // Logic for 5 rows per page
+    const start = (portalCurrentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+    const currentRows = portalDataRows.slice(start, end);
+
+    tbody.innerHTML = "";
+    currentRows.forEach(item => {
+        tbody.innerHTML += `
+            <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding: 12px; border: 1px solid #000; font-weight:bold;">${item.name}</td>
+                <td style="padding: 12px; border: 1px solid #000;">₹${item.total.toLocaleString()}</td>
+                <td style="padding: 12px; border: 1px solid #000; color: green; font-weight:bold;">₹${item.received.toLocaleString()}</td>
+                <td style="padding: 12px; border: 1px solid #000; color: red; font-weight:bold;">₹${item.pending.toLocaleString()}</td>
+            </tr>`;
+    });
+
+    // Update the "Page X of Y" text
+    const totalPages = Math.ceil(portalDataRows.length / rowsPerPage);
+    pageDisplay.innerText = `Page ${portalCurrentPage} of ${totalPages}`;
 }
 
 function changePortalPage(direction) {
-    const maxPage = Math.ceil(portalDataRows.length / rowsPerPage);
-    const newPage = portalCurrentPage + direction;
-    if (newPage >= 1 && newPage <= maxPage) {
-        portalCurrentPage = newPage;
+    const totalPages = Math.ceil(portalDataRows.length / rowsPerPage);
+    const targetPage = portalCurrentPage + direction;
+
+    // Check if the target page is valid
+    if (targetPage >= 1 && targetPage <= totalPages) {
+        portalCurrentPage = targetPage;
         renderPortalTable();
     }
 }
