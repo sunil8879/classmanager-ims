@@ -5155,6 +5155,7 @@ let subPortalData = [];
 const subRowsPerPage = 5;
 
 // 1. MAIN FETCH FUNCTION
+// 1. MAIN FETCH FUNCTION
 async function refreshSubjectWiseSummary() {
     if (!sessionInstID) return;
 
@@ -5163,40 +5164,47 @@ async function refreshSubjectWiseSummary() {
     const tbody = document.getElementById('portal-table-body');
     
     // Reset Data & UI
-    subPortalData = [];
+    subPortalData =[];
     tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Searching Database...</td></tr>";
 
-    // Build strict query
+    // 1. Fetch ALL active students (Bypasses Supabase Date filtering limits)
     let query = db.from('students')
                 .select('course, total_fees, paid_amount, pending_amount, admission_date')
                 .eq('institute_id', sessionInstID)
                 .eq('status', 'Active');
     
-    // Apply Strict Date Filters
-    if (yyyy && mm) {
-        query = query.like('admission_date', `${yyyy}-${mm}%`); 
-    } else if (yyyy) {
-        query = query.like('admission_date', `${yyyy}%`);    
-    } else if (mm) {
-        query = query.like('admission_date', `%-${mm}-%`);   
-    }
-
     const { data: students, error } = await query;
     if (error) return console.error("Database Error:", error.message);
 
-    // Grouping Logic
+    // 2. Javascript Memory Filtering & Grouping
+    const map = {};
+
     if (students && students.length > 0) {
-        const map = {};
         students.forEach(s => {
+            // Apply Strict Date Filters via String Extraction
+            if (yyyy || mm) {
+                if (!s.admission_date) return; // Skip if student has no date but a filter is active
+                
+                const stuYear = s.admission_date.substring(0, 4); // Extracts "2026"
+                const stuMonth = s.admission_date.substring(5, 7); // Extracts "02"
+
+                if (yyyy && yyyy !== stuYear) return; // Skip if Year doesn't match
+                if (mm && mm !== stuMonth) return;    // Skip if Month doesn't match
+            }
+
+            // Grouping by Course for matched students
             const subName = s.course || "General/Other";
-            if (!map[subName]) map[subName] = { total: 0, received: 0, pending: 0 };
-            map[subName].total += parseFloat(s.total_fees) || 0;
-            map[subName].received += parseFloat(s.paid_amount) || 0;
-            map[subName].pending += parseFloat(s.pending_amount) || 0;
+            if (!map) {
+                map = { total: 0, received: 0, pending: 0 };
+            }
+            
+            map.total += parseFloat(s.total_fees) || 0;
+            map.received += parseFloat(s.paid_amount) || 0;
+            map.pending += parseFloat(s.pending_amount) || 0;
         });
 
-        // Convert to Array & SORT BY RECEIVED (Falling Order)
-        subPortalData = Object.entries(map).map(([name, v]) => ({
+        // Convert to Array & SORT BY RECEIVED (Highest collection on top)
+        subPortalData = Object.entries(map).map(() => ({
             name: name,
             total: v.total,
             received: v.received,
@@ -5208,7 +5216,6 @@ async function refreshSubjectWiseSummary() {
     subPortalPage = 1;
     renderSubjectWiseTable();
 }
-
 // 2. RENDERING FUNCTION (Handles 5 rows and "Not Available" message)
 function renderSubjectWiseTable() {
     const tbody = document.getElementById('portal-table-body');
