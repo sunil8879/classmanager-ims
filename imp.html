@@ -5145,6 +5145,9 @@ async function fetchAutoInventory() {
 /* ==========================================
    CLEAN & FINAL: SUBJECT-WISE ANALYTICS ENGINE (GROUPED BY MONTH/YEAR)
    ========================================== */
+/* ==========================================
+   CLEAN & FINAL: SUBJECT-WISE ANALYTICS ENGINE (GROUPED BY MONTH/YEAR)
+   ========================================== */
 let subPortalPage = 1;
 let subPortalData =[];
 
@@ -5179,7 +5182,7 @@ async function refreshSubjectWiseSummary() {
                 // Create a unique key for grouping (Course + MonthYear)
                 const key = sub + "_" + mYear;
 
-                // FIX: We use map to safely store each grouping without overwriting the map
+                // THIS IS THE ACTUAL FIX: We use map to store the data properly!
                 if (!map) {
                     map = { name: sub, mYear: mYear, t: 0, r: 0, p: 0 };
                 }
