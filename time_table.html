@@ -316,30 +316,7 @@
                 </select>
             </div>
 
-            <!-- 8. Room Number -->
-            <div class="input-group">
-                <label>8. Room Number</label>
-                <select id="f-room">
-                    <option value="1">Room 1</option>
-                    <option value="2">Room 2</option>
-                    <option value="3">Room 3</option>
-                    <option value="4">Room 4</option>
-                    <option value="5">Room 5</option>
-                </select>
-            </div>
-
-            <!-- 9. Floor Number -->
-            <div class="input-group">
-                <label>9. Floor Number</label>
-                <select id="f-floor">
-                    <option value="Ground">Ground Floor</option>
-                    <option value="1st">1st Floor</option>
-                    <option value="2nd">2nd Floor</option>
-                    <option value="3rd">3rd Floor</option>
-                    <option value="4th">4th Floor</option>
-                    <option value="5th">5th Floor</option>
-                </select>
-            </div>
+        
         </div>
 
         <button type="button" class="btn-generate" onclick="generateTimeTable()">GENERATE AUTO TIME TABLE</button>
@@ -586,10 +563,19 @@ async function bookSlot(day, time, cellId) {
     const dateVal = document.getElementById('f-date').value;
 
     // 2️⃣ Validation
-    if (!roll || !student) return alert("Please enter and fetch student details.");
-    if (!course) return alert("Please select a course.");
-    if (!teacherId) return alert("Please select a teacher.");
-    if (!dateVal) return alert("Please select booking date.");
+// 2️⃣ Validation
+if (!roll || !student) return alert("Please enter and fetch student details.");
+if (!course) return alert("Please select a course.");
+if (!teacherId) return alert("Please select a teacher.");
+if (!dateVal) return alert("Please select booking date.");
+
+// 🔴 Past date check
+const selectedDate = new Date(dateVal);
+const today = new Date();
+today.setHours(0,0,0,0); // ignore time
+if (selectedDate < today) {
+    return alert("Booking date cannot be in the past.");
+}
     if (!sessionInstID) {
         const isAuth = await authenticateForBooking();
         if (!isAuth) return;
