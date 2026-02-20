@@ -284,13 +284,9 @@
             </div>
 
             <!-- 5. Teacher ID -->
-            <div class="input-group">
-                <label>5. Teacher ID</label>
-                <div style="display: flex; gap: 5px;">
-                    <input type="text" id="f-teacher-id" placeholder="Enter Teacher ID" style="flex: 1;">
-                    <button type="button" class="btn-fetch" onclick="fetchTeacher()">Fetch</button>
-                </div>
-            </div>
+           <select id="f-teacher">
+    <option value="">Select Teacher</option>
+</select>
 
             <!-- 4. Teacher Name -->
             <div class="input-group">
@@ -481,36 +477,84 @@ document.getElementById('f-roll').addEventListener('keydown', function(e) {
         }
 
         // --- 3. GRID GENERATOR LOGIC ---
-        function generateTimeTable() {
-            const tbody = document.getElementById('timetable-body');
-            tbody.innerHTML = ''; 
+    async function generateTimeTable() {
 
-            TIME_SLOTS.forEach((timeStr, rowIndex) => {
-                const tr = document.createElement('tr');
-                
-                const tdTime = document.createElement('td');
-                tdTime.className = 'time-slot';
-                tdTime.innerText = timeStr;
-                tr.appendChild(tdTime);
+    const dateVal = document.getElementById('f-date').value;
 
-                DAYS.forEach((dayStr, colIndex) => {
-                    const td = document.createElement('td');
-                    td.id = `cell-${rowIndex}-${colIndex}`;
-                    
-                    td.innerHTML = `
-                        <span class="open-slot">OPEN SLOT</span>
-                        <button type="button" class="btn-book" onclick="bookSlot('${dayStr}', '${timeStr}', 'cell-${rowIndex}-${colIndex}')">BOOK</button>
-                    `;
-                    tr.appendChild(td);
-                });
+    if (!dateVal) {
+        return alert("Please select booking date first.");
+    }
 
-                tbody.appendChild(tr);
-            });
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
 
-            document.getElementById('timetable-wrapper').style.display = 'block';
-            document.getElementById('timetable-wrapper').scrollIntoView({ behavior: 'smooth' });
-        }
+    // 🔵 Fetch all bookings for selected date
+    const { data: bookings, error } = await db
+        .from("class_bookings")
+        .select("*")
+        .eq("institute_id", sessionInstID)
+        .eq("booking_date", dateVal);
 
+    if (error) {
+        console.error("Error fetching bookings:", error);
+        return;
+    }
+
+    const tbody = document.getElementById('timetable-body');
+    tbody.innerHTML = '';
+
+    TIME_SLOTS.forEach((timeStr, rowIndex) => {
+
+        const tr = document.createElement('tr');
+
+        const tdTime = document.createElement('td');
+        tdTime.className = 'time-slot';
+        tdTime.innerText = timeStr;
+        tr.appendChild(tdTime);
+
+        DAYS.forEach((dayStr, colIndex) => {
+
+            const td = document.createElement('td');
+            const cellId = `cell-${rowIndex}-${colIndex}`;
+            td.id = cellId;
+
+            // 🔴 Check if this time slot is already booked
+            const isBooked = bookings?.some(b =>
+                b.time_slot === timeStr
+            );
+
+            if (isBooked) {
+
+                td.innerHTML = `
+                    <span style="color:red; font-weight:bold;">
+                        SLOT BOOKED
+                    </span>
+                `;
+
+                td.classList.add("booked-cell");
+
+            } else {
+
+                td.innerHTML = `
+                    <span class="open-slot">OPEN SLOT</span>
+                    <button type="button"
+                        class="btn-book"
+                        onclick="bookSlot('${dayStr}', '${timeStr}', '${cellId}')">
+                        BOOK
+                    </button>
+                `;
+            }
+
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('timetable-wrapper').style.display = 'block';
+}
         function getOrdinalNum(n) {
     n = Number(n);
 
@@ -533,53 +577,262 @@ document.getElementById('f-roll').addEventListener('keydown', function(e) {
     return `${getOrdinalNum(day)} ${month} ${year}`;
 }
         // --- 4. BOOKING & CONFIRMATION LOGIC ---
-        function bookSlot(day, time, cellId) {
-            const roll = document.getElementById('f-roll').value.trim();
-            const student = document.getElementById('f-student-name').value;
-            const course = document.getElementById('f-course').value;
-            const teacher = document.getElementById('f-teacher-name').value;
-            const room = document.getElementById('f-room').value;
-            const floor = document.getElementById('f-floor').value;
-            const dateVal = document.getElementById('f-date').value;
+async function bookSlot(day, time, cellId) {
+    // 1️⃣ Get values from form
+    const roll = document.getElementById('f-roll').value.trim();
+    const student = document.getElementById('f-student-name').value.trim();
+    const course = document.getElementById('f-course').value;
+    const teacherSelect = document.getElementById("f-teacher");
+    const teacherId = teacherSelect.value;
+    const room = document.getElementById('f-room').value;
+    const floor = document.getElementById('f-floor').value;
+    const dateVal = document.getElementById('f-date').value;
 
-            if (!student || !teacher) {
-                return alert("Please enter and Fetch Student & Teacher details in the top form before booking a slot.");
-            }
-            if (!dateVal) {
-                return alert("Please select a Booking Date in the form (Field 6) before booking.");
-            }
+    // 2️⃣ Validation
+    if (!roll || !student) return alert("Please enter and fetch student details.");
+    if (!course) return alert("Please select a course.");
+    if (!teacherId) return alert("Please select a teacher.");
+    if (!dateVal) return alert("Please select booking date.");
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
 
-            // Correct time parsing logic
-           // Correct time parsing logic
-const timeParts = time.split('to');
+    // 3️⃣ Check if teacher is already booked at this time
+    const { data: existingBooking } = await db
+        .from("class_bookings")
+        .select("id")
+        .eq("institute_id", sessionInstID)
+        .eq("teacher_id", teacherId)
+        .eq("booking_date", dateVal)
+        .eq("time_slot", time)
+        .maybeSingle();
 
-const firstPart = timeParts[0].trim();   // Take only starting time
-const hourMinute = firstPart.split(' ')[0]; // "09:00"
-const amPm = firstPart.includes('PM') ? 'pm' : 'am';
+    if (existingBooking) return alert("This teacher is already booked in this time slot.");
 
-let hourStr = hourMinute.split(':')[0];  // "09"
-hourStr = hourStr.replace(/^0+/, '');    // remove leading zero
+    // 4️⃣ Insert booking into Supabase
+    const { data: bookingData, error: insertError } = await db
+        .from("class_bookings")
+        .insert({
+            institute_id: sessionInstID,
+            teacher_id: teacherId,
+            student_roll: roll,
+            booking_date: dateVal,
+            time_slot: time,
+            course: course,
+            room: room,
+            floor: floor
+        })
+        .select()
+        .single();
 
-const simplifiedTime = `${hourStr} ${amPm}`;
+    if (insertError) return alert("Error saving booking: " + insertError.message);
 
-            const formattedDate = formatDateReadable(dateVal);
+    // 5️⃣ Update the timetable cell visually
+    const teacherName = teacherSelect.selectedOptions[0].dataset.name || '';
+    const cell = document.getElementById(cellId);
+    cell.innerHTML = `
+        <div class="booked-tag tag-teacher">Teacher: ${teacherName}</div>
+        <div class="booked-tag tag-student">Student: ${student}</div>
+        <div class="booked-tag tag-course">Course: ${course}</div>
+    `;
 
-            const message = `Student <b>${student.toUpperCase()}</b>, with roll number <b>${roll.toUpperCase()}</b>, has booked a <b>${course.toUpperCase()}</b> class on <b>${day.toUpperCase()}</b>, <b>${formattedDate}</b>, at <b>${simplifiedTime}</b> with teacher <b>${teacher.toUpperCase()}</b> in room no <b>${room}</b> on <b>${floor.toUpperCase()}</b> floor.`;
+    // 6️⃣ ✅ WhatsApp Notification to teacher
+    const teacherPhone = teacherSelect.selectedOptions[0].dataset.mobile; // include country code, e.g., 91XXXXXXXXXX
+    if (teacherPhone) {
+        const message = `
+📚 New Class Booking
 
-            const cell = document.getElementById(cellId);
-            cell.innerHTML = `
-                <div class="booked-tag tag-teacher">Teacher: ${teacher}</div>
-                <div class="booked-tag tag-student">Student: ${student}</div>
-                <div class="booked-tag tag-course">Course: ${course}</div>
-            `;
+Student: ${student}
+Course: ${course}
+Date: ${dateVal}
+Time: ${time}
+Booking ID: ${bookingData.id}
+        `;
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
+        window.open(whatsappURL, "_blank"); // opens WhatsApp Web or app
+    }
 
-            document.getElementById('confirmation-text').innerHTML = message;
-            document.getElementById('confirm-modal').style.display = 'flex';
-        }
-
+    alert("Booking saved successfully and teacher notified via WhatsApp.");
+}
         function closeModal() {
             document.getElementById('confirm-modal').style.display = 'none';
         }
+
+
+async function authenticateForBooking() {
+
+    const authResponse = await db.auth.getUser();
+    const user = authResponse.data.user;
+
+    if (user) {
+        const profileResponse = await db
+            .from('profiles')
+            .select('institute_id')
+            .eq('id', user.id)
+            .single();
+
+        if (profileResponse.data) {
+            sessionInstID = profileResponse.data.institute_id;
+        }
+    }
+
+    if (!sessionInstID) {
+        alert("Not logged in. Please login from main app.");
+        return false;
+    }
+
+    return true;
+}
+
+
+async function populateTeachersBySubject(selectedCourse) {
+
+    const teacherSelect = document.getElementById("f-teacher");
+    teacherSelect.innerHTML = '<option value="">Loading...</option>';
+
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
+
+    const { data, error } = await db
+        .from("teacher_details")
+        .select("id, teacher_name, mobile, email, experience, rating")
+        .eq("institute_id", sessionInstID)
+        .eq("subject_taught", selectedCourse);
+
+    if (error) {
+        console.error(error);
+        teacherSelect.innerHTML = '<option value="">Error loading teachers</option>';
+        return;
+    }
+
+    teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+
+    if (!data || data.length === 0) {
+        teacherSelect.innerHTML = '<option value="">No teachers available</option>';
+        return;
+    }
+
+    data.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+    data.forEach(teacher => {
+
+        const option = document.createElement("option");
+
+        option.value = teacher.id;
+
+        option.textContent =
+            `${teacher.teacher_name} (${teacher.experience || 0} yrs exp) ⭐ ${teacher.rating || 'N/A'}`;
+
+        option.dataset.name = teacher.teacher_name;
+        option.dataset.mobile = teacher.mobile;
+        option.dataset.email = teacher.email;
+
+        teacherSelect.appendChild(option);
+    });
+}
+
+document.getElementById("f-teacher").addEventListener("change", function () {
+
+    const selectedOption = this.options[this.selectedIndex];
+
+    if (!this.value) {
+        document.getElementById("teacher-mobile").value = "";
+        document.getElementById("teacher-email").value = "";
+        return;
+    }
+
+    document.getElementById("teacher-mobile").value =
+        selectedOption.dataset.mobile || "";
+
+    document.getElementById("teacher-email").value =
+        selectedOption.dataset.email || "";
+});
+
+
+
+
+
+async function bookClass() {
+
+  // 1️⃣ Get values from form
+  const studentName = document.getElementById("studentName").value;
+  const studentRoll = document.getElementById("studentRoll").value;
+  const bookingDate = document.getElementById("bookingDate").value;
+  const timeSlot = document.getElementById("timeSlot").value;
+  const teacherId = document.getElementById("teacherSelect").value;
+
+  // 2️⃣ Get logged in user
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+
+  if (!user) {
+    alert("Not logged in");
+    return;
+  }
+
+  // 3️⃣ Get institute_id from profiles
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("institute_id")
+    .eq("id", user.id)
+    .single();
+
+  const instituteId = profile.institute_id;
+
+  // 4️⃣ Get teacher mobile number
+  const { data: teacher } = await supabase
+    .from("teacher_details")
+    .select("mobile")
+    .eq("id", teacherId)
+    .single();
+
+  const teacherPhone = teacher.mobile; // Must be like 91XXXXXXXXXX
+
+  // 5️⃣ Insert booking
+  const { data, error } = await supabase
+    .from("class_bookings")
+    .insert([
+      {
+        institute_id: instituteId,
+        teacher_id: teacherId,
+        student_roll: studentRoll,
+        booking_date: bookingDate,
+        time_slot: timeSlot,
+        status: "pending"
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    alert("Booking failed: " + error.message);
+    return;
+  }
+
+  // 6️⃣ WhatsApp Message
+  const message = `
+📚 New Class Booking Request
+
+Student: ${studentName}
+Date: ${bookingDate}
+Time: ${timeSlot}
+Booking ID: ${data.id}
+
+Please confirm in dashboard.
+`;
+
+  const encodedMessage = encodeURIComponent(message);
+  const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
+
+  // 7️⃣ Open WhatsApp automatically
+  window.open(whatsappURL, "_blank");
+
+  alert("Booking saved. Teacher notified via WhatsApp.");
+}
     </script>
 </body>
 </html>
