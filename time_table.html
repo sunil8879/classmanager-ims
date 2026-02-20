@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Time Table Generator</title>
+
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            --aquamarine: #7FFFD4;
+            --white: #ffffff;
+            --black: #000000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: var(--white);
+            color: var(--black);
+            padding-bottom: 50px;
+        }
+
+        header {
+            background-color: var(--aquamarine);
+            padding: 25px;
+            text-align: center;
+            border-bottom: 4px solid var(--black);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .form-container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            border: 2px solid var(--black);
+            padding: 25px;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            margin-bottom: 30px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        input, select {
+            padding: 10px;
+            border: 2px solid var(--black);
+            border-radius: 6px;
+            font-size: 1rem;
+            background: var(--white);
+            color: var(--black);
+        }
+
+        /* FIX: ONLY grey out readonly inputs, not all inputs! */
+      input[readonly] {
+    background-color: #e0e0e0;
+    cursor: not-allowed;
+    color: #555;
+    font-weight: bold;
+}
+
+        .btn-fetch {
+            background: var(--black);
+            color: var(--aquamarine);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .btn-generate {
+            background-color: var(--aquamarine);
+            color: var(--black);
+            border: 3px solid var(--black);
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 4px 4px 0px var(--black);
+        }
+
+        .btn-generate:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px var(--black);
+        }
+
+        .timetable-container {
+            width: 95%;
+            margin: 0 auto;
+            display: none; 
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 3px solid var(--black);
+            text-align: center;
+        }
+
+        th, td {
+            border: 2px solid var(--black);
+            padding: 15px 10px;
+            min-width: 140px;
+            vertical-align: middle;
+        }
+
+        th.time-col { background-color: #f0f0f0; width: 150px; }
+        th.day-mon { background-color: #FFB6C1; } 
+        th.day-tue { background-color: #FFDAB9; } 
+        th.day-wed { background-color: #E6E6FA; } 
+        th.day-thu { background-color: #FFFACD; } 
+        th.day-fri { background-color: #E0FFFF; } 
+        th.day-sat { background-color: #F5F5DC; } 
+        th.day-sun { background-color: #FFE4E1; } 
+
+        td.time-slot {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .open-slot {
+            color: #008000; 
+            font-weight: 800;
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .btn-book {
+            background-color: #FF0000; 
+            color: #FFFFFF;
+            border: 2px solid var(--black);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-book:hover {
+            background-color: #cc0000;
+        }
+
+        .booked-tag {
+            padding: 4px 8px;
+            margin: 3px 0;
+            border-radius: 4px;
+            border: 1px solid #000;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #000;
+            display: block;
+        }
+        .tag-teacher { background-color: #FFFF00; } 
+        .tag-student { background-color: #90EE90; } 
+        .tag-course { background-color: #ADD8E6; }  
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: var(--white);
+            padding: 30px;
+            border: 4px solid var(--aquamarine);
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .modal-content p {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            margin-bottom: 25px;
+        }
+
+        .btn-print {
+            background-color: var(--black);
+            color: var(--aquamarine);
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn-close {
+            background-color: #ccc;
+            color: #000;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        @media print {
+            body * { visibility: hidden; }
+            #confirm-modal, #print-area, #print-area * { visibility: visible; }
+            #confirm-modal { position: absolute; top: 0; left: 0; display: block; background: none; }
+            #print-area { position: absolute; top: 0; left: 0; width: 100%; border: none; box-shadow: none; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Auto Time Table Generator</h1>
+    </header>
+
+    <div class="form-container">
+        <div class="form-grid">
+            <!-- 1. Student Roll Number -->
+            <div class="input-group">
+                <label>1. Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="f-roll" placeholder="Enter Roll Number" style="flex: 1;">
+                    <button type="button" class="btn-fetch" onclick="fetchStudent()">Fetch</button>
+                </div>
+            </div>
+
+            <!-- 2. Student Name -->
+            <div class="input-group">
+                <label>2. Student Name</label>
+                <input type="text" id="f-student-name" readonly placeholder="Auto-populated">
+            </div>
+
+            <!-- 3. Course Name -->
+            <div class="input-group">
+                <label>3. Course Name</label>
+                <input type="text" id="f-course" readonly placeholder="Auto-populated">
+            </div>
+
+            <!-- 5. Teacher ID -->
+            <div class="input-group">
+                <label>5. Teacher ID</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="f-teacher-id" placeholder="Enter Teacher ID" style="flex: 1;">
+                    <button type="button" class="btn-fetch" onclick="fetchTeacher()">Fetch</button>
+                </div>
+            </div>
+
+            <!-- 4. Teacher Name -->
+            <div class="input-group">
+                <label>4. Teacher Name</label>
+                <input type="text" id="f-teacher-name" readonly placeholder="Auto-populated">
+            </div>
+
+            <!-- 6. Day of the week -->
+            <div class="input-group">
+                <label>6. Booking Date</label>
+                <input type="date" id="f-date">
+            </div>
+
+            <!-- 7. Time Slot -->
+            <div class="input-group">
+                <label>7. Preferred Time Slot</label>
+                <select id="f-time">
+                    <option value="09:00 AM to 10:00 AM">09:00 AM to 10:00 AM</option>
+                    <option value="10:00 AM to 11:00 AM">10:00 AM to 11:00 AM</option>
+                    <option value="11:00 AM to 12:00 PM">11:00 AM to 12:00 PM</option>
+                    <option value="12:00 PM to 01:00 PM">12:00 PM to 01:00 PM</option>
+                    <option value="01:00 PM to 02:00 PM">01:00 PM to 02:00 PM</option>
+                    <option value="02:00 PM to 03:00 PM">02:00 PM to 03:00 PM</option>
+                    <option value="03:00 PM to 04:00 PM">03:00 PM to 04:00 PM</option>
+                    <option value="04:00 PM to 05:00 PM">04:00 PM to 05:00 PM</option>
+                    <option value="05:00 PM to 06:00 PM">05:00 PM to 06:00 PM</option>
+                </select>
+            </div>
+
+            <!-- 8. Room Number -->
+            <div class="input-group">
+                <label>8. Room Number</label>
+                <select id="f-room">
+                    <option value="1">Room 1</option>
+                    <option value="2">Room 2</option>
+                    <option value="3">Room 3</option>
+                    <option value="4">Room 4</option>
+                    <option value="5">Room 5</option>
+                </select>
+            </div>
+
+            <!-- 9. Floor Number -->
+            <div class="input-group">
+                <label>9. Floor Number</label>
+                <select id="f-floor">
+                    <option value="Ground">Ground Floor</option>
+                    <option value="1st">1st Floor</option>
+                    <option value="2nd">2nd Floor</option>
+                    <option value="3rd">3rd Floor</option>
+                    <option value="4th">4th Floor</option>
+                    <option value="5th">5th Floor</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="button" class="btn-generate" onclick="generateTimeTable()">GENERATE AUTO TIME TABLE</button>
+    </div>
+
+    <div class="timetable-container" id="timetable-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th class="time-col">TIME / DAY</th>
+                    <th class="day-mon">MONDAY</th>
+                    <th class="day-tue">TUESDAY</th>
+                    <th class="day-wed">WEDNESDAY</th>
+                    <th class="day-thu">THURSDAY</th>
+                    <th class="day-fri">FRIDAY</th>
+                    <th class="day-sat">SATURDAY</th>
+                    <th class="day-sun">SUNDAY</th>
+                </tr>
+            </thead>
+            <tbody id="timetable-body">
+                <!-- Rows injected by JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal-content" id="print-area">
+            <h2 style="margin-bottom: 15px; text-decoration: underline;">BOOKING CONFIRMATION</h2>
+            <p id="confirmation-text"></p>
+            <div class="no-print" style="margin-top: 20px;">
+                <button type="button" class="btn-print" onclick="window.print()"><i class="fas fa-print"></i> SAVE & PRINT</button>
+                <button type="button" class="btn-close" onclick="closeModal()">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. SUPABASE INITIALIZATION ---
+        const _supabaseUrl = 'https://erzwijnlbnwjdlluvxyk.supabase.co';
+        const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+        const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+
+        let sessionInstID = "";
+
+        async function checkCurrentSession() {
+            const { data: { user } } = await db.auth.getUser();
+            if (user) {
+                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).maybeSingle();
+                if (profile) sessionInstID = profile.institute_id;
+            }
+        }
+        checkCurrentSession();
+
+      const TIME_SLOTS = [
+    "09:00 AM to 10:00 AM",
+    "10:00 AM to 11:00 AM",
+    "11:00 AM to 12:00 PM",
+    "12:00 PM to 01:00 PM",
+    "01:00 PM to 02:00 PM",
+    "02:00 PM to 03:00 PM",
+    "03:00 PM to 04:00 PM",
+    "04:00 PM to 05:00 PM",
+    "05:00 PM to 06:00 PM"
+];
+
+const DAYS = [
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+    "SUNDAY"
+];
+
+        // --- 2. DATABASE FETCH LOGIC ---
+        async function fetchStudent() {
+            const roll = document.getElementById('f-roll').value.trim().toUpperCase();
+
+            if (!roll) {
+                alert("Please enter Student Roll Number.");
+                return;
+            }
+
+            let query = db.from('students').select('full_name, course').eq('roll_number', roll);
+            if (sessionInstID) query = query.eq('institute_id', sessionInstID);
+
+            const { data, error } = await query.limit(1).maybeSingle();
+
+            if (error) {
+                console.error("Fetch Error:", error.message);
+                alert("Database Error: " + error.message);
+                return;
+            }
+
+            if (!data) {
+                alert("Student not found. Please verify the Roll Number.");
+                document.getElementById('f-student-name').value = '';
+                document.getElementById('f-course').value = '';
+                return;
+            }
+
+            document.getElementById('f-student-name').value = data.full_name || '';
+            document.getElementById('f-course').value = data.course || '';
+        }
+
+document.getElementById('f-roll').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        fetchStudent();
+    }
+});
+
+        async function fetchTeacher() {
+            const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
+
+            if (!tid) {
+                alert("Please enter Teacher ID.");
+                return;
+            }
+
+            let query = db.from('teacher_details').select('teacher_name').eq('id', tid);
+            if (sessionInstID) query = query.eq('institute_id', sessionInstID);
+
+            const { data, error } = await query.limit(1).maybeSingle();
+
+            if (error || !data) {
+                alert("Teacher not found.");
+                document.getElementById('f-teacher-name').value = '';
+                return;
+            }
+
+            document.getElementById('f-teacher-name').value = data.teacher_name || '';
+        }
+
+        // --- 3. GRID GENERATOR LOGIC ---
+        function generateTimeTable() {
+            const tbody = document.getElementById('timetable-body');
+            tbody.innerHTML = ''; 
+
+            TIME_SLOTS.forEach((timeStr, rowIndex) => {
+                const tr = document.createElement('tr');
+                
+                const tdTime = document.createElement('td');
+                tdTime.className = 'time-slot';
+                tdTime.innerText = timeStr;
+                tr.appendChild(tdTime);
+
+                DAYS.forEach((dayStr, colIndex) => {
+                    const td = document.createElement('td');
+                    td.id = `cell-${rowIndex}-${colIndex}`;
+                    
+                    td.innerHTML = `
+                        <span class="open-slot">OPEN SLOT</span>
+                        <button type="button" class="btn-book" onclick="bookSlot('${dayStr}', '${timeStr}', 'cell-${rowIndex}-${colIndex}')">BOOK</button>
+                    `;
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('timetable-wrapper').style.display = 'block';
+            document.getElementById('timetable-wrapper').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function getOrdinalNum(n) {
+        function getOrdinalNum(n) {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+            const v = n % 100;
+            return n + (s || s || s);
+        }
+
+        function formatDateReadable(dateString) {
+            const d = new Date(dateString);
+           const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+];
+            return `${getOrdinalNum(d.getDate())} ${months} ${d.getFullYear()}`;
+        }
+
+        // --- 4. BOOKING & CONFIRMATION LOGIC ---
+        function bookSlot(day, time, cellId) {
+            const roll = document.getElementById('f-roll').value.trim();
+            const student = document.getElementById('f-student-name').value;
+            const course = document.getElementById('f-course').value;
+            const teacher = document.getElementById('f-teacher-name').value;
+            const room = document.getElementById('f-room').value;
+            const floor = document.getElementById('f-floor').value;
+            const dateVal = document.getElementById('f-date').value;
+
+            if (!student || !teacher) {
+                return alert("Please enter and Fetch Student & Teacher details in the top form before booking a slot.");
+            }
+            if (!dateVal) {
+                return alert("Please select a Booking Date in the form (Field 6) before booking.");
+            }
+
+            // Correct time parsing logic
+            const timeParts = time.split('to');
+            const firstPart = timeParts.trim();
+            const hourStr = firstPart.split(':').replace(/^0+/, ''); // Remove leading zeros
+            const amPm = firstPart.includes('PM') ? 'pm' : 'am';
+            const simplifiedTime = `${hourStr} ${amPm}`;
+
+            const formattedDate = formatDateReadable(dateVal);
+
+            const message = `Student <b>${student.toUpperCase()}</b>, with roll number <b>${roll.toUpperCase()}</b>, has booked a <b>${course.toUpperCase()}</b> class on <b>${day.toUpperCase()}</b>, <b>${formattedDate}</b>, at <b>${simplifiedTime}</b> with teacher <b>${teacher.toUpperCase()}</b> in room no <b>${room}</b> on <b>${floor.toUpperCase()}</b> floor.`;
+
+            const cell = document.getElementById(cellId);
+            cell.innerHTML = `
+                <div class="booked-tag tag-teacher">Teacher: ${teacher}</div>
+                <div class="booked-tag tag-student">Student: ${student}</div>
+                <div class="booked-tag tag-course">Course: ${course}</div>
+            `;
+
+            document.getElementById('confirmation-text').innerHTML = message;
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
