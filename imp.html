@@ -5149,6 +5149,7 @@ async function fetchAutoInventory() {
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
+/* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 let subPortalPage = 1;
 let subPortalData =[];
 
@@ -5165,7 +5166,7 @@ function parseMonthYearString(str) {
     const parts = str.trim().toLowerCase().split(/\s+/);
     
     if (parts.length >= 2) {
-        // Correctly remove commas if user typed "March, 2026"
+        // Apply replace to the specific array items: parts and parts
         const cleanMonth = parts.replace(/,/g, '');
         const cleanYear = parts.replace(/,/g, '');
         
@@ -5226,7 +5227,6 @@ async function refreshSubjectWiseSummary() {
     const map = {};
     students.forEach(s => {
         const sub = s.course || "General";
-        // Fixed mapping initialisation
         if (!map) {
             map = { t: 0, r: 0, p: 0, my: targetDisplayMonth };
         }
@@ -5279,9 +5279,6 @@ function moveSubjectWisePage(dir) {
         renderSubjectWiseTable();
     }
 }
-
-// Ensure the table auto-loads immediately
-setTimeout(refreshSubjectWiseSummary, 2000);
     </script>
 <script>
 if ('serviceWorker' in navigator) {
