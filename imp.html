@@ -667,9 +667,7 @@
     </div>
 
     <!-- Part 2: FEES PORTAL -->
-<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
-<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
-<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
+
 <div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
     <h3>2. SUBJECT-WISE FEES PORTAL</h3>
     <div class="form-grid">
@@ -703,6 +701,53 @@
         <button class="btn-fetch" style="padding: 5px 15px;" onclick="moveSubjectWisePage(1)">Next</button>
     </div>
 </div>
+
+<!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
+<div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
+    <h3>2. SUBJECT-WISE FEES PORTAL</h3>
+    
+    <!-- DYNAMIC LAYOUT: SIDEBAR ARCHIVE & MAIN TABLE -->
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; text-align: left;">
+        
+        <!-- Left Side: Months Archive Sidebar -->
+        <div style="flex: 1; min-width: 200px; max-width: 250px; background: #fff; padding: 15px; border-radius: 10px; border: 2px solid #000; max-height: 400px; overflow-y: auto; box-shadow: 0 5px 0px #ccc;">
+            <h4 style="margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 5px; color: #000; text-decoration: none;">Months Archive</h4>
+            <div id="portal-month-links">
+                <!-- Dynamic Links Will Appear Here -->
+            </div>
+        </div>
+
+        <!-- Right Side: Main Table Area -->
+        <div style="flex: 3; min-width: 300px;">
+            <h2 id="current-portal-month-title" style="color: #ff0000; text-transform: uppercase; margin-bottom: 15px; text-decoration: underline;">LOADING...</h2>
+            
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
+                    <thead style="background: #f2f2f2;">
+                        <tr>
+                            <th style="padding: 12px; border: 1px solid #000;">Subject Name</th>
+                            <th style="padding: 12px; border: 1px solid #000;">Total Fees</th>
+                            <th style="padding: 12px; border: 1px solid #000;">Total Received</th>
+                            <th style="padding: 12px; border: 1px solid #000;">Total Pending</th>
+                            <th style="padding: 12px; border: 1px solid #000;">Month & Year</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portal-table-body">
+                        <tr><td colspan="5" style="text-align:center; padding:20px;">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; align-items: center;">
+                <button class="btn-fetch" style="padding: 5px 15px; border: 1px solid #000; box-shadow: 0 4px 0px rgba(0,0,0,0.3);" onclick="moveSubjectWisePage(-1)">Previous</button>
+                <span id="portal-page-info" style="font-weight: bold; color: #000; border: 1px solid #000; padding: 5px 15px; border-radius: 5px; background: #fff;">Page 1</span>
+                <button class="btn-fetch" style="padding: 5px 15px; border: 1px solid #000; box-shadow: 0 4px 0px rgba(0,0,0,0.3);" onclick="moveSubjectWisePage(1)">Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+
     <!-- Part 3: PAYMENT LOG -->
     <div class="card">
         <h3>3. PAYMENT LOG</h3>
@@ -5139,8 +5184,10 @@ async function fetchAutoInventory() {
 
 /* --- NEW SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
+<<<<
+/* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 let subPortalPage = 1;
-let subPortalData = [];
+let subPortalData =[];
 
 async function refreshSubjectWiseSummary() {
     if (!sessionInstID) return;
@@ -5172,14 +5219,14 @@ async function refreshSubjectWiseSummary() {
     const map = {};
     students.forEach(s => {
         const sub = s.course || "General";
-        if (!map[sub]) map[sub] = { t: 0, r: 0, p: 0 };
-        map[sub].t += parseFloat(s.total_fees) || 0;
-        map[sub].r += parseFloat(s.paid_amount) || 0;
-        map[sub].p += parseFloat(s.pending_amount) || 0;
+        if (!map) map = { t: 0, r: 0, p: 0 };
+        map.t += parseFloat(s.total_fees) || 0;
+        map.r += parseFloat(s.paid_amount) || 0;
+        map.p += parseFloat(s.pending_amount) || 0;
     });
 
     // 3. Convert to Array and SORT by 'Received' (Falling Order)
-    subPortalData = Object.entries(map).map(([name, val]) => ({ name, ...val }));
+    subPortalData = Object.entries(map).map(() => ({ name, ...val }));
     
     // THE SORTING LOGIC (b.r - a.r makes it falling/descending)
     subPortalData.sort((a, b) => b.r - a.r);
@@ -5225,7 +5272,157 @@ function moveSubjectWisePage(dir) {
 // Ensure the table loads when you enter the Fee tab
 // Add this line inside your showSection('fee') logic or simply call it:
 setTimeout(refreshSubjectWiseSummary, 2000);
+====
+/* --- REFINED SUBJECT-WISE ANALYTICS ENGINE (DYNAMIC CALENDAR & PAGINATION) --- */
+let subPortalPage = 1;
+let subPortalData =[];
+let currentPortalFilter = "";
 
+function initSubjectWisePortal() {
+    const now = new Date();
+    const year = now.getFullYear();
+    let month = now.getMonth() + 1;
+    month = month < 10 ? '0' + month : month;
+    currentPortalFilter = `${year}-${month}`; // Defaults dynamically to e.g. "2026-03"
+    
+    updatePortalTitle(currentPortalFilter);
+    generatePortalMonthLinks();
+    refreshSubjectWiseSummary();
+}
+
+function updatePortalTitle(yyyy_mm) {
+    const dateObj = new Date(yyyy_mm + "-01");
+    const title = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
+    document.getElementById('current-portal-month-title').innerText = title;
+}
+
+function setPortalMonth(yyyy_mm) {
+    currentPortalFilter = yyyy_mm;
+    updatePortalTitle(yyyy_mm);
+    generatePortalMonthLinks(); // To update the color highlight
+    refreshSubjectWiseSummary();
+}
+
+function generatePortalMonthLinks() {
+    const container = document.getElementById('portal-month-links');
+    container.innerHTML = "";
+
+    const now = new Date();
+    const currentY = now.getFullYear();
+    const currentM = now.getMonth() + 1;
+    const startYear = 2026; // System starts from 2026
+    let html = "";
+
+    // Loop backwards so newest years/months appear at top
+    for (let y = currentY; y >= startYear; y--) {
+        html += `<div style="font-weight:bold; margin: 15px 0 5px 0; color:#000; text-decoration: underline;">Year ${y}</div>`;
+        let maxMonth = (y === currentY) ? currentM : 12;
+        
+        for (let m = maxMonth; m >= 1; m--) {
+            let monthStr = m < 10 ? '0' + m : m;
+            let yyyy_mm = `${y}-${monthStr}`;
+            let dateObj = new Date(yyyy_mm + "-01");
+            let monthName = dateObj.toLocaleString('default', { month: 'short' });
+            
+            let isSelected = (yyyy_mm === currentPortalFilter);
+            let bg = isSelected ? "#007bff" : "#f0f0f0";
+            let color = isSelected ? "#fff" : "#000";
+            let weight = isSelected ? "bold" : "normal";
+            let border = isSelected ? "2px solid #000" : "1px solid #ccc";
+
+            html += `<button onclick="setPortalMonth('${yyyy_mm}')" 
+                        style="display:block; width:100%; text-align:left; padding:8px 12px; margin:4px 0; border:${border}; background:${bg}; color:${color}; border-radius:6px; cursor:pointer; font-family: 'Times New Roman', serif; font-weight: ${weight}; transition: 0.2s;">
+                        ${monthName} ${y}
+                     </button>`;
+        }
+    }
+    container.innerHTML = html;
+}
+
+async function refreshSubjectWiseSummary() {
+    if (!sessionInstID) return;
+
+    const tbody = document.getElementById('portal-table-body');
+    const monthFilter = currentPortalFilter; 
+    
+    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>Updating Summary...</td></tr>";
+
+    let query = db.from('students')
+                .select('course, total_fees, paid_amount, pending_amount, admission_date')
+                .eq('institute_id', sessionInstID)
+                .eq('status', 'Active');
+    
+    if (monthFilter) {
+        query = query.like('admission_date', `${monthFilter}%`);
+    }
+
+    const { data: students, error } = await query;
+
+    if (error) {
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; color:red;'>Error fetching data.</td></tr>";
+        return;
+    }
+
+    const map = {};
+    students.forEach(s => {
+        const sub = s.course || "General";
+        if (!map) map = { t: 0, r: 0, p: 0 };
+        map.t += parseFloat(s.total_fees) || 0;
+        map.r += parseFloat(s.paid_amount) || 0;
+        map.p += parseFloat(s.pending_amount) || 0;
+    });
+
+    subPortalData = Object.entries(map).map(() => ({ name, ...val }));
+    
+    // THE SORTING LOGIC: Arranged strictly descending (Highest Received First)
+    subPortalData.sort((a, b) => b.r - a.r);
+
+    subPortalPage = 1;
+    renderSubjectWiseTable();
+}
+
+function renderSubjectWiseTable() {
+    const tbody = document.getElementById('portal-table-body');
+    const pageInfo = document.getElementById('portal-page-info');
+    
+    if (subPortalData.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No student records found for this period.</td></tr>";
+        pageInfo.innerText = "Page 1 of 1";
+        return;
+    }
+
+    const start = (subPortalPage - 1) * 5;
+    const rows = subPortalData.slice(start, start + 5);
+    const maxPage = Math.ceil(subPortalData.length / 5);
+
+    // Format the 5th column nicely e.g., "Feb 2026" based on the current active filter
+    const dateObj = new Date(currentPortalFilter + "-01");
+    const niceMonthYear = dateObj.toLocaleString('default', { month: 'short', year: 'numeric' });
+
+    tbody.innerHTML = rows.map(item => `
+        <tr style="border-bottom: 1px solid #000;">
+            <td style="padding:12px; border:1px solid #000;"><b>${item.name}</b></td>
+            <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000; color: green; font-weight:bold;">₹${item.r.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000; color: red; font-weight:bold;">₹${item.p.toLocaleString('en-IN')}</td>
+            <td style="padding:12px; border:1px solid #000; font-weight:bold;">${niceMonthYear}</td>
+        </tr>`).join('');
+
+    pageInfo.innerText = `Page ${subPortalPage} of ${maxPage}`;
+}
+
+function moveSubjectWisePage(dir) {
+    const maxPage = Math.ceil(subPortalData.length / 5) || 1;
+    const target = subPortalPage + dir;
+    if (target >= 1 && target <= maxPage) {
+        subPortalPage = target;
+        renderSubjectWiseTable();
+    }
+}
+
+// Initialize automatically after 2 seconds
+setTimeout(initSubjectWisePortal, 2000);
+>>>>
     </script>
 <script>
 if ('serviceWorker' in navigator) {
