@@ -5182,11 +5182,8 @@ async function fetchAutoInventory() {
 
 
 
-/* --- NEW SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
-<<<<
-/* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
-let subPortalPage = 1;
+
 let subPortalData =[];
 
 async function refreshSubjectWiseSummary() {
@@ -5232,7 +5229,7 @@ async function refreshSubjectWiseSummary() {
     subPortalData.sort((a, b) => b.r - a.r);
 
     // Reset to page 1 and render
-    subPortalPage = 1;
+
     renderSubjectWiseTable();
 }
 
@@ -5272,10 +5269,10 @@ function moveSubjectWisePage(dir) {
 // Ensure the table loads when you enter the Fee tab
 // Add this line inside your showSection('fee') logic or simply call it:
 setTimeout(refreshSubjectWiseSummary, 2000);
-====
+
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE (DYNAMIC CALENDAR & PAGINATION) --- */
-let subPortalPage = 1;
-let subPortalData =[];
+
+
 let currentPortalFilter = "";
 
 function initSubjectWisePortal() {
@@ -5377,7 +5374,7 @@ async function refreshSubjectWiseSummary() {
     // THE SORTING LOGIC: Arranged strictly descending (Highest Received First)
     subPortalData.sort((a, b) => b.r - a.r);
 
-    subPortalPage = 1;
+ 
     renderSubjectWiseTable();
 }
 
@@ -5422,7 +5419,7 @@ function moveSubjectWisePage(dir) {
 
 // Initialize automatically after 2 seconds
 setTimeout(initSubjectWisePortal, 2000);
->>>>
+
     </script>
 <script>
 if ('serviceWorker' in navigator) {
