@@ -5140,21 +5140,23 @@ async function fetchAutoInventory() {
 /* --- NEW SUBJECT-WISE ANALYTICS ENGINE --- */
 /* --- REFINED SUBJECT-WISE ANALYTICS ENGINE --- */
 let subPortalPage = 1;
-let subPortalData =[];
+let subPortalData = [];
 
 async function refreshSubjectWiseSummary() {
     if (!sessionInstID) return;
 
     const tbody = document.getElementById('portal-table-body');
-    const monthFilter = document.getElementById('portal-calendar').value; 
+    const monthFilter = document.getElementById('portal-calendar').value; // Format: YYYY-MM
     
-    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>Updating Summary...</td></tr>";
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Updating Summary...</td></tr>";
 
+    // 1. Fetch Students (Direct connection to Master Table)
     let query = db.from('students')
                 .select('course, total_fees, paid_amount, pending_amount, admission_date')
                 .eq('institute_id', sessionInstID)
                 .eq('status', 'Active');
     
+    // If a month is selected, find all students whose admission date STARTS with that year-month
     if (monthFilter) {
         query = query.like('admission_date', `${monthFilter}%`);
     }
@@ -5162,42 +5164,27 @@ async function refreshSubjectWiseSummary() {
     const { data: students, error } = await query;
 
     if (error) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; color:red;'>Error fetching data.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; color:red;'>Error fetching data.</td></tr>";
         return;
     }
 
+    // 2. Group Totals by Subject
     const map = {};
-    
     students.forEach(s => {
         const sub = s.course || "General";
-        
-        // Extract and format Month & Year
-        let mYear = "Unknown";
-        if (s.admission_date) {
-            const d = new Date(s.admission_date);
-            mYear = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-        }
-
-        // The Fix: Create a unique key for EACH Subject + Month/Year combination
-        const key = sub + "_" + mYear;
-
-        // If this specific combination doesn't exist yet, create it safely
-        if (!map) {
-            map = { name: sub, mYear: mYear, t: 0, r: 0, p: 0 };
-        }
-
-        // Add the amounts to this specific combination
-        map.t += parseFloat(s.total_fees) || 0;
-        map.r += parseFloat(s.paid_amount) || 0;
-        map.p += parseFloat(s.pending_amount) || 0;
+        if (!map[sub]) map[sub] = { t: 0, r: 0, p: 0 };
+        map[sub].t += parseFloat(s.total_fees) || 0;
+        map[sub].r += parseFloat(s.paid_amount) || 0;
+        map[sub].p += parseFloat(s.pending_amount) || 0;
     });
 
-    // Convert the map back to an array
-    subPortalData = Object.values(map);
+    // 3. Convert to Array and SORT by 'Received' (Falling Order)
+    subPortalData = Object.entries(map).map(([name, val]) => ({ name, ...val }));
     
-    // Sort Descending by amount received
+    // THE SORTING LOGIC (b.r - a.r makes it falling/descending)
     subPortalData.sort((a, b) => b.r - a.r);
 
+    // Reset to page 1 and render
     subPortalPage = 1;
     renderSubjectWiseTable();
 }
@@ -5207,15 +5194,14 @@ function renderSubjectWiseTable() {
     const pageInfo = document.getElementById('portal-page-info');
     
     if (subPortalData.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No student records found.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>No student records found for this period.</td></tr>";
         pageInfo.innerText = "Page 1 of 1";
         return;
     }
 
-    // Pagination Logic: Show only 5
     const start = (subPortalPage - 1) * 5;
     const rows = subPortalData.slice(start, start + 5);
-    const maxPage = Math.ceil(subPortalData.length / 5) || 1;
+    const maxPage = Math.ceil(subPortalData.length / 5);
 
     tbody.innerHTML = rows.map(item => `
         <tr style="border-bottom: 1px solid #000;">
@@ -5223,7 +5209,6 @@ function renderSubjectWiseTable() {
             <td style="padding:12px; border:1px solid #000;">₹${item.t.toLocaleString('en-IN')}</td>
             <td style="padding:12px; border:1px solid #000; color: green; font-weight:bold;">₹${item.r.toLocaleString('en-IN')}</td>
             <td style="padding:12px; border:1px solid #000; color: red; font-weight:bold;">₹${item.p.toLocaleString('en-IN')}</td>
-            <td style="padding:12px; border:1px solid #000;">${item.mYear}</td>
         </tr>`).join('');
 
     pageInfo.innerText = `Page ${subPortalPage} of ${maxPage}`;
@@ -5237,6 +5222,10 @@ function moveSubjectWisePage(dir) {
         renderSubjectWiseTable();
     }
 }
+// Ensure the table loads when you enter the Fee tab
+// Add this line inside your showSection('fee') logic or simply call it:
+setTimeout(refreshSubjectWiseSummary, 2000);
+
     </script>
 <script>
 if ('serviceWorker' in navigator) {
