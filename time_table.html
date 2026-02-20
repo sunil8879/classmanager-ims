@@ -733,15 +733,20 @@ async function populateTeachersBySubject(selectedCourse) {
 }
 
 document.getElementById("f-teacher").addEventListener("change", function () {
-
     const selectedOption = this.options[this.selectedIndex];
 
     if (!this.value) {
+        document.getElementById("f-teacher-name").value = "";
         document.getElementById("teacher-mobile").value = "";
         document.getElementById("teacher-email").value = "";
         return;
     }
 
+    // ✅ Populate teacher name
+    document.getElementById("f-teacher-name").value =
+        selectedOption.dataset.name || "";
+
+    // Optional: populate mobile & email if you have inputs for them
     document.getElementById("teacher-mobile").value =
         selectedOption.dataset.mobile || "";
 
