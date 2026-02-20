@@ -671,28 +671,50 @@
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
 <!-- Part 2: FEES PORTAL (Subject-Wise Summary) -->
 <!-- Part 2: FEES PORTAL -->
+<!-- Part 2: FEES PORTAL -->
 <div class="card" style="margin-bottom: 30px; border-top-color: #007bff;">
     <h3>2. SUBJECT-WISE FEES PORTAL</h3>
-    <div class="form-grid">
-        <div class="input-group">
-            <label>Month</label>
-            <select id="portal-month" onchange="refreshSubjectWiseSummary()">
-                <option value="">All Months</option>
-                <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option>
-                <option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option>
-                <option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option>
-                <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
-            </select>
+    
+    <!-- NEW HYPERLINK FILTER BOXES -->
+    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; text-align: left;">
+        
+        <!-- MONTH BOX -->
+        <div style="border: 2px solid #000; padding: 15px; border-radius: 10px; background: #f8f9fa;">
+            <p style="margin-bottom: 10px; font-weight: bold; color: #007bff;">Filter by Month: <span id="disp-sel-month" style="color: #ff0000; text-decoration: underline;">All Time</span></p>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 1.1rem;">
+                <a href="javascript:void(0)" onclick="setPortalMonth('')" style="color: #000; font-weight: bold; text-decoration: none;">All</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('01')" style="color: #007bff; text-decoration: none;">Jan</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('02')" style="color: #007bff; text-decoration: none;">Feb</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('03')" style="color: #007bff; text-decoration: none;">Mar</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('04')" style="color: #007bff; text-decoration: none;">Apr</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('05')" style="color: #007bff; text-decoration: none;">May</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('06')" style="color: #007bff; text-decoration: none;">Jun</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('07')" style="color: #007bff; text-decoration: none;">Jul</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('08')" style="color: #007bff; text-decoration: none;">Aug</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('09')" style="color: #007bff; text-decoration: none;">Sep</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('10')" style="color: #007bff; text-decoration: none;">Oct</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('11')" style="color: #007bff; text-decoration: none;">Nov</a>
+                <a href="javascript:void(0)" onclick="setPortalMonth('12')" style="color: #007bff; text-decoration: none;">Dec</a>
+            </div>
         </div>
-        <div class="input-group">
-            <label>Year</label>
-            <select id="portal-year" onchange="refreshSubjectWiseSummary()">
-                <option value="">All Years</option>
-                <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
-            </select>
+
+        <!-- YEAR BOX -->
+        <div style="border: 2px solid #000; padding: 15px; border-radius: 10px; background: #f8f9fa;">
+            <p style="margin-bottom: 10px; font-weight: bold; color: #007bff;">Filter by Year: <span id="disp-sel-year" style="color: #ff0000; text-decoration: underline;">All Time</span></p>
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; font-size: 1.1rem;">
+                <a href="javascript:void(0)" onclick="setPortalYear('')" style="color: #000; font-weight: bold; text-decoration: none;">All</a>
+                <a href="javascript:void(0)" onclick="setPortalYear('2025')" style="color: #007bff; text-decoration: none;">2025</a>
+                <a href="javascript:void(0)" onclick="setPortalYear('2026')" style="color: #007bff; text-decoration: none;">2026</a>
+                <a href="javascript:void(0)" onclick="setPortalYear('2027')" style="color: #007bff; text-decoration: none;">2027</a>
+                <a href="javascript:void(0)" onclick="setPortalYear('2028')" style="color: #007bff; text-decoration: none;">2028</a>
+                <a href="javascript:void(0)" onclick="setPortalYear('2029')" style="color: #007bff; text-decoration: none;">2029</a>
+                <a href="javascript:void(0)" onclick="setPortalYear('2030')" style="color: #007bff; text-decoration: none;">2030</a>
+            </div>
         </div>
+
     </div>
 
+    <!-- TABLE AREA (Unchanged Structure) -->
     <div style="overflow-x: auto; margin-top: 20px;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
             <thead style="background: #f2f2f2;">
@@ -707,6 +729,7 @@
         </table>
     </div>
 
+    <!-- PAGINATION AREA (Unchanged Structure) -->
     <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; align-items: center;">
         <button class="btn-fetch" style="padding: 5px 15px;" onclick="moveSubjectWisePage(-1)">Prev</button>
         <span id="portal-page-info" style="font-weight: bold; color: #000;">Page 1</span>
@@ -5150,90 +5173,111 @@ async function fetchAutoInventory() {
 /* ==========================================
    CLEAN & FINAL: SUBJECT-WISE ANALYTICS ENGINE
    ========================================== */
+/* ==========================================
+   CLEAN & FINAL: SUBJECT-WISE ANALYTICS ENGINE
+   ========================================== */
 let subPortalPage = 1;
-let subPortalData = [];
+let subPortalData =[];
 const subRowsPerPage = 5;
 
-// 1. MAIN FETCH FUNCTION
-// 1. MAIN FETCH FUNCTION
+// Variables to track clicked hyperlinks
+let portalFilterMonth = "";
+let portalFilterYear = "";
+
+// 1. Hyperlink Click Handlers
+function setPortalMonth(m) {
+    portalFilterMonth = m;
+    const monthNames = {"": "All Time", "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec"};
+    document.getElementById('disp-sel-month').innerText = monthNames;
+    refreshSubjectWiseSummary();
+}
+
+function setPortalYear(y) {
+    portalFilterYear = y;
+    document.getElementById('disp-sel-year').innerText = y === "" ? "All Time" : y;
+    refreshSubjectWiseSummary();
+}
+
+// 2. MAIN FETCH FUNCTION
 async function refreshSubjectWiseSummary() {
     if (!sessionInstID) return;
 
-    const mm = document.getElementById('portal-month').value;
-    const yyyy = document.getElementById('portal-year').value;
     const tbody = document.getElementById('portal-table-body');
     
-    // Reset Data & UI
+    // Reset Data & UI instantly so user knows it's loading
     subPortalData =[];
-    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Searching Database...</td></tr>";
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px; font-weight:bold;'>Searching Database...</td></tr>";
 
     try {
-        // 1. Fetch ALL active students for this institute safely
+        // Fetch ALL active students for THIS institute ONLY
         const { data: students, error } = await db.from('students')
             .select('course, total_fees, paid_amount, pending_amount, admission_date')
             .eq('institute_id', sessionInstID)
             .eq('status', 'Active');
+        
+        if (error) throw error;
 
-        if (error) {
-            console.error("Database Error:", error.message);
-            tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; color:red;'>Database Error</td></tr>";
-            return;
-        }
-
-        // 2. Exact Javascript Memory Filtering & Grouping
-        const map = {};
+        // Rock-solid traditional Javascript object to hold the calculations
+        let courseTotals = {};
 
         if (students && students.length > 0) {
-            // Using a standard loop to prevent silent crashes
             for (let i = 0; i < students.length; i++) {
                 let s = students;
 
-                // A. FILTERING LOGIC
-                if (yyyy || mm) {
-                    if (!s.admission_date) continue; // Skip if student has no date but a filter is active
-                    
-                    const stuYear = s.admission_date.substring(0, 4); // Extracts "2026"
-                    const stuMonth = s.admission_date.substring(5, 7); // Extracts "02"
-
-                    if (yyyy && yyyy !== stuYear) continue; // Skip if Year doesn't match
-                    if (mm && mm !== stuMonth) continue;    // Skip if Month doesn't match
+                // Safely slice the date string (Format: YYYY-MM-DD)
+                let stuYear = "";
+                let stuMonth = "";
+                if (s.admission_date && s.admission_date.length >= 10) {
+                    stuYear = s.admission_date.substring(0, 4);
+                    stuMonth = s.admission_date.substring(5, 7);
                 }
 
-                // B. GROUPING LOGIC
-                const subName = s.course || "General/Other";
-                
-                // If this course doesn't exist in our map yet, create it
-                if (!map) {
-                    map = { total: 0, received: 0, pending: 0 };
+                // If user clicked a hyperlink, skip students that don't match
+                if (portalFilterYear !== "" && portalFilterYear !== stuYear) continue;
+                if (portalFilterMonth !== "" && portalFilterMonth !== stuMonth) continue;
+
+                // Group by Course Name
+                let courseName = s.course || "General/Other";
+
+                if (!courseTotals) {
+                    courseTotals = { total: 0, received: 0, pending: 0 };
                 }
-                
-                // Add the values together
-                map.total += parseFloat(s.total_fees) || 0;
-                map.received += parseFloat(s.paid_amount) || 0;
-                map.pending += parseFloat(s.pending_amount) || 0;
+
+                // Safely add the money
+                courseTotals.total += parseFloat(s.total_fees) || 0;
+                courseTotals.received += parseFloat(s.paid_amount) || 0;
+                courseTotals.pending += parseFloat(s.pending_amount) || 0;
             }
         }
 
-        // 3. Convert mapped object to Array & SORT BY RECEIVED (Highest collection on top)
-        subPortalData = Object.entries(map).map(() => ({
-            name: courseName,
-            total: values.total,
-            received: values.received,
-            pending: values.pending
-        })).sort((a, b) => b.received - a.received);
+        // Convert our object into a flat array for the table
+        let keys = Object.keys(courseTotals);
+        for (let i = 0; i < keys.length; i++) {
+            let k = keys;
+            subPortalData.push({
+                name: k,
+                total: courseTotals.total,
+                received: courseTotals.received,
+                pending: courseTotals.pending
+            });
+        }
 
-        // Always reset to page 1 on search
+        // STRICT REQUIREMENT: Sort descending by Fees Received
+        subPortalData.sort(function(a, b) {
+            return b.received - a.received;
+        });
+
+        // Send to your existing render function
         subPortalPage = 1;
-        
-        // 4. Send to your existing rendering function
         renderSubjectWiseTable();
 
     } catch (err) {
-        console.error("Processing Error:", err);
-        tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; color:red;'>Error Processing Data</td></tr>";
+        console.error("Aggregation Error: ", err.message);
+        tbody.innerHTML = `<tr><td colspan='4' style='text-align:center; padding:20px; color:red; font-weight:bold;'>Error: ${err.message}</td></tr>`;
     }
 }
-// 2. RENDERING FUNCTION (Handles 5 rows and "Not Available" message)
+
+// 3. RENDERING FUNCTION (Existing code untouched, works perfectly with new logic)
 function renderSubjectWiseTable() {
     const tbody = document.getElementById('portal-table-body');
     const pageInfo = document.getElementById('portal-page-info');
@@ -5260,7 +5304,7 @@ function renderSubjectWiseTable() {
     pageInfo.innerText = `Page ${subPortalPage} of ${maxPage}`;
 }
 
-// 3. PAGINATION BUTTON LOGIC
+// 4. PAGINATION BUTTON LOGIC (Existing code untouched)
 function moveSubjectWisePage(dir) {
     const maxPage = Math.ceil(subPortalData.length / subRowsPerPage) || 1;
     const target = subPortalPage + dir;
@@ -5270,7 +5314,7 @@ function moveSubjectWisePage(dir) {
     }
 }
 
-// Trigger initial load after a short delay to ensure login session is ready
+// Trigger initial load after a short delay
 setTimeout(refreshSubjectWiseSummary, 2500);
     </script>
 <script>
