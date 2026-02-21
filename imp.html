@@ -484,6 +484,7 @@
 <button class="nav-tab" onclick="showSection('calendar-mod')"><i class="fas fa-calendar-alt"></i> 20. Academic Calendar</button>
 <button class="nav-tab" onclick="showSection('alumni-mod')"><i class="fas fa-user-graduate"></i> 21. Alumni Section</button>
 <button class="nav-tab" onclick="showSection('inventory-mod')"><i class="fas fa-boxes"></i> 22. Inventory Manager</button>
+<button class="nav-tab" onclick="showSection('scholarship-mod')"><i class="fas fa-award"></i> 23. Scholarship Tracker</button>
 
 
         </aside>
@@ -1732,6 +1733,69 @@
 
 
 
+
+
+
+
+<!-- 23. SCHOLARSHIP TRACKER SECTION -->
+<section id="scholarship-mod" class="content-section">
+    <div class="card" style="border-top: 5px solid #f39c12; max-width: 1000px;">
+        <h3><i class="fas fa-award"></i> Scholarship Tracker & Award Generator</h3>
+        
+        <div class="form-grid">
+            <div class="input-group"><label>1. Today's Date</label><input type="date" id="sch-today"></div>
+            
+            <div class="input-group">
+                <label>3. Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="sch-roll" placeholder="IMS-XXXX">
+                    <button class="btn-fetch" onclick="fetchStudentForScholarship()" style="padding: 5px 10px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            
+            <div class="input-group"><label>2. Full Name</label><input type="text" id="sch-name" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>4. Course Name</label><input type="text" id="sch-course" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>6. Total Course Fee (₹)</label><input type="number" id="sch-total-fee" readonly style="background:#eee; font-weight:bold;"></div>
+            
+            <div class="input-group"><label>5. Scholarship Name</label><input type="text" id="sch-sch-name" placeholder="e.g. Talent Search 2026"></div>
+            <div class="input-group"><label>7. Applied On</label><input type="date" id="sch-applied-date"></div>
+            <div class="input-group"><label>8. Documents Required</label><input type="text" id="sch-docs" placeholder="e.g. Income Cert, Marksheet"></div>
+            
+            <div class="input-group">
+                <label>9. Status</label>
+                <select id="sch-status" onchange="calculateScholarship()">
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+            
+            <div class="input-group"><label>10. Scholarship %</label><input type="number" id="sch-pct" value="0" oninput="calculateScholarship()" placeholder="0"></div>
+            <div class="input-group"><label>11. Scholarship Amount (₹)</label><input type="text" id="sch-amt" readonly style="background:#eee; color:#27ae60; font-weight:bold;"></div>
+            <div class="input-group"><label>12. Final Fees (₹)</label><input type="text" id="sch-final-fee" readonly style="background:#eee; color:#ff0000; font-weight:bold;"></div>
+            
+            <div class="input-group"><label>13. Valid From</label><input type="date" id="sch-valid-from"></div>
+            <div class="input-group"><label>14. Valid To</label><input type="date" id="sch-valid-to"></div>
+            <div class="input-group" style="grid-column: 1/-1;"><label>15. Remarks</label><input type="text" id="sch-remarks" placeholder="Reasons for rejection / Applied on total fee, etc."></div>
+            
+            <div class="input-group" style="grid-column: 1/-1; border: 2px dashed #007bff; padding: 10px; border-radius: 8px;">
+                <label>Upload Student Documents (Optional)</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="file" id="sch-upload" accept=".pdf, .jpg, .png">
+                    <button class="btn-add" style="background:#1877F2; padding: 8px 15px;" onclick="uploadScholarshipDoc()"><i class="fas fa-upload"></i> UPLOAD</button>
+                    <span id="sch-upload-status" style="font-size: 0.8rem; color: #27ae60; font-weight: bold;"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-row" style="margin-top: 25px;">
+            <button class="btn-add" onclick="addScholarship()">ADD RECORD</button>
+            <button class="btn-fetch" onclick="fetchScholarshipByRoll()">FETCH (Roll No)</button>
+            <button class="btn-edit" onclick="updateScholarship()">UPDATE (Roll No)</button>
+            <button class="btn-add" style="background:#673ab7;" onclick="printScholarship()"><i class="fas fa-print"></i> PRINT AWARD LETTER</button>
+        </div>
+    </div>
+</section>
         </main>
     </div>
 
@@ -5444,7 +5508,245 @@ async function fetchAutoInventory() {
 
 
 
+/* ==========================================
+   23. SCHOLARSHIP TRACKER LOGIC
+   ========================================== */
 
+// 1. Set Today's Date on Load
+document.addEventListener('DOMContentLoaded', () => {
+    const schToday = document.getElementById('sch-today');
+    if(schToday) schToday.value = new Date().toISOString().split('T')[0];
+});
+
+// 2. Fetch Base Student Details
+async function fetchStudentForScholarship() {
+    const roll = document.getElementById('sch-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter Roll Number first.");
+
+    const { data, error } = await db.from('students')
+        .select('full_name, course, total_fees')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (error || !data) return alert("Student not found. Ensure Roll No is correct.");
+
+    document.getElementById('sch-name').value = data.full_name;
+    document.getElementById('sch-course').value = data.course;
+    document.getElementById('sch-total-fee').value = data.total_fees || 0;
+    
+    calculateScholarship(); // Initialize calculations
+}
+
+// 3. Dynamic Calculation Engine
+function calculateScholarship() {
+    const status = document.getElementById('sch-status').value;
+    const totalFee = parseFloat(document.getElementById('sch-total-fee').value) || 0;
+    const pctInput = document.getElementById('sch-pct');
+    const validFrom = document.getElementById('sch-valid-from');
+    const validTo = document.getElementById('sch-valid-to');
+
+    if (status === 'Approved') {
+        pctInput.readOnly = false;
+        validFrom.disabled = false;
+        validTo.disabled = false;
+        
+        const pct = parseFloat(pctInput.value) || 0;
+        const schAmount = (totalFee * pct) / 100;
+        const finalFee = totalFee - schAmount;
+
+        document.getElementById('sch-amt').value = schAmount.toFixed(2);
+        document.getElementById('sch-final-fee').value = finalFee.toFixed(2);
+    } else {
+        // If Pending or Rejected
+        pctInput.value = 0;
+        pctInput.readOnly = true;
+        validFrom.value = "";
+        validTo.value = "";
+        validFrom.disabled = true;
+        validTo.disabled = true;
+
+        document.getElementById('sch-amt').value = "NA";
+        document.getElementById('sch-final-fee').value = totalFee.toFixed(2);
+    }
+}
+
+// 4. File Upload (Supabase Storage)
+let uploadedDocUrl = "";
+async function uploadScholarshipDoc() {
+    const fileInput = document.getElementById('sch-upload');
+    const roll = document.getElementById('sch-roll').value.trim().toUpperCase();
+    
+    if(!roll) return alert("Enter Roll Number before uploading.");
+    if(fileInput.files.length === 0) return alert("Select a file first.");
+
+    const file = fileInput.files[0];
+    const filePath = `${sessionInstID}/${roll}_${file.name}`;
+    
+    document.getElementById('sch-upload-status').innerText = "Uploading...";
+
+    const { data, error } = await db.storage.from('scholarship_docs').upload(filePath, file, { upsert: true });
+    
+    if(error) {
+        document.getElementById('sch-upload-status').innerText = "Upload Failed!";
+        alert("Upload Error: " + error.message);
+    } else {
+        const { data: publicUrlData } = db.storage.from('scholarship_docs').getPublicUrl(filePath);
+        uploadedDocUrl = publicUrlData.publicUrl;
+        document.getElementById('sch-upload-status').innerText = "File Uploaded Successfully ✓";
+    }
+}
+
+// 5. Build Data Object
+function getScholarshipData() {
+    return {
+        institute_id: sessionInstID,
+        roll_number: document.getElementById('sch-roll').value.trim().toUpperCase(),
+        student_name: document.getElementById('sch-name').value,
+        course_name: document.getElementById('sch-course').value,
+        total_course_fee: parseFloat(document.getElementById('sch-total-fee').value) || 0,
+        scholarship_name: document.getElementById('sch-sch-name').value,
+        applied_on: document.getElementById('sch-applied-date').value,
+        docs_required: document.getElementById('sch-docs').value,
+        status: document.getElementById('sch-status').value,
+        scholarship_pct: parseFloat(document.getElementById('sch-pct').value) || 0,
+        scholarship_amount: parseFloat(document.getElementById('sch-amt').value) || 0,
+        final_fees: parseFloat(document.getElementById('sch-final-fee').value) || 0,
+        valid_from: document.getElementById('sch-valid-from').value || null,
+        valid_to: document.getElementById('sch-valid-to').value || null,
+        remarks: document.getElementById('sch-remarks').value,
+        document_url: uploadedDocUrl
+    };
+}
+
+// 6. ADD Record
+async function addScholarship() {
+    const data = getScholarshipData();
+    if (!data.roll_number || !data.scholarship_name) return alert("Roll Number and Scholarship Name are required.");
+
+    const { error } = await db.from('scholarships').insert([data]);
+    
+    if (error) {
+        if (error.code === '23505') alert("Error: A scholarship record already exists for this Roll Number. Use UPDATE instead.");
+        else alert("Save Error: " + error.message);
+    } else {
+        alert("Success: Scholarship Record Added!");
+    }
+}
+
+// 7. FETCH Record
+async function fetchScholarshipByRoll() {
+    const roll = prompt("Enter Roll Number to fetch Scholarship Record:");
+    if(!roll) return;
+
+    const { data, error } = await db.from('scholarships')
+        .select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).maybeSingle();
+
+    if(error || !data) return alert("No scholarship record found for this student.");
+
+    document.getElementById('sch-roll').value = data.roll_number;
+    document.getElementById('sch-name').value = data.student_name;
+    document.getElementById('sch-course').value = data.course_name;
+    document.getElementById('sch-total-fee').value = data.total_course_fee;
+    document.getElementById('sch-sch-name').value = data.scholarship_name;
+    document.getElementById('sch-applied-date').value = data.applied_on;
+    document.getElementById('sch-docs').value = data.docs_required;
+    document.getElementById('sch-status').value = data.status;
+    document.getElementById('sch-pct').value = data.scholarship_pct;
+    document.getElementById('sch-valid-from').value = data.valid_from || "";
+    document.getElementById('sch-valid-to').value = data.valid_to || "";
+    document.getElementById('sch-remarks').value = data.remarks;
+    
+    if(data.document_url) {
+        document.getElementById('sch-upload-status').innerHTML = `<a href="${data.document_url}" target="_blank">View Saved Document</a>`;
+    }
+    
+    calculateScholarship();
+    alert("Record Loaded Successfully.");
+}
+
+// 8. UPDATE Record
+async function updateScholarship() {
+    const data = getScholarshipData();
+    if (!data.roll_number) return alert("Fetch a record first before updating.");
+
+    const { error } = await db.from('scholarships')
+        .update(data)
+        .eq('roll_number', data.roll_number)
+        .eq('institute_id', sessionInstID);
+
+    if (error) alert("Update Error: " + error.message);
+    else alert("Success: Scholarship Record Updated!");
+}
+
+// 9. PRINT Award Letter
+function printScholarship() {
+    const status = document.getElementById('sch-status').value;
+    if(status !== 'Approved') return alert("Award letters can only be printed for 'Approved' scholarships.");
+
+    const name = document.getElementById('sch-name').value;
+    const roll = document.getElementById('sch-roll').value;
+    const schName = document.getElementById('sch-sch-name').value;
+    const schAmt = document.getElementById('sch-amt').value;
+    const course = document.getElementById('sch-course').value;
+    const date = new Date().toLocaleDateString('en-GB');
+
+    const html = `
+    <html>
+        <head>
+            <title>Scholarship Award - ${roll}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+            <style>
+                body { margin: 0; padding: 40px; display: flex; justify-content: center; background: #fff; }
+                .cert-container { width: 800px; padding: 40px; border: 10px double #f39c12; font-family: 'Poppins', sans-serif; text-align: center; position: relative; }
+                .logo { width: 80px; position: absolute; top: 30px; left: 30px; }
+                .title { color: #f39c12; font-size: 40px; font-weight: 800; margin-bottom: 5px; text-transform: uppercase; }
+                .sub-title { font-size: 20px; letter-spacing: 3px; color: #555; margin-bottom: 40px; }
+                .content { font-size: 18px; line-height: 1.8; color: #333; }
+                .highlight { font-size: 26px; color: #d35400; font-weight: bold; border-bottom: 2px solid #ccc; padding: 0 20px; display: inline-block; margin: 15px 0; }
+                .amount { font-size: 35px; color: #27ae60; font-weight: bold; margin: 20px 0; }
+                .footer { margin-top: 80px; display: flex; justify-content: space-between; padding: 0 40px; }
+                .sign-line { border-top: 2px solid #333; width: 200px; padding-top: 5px; font-weight: bold; }
+                @media print { @page { size: landscape; } body { padding: 0; } }
+            </style>
+        </head>
+        <body onload="window.print(); window.close();">
+            <div class="cert-container">
+                <img src="icon-192x192.png" class="logo" alt="Logo">
+                <div class="title">OFFICIAL AWARD LETTER</div>
+                <div class="sub-title">SCHOLARSHIP & FINANCIAL AID</div>
+                
+                <div class="content">
+                    This is to officially certify and congratulate<br>
+                    <span class="highlight">${name}</span><br>
+                    (Roll Number: <b>${roll}</b>)<br><br>
+                    For demonstrating outstanding merit and being selected for the<br>
+                    <b>${schName}</b> for the <b>${course}</b> program.<br>
+                    
+                    <div class="amount">Award Amount: ₹ ${schAmt}</div>
+                    
+                    This scholarship amount has been applied directly to your academic fees. <br>
+                    We wish you continued excellence in your academic journey!
+                </div>
+                
+                <div class="footer">
+                    <div>
+                        <p style="margin-bottom: 40px;">Date: <b>${date}</b></p>
+                        <div class="sign-line">Institute Seal</div>
+                    </div>
+                    <div>
+                        <p style="margin-bottom: 40px;"><br></p>
+                        <div class="sign-line">Authorized Signatory</div>
+                    </div>
+                </div>
+            </div>
+        </body>
+    </html>`;
+
+    const win = window.open('', '_blank', 'width=1000,height=750');
+    win.document.write(html);
+    win.document.close();
+}
 
 
 
