@@ -3554,7 +3554,7 @@ async function updateTeacherAvailability(teacherId, instituteId) {
             .from('teacher_details')
             .update({ daily_availability: availabilityDate })
             .eq('id', teacherId)
-            .eq('institute_id', instituteId);
+            .eq('institute_id', sessionInstID);
 
         // 3. Handle response
         if (error) {
