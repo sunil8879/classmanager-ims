@@ -683,7 +683,7 @@ async function bookSlot(day, time, cellId) {
     if (!teacherId) return alert("Please select a teacher.");
     if (!dateVal) return alert("Please select booking date.");
 
-    // 🔴 Past date check
+    // 🔴 Past date check (Prevents booking for yesterday)
     const selectedDate = new Date(dateVal);
     const today = new Date();
     today.setHours(0,0,0,0); // ignore time
@@ -698,55 +698,11 @@ async function bookSlot(day, time, cellId) {
     const allowedSlots = selectedOption.dataset.timeslots || "";
     const availStatus = selectedOption.dataset.availability || "No";
 
+    // If the teacher said "No" to availability OR the specific time clicked is not in their allowed list
     if (availStatus !== "Yes" || !allowedSlots.includes(time)) {
         return alert("BOOKING NOT AVAILABLE FOR THIS TIME SLOT.");
     }
 
-    // ============================================
-    // 🚨 RULE 2: 24-HOUR MAX & 4-HOUR MIN ENFORCEMENT
-    // ============================================
-  // ============================================
-    // 🚨 RULE 2: 24-HOUR MAX & 4-HOUR MIN ENFORCEMENT
-    // ============================================
-    
-    // 1. Safely parse the Date to avoid UTC timezone bugs
-    const [year, month, dayNum] = dateVal.split('-');
-    const targetDateTime = new Date(year, month - 1, dayNum);
-
-    // 2. Validate that the column they clicked matches the Date they selected
-    const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-    const actualDayOfWeek = dayNames[targetDateTime.getDay()];
-    
-    if (day.toUpperCase() !== actualDayOfWeek) {
-        return alert(`DATE MISMATCH ERROR:\nYou selected ${dateVal} in the calendar, which is a ${actualDayOfWeek}.\n\nYou must click the BOOK button under the ${actualDayOfWeek} column!`);
-    }
-
-    // 3. Extract exact time and add it to the date object
-    const startTimeStr = time.split(" to ")[0];
-    const match = startTimeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    
-    if (match) {
-        let hours = parseInt(match[1], 10);
-        const mins = parseInt(match[2], 10);
-        const ampm = match[3].toUpperCase();
-        if (ampm === 'PM' && hours < 12) hours += 12;
-        if (ampm === 'AM' && hours === 12) hours = 0;
-        targetDateTime.setHours(hours, mins, 0, 0);
-    }
-
-    // 4. Calculate exact difference from right NOW
-    const now = new Date();
-    const diffMs = targetDateTime.getTime() - now.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
-
-    // 5. Apply the 4 to 24-hour rule
-    if (diffHours < 4 || diffHours > 24) {
-        let timeMsg = diffHours < 0 
-            ? "That time slot is in the past!" 
-            : `That slot is ${diffHours.toFixed(1)} hours away.`;
-            
-        return alert(`NO BOOKING ALLOWED AT THIS TIME.\n\n${timeMsg}\n(Bookings must be made exactly between 4 to 24 hours in advance).`);
-    }
     // 3️⃣ Auth Check
     if (!sessionInstID) {
         const isAuth = await authenticateForBooking();
@@ -766,7 +722,7 @@ async function bookSlot(day, time, cellId) {
         return alert("You cannot book this teacher more than 3 times in a day.");
     }
 
-    // 4️⃣ Check if teacher is already booked at this time
+    // 4️⃣ Check if teacher is already booked at this time by someone else
     const { data: existingBooking } = await db
         .from("class_bookings")
         .select("id")
@@ -814,7 +770,6 @@ async function bookSlot(day, time, cellId) {
 
     alert("Booking saved successfully and teacher notified via WhatsApp.");
 }
-
         function closeModal() {
             document.getElementById('confirm-modal').style.display = 'none';
         }
