@@ -675,78 +675,24 @@ async function bookSlot(day, time, cellId) {
     const course = document.getElementById('f-course').value;
     const teacherSelect = document.getElementById("f-teacher");
     const teacherId = teacherSelect.value;
-
     const dateVal = document.getElementById('f-date').value;
 
-    // 2️⃣ Validation
-// 2️⃣ Validation
-if (!roll || !student) return alert("Please enter and fetch student details.");
-if (!course) return alert("Please select a course.");
-if (!teacherId) return alert("Please select a teacher.");
-if (!dateVal) return alert("Please select booking date.");
+    // 2️⃣ Standard Form Validation
+    if (!roll || !student) return alert("Please enter and fetch student details.");
+    if (!course) return alert("Please select a course.");
+    if (!teacherId) return alert("Please select a teacher.");
+    if (!dateVal) return alert("Please select booking date.");
 
-// 🔴 Past date check
-const selectedDate = new Date(dateVal);
-const today = new Date();
-today.setHours(0,0,0,0); // ignore time
-if (selectedDate < today) {
-    return alert("Booking date cannot be in the past.");
-}
-    if (!sessionInstID) {
-        const isAuth = await authenticateForBooking();
-        if (!isAuth) return;
+    // 🔴 Past date check
+    const selectedDate = new Date(dateVal);
+    const today = new Date();
+    today.setHours(0,0,0,0); // ignore time
+    if (selectedDate < today) {
+        return alert("Booking date cannot be in the past.");
     }
 
-// 🔵 Check if student has already booked this teacher 3 times today
-const { data: existingStudentBookings } = await db
-    .from("class_bookings")
-    .select("id")
-    .eq("institute_id", sessionInstID)
-    .eq("teacher_id", teacherId)
-    .eq("student_roll", roll)
-    .eq("booking_date", dateVal);
-
-if (existingStudentBookings.length >= 3) {
-    return alert("You cannot book this teacher more than 3 times in a day.");
-}
-
-    // 3️⃣ Check if teacher is already booked at this time
-    const { data: existingBooking } = await db
-        .from("class_bookings")
-        .select("id")
-        .eq("institute_id", sessionInstID)
-        .eq("teacher_id", teacherId)
-        .eq("booking_date", dateVal)
-        .eq("time_slot", time)
-        .maybeSingle();
-
-    if (existingBooking) return alert("This teacher is already booked in this time slot.");
-
-    // 4️⃣ Insert booking into Supabase
-    const { data: bookingData, error: insertError } = await db
-        .from("class_bookings")
-        .insert({
-            institute_id: sessionInstID,
-            teacher_id: teacherId,
-            student_roll: roll,
-            booking_date: dateVal,
-            time_slot: time,
-            course: course
-        
-        })
-        .select()
-        .single();
-
-    if (insertError) return alert("Error saving booking: " + insertError.message);
-
-
-
-
-
-
-
-// ============================================
-    // RULE 1: STRICT AVAILABILITY ENFORCEMENT
+    // ============================================
+    // 🚨 RULE 1: STRICT AVAILABILITY ENFORCEMENT
     // ============================================
     const selectedOption = teacherSelect.options[teacherSelect.selectedIndex];
     const allowedSlots = selectedOption.dataset.timeslots || "";
@@ -757,9 +703,8 @@ if (existingStudentBookings.length >= 3) {
     }
 
     // ============================================
-    // RULE 2: 24-HOUR MAX & 4-HOUR MIN ENFORCEMENT
+    // 🚨 RULE 2: 24-HOUR MAX & 4-HOUR MIN ENFORCEMENT
     // ============================================
-    // Parse the start time out of the string (e.g. "09:00 AM" out of "09:00 AM to 10:00 AM")
     const startTimeStr = time.split(" to ")[0];
     const targetDateTime = new Date(dateVal);
 
@@ -783,10 +728,54 @@ if (existingStudentBookings.length >= 3) {
         return alert("NO BOOKING ALLOWED AT THIS TIME. (Bookings must be made between 4 to 24 hours in advance).");
     }
 
+    // 3️⃣ Auth Check
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
 
+    // 🔵 Check if student has already booked this teacher 3 times today
+    const { data: existingStudentBookings } = await db
+        .from("class_bookings")
+        .select("id")
+        .eq("institute_id", sessionInstID)
+        .eq("teacher_id", teacherId)
+        .eq("student_roll", roll)
+        .eq("booking_date", dateVal);
 
+    if (existingStudentBookings.length >= 3) {
+        return alert("You cannot book this teacher more than 3 times in a day.");
+    }
 
-    // 5️⃣ Update the timetable cell visually
+    // 4️⃣ Check if teacher is already booked at this time
+    const { data: existingBooking } = await db
+        .from("class_bookings")
+        .select("id")
+        .eq("institute_id", sessionInstID)
+        .eq("teacher_id", teacherId)
+        .eq("booking_date", dateVal)
+        .eq("time_slot", time)
+        .maybeSingle();
+
+    if (existingBooking) return alert("This teacher is already booked in this time slot.");
+
+    // 5️⃣ Insert booking into Supabase (ONLY happens if all rules passed!)
+    const { data: bookingData, error: insertError } = await db
+        .from("class_bookings")
+        .insert({
+            institute_id: sessionInstID,
+            teacher_id: teacherId,
+            student_roll: roll,
+            booking_date: dateVal,
+            time_slot: time,
+            course: course
+        })
+        .select()
+        .single();
+
+    if (insertError) return alert("Error saving booking: " + insertError.message);
+
+    // 6️⃣ Update the timetable cell visually
     const teacherName = teacherSelect.selectedOptions[0].dataset.name || '';
     const cell = document.getElementById(cellId);
     cell.innerHTML = `
@@ -795,25 +784,18 @@ if (existingStudentBookings.length >= 3) {
         <div class="booked-tag tag-course">Course: ${course}</div>
     `;
 
-    // 6️⃣ ✅ WhatsApp Notification to teacher
-    const teacherPhone = teacherSelect.selectedOptions[0].dataset.mobile; // include country code, e.g., 91XXXXXXXXXX
+    // 7️⃣ WhatsApp Notification to teacher
+    const teacherPhone = teacherSelect.selectedOptions[0].dataset.mobile; 
     if (teacherPhone) {
-        const message = `
-📚 New Class Booking
-
-Student: ${student}
-Course: ${course}
-Date: ${dateVal}
-Time: ${time}
-Booking ID: ${bookingData.id}
-        `;
+        const message = `📚 New Class Booking\n\nStudent: ${student}\nCourse: ${course}\nDate: ${dateVal}\nTime: ${time}\nBooking ID: ${bookingData.id}`;
         const encodedMessage = encodeURIComponent(message);
         const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
-        window.open(whatsappURL, "_blank"); // opens WhatsApp Web or app
+        window.open(whatsappURL, "_blank"); 
     }
 
     alert("Booking saved successfully and teacher notified via WhatsApp.");
 }
+
         function closeModal() {
             document.getElementById('confirm-modal').style.display = 'none';
         }
@@ -846,7 +828,6 @@ async function authenticateForBooking() {
 
 
 async function populateTeachersBySubject(selectedCourse) {
-
     const teacherSelect = document.getElementById("f-teacher");
     teacherSelect.innerHTML = '<option value="">Loading...</option>';
 
@@ -855,9 +836,10 @@ async function populateTeachersBySubject(selectedCourse) {
         if (!isAuth) return;
     }
 
+    // UPDATED: Added availability and time_of_slot to the select query
     const { data, error } = await db
         .from("teacher_details")
-     .select("id, teacher_name, mobile, email, experience, rating, availability, time_of_slot")
+        .select("id, teacher_name, mobile, email, experience, rating, availability, time_of_slot") 
         .eq("institute_id", sessionInstID)
         .eq("subject_taught", selectedCourse);
 
@@ -877,58 +859,53 @@ async function populateTeachersBySubject(selectedCourse) {
     data.sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
     data.forEach(teacher => {
-
         const option = document.createElement("option");
-
         option.value = teacher.id;
+        option.textContent = `${teacher.teacher_name} (${teacher.experience || 0} yrs exp) ⭐ ${teacher.rating || 'N/A'}`;
 
-        option.textContent =
-            `${teacher.teacher_name} (${teacher.experience || 0} yrs exp) ⭐ ${teacher.rating || 'N/A'}`;
-
+        // Store data in the HTML option element so we can grab it instantly when clicked
         option.dataset.name = teacher.teacher_name;
-        option.dataset.mobile = teacher.mobile;
-        option.dataset.email = teacher.email;
-option.dataset.availability = teacher.availability; // <-- ADD THIS
-option.dataset.timeslots = teacher.time_of_slot; 
+        option.dataset.mobile = teacher.mobile || "";
+        option.dataset.email = teacher.email || "";
+        option.dataset.availability = teacher.availability || "No";
+        option.dataset.timeslots = teacher.time_of_slot || "";
 
         teacherSelect.appendChild(option);
     });
 }
 
+
+
+
+
+
+
 document.getElementById("f-teacher").addEventListener("change", function () {
     const selectedOption = this.options[this.selectedIndex];
+    const slotsInput = document.getElementById("f-teacher-available-slots");
 
+    // If the user selects the default "Select Teacher" placeholder
     if (!this.value) {
         document.getElementById("f-teacher-name").value = "";
-        document.getElementById("teacher-mobile").value = "";
-        document.getElementById("teacher-email").value = "";
+        if (slotsInput) slotsInput.value = "";
         return;
     }
 
-    // ✅ Populate teacher name
-    document.getElementById("f-teacher-name").value =
-        selectedOption.dataset.name || "";
+    // 1. Auto-populate teacher name
+    document.getElementById("f-teacher-name").value = selectedOption.dataset.name || "";
 
-    // Optional: populate mobile & email if you have inputs for them
-    document.getElementById("teacher-mobile").value =
-        selectedOption.dataset.mobile || "";
-
-    document.getElementById("teacher-email").value =
-        selectedOption.dataset.email || "";
-
-
-
-// Autopopulate Available Slots Field
-    const slotsStr = selectedOption.dataset.timeslots || "";
-    const avail = selectedOption.dataset.availability || "No";
-    if (avail === "Yes" && slotsStr) {
-        document.getElementById("f-teacher-available-slots").value = slotsStr;
-    } else {
-        document.getElementById("f-teacher-available-slots").value = "Teacher Not Available / No Slots Set";
+    // 2. Auto-populate available slots instantly
+    if (slotsInput) {
+        const avail = selectedOption.dataset.availability;
+        const slotsStr = selectedOption.dataset.timeslots;
+        
+        if (avail === "Yes" && slotsStr && slotsStr.trim() !== "") {
+            slotsInput.value = slotsStr;
+        } else {
+            slotsInput.value = "Teacher Not Available / No Slots Set";
+        }
     }
 });
-
-
 
 
 
