@@ -401,6 +401,14 @@ input[readonly] {
                 <input type="date" id="f-date">
             </div>
 
+
+<div class="input-group">
+    <label>Availability Status</label>
+    <input type="date" id="availability-status" placeholder="Select Availability Date">
+</div>
+
+
+
             <!-- 7. Time Slot -->
             <div class="input-group">
                 <label>7. Preferred Time Slot</label>
@@ -850,6 +858,47 @@ document.getElementById("f-teacher").addEventListener("change", function () {
     document.getElementById("teacher-email").value =
         selectedOption.dataset.email || "";
 });
+
+
+
+
+
+async function validateBookingTime(teacherId, scheduledTime) {
+    // Fetch teacher availability from Supabase
+    const { data: teacher, error } = await supabase
+        .from('teacher_details')
+        .select('daily_availability')
+        .eq('teacher_id', teacherId)
+        .single();
+
+    if (error || !teacher || !teacher.daily_availability) {
+        alert("Teacher is not available on the selected date.");
+        return false;
+    }
+
+    const availDate = new Date(teacher.daily_availability);
+    const bookingDate = new Date(scheduledTime);
+
+    // Compare dates only (ignore time)
+    if (bookingDate.toDateString() !== availDate.toDateString()) {
+        alert("Booking is not on teacher's available date.");
+        return false;
+    }
+
+    // Check 2–4 hours before scheduled time
+    const now = new Date();
+    const diffHours = (bookingDate - now) / (1000 * 60 * 60);
+
+    if (diffHours < 2 || diffHours > 4) {
+        alert("Booking must be at least 2 hours and at most 4 hours before the scheduled time.");
+        return false;
+    }
+
+    return true;
+}
+
+
+
 
 
 

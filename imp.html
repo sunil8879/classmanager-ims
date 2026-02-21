@@ -1106,6 +1106,16 @@
         <option value="Inactive">Inactive</option>
     </select>
 </div>
+
+
+
+<div class="input-group">
+    <label>Daily Availability</label>
+    <input type="date" id="tch-daily-availability">
+</div>
+
+
+
 <!-- END OF NEW TEACHER FIELDS -->
 <div class="input-group" style="grid-column: 1 / -1; width: 100%; max-width: 350px; margin: 15px auto 0; text-align: center;">
     <label style="display: block; margin-bottom: 5px; color: #000; font-weight: bold;">WhatsApp Mobile Number</label>
@@ -3516,6 +3526,28 @@ document.getElementById('tch-gender').value = data.gender || "";
 
     alert("Details Loaded for " + data.teacher_name);
 }
+
+
+
+async function updateTeacherAvailability(teacherId) {
+    const availabilityDate = document.getElementById('tch-daily-availability').value;
+
+    const { data, error } = await supabase
+        .from('teacher_details')
+        .update({ daily_availability: availabilityDate || null })
+        .eq('teacher_id', teacherId);
+
+    if (error) {
+        console.error("Error updating availability:", error);
+        alert("Failed to save availability!");
+    } else {
+        alert("Daily availability updated successfully!");
+    }
+}
+
+
+
+
 
 // 5. EDIT TEACHER
 async function editTeacher() {
