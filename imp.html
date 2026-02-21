@@ -1873,6 +1873,7 @@
             
             <div class="button-row" style="margin-top: 20px;">
                 <button class="btn-add" style="background:#e84393; border-color:#d63031;" onclick="addPTMRecord()">ADD PTM RECORD</button>
+<button class="btn-fetch" onclick="fetchPTMRecordByRoll()">FETCH PTM RECORD</button>
             </div>
         </div>
     </div>
@@ -6053,6 +6054,58 @@ async function addPTMRecord() {
     } else {
         alert(`Success! Slot ${data.slot_time} booked for ${data.student_name}. You can now use the WhatsApp buttons to inform everyone.`);
     }
+}
+
+
+
+
+
+// Fetch Existing PTM Record by Roll Number
+async function fetchPTMRecordByRoll() {
+    const roll = prompt("Enter Student Roll Number to fetch PTM record:");
+    if (!roll) return;
+
+    const ptmMonth = document.getElementById('ptm-month').value;
+    if (!ptmMonth) return alert("Please select the Month & Year in Step 1 first.");
+    
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const { data, error } = await db.from('ptm_schedule')
+        .select('*')
+        .eq('roll_number', roll.toUpperCase())
+        .eq('month_year', monthYearStr)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (error || !data) return alert("No PTM record found for this student in " + monthYearStr + ".");
+
+    // Populate UI Step 1 (Config)
+    document.getElementById('ptm-date').value = data.ptm_date;
+    document.getElementById('ptm-start').value = data.start_time;
+    document.getElementById('ptm-end').value = data.end_time;
+    document.getElementById('ptm-duration').value = data.slot_duration;
+    document.getElementById('ptm-status').value = data.status;
+
+    // Populate UI Step 2 (Booking & Details)
+    document.getElementById('ptm-roll').value = data.roll_number;
+    document.getElementById('ptm-sname').value = data.student_name;
+    document.getElementById('ptm-course').value = data.course_name;
+    document.getElementById('ptm-tid').value = data.teacher_id;
+    document.getElementById('ptm-tname').value = data.teacher_name;
+    document.getElementById('ptm-slot-time').value = data.slot_time;
+    document.getElementById('ptm-tmob').value = data.teacher_mobile || "";
+    document.getElementById('ptm-mmob').value = data.mother_mobile || "";
+    document.getElementById('ptm-fmob').value = data.father_mobile || "";
+    document.getElementById('ptm-remarks').value = data.remarks || "";
+
+    // Reactivate WhatsApp communication buttons
+    generatePTMWhatsAppLinks(
+        data.month_year, data.ptm_date, data.start_time, data.end_time, 
+        data.slot_time, data.teacher_name, data.teacher_mobile, 
+        data.mother_mobile, data.father_mobile
+    );
+
+    alert("PTM Record for " + data.student_name + " loaded successfully!");
 }
     </script>
 <script>
