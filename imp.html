@@ -740,12 +740,6 @@
             <button class="btn-fetch" onclick="fetchBatch()">FETCH (by Name)</button>
         </div>
     </div>
-<div id="batch-time-table" style="margin-top:20px; border-top:1px solid #ccc; padding-top:10px;">
-        <h3>Time Table Planner</h3>
-        <input type="text" id="roll-number" placeholder="Enter Roll Number">
-        <button id="fetch-btn">Fetch Time Table</button>
-        <div id="timetable-result" style="margin-top:10px;"></div>
-    </div>
 </section>
 
 <!-- 5. ATTENDANCE -->
@@ -5133,28 +5127,6 @@ async function fetchAutoInventory() {
 
 
 
-
-document.getElementById('fetch-btn').addEventListener('click', fetchTimeTable);
-document.getElementById('roll-number').addEventListener('keypress', function(e){
-    if(e.key === 'Enter') fetchTimeTable();
-});
-
-function fetchTimeTable() {
-    const roll = document.getElementById('roll-number').value.trim();
-    if(!roll){
-        alert("Please enter Roll Number");
-        return;
-    }
-
-    // Example timetable data
-    const sampleTimetable = {
-        "101": "Math 9AM, English 10AM, Physics 11AM",
-        "102": "Science 9AM, History 10AM, Art 11AM"
-    };
-
-    const result = sampleTimetable[roll];
-    document.getElementById('timetable-result').innerHTML = result ? result : "No timetable found for Roll " + roll;
-}
 
 
 
