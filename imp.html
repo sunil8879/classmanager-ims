@@ -1112,8 +1112,10 @@
 <div class="input-group">
     <label>Daily Availability</label>
     <input type="date" id="tch-daily-availability">
+    <button type="button" onclick="updateTeacherAvailability('TCH-1907', 'INST-123')">
+        Save Availability
+    </button>
 </div>
-<button type="button" onclick="updateTeacherAvailability('TCH-1907', 'INS-001')">Save Daily Availability</button>
 
 
 
@@ -1739,7 +1741,7 @@
             <p>2026 ClassManager. All rights Reserved</p>
         </div>
     </footer>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.32.0/dist/supabase.min.js"></script>
+
 
 <script>
 
@@ -3539,32 +3541,40 @@ document.getElementById('tch-gender').value = data.gender || "";
 
 
 
- async function updateTeacherAvailability(teacherId, instituteId) {
-      try {
-          const availabilityDate = document.getElementById('tch-daily-availability').value;
+async function updateTeacherAvailability(teacherId, instituteId) {
+    try {
+        const availabilityDate = document.getElementById('tch-daily-availability').value;
 
-          if (!availabilityDate) {
-              alert("Please select a date!");
-              return;
-          }
+        if (!availabilityDate) {
+            alert("Please select a date!");
+            return;
+        }
 
-          const { data, error } = await supabase
-              .from('teacher_details')
-              .update({ daily_availability: availabilityDate })
-              .eq('teacher_id', teacherId)
-              .eq('institute_id', instituteId);
+        // Update teacher's daily availability in Supabase
+        const { data, error } = await supabase
+            .from('teacher_details')
+            .update({ daily_availability: availabilityDate })
+            .eq('teacher_id', teacherId)
+            .eq('institute_id', instituteId);
 
-          if (error) {
-              console.error("Supabase error:", error);
-              alert("Something went wrong! Check console for details.");
-          } else {
-              alert("Daily availability updated successfully!");
-          }
-      } catch (err) {
-          console.error("Unexpected error:", err);
-          alert("Something went wrong! Check console for details.");
-      }
-  }
+        if (error) {
+            console.error("Supabase error:", error);
+            alert("Something went wrong! Check console for details.");
+        } else {
+            alert("Daily availability updated successfully!");
+        }
+    } catch (err) {
+        console.error("Unexpected error:", err);
+        alert("Something went wrong! Check console for details.");
+    }
+}
+
+
+
+
+
+
+
 
 // 5. EDIT TEACHER
 async function editTeacher() {
