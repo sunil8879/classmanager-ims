@@ -460,9 +460,7 @@
 <button class="nav-tab" onclick="showSection('calendar-mod')"><i class="fas fa-calendar-alt"></i> Academic Calendar</button>
 <button class="nav-tab" onclick="showSection('alumni-mod')"><i class="fas fa-user-graduate"></i> Alumni Section</button>
 <button class="nav-tab" onclick="showSection('inventory-mod')"><i class="fas fa-boxes"></i> Inventory Manager</button>
-<button class="nav-tab" onclick="showSection('time-table')">
-    <i class="fas fa-calendar"></i> Time Table Planner
-</button>
+
 
         </aside>
 
@@ -741,6 +739,10 @@
             <button class="btn-add" onclick="addBatch()">ADD Batch</button>
             <button class="btn-fetch" onclick="fetchBatch()">FETCH (by Name)</button>
         </div>
+<div style="margin-top: 20px;">
+        <h3>Time Table Planner</h3>
+        <iframe src="time_table.html" style="width:100%; height:600px; border:none;"></iframe>
+    </div>
     </div>
 </section>
 
@@ -1658,9 +1660,7 @@
     </div>
 </section>
 
-<section id="time-table" class="content-section" style="display:none;">
-    <iframe src="time_table.html" style="width:100%; height:600px; border:none;"></iframe>
-</section>
+
 
         </main>
     </div>
