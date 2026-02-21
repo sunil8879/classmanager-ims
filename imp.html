@@ -5519,28 +5519,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 2. Fetch Base Student Details
+// 2. Fetch Base Student Details
 async function fetchStudentForScholarship() {
     const roll = document.getElementById('sch-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter Roll Number first.");
 
-    const { data, error } = await db.from('students')
+    // Step A: Fetch base data
+    const { data: student, error } = await db.from('students')
         .select('full_name, course, total_fees')
         .eq('roll_number', roll)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (error || !data) return alert("Student not found. Ensure Roll No is correct.");
+    if (error || !student) return alert("Student not found. Ensure Roll No is correct.");
 
-    document.getElementById('sch-name').value = data.full_name;
-    document.getElementById('sch-course').value = data.course;
-    document.getElementById('sch-total-fee').value = data.total_fees || 0;
-    
-    calculateScholarship(); // Initialize calculations
-}
+    document.getElementById('sch-name').value = student.full_name;
+    document.getElementById('sch-course').value = student.course;
+    document.getElementById('sch-total-fee').value = student.total_fees || 0;
 
-
-
-// Fetch course_end_date and store it temporarily
+    // Step B: Fetch course_end_date and store it temporarily
     const { data: details } = await db.from('student_details')
         .select('course_end_date')
         .eq('roll_number', roll)
@@ -5548,11 +5545,12 @@ async function fetchStudentForScholarship() {
         .maybeSingle();
 
     if (details && details.course_end_date) {
+        // Save it invisibly in the dataset to use during calculation
         document.getElementById('sch-valid-to').dataset.autoEnd = details.course_end_date;
     }
 
-
-
+    calculateScholarship(); // Initialize calculations
+}
 
 // 3. Dynamic Calculation Engine
 function calculateScholarship() {
@@ -5566,16 +5564,11 @@ function calculateScholarship() {
         pctInput.readOnly = false;
         validFrom.disabled = false;
         validTo.disabled = false;
-
-
-
-
-// Auto-fill Valid To with course end date if it is currently empty
+        
+        // Auto-fill Valid To with course end date if it is currently empty
         if (!validTo.value && validTo.dataset.autoEnd) {
             validTo.value = validTo.dataset.autoEnd;
         }
-
-
         
         const pct = parseFloat(pctInput.value) || 0;
         const schAmount = (totalFee * pct) / 100;
