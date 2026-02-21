@@ -404,6 +404,15 @@ input[readonly] {
 
 
 
+<div class="input-group">
+    <label>Time Slots Available:</label>
+    <select id="available-time-slots" multiple>
+        <!-- Options will be populated by JS -->
+    </select>
+</div>
+
+
+
 
 
             <!-- 7. Time Slot -->
@@ -860,7 +869,60 @@ document.getElementById("f-teacher").addEventListener("change", function () {
 
 
 
+async function loadTeacherTimeSlots(teacherId, instituteId) {
+    try {
+        const { data, error } = await db.teacher_details
+            .select('availability, time_of_slot')
+            .eq('id', teacherId)
+            .eq('institute_id', instituteId)
+            .single();
 
+        if (error) {
+            console.error(error);
+            return;
+        }
+
+        const select = document.getElementById('available-time-slots');
+        select.innerHTML = '';
+
+        if (data.availability === 'yes' && data.time_of_slot) {
+            const slots = data.time_of_slot.split(', ');
+            slots.forEach(slot => {
+                const opt = document.createElement('option');
+                opt.value = slot;
+                opt.textContent = slot;
+                select.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// Call this on page load
+loadTeacherTimeSlots('TCH-1907', sessionInstID);
+
+function generateTimeTable() {
+    const select = document.getElementById('available-time-slots');
+    const selectedSlot = select.value;
+
+    const now = new Date();
+    const selectedDate = new Date(); // you can adjust this to actual selected booking date
+
+    const diffHours = (selectedDate - now) / (1000 * 60 * 60);
+    if (diffHours < 4 || diffHours > 24) {
+        alert("NO BOOKING ALLOWED AT THIS TIME");
+        return;
+    }
+
+    if (!Array.from(select.options).some(opt => opt.value === selectedSlot)) {
+        alert("BOOKING NOT AVAILABLE FOR THIS TIME SLOT");
+        return;
+    }
+
+    // Proceed with booking
+    alert("Booking page opened for slot: " + selectedSlot);
+}
 
 
 

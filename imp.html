@@ -1106,6 +1106,49 @@
         <option value="Inactive">Inactive</option>
     </select>
 </div>
+
+
+
+
+
+
+
+
+<!-- TEACHER PORTAL Section -->
+<div class="input-group">
+    <label>Availability Status (Next Day)</label>
+    <select id="tch-availability">
+        <option value="no" selected>No</option>
+        <option value="yes">Yes</option>
+    </select>
+</div>
+
+<div class="input-group" id="time-slot-container" style="display:none;">
+    <label>Select Time Slots:</label>
+    <div id="time-slot-list">
+        <!-- 12 time slots -->
+        <label><input type="checkbox" value="9 am to 10 am"> 9 am to 10 am</label>
+        <label><input type="checkbox" value="10 am to 11 am"> 10 am to 11 am</label>
+        <label><input type="checkbox" value="11 am to 12 pm"> 11 am to 12 pm</label>
+        <label><input type="checkbox" value="12 pm to 1 pm"> 12 pm to 1 pm</label>
+        <label><input type="checkbox" value="1 pm to 2 pm"> 1 pm to 2 pm</label>
+        <label><input type="checkbox" value="2 pm to 3 pm"> 2 pm to 3 pm</label>
+        <label><input type="checkbox" value="3 pm to 4 pm"> 3 pm to 4 pm</label>
+        <label><input type="checkbox" value="4 pm to 5 pm"> 4 pm to 5 pm</label>
+        <label><input type="checkbox" value="5 pm to 6 pm"> 5 pm to 6 pm</label>
+        <label><input type="checkbox" value="6 pm to 7 pm"> 6 pm to 7 pm</label>
+        <label><input type="checkbox" value="7 pm to 8 pm"> 7 pm to 8 pm</label>
+        <label><input type="checkbox" value="8 pm to 9 pm"> 8 pm to 9 pm</label>
+    </div>
+</div>
+
+<button type="button" onclick="updateTeacherAvailability('TCH-1907', sessionInstID)">Save</button>
+
+
+
+
+
+
 <!-- END OF NEW TEACHER FIELDS -->
 <div class="input-group" style="grid-column: 1 / -1; width: 100%; max-width: 350px; margin: 15px auto 0; text-align: center;">
     <label style="display: block; margin-bottom: 5px; color: #000; font-weight: bold;">WhatsApp Mobile Number</label>
@@ -3544,6 +3587,62 @@ mobile: document.getElementById('tch-mobile').value,
     if (error) alert("Update Error: " + error.message);
     else alert("Success! Teacher details updated.");
 }
+
+
+
+
+
+
+document.getElementById('tch-availability').addEventListener('change', function() {
+    const container = document.getElementById('time-slot-container');
+    container.style.display = this.value === 'yes' ? 'block' : 'none';
+});
+
+
+
+
+
+async function updateTeacherAvailability(teacherId, instituteId) {
+    try {
+        const availability = document.getElementById('tch-availability').value;
+
+        // Collect selected time slots if availability is yes
+        let timeOfSlot = '';
+        if (availability === 'yes') {
+            const checkedBoxes = document.querySelectorAll('#time-slot-list input[type=checkbox]:checked');
+            if (checkedBoxes.length === 0) {
+                alert("Select at least one time slot!");
+                return;
+            }
+            timeOfSlot = Array.from(checkedBoxes).map(cb => cb.value).join(', ');
+        }
+
+        const { data, error } = await db.teacher_details
+            .update({
+                availability: availability,
+                time_of_slot: timeOfSlot
+            })
+            .eq('id', teacherId)
+            .eq('institute_id', instituteId);
+
+        if (error) {
+            console.error("Supabase error:", error);
+            alert("Something went wrong! Check console.");
+        } else {
+            alert("Availability and time slots updated successfully!");
+        }
+    } catch (err) {
+        console.error("Unexpected error:", err);
+        alert("Something went wrong! Check console.");
+    }
+}
+
+
+
+
+
+
+
 /* ==========================================
    12. STUDENT PORTAL (View Only)
    ========================================== */
