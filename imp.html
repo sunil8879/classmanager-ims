@@ -1112,7 +1112,7 @@
 <div class="input-group">
     <label>Daily Availability</label>
     <input type="date" id="tch-daily-availability">
-    <button type="button" onclick="updateTeacherAvailability('TCH-1907', 'INST-123')">
+    <button type="button" onclick="updateTeacherAvailability('TCH-1907','INST-123')">
         Save Availability
     </button>
 </div>
@@ -3550,15 +3550,14 @@ async function updateTeacherAvailability(teacherId, instituteId) {
             return;
         }
 
-        // Update teacher's daily availability in Supabase
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('teacher_details')
             .update({ daily_availability: availabilityDate })
             .eq('teacher_id', teacherId)
             .eq('institute_id', instituteId);
 
         if (error) {
-            console.error("Supabase error:", error);
+            console.error("DB error:", error);
             alert("Something went wrong! Check console for details.");
         } else {
             alert("Daily availability updated successfully!");
