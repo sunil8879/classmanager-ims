@@ -1106,17 +1106,6 @@
         <option value="Inactive">Inactive</option>
     </select>
 </div>
-
-
-
-<div class="input-group">
-    <label>Daily Availability</label>
-    <input type="date" id="tch-daily-availability">
-    <button type="button" onclick="updateTeacherAvailability('TCH-1907', sessionInstID)">Save</button>
-</div>
-
-
-
 <!-- END OF NEW TEACHER FIELDS -->
 <div class="input-group" style="grid-column: 1 / -1; width: 100%; max-width: 350px; margin: 15px auto 0; text-align: center;">
     <label style="display: block; margin-bottom: 5px; color: #000; font-weight: bold;">WhatsApp Mobile Number</label>
@@ -1739,10 +1728,7 @@
             <p>2026 ClassManager. All rights Reserved</p>
         </div>
     </footer>
-
-
 <script>
-
 /* ==========================================
    1. CORE INITIALIZATION
    ========================================== */
@@ -3530,45 +3516,6 @@ document.getElementById('tch-gender').value = data.gender || "";
 
     alert("Details Loaded for " + data.teacher_name);
 }
-
-
-
-
-
-
-
-
-
-async function updateTeacherAvailability(teacherId, instituteId) {
-    try {
-        // Get the date value directly from the date picker
-        const availabilityDate = document.getElementById('tch-daily-availability').value;
-
-        if (!availabilityDate) {
-            alert("Please select a date!");
-            return;
-        }
-
-        // Update the teacher record in Supabase
-        const { data, error } = await db
-            .from('teacher_details')
-            .update({ daily_availability: availabilityDate })
-            .eq('id', teacherId)        // your column for teacher ID
-            .eq('institute_id', instituteId); // ensures correct institute
-
-        if (error) {
-            console.error("Supabase error:", error);
-            alert("Something went wrong! Check console.");
-        } else {
-            alert("Daily availability updated successfully!");
-        }
-    } catch (err) {
-        console.error("Unexpected error:", err);
-        alert("Something went wrong! Check console.");
-    }
-}
-
-
 
 // 5. EDIT TEACHER
 async function editTeacher() {
