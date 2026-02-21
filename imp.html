@@ -1112,8 +1112,10 @@
 <div class="input-group">
     <label>Daily Availability</label>
     <input type="date" id="tch-daily-availability">
-    <button type="button" id="save-availability-btn">Save</button>
 </div>
+
+<!-- Button to save -->
+<button type="button" onclick="saveTeacherAvailability('TCH-1234', 'INST-001')">Save Availability</button>
 
 
 
@@ -3536,18 +3538,27 @@ document.getElementById('tch-gender').value = data.gender || "";
 
 
 
-async function updateTeacherAvailability(teacherId) {
-        const availabilityDate = document.getElementById('tch-daily-availability').value;
+async function saveTeacherAvailability(teacherId, instituteId) {
+    // 1. Get the date value from the input
+    const availabilityDate = document.getElementById('tch-daily-availability').value;
 
-        if (!availabilityDate) {
-            alert("Please select a date!");
-            return;
-        }
+    // 2. Validation
+    if (!teacherId || !instituteId) {
+        alert("Teacher ID or Institute ID missing!");
+        return;
+    }
+    if (!availabilityDate) {
+        alert("Please select a date!");
+        return;
+    }
 
+    try {
+        // 3. Update Supabase
         const { data, error } = await supabase
             .from('teacher_details')
             .update({ daily_availability: availabilityDate })
-            .eq('teacher_id', teacherId);
+            .eq('teacher_id', teacherId)
+            .eq('institute_id', instituteId);
 
         if (error) {
             console.error("Error updating availability:", error);
@@ -3555,16 +3566,11 @@ async function updateTeacherAvailability(teacherId) {
         } else {
             alert("Daily availability updated successfully!");
         }
+    } catch (err) {
+        console.error("Unexpected error:", err);
+        alert("Something went wrong!");
     }
-
-    // Attach event listener to Save button
-    document.getElementById('save-availability-btn').addEventListener('click', () => {
-        const teacherId = 'TCH-1234'; // Replace with actual teacher ID dynamically if needed
-        updateTeacherAvailability(teacherId);
-    });
-
-
-
+}
 
 
 
