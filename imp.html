@@ -3553,7 +3553,7 @@ async function updateTeacherAvailability(teacherId, instituteId) {
         const { data, error } = await db
             .from('teacher_details')
             .update({ daily_availability: availabilityDate })
-            .eq('teacher_id', teacherId)
+            .eq('id', teacherId)
             .eq('institute_id', instituteId);
 
         if (error) {
