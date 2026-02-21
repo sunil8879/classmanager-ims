@@ -3617,13 +3617,13 @@ async function updateTeacherAvailability(teacherId, instituteId) {
             timeOfSlot = Array.from(checkedBoxes).map(cb => cb.value).join(', ');
         }
 
-        const { data, error } = await db.teacher_details
+        const { data, error } = await db.from('teacher_details')
             .update({
                 availability: availability,
                 time_of_slot: timeOfSlot
             })
             .eq('id', teacherId)
-            .eq('institute_id', instituteId);
+            .eq('institute_id',sessionInstID);
 
         if (error) {
             console.error("Supabase error:", error);
