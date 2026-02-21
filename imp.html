@@ -1111,8 +1111,8 @@
 
 <div class="input-group">
     <label>Daily Availability</label>
-    <input type="date" id="tch-daily-availability" placeholder="DD/MM/YYYY">
-    <button type="button" onclick="updateTeacherAvailability('TCH-1907', 1)">Save</button>
+    <input type="date" id="tch-daily-availability">
+    <button type="button" onclick="updateTeacherAvailability('TCH-1907', sessionInstID)">Save</button>
 </div>
 
 
@@ -3541,7 +3541,7 @@ document.getElementById('tch-gender').value = data.gender || "";
 
 async function updateTeacherAvailability(teacherId, instituteId) {
     try {
-        // 1. Get the date value from the input
+        // Get the date value directly from the date picker
         const availabilityDate = document.getElementById('tch-daily-availability').value;
 
         if (!availabilityDate) {
@@ -3549,24 +3549,22 @@ async function updateTeacherAvailability(teacherId, instituteId) {
             return;
         }
 
-        // 2. Update Supabase table
-           const { data, error } = await db
+        // Update the teacher record in Supabase
+        const { data, error } = await db
             .from('teacher_details')
             .update({ daily_availability: availabilityDate })
-            .eq('id', teacherId)
-            .eq('institute_id', sessionInstID);
+            .eq('id', teacherId)        // your column for teacher ID
+            .eq('institute_id', instituteId); // ensures correct institute
 
-        // 3. Handle response
         if (error) {
             console.error("Supabase error:", error);
-            alert("Something went wrong! Check console for details.");
+            alert("Something went wrong! Check console.");
         } else {
             alert("Daily availability updated successfully!");
         }
-
     } catch (err) {
         console.error("Unexpected error:", err);
-        alert("Something went wrong! Check console for details.");
+        alert("Something went wrong! Check console.");
     }
 }
 
