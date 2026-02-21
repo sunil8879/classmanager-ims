@@ -3594,7 +3594,64 @@ async function addTeacherDetails() {
     const name = document.getElementById('tch-name').value;
     const mobile = document.getElementById('tch-mobile').value;
 
+
+
+
     if (!id || !name || !mobile) return alert("Error: ID, Name, and Mobile are mandatory.");
+
+
+// --- START OF NEW TEACHER VALIDATIONS ---
+    const tchNameVal = document.getElementById('tch-name').value.trim();
+    const tchAgeVal = parseInt(document.getElementById('tch-age').value) || 0;
+    const tchSalaryVal = parseFloat(document.getElementById('tch-salary').value) || 0;
+    const tchEmailVal = document.getElementById('tch-email').value.trim();
+    const tchAddressVal = document.getElementById('tch-address').value.trim();
+    const tchRatingVal = parseFloat(document.getElementById('tch-rating').value) || 0;
+    const tchMobileVal = document.getElementById('tch-mobile').value.trim();
+
+    // 1. Full name validation (Must have at least 2 words, second word >= 2 letters)
+    const tchNameWords = tchNameVal.split(/\s+/).filter(w => w.length > 0);
+    if (tchNameWords.length < 2 || tchNameWords[1].length < 2) {
+        return alert("Error: Please enter the Teacher's Full Name. The second word (Surname) must be at least 2 letters long.");
+    }
+
+    // 2. Age cannot be 0 or negative
+    if (tchAgeVal <= 0) {
+        return alert("Error: Age cannot be 0 or negative.");
+    }
+
+    // 3. Salary cannot be 0 or negative
+    if (tchSalaryVal <= 0) {
+        return alert("Error: Salary cannot be 0 or negative.");
+    }
+
+    // 4. Email has to have @ symbol
+    if (!tchEmailVal || !tchEmailVal.includes('@')) {
+        return alert("Error: Please enter a valid Email address containing the '@' symbol.");
+    }
+
+    // 5 & 6. Full address provided, minimum 15 chars, and contains numeric values
+    if (!tchAddressVal) {
+        return alert("Error: Full Address must be provided.");
+    }
+    if (tchAddressVal.length < 15 || !/\d/.test(tchAddressVal)) {
+        return alert("Error: Full Address must be at least 15 characters long and include numeric values (e.g., House Number, Pincode).");
+    }
+
+    // 7. Rating cannot be more than 5
+    if (tchRatingVal > 5) {
+        return alert("Error: Rating cannot be more than 5.");
+    }
+
+    // 8. WhatsApp mobile number should be exactly 10 digits
+    if (!/^\d{10}$/.test(tchMobileVal)) {
+        return alert("Error: WhatsApp Mobile Number must be exactly 10 digits long.");
+    }
+    // --- END OF NEW TEACHER VALIDATIONS ---
+
+
+
+
 
     const { error } = await db.from('teacher_details').insert([{
         institute_id: sessionInstID,
@@ -3659,6 +3716,59 @@ document.getElementById('tch-availability').value = data.availability || "No";
 async function editTeacher() {
     const id = document.getElementById('tch-id').value;
     if (!id) return alert("Error: Fetch a teacher first using FETCH button.");
+
+
+
+
+
+
+
+// --- START OF NEW VALIDATIONS TO ADD ---
+    const vName = document.getElementById('tch-name').value.trim();
+    const vAge = parseInt(document.getElementById('tch-age').value) || 0;
+    const vSalary = parseFloat(document.getElementById('tch-salary').value) || 0;
+    const vEmail = document.getElementById('tch-email').value.trim();
+    const vAddress = document.getElementById('tch-address').value.trim();
+    const vRating = parseFloat(document.getElementById('tch-rating').value) || 0;
+    const vMobile = document.getElementById('tch-mobile').value.trim();
+
+    // 1. Full name: Second word should have 2 or more letters
+    const nameWords = vName.split(/\s+/).filter(w => w.length > 0);
+    if (nameWords.length < 2 || nameWords[1].length < 2) {
+        return alert("Error: Teacher's Name must include a surname (second word) with at least 2 letters.");
+    }
+
+    // 2. Age cannot be 0 or negative
+    if (vAge <= 0) return alert("Error: Age cannot be 0 or negative.");
+
+    // 3. Salary cannot be 0 or negative
+    if (vSalary <= 0) return alert("Error: Salary cannot be 0 or negative.");
+
+    // 4. Email has to have @ symbol
+    if (!vEmail.includes('@')) return alert("Error: Email must contain an '@' symbol.");
+
+    // 5 & 6. Address: Must be provided, >= 15 chars, and contain numbers
+    if (!vAddress) return alert("Error: Full address must be provided.");
+    if (vAddress.length < 15 || !/\d/.test(vAddress)) {
+        return alert("Error: Address must be at least 15 characters long and contain numeric values.");
+    }
+
+    // 7. Rating cannot be more than 5
+    if (vRating > 5) return alert("Error: Rating cannot be more than 5.");
+
+    // 8. Mobile no should be 10 digits long
+    if (!/^\d{10}$/.test(vMobile)) return alert("Error: WhatsApp Mobile Number must be exactly 10 digits long.");
+    // --- END OF NEW VALIDATIONS TO ADD ---
+
+
+
+
+
+
+
+
+
+
 
     const tchData = {
         teacher_name: document.getElementById('tch-name').value,
