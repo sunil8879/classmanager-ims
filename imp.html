@@ -3550,9 +3550,10 @@ async function updateTeacherAvailability(teacherId, instituteId) {
         }
 
         // 2. Update Supabase table
-        const { data, error } = await db('teacher_details')
+           const { data, error } = await db
+            .from('teacher_details')
             .update({ daily_availability: availabilityDate })
-            .eq('id', teacherId)            // your column is 'id'
+            .eq('id', teacherId)
             .eq('institute_id', instituteId);
 
         // 3. Handle response
