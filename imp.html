@@ -1114,8 +1114,8 @@
     <input type="date" id="tch-daily-availability">
 </div>
 
-<!-- Button to save -->
-<button type="button" onclick="saveTeacherAvailability('TCH-1234', 'INST-001')">Save Availability</button>
+<!-- Save Button -->
+<button type="button" onclick="updateTeacherAvailability('TCH-1907', 'INS-001')">Save Daily Availability</button>
 
 
 
@@ -3538,39 +3538,32 @@ document.getElementById('tch-gender').value = data.gender || "";
 
 
 
-async function saveTeacherAvailability(teacherId, instituteId) {
-    // 1. Get the date value from the input
-    const availabilityDate = document.getElementById('tch-daily-availability').value;
+ async function updateTeacherAvailability(teacherId, instituteId) {
+        try {
+            const availabilityDate = document.getElementById('tch-daily-availability').value;
 
-    // 2. Validation
-    if (!teacherId || !instituteId) {
-        alert("Teacher ID or Institute ID missing!");
-        return;
-    }
-    if (!availabilityDate) {
-        alert("Please select a date!");
-        return;
-    }
+            if (!availabilityDate) {
+                alert("Please select a date!");
+                return;
+            }
 
-    try {
-        // 3. Update Supabase
-        const { data, error } = await supabase
-            .from('teacher_details')
-            .update({ daily_availability: availabilityDate })
-            .eq('teacher_id', teacherId)
-            .eq('institute_id', instituteId);
+            const { data, error } = await supabase
+                .from('teacher_details')
+                .update({ daily_availability: availabilityDate })
+                .eq('teacher_id', teacherId)
+                .eq('institute_id', instituteId); // ensures only this institute's teacher is updated
 
-        if (error) {
-            console.error("Error updating availability:", error);
-            alert("Failed to save availability!");
-        } else {
-            alert("Daily availability updated successfully!");
+            if (error) {
+                console.error("Supabase error:", error);
+                alert("Something went wrong! Check console for details.");
+            } else {
+                alert("Daily availability updated successfully!");
+            }
+        } catch (err) {
+            console.error("Unexpected error:", err);
+            alert("Something went wrong! Check console for details.");
         }
-    } catch (err) {
-        console.error("Unexpected error:", err);
-        alert("Something went wrong!");
     }
-}
 
 
 
