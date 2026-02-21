@@ -2367,6 +2367,56 @@ async function saveFeeUpdate() {
         return alert("Error: Payment exceeds remaining balance.");
     }
 
+
+
+
+
+
+
+// --- START OF NEW ADDED VALIDATIONS ---
+    
+    // Fetch remaining fields to check if they are empty
+    const courseVal = document.getElementById('fee-course').value.trim();
+    const dueDatesVal = document.getElementById('fee-due-dates').value.trim();
+    const statusVal = document.getElementById('fee-status').value;
+    
+    // 5. All fields are compulsory
+    if (!fullNameVal || !joinDateVal || !courseVal || !dueDatesVal || !statusVal || 
+        document.getElementById('fee-total').value === "" || 
+        document.getElementById('fee-prev-paid').value === "" || 
+        document.getElementById('fee-paid-now').value === "" || 
+        document.getElementById('fee-pending').value === "") {
+        return alert("Error: All fields are compulsory.");
+    }
+
+    // 1. Date today cannot be in the past
+    if (payDate < todayStr) {
+        return alert("Error: 'Date Today' cannot be in the past.");
+    }
+
+    // 2. Second word of Name should be at least 2 letters long
+    const nameParts = fullNameVal.split(/\s+/).filter(w => w.length > 0);
+    if (nameParts.length >= 2 && nameParts[1].length < 2) {
+        return alert("Error: The second word (Surname) must be at least 2 letters long.");
+    }
+
+    // 3. Amount now paying cannot be more than total fees
+    if (nowPaying > totalFees) {
+        return alert("Error: Amount Now Paying cannot be more than Total Fees.");
+    }
+
+    // 4. Due dates cannot be in the past (Validates format like "March 2026")
+    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    const dateArray = dueDatesVal.split(',');
+    for (let d of dateArray) {
+        const parsedD = new Date(d.trim() + " 1"); // Parses "March 2026" as "March 1, 2026"
+        if (parsedD.toString() !== "Invalid Date" && parsedD.getTime() < currentMonthStart) {
+            return alert("Error: Due Date '" + d.trim() + "' cannot be in the past.");
+        }
+    }
+    
+    // --- END OF NEW ADDED VALIDATIONS ---
+
     // 3. DATABASE CONNECTION (BRIDGE TO STUDENT_DETAILS)
     const { data: detail, error: fetchErr } = await db.from('student_details')
         .select('student_id')
