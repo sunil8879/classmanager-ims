@@ -5538,6 +5538,22 @@ async function fetchStudentForScholarship() {
     calculateScholarship(); // Initialize calculations
 }
 
+
+
+// Fetch course_end_date and store it temporarily
+    const { data: details } = await db.from('student_details')
+        .select('course_end_date')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (details && details.course_end_date) {
+        document.getElementById('sch-valid-to').dataset.autoEnd = details.course_end_date;
+    }
+
+
+
+
 // 3. Dynamic Calculation Engine
 function calculateScholarship() {
     const status = document.getElementById('sch-status').value;
@@ -5550,6 +5566,16 @@ function calculateScholarship() {
         pctInput.readOnly = false;
         validFrom.disabled = false;
         validTo.disabled = false;
+
+
+
+
+// Auto-fill Valid To with course end date if it is currently empty
+        if (!validTo.value && validTo.dataset.autoEnd) {
+            validTo.value = validTo.dataset.autoEnd;
+        }
+
+
         
         const pct = parseFloat(pctInput.value) || 0;
         const schAmount = (totalFee * pct) / 100;
