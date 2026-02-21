@@ -705,29 +705,48 @@ async function bookSlot(day, time, cellId) {
     // ============================================
     // 🚨 RULE 2: 24-HOUR MAX & 4-HOUR MIN ENFORCEMENT
     // ============================================
-    const startTimeStr = time.split(" to ")[0];
-    const targetDateTime = new Date(dateVal);
+  // ============================================
+    // 🚨 RULE 2: 24-HOUR MAX & 4-HOUR MIN ENFORCEMENT
+    // ============================================
+    
+    // 1. Safely parse the Date to avoid UTC timezone bugs
+    const [year, month, dayNum] = dateVal.split('-');
+    const targetDateTime = new Date(year, month - 1, dayNum);
 
-    // Convert AM/PM string to 24-hour Date Object
+    // 2. Validate that the column they clicked matches the Date they selected
+    const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const actualDayOfWeek = dayNames[targetDateTime.getDay()];
+    
+    if (day.toUpperCase() !== actualDayOfWeek) {
+        return alert(`DATE MISMATCH ERROR:\nYou selected ${dateVal} in the calendar, which is a ${actualDayOfWeek}.\n\nYou must click the BOOK button under the ${actualDayOfWeek} column!`);
+    }
+
+    // 3. Extract exact time and add it to the date object
+    const startTimeStr = time.split(" to ")[0];
     const match = startTimeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    
     if (match) {
-        let hours = parseInt(match[1]);
-        const mins = parseInt(match[2]);
+        let hours = parseInt(match[1], 10);
+        const mins = parseInt(match[2], 10);
         const ampm = match[3].toUpperCase();
         if (ampm === 'PM' && hours < 12) hours += 12;
         if (ampm === 'AM' && hours === 12) hours = 0;
         targetDateTime.setHours(hours, mins, 0, 0);
     }
 
+    // 4. Calculate exact difference from right NOW
     const now = new Date();
-    const diffMs = targetDateTime - now;
+    const diffMs = targetDateTime.getTime() - now.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
 
-    // If less than 4 hours ahead OR more than 24 hours ahead, BLOCK.
+    // 5. Apply the 4 to 24-hour rule
     if (diffHours < 4 || diffHours > 24) {
-        return alert("NO BOOKING ALLOWED AT THIS TIME. (Bookings must be made between 4 to 24 hours in advance).");
+        let timeMsg = diffHours < 0 
+            ? "That time slot is in the past!" 
+            : `That slot is ${diffHours.toFixed(1)} hours away.`;
+            
+        return alert(`NO BOOKING ALLOWED AT THIS TIME.\n\n${timeMsg}\n(Bookings must be made exactly between 4 to 24 hours in advance).`);
     }
-
     // 3️⃣ Auth Check
     if (!sessionInstID) {
         const isAuth = await authenticateForBooking();
