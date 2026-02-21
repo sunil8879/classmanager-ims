@@ -1111,7 +1111,7 @@
 
 <div class="input-group">
     <label>Daily Availability</label>
-    <input type="text" id="tch-daily-availability" placeholder="DD/MM/YYYY">
+    <input type="date" id="tch-daily-availability" placeholder="DD/MM/YYYY">
     <button type="button" onclick="updateTeacherAvailability('TCH-1907', 1)">Save</button>
 </div>
 
@@ -3541,41 +3541,33 @@ document.getElementById('tch-gender').value = data.gender || "";
 
 async function updateTeacherAvailability(teacherId, instituteId) {
     try {
-        // 1. Get date from UI
-        let availabilityDate = document.getElementById('tch-daily-availability').value; // DD/MM/YYYY
+        // 1. Get the date value from the input
+        const availabilityDate = document.getElementById('tch-daily-availability').value;
 
         if (!availabilityDate) {
             alert("Please select a date!");
             return;
         }
 
-        // 2. Convert DD/MM/YYYY → YYYY-MM-DD for Supabase
-        const parts = availabilityDate.split('/');
-        if (parts.length !== 3) {
-            alert("Invalid date format! Use DD/MM/YYYY.");
-            return;
-        }
-        availabilityDate = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-
-        // 3. Update Supabase
-        const { data, error } = await db
-            .from('teacher_details')
+        // 2. Update Supabase table
+        const { data, error } = await db('teacher_details')
             .update({ daily_availability: availabilityDate })
-            .eq('id', teacherId)
+            .eq('id', teacherId)            // your column is 'id'
             .eq('institute_id', instituteId);
 
+        // 3. Handle response
         if (error) {
             console.error("Supabase error:", error);
-            alert("Something went wrong! Check console.");
+            alert("Something went wrong! Check console for details.");
         } else {
             alert("Daily availability updated successfully!");
         }
+
     } catch (err) {
         console.error("Unexpected error:", err);
-        alert("Something went wrong! Check console.");
+        alert("Something went wrong! Check console for details.");
     }
 }
-
 
 
 
