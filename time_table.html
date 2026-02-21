@@ -395,21 +395,24 @@ input[readonly] {
                 <input type="text" id="f-teacher-name" readonly placeholder="Auto-populated">
             </div>
 
+
+
+
+<!-- AVAILABLE SLOTS -->
+<div class="input-group" style="grid-column: 1 / -1;">
+    <label style="color: #20B2AA;">Teacher's Available Time Slots (Tomorrow)</label>
+    <input type="text" id="f-teacher-available-slots" readonly placeholder="Select a teacher to see available slots..." style="font-weight:bold; color:#008080;">
+</div>
+
+
+
+
+
             <!-- 6. Day of the week -->
             <div class="input-group">
                 <label>6. Booking Date</label>
                 <input type="date" id="f-date">
             </div>
-
-
-
-
-<div class="input-group">
-    <label>Time Slots Available:</label>
-    <select id="available-time-slots" multiple>
-        <!-- Options will be populated by JS -->
-    </select>
-</div>
 
 
 
@@ -736,6 +739,53 @@ if (existingStudentBookings.length >= 3) {
 
     if (insertError) return alert("Error saving booking: " + insertError.message);
 
+
+
+
+
+
+
+// ============================================
+    // RULE 1: STRICT AVAILABILITY ENFORCEMENT
+    // ============================================
+    const selectedOption = teacherSelect.options[teacherSelect.selectedIndex];
+    const allowedSlots = selectedOption.dataset.timeslots || "";
+    const availStatus = selectedOption.dataset.availability || "No";
+
+    if (availStatus !== "Yes" || !allowedSlots.includes(time)) {
+        return alert("BOOKING NOT AVAILABLE FOR THIS TIME SLOT.");
+    }
+
+    // ============================================
+    // RULE 2: 24-HOUR MAX & 4-HOUR MIN ENFORCEMENT
+    // ============================================
+    // Parse the start time out of the string (e.g. "09:00 AM" out of "09:00 AM to 10:00 AM")
+    const startTimeStr = time.split(" to ")[0];
+    const targetDateTime = new Date(dateVal);
+
+    // Convert AM/PM string to 24-hour Date Object
+    const match = startTimeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (match) {
+        let hours = parseInt(match[1]);
+        const mins = parseInt(match[2]);
+        const ampm = match[3].toUpperCase();
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        targetDateTime.setHours(hours, mins, 0, 0);
+    }
+
+    const now = new Date();
+    const diffMs = targetDateTime - now;
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    // If less than 4 hours ahead OR more than 24 hours ahead, BLOCK.
+    if (diffHours < 4 || diffHours > 24) {
+        return alert("NO BOOKING ALLOWED AT THIS TIME. (Bookings must be made between 4 to 24 hours in advance).");
+    }
+
+
+
+
     // 5️⃣ Update the timetable cell visually
     const teacherName = teacherSelect.selectedOptions[0].dataset.name || '';
     const cell = document.getElementById(cellId);
@@ -807,7 +857,7 @@ async function populateTeachersBySubject(selectedCourse) {
 
     const { data, error } = await db
         .from("teacher_details")
-        .select("id, teacher_name, mobile, email, experience, rating")
+     .select("id, teacher_name, mobile, email, experience, rating, availability, time_of_slot")
         .eq("institute_id", sessionInstID)
         .eq("subject_taught", selectedCourse);
 
@@ -838,6 +888,8 @@ async function populateTeachersBySubject(selectedCourse) {
         option.dataset.name = teacher.teacher_name;
         option.dataset.mobile = teacher.mobile;
         option.dataset.email = teacher.email;
+option.dataset.availability = teacher.availability; // <-- ADD THIS
+option.dataset.timeslots = teacher.time_of_slot; 
 
         teacherSelect.appendChild(option);
     });
@@ -863,66 +915,22 @@ document.getElementById("f-teacher").addEventListener("change", function () {
 
     document.getElementById("teacher-email").value =
         selectedOption.dataset.email || "";
+
+
+
+// Autopopulate Available Slots Field
+    const slotsStr = selectedOption.dataset.timeslots || "";
+    const avail = selectedOption.dataset.availability || "No";
+    if (avail === "Yes" && slotsStr) {
+        document.getElementById("f-teacher-available-slots").value = slotsStr;
+    } else {
+        document.getElementById("f-teacher-available-slots").value = "Teacher Not Available / No Slots Set";
+    }
 });
 
 
 
 
-
-async function loadTeacherTimeSlots(teacherId, instituteId) {
-    try {
-        const { data, error } = await db.teacher_details
-            .select('availability, time_of_slot')
-            .eq('id', teacherId)
-            .eq('institute_id', instituteId)
-            .single();
-
-        if (error) {
-            console.error(error);
-            return;
-        }
-
-        const select = document.getElementById('available-time-slots');
-        select.innerHTML = '';
-
-        if (data.availability === 'yes' && data.time_of_slot) {
-            const slots = data.time_of_slot.split(', ');
-            slots.forEach(slot => {
-                const opt = document.createElement('option');
-                opt.value = slot;
-                opt.textContent = slot;
-                select.appendChild(opt);
-            });
-        }
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-// Call this on page load
-loadTeacherTimeSlots('TCH-1907', sessionInstID);
-
-function generateTimeTable() {
-    const select = document.getElementById('available-time-slots');
-    const selectedSlot = select.value;
-
-    const now = new Date();
-    const selectedDate = new Date(); // you can adjust this to actual selected booking date
-
-    const diffHours = (selectedDate - now) / (1000 * 60 * 60);
-    if (diffHours < 4 || diffHours > 24) {
-        alert("NO BOOKING ALLOWED AT THIS TIME");
-        return;
-    }
-
-    if (!Array.from(select.options).some(opt => opt.value === selectedSlot)) {
-        alert("BOOKING NOT AVAILABLE FOR THIS TIME SLOT");
-        return;
-    }
-
-    // Proceed with booking
-    alert("Booking page opened for slot: " + selectedSlot);
-}
 
 
 

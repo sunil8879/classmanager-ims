@@ -1114,35 +1114,41 @@
 
 
 
-<!-- TEACHER PORTAL Section -->
 <div class="input-group">
-    <label>Availability Status (Next Day)</label>
-    <select id="tch-availability">
-        <option value="no" selected>No</option>
-        <option value="yes">Yes</option>
+    <label>Status</label>
+    <select id="tch-status">
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
     </select>
 </div>
 
-<div class="input-group" id="time-slot-container" style="display:none;">
-    <label>Select Time Slots:</label>
-    <div id="time-slot-list">
-        <!-- 12 time slots -->
-        <label><input type="checkbox" value="9 am to 10 am"> 9 am to 10 am</label>
-        <label><input type="checkbox" value="10 am to 11 am"> 10 am to 11 am</label>
-        <label><input type="checkbox" value="11 am to 12 pm"> 11 am to 12 pm</label>
-        <label><input type="checkbox" value="12 pm to 1 pm"> 12 pm to 1 pm</label>
-        <label><input type="checkbox" value="1 pm to 2 pm"> 1 pm to 2 pm</label>
-        <label><input type="checkbox" value="2 pm to 3 pm"> 2 pm to 3 pm</label>
-        <label><input type="checkbox" value="3 pm to 4 pm"> 3 pm to 4 pm</label>
-        <label><input type="checkbox" value="4 pm to 5 pm"> 4 pm to 5 pm</label>
-        <label><input type="checkbox" value="5 pm to 6 pm"> 5 pm to 6 pm</label>
-        <label><input type="checkbox" value="6 pm to 7 pm"> 6 pm to 7 pm</label>
-        <label><input type="checkbox" value="7 pm to 8 pm"> 7 pm to 8 pm</label>
-        <label><input type="checkbox" value="8 pm to 9 pm"> 8 pm to 9 pm</label>
-    </div>
+<!-- START NEW TEACHER AVAILABILITY FIELDS -->
+<div class="input-group">
+    <label>Availability Status (<span id="tch-tomorrow-date" style="color:#007bff;"></span>)</label>
+    <select id="tch-availability" onchange="toggleTeacherTimeSlots()">
+        <option value="No">No</option>
+        <option value="Yes">Yes</option>
+    </select>
 </div>
 
-<button type="button" onclick="updateTeacherAvailability('TCH-1907', sessionInstID)">Save</button>
+<div class="input-group" id="tch-timeslots-container" style="display: none; grid-column: 1 / -1; background: #f0faff; padding: 15px; border: 2px solid #007bff; border-radius: 8px; margin-top: 10px;">
+    <label style="margin-bottom: 10px; color: #007bff;">Select Available Time Slots (Check all that apply):</label>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;" id="tch-time-checkboxes">
+        <label><input type="checkbox" value="09:00 AM to 10:00 AM"> 09:00 AM to 10:00 AM</label>
+        <label><input type="checkbox" value="10:00 AM to 11:00 AM"> 10:00 AM to 11:00 AM</label>
+        <label><input type="checkbox" value="11:00 AM to 12:00 PM"> 11:00 AM to 12:00 PM</label>
+        <label><input type="checkbox" value="12:00 PM to 01:00 PM"> 12:00 PM to 01:00 PM</label>
+        <label><input type="checkbox" value="01:00 PM to 02:00 PM"> 01:00 PM to 02:00 PM</label>
+        <label><input type="checkbox" value="02:00 PM to 03:00 PM"> 02:00 PM to 03:00 PM</label>
+        <label><input type="checkbox" value="03:00 PM to 04:00 PM"> 03:00 PM to 04:00 PM</label>
+        <label><input type="checkbox" value="04:00 PM to 05:00 PM"> 04:00 PM to 05:00 PM</label>
+        <label><input type="checkbox" value="05:00 PM to 06:00 PM"> 05:00 PM to 06:00 PM</label>
+        <label><input type="checkbox" value="06:00 PM to 07:00 PM"> 06:00 PM to 07:00 PM</label>
+        <label><input type="checkbox" value="07:00 PM to 08:00 PM"> 07:00 PM to 08:00 PM</label>
+        <label><input type="checkbox" value="08:00 PM to 09:00 PM"> 08:00 PM to 09:00 PM</label>
+    </div>
+</div>
+<!-- END NEW TEACHER AVAILABILITY FIELDS -->
 
 
 
@@ -3497,6 +3503,10 @@ function clearTeacherForm() {
     if (statusEl) statusEl.value = "Active";
 }
 
+document.getElementById('tch-availability').value = "No";
+    toggleTeacherTimeSlots();
+    setTeacherTimeSlots("");
+
 // 3. ADD TEACHER
 // 1. UPDATED: ADD TEACHER (Now includes Mobile)
 async function addTeacherDetails() {
@@ -3521,7 +3531,9 @@ gender: document.getElementById('tch-gender').value,
         full_address: document.getElementById('tch-address').value,
         experience: parseFloat(document.getElementById('tch-exp').value) || 0,
         rating: parseFloat(document.getElementById('tch-rating').value) || 0,
-        status: document.getElementById('tch-status').value || "Active"
+availability: document.getElementById('tch-availability').value,
+        status: document.getElementById('tch-status').value || "Active",
+time_of_slot: (document.getElementById('tch-availability').value === 'Yes') ? getSelectedTeacherTimeSlots() : ""
     }]);
 
     if (error) alert("DB Error: " + error.message);
@@ -3556,6 +3568,9 @@ document.getElementById('tch-gender').value = data.gender || "";
     document.getElementById('tch-exp').value = data.experience || "";
     document.getElementById('tch-rating').value = data.rating || "";
     document.getElementById('tch-status').value = data.status || "Active";
+document.getElementById('tch-availability').value = data.availability || "No";
+    toggleTeacherTimeSlots();
+    setTeacherTimeSlots(data.time_of_slot);
 
     alert("Details Loaded for " + data.teacher_name);
 }
@@ -3579,7 +3594,9 @@ mobile: document.getElementById('tch-mobile').value,
         full_address: document.getElementById('tch-address').value,
         experience: parseFloat(document.getElementById('tch-exp').value) || 0,
         rating: parseFloat(document.getElementById('tch-rating').value) || 0,
-        status: document.getElementById('tch-status').value || "Active"
+        status: document.getElementById('tch-status').value || "Active",
+availability: document.getElementById('tch-availability').value, // <-- ADD THIS
+        time_of_slot: (document.getElementById('tch-availability').value === 'Yes') ? getSelectedTeacherTimeSlots() : "" 
     };
 
     const { error } = await db.from('teacher_details').update(tchData).eq('id', id);
@@ -3593,51 +3610,36 @@ mobile: document.getElementById('tch-mobile').value,
 
 
 
-document.getElementById('tch-availability').addEventListener('change', function() {
-    const container = document.getElementById('time-slot-container');
-    container.style.display = this.value === 'yes' ? 'block' : 'none';
+
+
+
+// Helper functions for Availability
+document.addEventListener('DOMContentLoaded', () => {
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    const labelEl = document.getElementById('tch-tomorrow-date');
+    if(labelEl) labelEl.innerText = "For " + tmrw.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 });
 
-
-
-
-
-async function updateTeacherAvailability(teacherId, instituteId) {
-    try {
-        const availability = document.getElementById('tch-availability').value;
-
-        // Collect selected time slots if availability is yes
-        let timeOfSlot = '';
-        if (availability === 'yes') {
-            const checkedBoxes = document.querySelectorAll('#time-slot-list input[type=checkbox]:checked');
-            if (checkedBoxes.length === 0) {
-                alert("Select at least one time slot!");
-                return;
-            }
-            timeOfSlot = Array.from(checkedBoxes).map(cb => cb.value).join(', ');
-        }
-
-        const { data, error } = await db.from('teacher_details')
-            .update({
-                availability: availability,
-                time_of_slot: timeOfSlot
-            })
-            .eq('id', teacherId)
-            .eq('institute_id',sessionInstID);
-
-        if (error) {
-            console.error("Supabase error:", error);
-            alert("Something went wrong! Check console.");
-        } else {
-            alert("Availability and time slots updated successfully!");
-        }
-    } catch (err) {
-        console.error("Unexpected error:", err);
-        alert("Something went wrong! Check console.");
-    }
+function toggleTeacherTimeSlots() {
+    const avail = document.getElementById('tch-availability').value;
+    document.getElementById('tch-timeslots-container').style.display = (avail === 'Yes') ? 'block' : 'none';
 }
 
+function getSelectedTeacherTimeSlots() {
+    const checkboxes = document.querySelectorAll('#tch-time-checkboxes input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value).join(', ');
+}
 
+function setTeacherTimeSlots(slotsStr) {
+    const checkboxes = document.querySelectorAll('#tch-time-checkboxes input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false); // clear all
+    if (!slotsStr) return;
+    const slotsArr = slotsStr.split(',').map(s => s.trim());
+    checkboxes.forEach(cb => {
+        if (slotsArr.includes(cb.value)) cb.checked = true;
+    });
+}
 
 
 
