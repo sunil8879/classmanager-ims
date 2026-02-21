@@ -485,6 +485,7 @@
 <button class="nav-tab" onclick="showSection('alumni-mod')"><i class="fas fa-user-graduate"></i> 21. Alumni Section</button>
 <button class="nav-tab" onclick="showSection('inventory-mod')"><i class="fas fa-boxes"></i> 22. Inventory Manager</button>
 <button class="nav-tab" onclick="showSection('scholarship-mod')"><i class="fas fa-award"></i> 23. Scholarship Tracker</button>
+<button class="nav-tab" onclick="showSection('ptm-mod')"><i class="fas fa-handshake"></i> 24. PTM Schedule</button>
 
 
         </aside>
@@ -1793,6 +1794,86 @@
             <button class="btn-fetch" onclick="fetchScholarshipByRoll()">FETCH (Roll No)</button>
             <button class="btn-edit" onclick="updateScholarship()">UPDATE (Roll No)</button>
             <button class="btn-add" style="background:#673ab7;" onclick="printScholarship()"><i class="fas fa-print"></i> PRINT AWARD LETTER</button>
+        </div>
+    </div>
+</section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 24. PTM SCHEDULE SECTION -->
+<section id="ptm-mod" class="content-section">
+    <div class="card" style="border-top: 5px solid #e84393; max-width: 1000px;">
+        <h3><i class="fas fa-handshake"></i> Parent-Teacher Meeting (PTM) Scheduler</h3>
+        
+        <!-- PTM Setup Parameters -->
+        <div style="background: #fff0f5; padding: 15px; border-radius: 10px; border: 1px solid #e84393; margin-bottom: 20px;">
+            <h4 style="margin-bottom: 10px; color: #e84393;">Step 1: PTM Configuration</h4>
+            <div class="form-grid">
+                <div class="input-group"><label>Month & Year</label><input type="month" id="ptm-month"></div>
+                <div class="input-group"><label>PTM Date</label><input type="date" id="ptm-date" onchange="checkPTMDateValidity()"></div>
+                <div class="input-group"><label>Start Time</label><input type="time" id="ptm-start" value="09:00"></div>
+                <div class="input-group"><label>End Time</label><input type="time" id="ptm-end" value="12:00"></div>
+                <div class="input-group"><label>Slot Duration (Mins)</label><input type="number" id="ptm-duration" value="15"></div>
+                <div class="input-group">
+                    <label>Status</label>
+                    <select id="ptm-status" onchange="togglePTMStatus()">
+                        <option value="Open">Open</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student & Auto-Slot Generation -->
+        <div id="ptm-booking-area">
+            <h4 style="margin-bottom: 10px; color: #000; text-align: left;">Step 2: Auto-Allocate Slot</h4>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Student Roll Number</label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="ptm-roll" placeholder="IMS-XXXX">
+                        <button class="btn-fetch" onclick="fetchAndAllocatePTM()" style="padding: 5px 10px;"><i class="fas fa-magic"></i> Auto-Slot</button>
+                    </div>
+                </div>
+                
+                <div class="input-group"><label>Student Name</label><input type="text" id="ptm-sname" readonly style="background:#eee;"></div>
+                <div class="input-group"><label>Course</label><input type="text" id="ptm-course" readonly style="background:#eee;"></div>
+                
+                <div class="input-group"><label>Teacher ID</label><input type="text" id="ptm-tid" readonly style="background:#eee;"></div>
+                <div class="input-group"><label>Teacher Name</label><input type="text" id="ptm-tname" readonly style="background:#eee;"></div>
+                
+                <div class="input-group"><label>Allocated Slot Time</label><input type="time" id="ptm-slot-time" readonly style="background:#dff9fb; border: 2px solid #22a6b3; font-weight: bold; color: #000;"></div>
+            </div>
+
+            <!-- Communication Area -->
+            <hr style="margin: 20px 0;">
+            <div class="form-grid" style="align-items: center;">
+                <div class="input-group"><label>Teacher Mobile</label><input type="text" id="ptm-tmob" readonly style="background:#eee;"></div>
+                <a href="#" id="wa-ptm-teacher" target="_blank" style="background:#25D366; color:#fff; padding:10px; border-radius:5px; text-decoration:none; text-align:center; margin-top:15px; pointer-events:none; opacity:0.5;"><i class="fab fa-whatsapp"></i> Inform Teacher</a>
+
+                <div class="input-group"><label>Mother's Mobile</label><input type="text" id="ptm-mmob" readonly style="background:#eee;"></div>
+                <a href="#" id="wa-ptm-mother" target="_blank" style="background:#25D366; color:#fff; padding:10px; border-radius:5px; text-decoration:none; text-align:center; margin-top:15px; pointer-events:none; opacity:0.5;"><i class="fab fa-whatsapp"></i> Inform Mother</a>
+
+                <div class="input-group"><label>Father's Mobile</label><input type="text" id="ptm-fmob" readonly style="background:#eee;"></div>
+                <a href="#" id="wa-ptm-father" target="_blank" style="background:#25D366; color:#fff; padding:10px; border-radius:5px; text-decoration:none; text-align:center; margin-top:15px; pointer-events:none; opacity:0.5;"><i class="fab fa-whatsapp"></i> Inform Father</a>
+            </div>
+
+            <div class="input-group" style="margin-top: 15px;"><label>Remarks</label><input type="text" id="ptm-remarks" placeholder="e.g. Parents informed, Confirmed present"></div>
+            
+            <div class="button-row" style="margin-top: 20px;">
+                <button class="btn-add" style="background:#e84393; border-color:#d63031;" onclick="addPTMRecord()">ADD PTM RECORD</button>
+            </div>
         </div>
     </div>
 </section>
@@ -5770,6 +5851,209 @@ function printScholarship() {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+/* ==========================================
+   24. PTM SCHEDULER LOGIC
+   ========================================== */
+
+// Default month setup
+document.addEventListener('DOMContentLoaded', () => {
+    const ptmMonth = document.getElementById('ptm-month');
+    if (ptmMonth) ptmMonth.value = new Date().toISOString().substring(0, 7);
+});
+
+// Rule 3: Close Booking if current date > ptm_date
+function checkPTMDateValidity() {
+    const ptmDate = document.getElementById('ptm-date').value;
+    const statusSelect = document.getElementById('ptm-status');
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (ptmDate && today > ptmDate) {
+        alert("Notice: The selected PTM Date has passed. Bookings will be closed automatically.");
+        statusSelect.value = "Closed";
+    } else {
+        statusSelect.value = "Open";
+    }
+    togglePTMStatus();
+}
+
+function togglePTMStatus() {
+    const status = document.getElementById('ptm-status').value;
+    const area = document.getElementById('ptm-booking-area');
+    if (status === 'Closed') {
+        area.style.pointerEvents = 'none';
+        area.style.opacity = '0.5';
+    } else {
+        area.style.pointerEvents = 'auto';
+        area.style.opacity = '1';
+    }
+}
+
+// Helper to add minutes to time (HH:MM)
+function addMinutesToTime(timeStr, minsToAdd) {
+    const [h, m] = timeStr.split(':').map(Number);
+    let date = new Date();
+    date.setHours(h, m, 0, 0);
+    date.setMinutes(date.getMinutes() + minsToAdd);
+    return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+}
+
+// Fetch Student, Teacher, and Calculate Slot
+async function fetchAndAllocatePTM() {
+    const ptmMonth = document.getElementById('ptm-month').value;
+    const ptmDate = document.getElementById('ptm-date').value;
+    const startTime = document.getElementById('ptm-start').value;
+    const endTime = document.getElementById('ptm-end').value;
+    const duration = parseInt(document.getElementById('ptm-duration').value);
+    const roll = document.getElementById('ptm-roll').value.trim().toUpperCase();
+
+    if (!ptmMonth || !ptmDate || !startTime || !endTime || !duration || !roll) {
+        return alert("Please configure Step 1 fully and enter a Roll Number.");
+    }
+
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // 1. Fetch Student Details
+    const { data: stu, error: stuErr } = await db.from('students')
+        .select('full_name, course, mother_mobile, father_mobile')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (stuErr || !stu) return alert("Student not found.");
+
+    // 2. Fetch Teacher Allocation
+    const { data: alloc, error: allocErr } = await db.from('student_allocations')
+        .select('teacher_id')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (allocErr || !alloc) return alert(`No teacher allocated to ${roll}. Please allocate a teacher first in Module 18.`);
+
+    // 3. Fetch Teacher Details
+    const { data: teacher } = await db.from('teacher_details')
+        .select('teacher_name, mobile')
+        .eq('id', alloc.teacher_id)
+        .eq('institute_id', sessionInstID)
+        .single();
+
+    // 4. Find Available Slot (Rule 1 Logic)
+    // Fetch all existing slots for this teacher on this date
+    const { data: booked } = await db.from('ptm_schedule')
+        .select('slot_time')
+        .eq('teacher_id', alloc.teacher_id)
+        .eq('ptm_date', ptmDate)
+        .eq('institute_id', sessionInstID);
+
+    const bookedTimes = booked ? booked.map(b => b.slot_time.substring(0, 5)) : []; // Get "HH:MM"
+    
+    let currentSlot = startTime;
+    let allocatedSlot = null;
+
+    while (currentSlot < endTime) {
+        if (!bookedTimes.includes(currentSlot)) {
+            allocatedSlot = currentSlot;
+            break;
+        }
+        currentSlot = addMinutesToTime(currentSlot, duration);
+    }
+
+    if (!allocatedSlot) {
+        return alert(`All slots for ${teacher.teacher_name} are booked on this date between ${startTime} and ${endTime}.`);
+    }
+
+    // Populate UI
+    document.getElementById('ptm-sname').value = stu.full_name;
+    document.getElementById('ptm-course').value = stu.course;
+    document.getElementById('ptm-tid').value = alloc.teacher_id;
+    document.getElementById('ptm-tname').value = teacher.teacher_name;
+    document.getElementById('ptm-slot-time').value = allocatedSlot;
+    
+    document.getElementById('ptm-tmob').value = teacher.mobile || "";
+    document.getElementById('ptm-mmob').value = stu.mother_mobile || "";
+    document.getElementById('ptm-fmob').value = stu.father_mobile || "";
+
+    // Generate WhatsApp Messages
+    generatePTMWhatsAppLinks(monthYearStr, ptmDate, startTime, endTime, allocatedSlot, teacher.teacher_name, teacher.mobile, stu.mother_mobile, stu.father_mobile);
+}
+
+// Generate the specific automated WhatsApp messages
+function generatePTMWhatsAppLinks(mYear, date, start, end, slot, tName, tMob, mMob, fMob) {
+    const tMsg = encodeURIComponent(`Dear ${tName}, this is to inform you that the PTM for the current month ${mYear} is going to be conducted on ${date} between ${start} and ${end}. Your presence is highly essential. Please confirm.`);
+    const mMsg = encodeURIComponent(`Dear mam, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
+    const fMsg = encodeURIComponent(`Dear sir, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
+
+    setupWALink('wa-ptm-teacher', tMob, tMsg);
+    setupWALink('wa-ptm-mother', mMob, mMsg);
+    setupWALink('wa-ptm-father', fMob, fMsg);
+}
+
+function setupWALink(btnId, mobile, msg) {
+    const btn = document.getElementById(btnId);
+    if (mobile && mobile.length === 10) {
+        btn.href = `https://wa.me/91${mobile}?text=${msg}`;
+        btn.style.pointerEvents = 'auto';
+        btn.style.opacity = '1';
+    } else {
+        btn.href = "#";
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.5';
+    }
+}
+
+// Add PTM Record to Database
+async function addPTMRecord() {
+    const ptmMonth = document.getElementById('ptm-month').value;
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const data = {
+        institute_id: sessionInstID,
+        month_year: monthYearStr,
+        ptm_date: document.getElementById('ptm-date').value,
+        start_time: document.getElementById('ptm-start').value,
+        end_time: document.getElementById('ptm-end').value,
+        slot_duration: parseInt(document.getElementById('ptm-duration').value),
+        status: document.getElementById('ptm-status').value,
+        roll_number: document.getElementById('ptm-roll').value.trim().toUpperCase(),
+        student_name: document.getElementById('ptm-sname').value,
+        course_name: document.getElementById('ptm-course').value,
+        teacher_id: document.getElementById('ptm-tid').value,
+        teacher_name: document.getElementById('ptm-tname').value,
+        slot_time: document.getElementById('ptm-slot-time').value,
+        teacher_mobile: document.getElementById('ptm-tmob').value,
+        mother_mobile: document.getElementById('ptm-mmob').value,
+        father_mobile: document.getElementById('ptm-fmob').value,
+        remarks: document.getElementById('ptm-remarks').value
+    };
+
+    if (!data.roll_number || !data.slot_time) {
+        return alert("Error: Please fetch and allocate a slot before saving.");
+    }
+
+    const { error } = await db.from('ptm_schedule').insert([data]);
+
+    if (error) {
+        if (error.code === '23505') {
+            alert("Database Error: This slot is either already taken OR the student already has a PTM booked for this month.");
+        } else {
+            alert("Save Error: " + error.message);
+        }
+    } else {
+        alert(`Success! Slot ${data.slot_time} booked for ${data.student_name}. You can now use the WhatsApp buttons to inform everyone.`);
+    }
+}
     </script>
 <script>
 if ('serviceWorker' in navigator) {
