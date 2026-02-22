@@ -491,6 +491,7 @@ height: 65px; white-space: nowrap;
 <button class="nav-tab" onclick="showSection('inventory-mod')"><i class="fas fa-boxes"></i> 22. Inventory Manager</button>
 <button class="nav-tab" onclick="showSection('scholarship-mod')"><i class="fas fa-award"></i> 23. Scholarship Tracker</button>
 <button class="nav-tab" onclick="showSection('ptm-mod')"><i class="fas fa-handshake"></i> 24. PTM Schedule</button>
+<button class="nav-tab" onclick="showSection('batch-master')"><i class="fas fa-users-cog"></i> 25. Batch Master</button>
 
 
         </aside>
@@ -1961,6 +1962,68 @@ height: 65px; white-space: nowrap;
                 <button class="btn-add" style="background:#e84393; border-color:#d63031;" onclick="addPTMRecord()">ADD PTM RECORD</button>
 <button class="btn-fetch" onclick="fetchPTMRecordByRoll()">FETCH PTM RECORD</button>
             </div>
+        </div>
+    </div>
+</section>
+
+
+
+
+
+
+
+
+
+
+<!-- 25. BATCH MASTER SECTION -->
+<section id="batch-master" class="content-section">
+    <div class="card" style="border-top: 5px solid #2980b9; max-width: 1100px;">
+        <h3><i class="fas fa-users-cog"></i> Batch Master List</h3>
+        
+        <div class="form-grid">
+            <div class="input-group"><label>Date Today</label><input type="date" id="bm-date"></div>
+            
+            <div class="input-group">
+                <label>Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="bm-roll" placeholder="IMS-XXXX">
+                    <button class="btn-fetch" onclick="autopopulateBatchMaster()" style="padding: 5px 10px;"><i class="fas fa-search"></i> Auto-Fill</button>
+                </div>
+            </div>
+            
+            <div class="input-group"><label>Student Full Name</label><input type="text" id="bm-sname" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Course Name</label><input type="text" id="bm-course" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Teacher ID</label><input type="text" id="bm-tid" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Teacher Name</label><input type="text" id="bm-tname" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>Batch Name</label><input type="text" id="bm-bname" readonly style="background:#eee;"></div>
+            <div class="input-group" style="grid-column: 1/-1;"><label>Remarks</label><input type="text" id="bm-remarks" placeholder="Add remarks..."></div>
+        </div>
+
+        <div class="button-row">
+            <button class="btn-add" onclick="addBatchMasterRecord()">ADD RECORD</button>
+            <button class="btn-fetch" onclick="fetchBatchMasterRecord()">FETCH (By Roll No)</button>
+            <button class="btn-fetch" style="background:#8e44ad;" onclick="listAllByBatch()">LIST STUDENTS (By Batch)</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearBatchMaster()">CLEAR</button>
+        </div>
+
+        <!-- Table Display Area -->
+        <div id="bm-list-area" style="display:none; margin-top: 30px; overflow-x: auto; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #ddd;">
+            <h4 style="margin-bottom: 15px; color: #000; text-align: left;" id="bm-list-title">Student List</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; color: #000;">
+                <thead style="background: #eee;">
+                    <tr>
+                        <th style="padding:10px; border:1px solid #ccc; text-align:left;">Batch Name</th>
+                        <th style="padding:10px; border:1px solid #ccc; text-align:left;">Roll No</th>
+                        <th style="padding:10px; border:1px solid #ccc; text-align:left;">Full Name</th>
+                        <th style="padding:10px; border:1px solid #ccc; text-align:left;">Teacher ID</th>
+                        <th style="padding:10px; border:1px solid #ccc; text-align:left;">Teacher Name</th>
+                        <th style="padding:10px; border:1px solid #ccc; text-align:left;">Course Name</th>
+                    </tr>
+                </thead>
+                <tbody id="bm-list-body">
+                    <!-- Rows will be injected here -->
+                </tbody>
+            </table>
         </div>
     </div>
 </section>
@@ -6192,6 +6255,160 @@ async function fetchPTMRecordByRoll() {
     );
 
     alert("PTM Record for " + data.student_name + " loaded successfully!");
+}
+
+
+
+
+
+
+
+/* ==========================================
+   25. BATCH MASTER LOGIC (TABLE: "list")
+   ========================================== */
+
+// 1. Initialize Date on Load
+document.addEventListener('DOMContentLoaded', () => {
+    const bmDate = document.getElementById('bm-date');
+    if(bmDate) bmDate.value = new Date().toISOString().split('T')[0];
+});
+
+// 2. Clear Form
+function clearBatchMaster() {
+    ['bm-roll','bm-sname','bm-course','bm-tid','bm-tname','bm-bname','bm-remarks'].forEach(id => {
+        document.getElementById(id).value = "";
+    });
+    document.getElementById('bm-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('bm-list-area').style.display = 'none';
+}
+
+// 3. Auto-populate from multiple tables
+async function autopopulateBatchMaster() {
+    const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Please enter a Roll Number first.");
+
+    // A. Fetch from STUDENTS table
+    const { data: stu, error: stuErr } = await db.from('students')
+        .select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+
+    if (stuErr || !stu) return alert("Student not found in admission records.");
+    
+    document.getElementById('bm-sname').value = stu.full_name;
+    document.getElementById('bm-course').value = stu.course || "N/A";
+
+    // B. Fetch linked Teacher ID from STUDENT_ALLOCATIONS
+    const { data: alloc } = await db.from('student_allocations')
+        .select('teacher_id').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+
+    if (alloc && alloc.teacher_id) {
+        document.getElementById('bm-tid').value = alloc.teacher_id;
+
+        // C. Fetch Teacher Name from TEACHER_DETAILS
+        const { data: teacher } = await db.from('teacher_details')
+            .select('teacher_name').eq('id', alloc.teacher_id).eq('institute_id', sessionInstID).maybeSingle();
+        
+        if (teacher) document.getElementById('bm-tname').value = teacher.teacher_name;
+
+        // D. Fetch Batch Name from BATCHES table using Teacher ID
+        const { data: batch } = await db.from('batches')
+            .select('batch_name').eq('teacher_id', alloc.teacher_id).eq('institute_id', sessionInstID).maybeSingle();
+        
+        if (batch) document.getElementById('bm-bname').value = batch.batch_name;
+        else document.getElementById('bm-bname').value = "No Batch Assigned";
+
+    } else {
+        alert("This student is not allocated to a teacher yet. Go to Module 18 (Student Allocation) first.");
+        document.getElementById('bm-tid').value = "N/A";
+        document.getElementById('bm-tname').value = "N/A";
+        document.getElementById('bm-bname').value = "N/A";
+    }
+}
+
+// 4. ADD RECORD to "list" table
+async function addBatchMasterRecord() {
+    const data = {
+        institute_id: sessionInstID,
+        date_today: document.getElementById('bm-date').value,
+        roll_number: document.getElementById('bm-roll').value.trim().toUpperCase(),
+        student_name: document.getElementById('bm-sname').value,
+        course_name: document.getElementById('bm-course').value,
+        teacher_id: document.getElementById('bm-tid').value,
+        teacher_name: document.getElementById('bm-tname').value,
+        batch_name: document.getElementById('bm-bname').value,
+        remarks: document.getElementById('bm-remarks').value
+    };
+
+    if (!data.roll_number || !data.student_name) return alert("Please Auto-Fill the student details first.");
+
+    const { error } = await db.from('list').insert([data]);
+
+    if (error) alert("Error saving record: " + error.message);
+    else {
+        alert("Success! Record added to Batch Master.");
+        clearBatchMaster();
+    }
+}
+
+// 5. FETCH RECORD (By Roll Number)
+async function fetchBatchMasterRecord() {
+    const roll = prompt("Enter Student Roll Number to fetch from Batch Master:");
+    if (!roll) return;
+
+    const { data, error } = await db.from('list')
+        .select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).order('created_at', {ascending: false}).limit(1).maybeSingle();
+
+    if (error || !data) return alert("No Batch Master record found for Roll Number: " + roll);
+
+    document.getElementById('bm-date').value = data.date_today || "";
+    document.getElementById('bm-roll').value = data.roll_number;
+    document.getElementById('bm-sname').value = data.student_name || "";
+    document.getElementById('bm-course').value = data.course_name || "";
+    document.getElementById('bm-tid').value = data.teacher_id || "";
+    document.getElementById('bm-tname').value = data.teacher_name || "";
+    document.getElementById('bm-bname').value = data.batch_name || "";
+    document.getElementById('bm-remarks').value = data.remarks || "";
+    
+    alert("Record Loaded Successfully.");
+}
+
+// 6. LIST ALL STUDENTS (By Batch Name - Case Insensitive)
+async function listAllByBatch() {
+    const bName = prompt("Enter Batch Name to view list of students:");
+    if (!bName) return;
+
+    // Use .ilike() for Case Insensitive matching
+    const { data, error } = await db.from('list')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .ilike('batch_name', `%${bName}%`)
+        .order('student_name', { ascending: true });
+
+    if (error) return alert("Error fetching list: " + error.message);
+
+    const listArea = document.getElementById('bm-list-area');
+    const tbody = document.getElementById('bm-list-body');
+    const title = document.getElementById('bm-list-title');
+
+    if (!data || data.length === 0) {
+        listArea.style.display = 'none';
+        return alert("No students found assigned to Batch matching: " + bName);
+    }
+
+    // Render Table Rows
+    tbody.innerHTML = data.map(row => `
+        <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding:10px;"><b>${row.batch_name}</b></td>
+            <td style="padding:10px;">${row.roll_number}</td>
+            <td style="padding:10px;">${row.student_name}</td>
+            <td style="padding:10px;">${row.teacher_id}</td>
+            <td style="padding:10px;">${row.teacher_name}</td>
+            <td style="padding:10px;">${row.course_name}</td>
+        </tr>
+    `).join('');
+
+    title.innerText = `Search Results for Batch: "${bName}" (${data.length} students)`;
+    listArea.style.display = 'block';
+    listArea.scrollIntoView({ behavior: 'smooth' });
 }
     </script>
 <script>
