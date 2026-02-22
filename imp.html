@@ -2169,22 +2169,22 @@ function isValidMobile(mobile) {
 
 
 
-// Shows/Hides the Institute ID box based on role selected
 function toggleInstIdField() {
     const role = document.getElementById('sig-role').value;
     const instIdField = document.getElementById('sig-inst-id');
-    if (role === 'Teacher' || role === 'Student') {
-        instIdField.style.display = 'block'; // Show box
-    } else {
-        instIdField.style.display = 'none';  // Hide box for Owner
-        instIdField.value = "";
+    if (instIdField) {
+        if (role === 'Teacher' || role === 'Student') {
+            instIdField.style.display = 'block'; // Show box
+        } else {
+            instIdField.style.display = 'none';  // Hide box for Owner
+            instIdField.value = "";
+        }
     }
 }
 
 
 
 
-// 4. Handle Signup
 async function handleSignup() {
     const name = document.getElementById('sig-name').value.trim();
     const role = document.getElementById('sig-role').value;
@@ -2193,24 +2193,7 @@ async function handleSignup() {
     const state = document.getElementById('sig-state').value;
     const mobile = document.getElementById('sig-mobile').value.trim();
 
-
-
-
-    // ADDITION: Generate a unique Institute ID (e.g., CM-4821)
- // Logic: Owners get a NEW ID. Teachers/Students MUST type the existing ID.
-    let finalInstID = "";
-    if (role === 'Owner') {
-        finalInstID = "CM-" + Math.floor(1000 + Math.random() * 9000);
-    } else {
-        finalInstID = document.getElementById('sig-inst-id').value.trim().toUpperCase();
-        if (!finalInstID) return alert("Error: Please enter the Owner's Institute ID to join their institute.");
-    }
-
-
-
-
-
-    // Validations
+    // 1. Basic Validations FIRST
     if (!name) return alert("Error: Please enter Full Name");
     if (!role) return alert("Error: Please select your Status (Role)");
     if (!isValidEmail(email)) return alert("Error: Please enter a valid Email ID");
@@ -2218,12 +2201,24 @@ async function handleSignup() {
     if (!state) return alert("Error: Please select your State/UT");
     if (!isValidMobile(mobile)) return alert("Error: Please enter a valid 10-digit Indian Mobile Number");
 
+    // 2. Institute ID Logic (The Fix)
+    let finalInstID = "";
+    if (role === 'Owner') {
+        // Owners get a brand new ID generated
+        finalInstID = "CM-" + Math.floor(1000 + Math.random() * 9000);
+    } else {
+        // Teachers & Students MUST type the Owner's ID
+        finalInstID = document.getElementById('sig-inst-id').value.trim().toUpperCase();
+        if (!finalInstID) return alert("Error: Please enter the Owner's Institute ID to join their institute.");
+    }
+
+    // 3. Supabase Auth Signup
     const { data, error } = await db.auth.signUp({ email, password: pass });
 
     if (error) return alert("Signup Failed: " + error.message);
 
     if (data.user) {
-        // Create Profile in DB
+        // 4. Create Profile in DB using finalInstID
         const { error: profileError } = await db.from('profiles').insert([{ 
             id: data.user.id, 
             full_name: name, 
@@ -2231,19 +2226,22 @@ async function handleSignup() {
             role: role, 
             mobile_number: mobile,
             state: state,
-            institute_id: newInstID // ADDITION: Link the user to the generated ID
+            institute_id: finalInstID 
         }]);
 
-        if (profileError) alert("Profile Error: " + profileError.message);
-        else {
-            // ADDITION: Added the ID to the success message
-            alert("Success! Account created. Your Institute ID is: " + newInstID + ". Please check your email for verification.");
+        if (profileError) {
+            alert("Profile Error: " + profileError.message);
+        } else {
+            // Show correct success message based on role
+            if (role === 'Owner') {
+                alert("Success! Account created.\n\nYour newly generated Institute ID is: " + finalInstID + "\n(Share this ID with your teachers & students!).\n\nPlease check your email for verification.");
+            } else {
+                alert("Success! You have been successfully linked to Institute " + finalInstID + ".\n\nPlease check your email for verification.");
+            }
             clearForm('signup-form');
         }
     }
 }
-
-
 
 
 
