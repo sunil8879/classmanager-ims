@@ -6422,35 +6422,50 @@ async function listAllByBatch() {
    ROLE-BASED UI RESTRICTIONS (ADD-ONLY)
    ========================================== */
 
+/* ==========================================
+   MASTER AUTHENTICATION & UI CONTROLLER
+   ========================================== */
 let sessionRole = ""; // Store role globally
 
-// This listens in the background. It fires automatically on page load or login.
+// This runs automatically the exact moment someone logs in, logs out, or reloads the page.
 db.auth.onAuthStateChange(async (event, session) => {
     if (session && session.user) {
-        // 1. Fetch the user's role from the database
+        // 1. Fetch the user's complete profile
         const { data: profile } = await db.from('profiles')
-            .select('role')
+            .select('role, full_name, institute_id')
             .eq('id', session.user.id)
             .single();
             
         if (profile) {
+            // 2. Set Global Variables required for data fetching
             sessionRole = profile.role;
-            const tabs = document.querySelectorAll('.nav-tab');
+            sessionUserName = profile.full_name;
+            sessionInstID = profile.institute_id;
             
-            // 2. Loop through all sidebar buttons and hide based on role
+            // 3. Show Welcome Bar & Logout Button
+            document.getElementById('auth-status-bar').style.display = 'flex';
+            document.getElementById('logout-btn').style.display = 'block';
+            document.getElementById('user-greeting').innerText = `Welcome ${sessionUserName} (${sessionRole})`;
+            
+            // 4. Switch Home Page from Visitor Image to Dashboard Stats
+            document.getElementById('home-visitor-view').style.display = 'none';
+            document.getElementById('home-user-view').style.display = 'block';
+            
+            // 5. Fetch and display the actual numbers in the dashboard
+            if (typeof loadHomeDashboardStats === 'function') {
+                loadHomeDashboardStats();
+            }
+
+            // 6. Apply Sidebar Tab Restrictions
+            const tabs = document.querySelectorAll('.nav-tab');
             tabs.forEach(tab => {
                 const tabText = tab.innerText.toLowerCase();
-                
-                // Reset to default flex display just in case
-                tab.style.display = 'flex'; 
+                tab.style.display = 'flex'; // Reset to visible first
                 
                 // --- STUDENT RESTRICTIONS ---
                 if (sessionRole === 'Student') {
-                    // Hide everything EXCEPT these 5 tabs
-                    if (!tabText.includes('home') && 
-                        !tabText.includes('login') && 
-                        !tabText.includes('students portal') && 
-                        !tabText.includes('message corner') && 
+                    if (!tabText.includes('home') && !tabText.includes('login') && 
+                        !tabText.includes('students portal') && !tabText.includes('message corner') && 
                         !tabText.includes('academic calendar')) {
                         tab.style.display = 'none';
                     }
@@ -6458,28 +6473,27 @@ db.auth.onAuthStateChange(async (event, session) => {
                 
                 // --- TEACHER RESTRICTIONS ---
                 if (sessionRole === 'Teacher') {
-                    // Hide financial, admin, and owner-only tabs
-                    if (tabText.includes('fee') || 
-                        tabText.includes('admin') || 
-                        tabText.includes('lead') || 
-                        tabText.includes('expense') || 
-                        tabText.includes('id card') || 
-                        tabText.includes('certificate') || 
-                        tabText.includes('alumni') || 
-                        tabText.includes('inventory') || 
-                        tabText.includes('scholarship') ||
-                        tabText.includes('teacher portal') || 
-                        tabText.includes('student management') ||
-                        tabText.includes('allocation')) {
+                    if (tabText.includes('fee') || tabText.includes('admin') || 
+                        tabText.includes('lead') || tabText.includes('expense') || 
+                        tabText.includes('id card') || tabText.includes('certificate') || 
+                        tabText.includes('alumni') || tabText.includes('inventory') || 
+                        tabText.includes('scholarship') || tabText.includes('teacher portal') || 
+                        tabText.includes('student management') || tabText.includes('allocation')) {
                         tab.style.display = 'none';
                     }
                 }
             });
         }
     } else {
-        // If logged out, reset all tabs to visible
+        // 7. LOGGED OUT STATE - Revert everything back to normal
+        document.getElementById('auth-status-bar').style.display = 'none';
+        document.getElementById('home-visitor-view').style.display = 'block';
+        document.getElementById('home-user-view').style.display = 'none';
         document.querySelectorAll('.nav-tab').forEach(tab => tab.style.display = 'flex');
+        
         sessionRole = "";
+        sessionInstID = "";
+        sessionUserName = "";
     }
 });
     </script>
