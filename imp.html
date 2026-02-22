@@ -636,12 +636,17 @@ height: 65px; white-space: nowrap;
             <h3>Signup</h3>
             <div class="form-grid" style="grid-template-columns: 1fr;" id="signup-form">
                 <input type="text" id="sig-name" placeholder="Full Name">
-                <select id="sig-role">
+
+               <select id="sig-role" onchange="toggleInstIdField()">
                     <option value="">Select Status</option>
                     <option>Owner</option>
                     <option>Teacher</option>
                     <option>Student</option>
                 </select>
+                <!-- NEW: Hidden field that only shows for Teachers/Students -->
+                <input type="text" id="sig-inst-id" placeholder="Enter Owner's Institute ID (e.g. CM-1234)" style="display: none; border: 2px solid #007bff;">
+
+
                 <input type="email" id="sig-email" placeholder="Email Id">
                 
                 <div style="position: relative;">
@@ -2162,6 +2167,23 @@ function isValidMobile(mobile) {
     return /^[6-9]\d{9}$/.test(mobile); // Indian mobile starts with 6,7,8,9
 }
 
+
+
+// Shows/Hides the Institute ID box based on role selected
+function toggleInstIdField() {
+    const role = document.getElementById('sig-role').value;
+    const instIdField = document.getElementById('sig-inst-id');
+    if (role === 'Teacher' || role === 'Student') {
+        instIdField.style.display = 'block'; // Show box
+    } else {
+        instIdField.style.display = 'none';  // Hide box for Owner
+        instIdField.value = "";
+    }
+}
+
+
+
+
 // 4. Handle Signup
 async function handleSignup() {
     const name = document.getElementById('sig-name').value.trim();
@@ -2171,8 +2193,22 @@ async function handleSignup() {
     const state = document.getElementById('sig-state').value;
     const mobile = document.getElementById('sig-mobile').value.trim();
 
+
+
+
     // ADDITION: Generate a unique Institute ID (e.g., CM-4821)
-    const newInstID = "CM-" + Math.floor(1000 + Math.random() * 9000);
+ // Logic: Owners get a NEW ID. Teachers/Students MUST type the existing ID.
+    let finalInstID = "";
+    if (role === 'Owner') {
+        finalInstID = "CM-" + Math.floor(1000 + Math.random() * 9000);
+    } else {
+        finalInstID = document.getElementById('sig-inst-id').value.trim().toUpperCase();
+        if (!finalInstID) return alert("Error: Please enter the Owner's Institute ID to join their institute.");
+    }
+
+
+
+
 
     // Validations
     if (!name) return alert("Error: Please enter Full Name");
@@ -2206,6 +2242,18 @@ async function handleSignup() {
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
 // 5. Handle Login
 // 5. Updated Handle Login with Role Verification
 // Global variable to store name for the "Bye Bye" message
