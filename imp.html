@@ -6417,6 +6417,76 @@ async function listAllByBatch() {
 
 
 
+/* ==========================================
+   ROLE-BASED TAB VISIBILITY (ADD-ON)
+   ========================================== */
+async function applyRoleVisibility() {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return; 
+
+    // Fetch the user's role from the database
+    const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
+    if (!profile) return;
+
+    const role = profile.role;
+    const tabs = document.querySelectorAll('aside.sidebar .nav-tab');
+
+    // Define visibility rules based on your prompt
+    const studentAllowed = ['home', 'login', 'students', 'student-p', 'id-gen', 'cert-gen', 'tracking', 'exam-mod', 'message-corner', 'calendar-mod', 'scholarship-mod', 'ptm-mod'];
+    const teacherBlocked = ['fee', 'reminder'];
+
+    // Apply the rules by reading the 'onclick' attribute of each tab
+    tabs.forEach(tab => {
+        const clickAttr = tab.getAttribute('onclick') || "";
+        const match = clickAttr.match(/showSection\('([^']+)'\)/);
+        
+        if (match) {
+            const sectionId = match[1];
+            
+            if (role === 'Owner') {
+                tab.style.display = ''; // Shows all 25 tabs
+            } else if (role === 'Teacher') {
+                tab.style.display = teacherBlocked.includes(sectionId) ? 'none' : ''; // Hides Fee and Reminder
+            } else if (role === 'Student') {
+                tab.style.display = studentAllowed.includes(sectionId) ? '' : 'none'; // Shows only the 10 listed + Home/Login
+            }
+        }
+    });
+}
+
+// Observe changes to the Auth Status Bar to trigger visibility rules securely on login/page load
+const authObserver = new MutationObserver((mutations) => {
+    mutations.forEach(mutation => {
+        if (mutation.attributeName === 'style') {
+            const displayStyle = document.getElementById('auth-status-bar').style.display;
+            if (displayStyle === 'flex') {
+                applyRoleVisibility();
+            } else {
+                // Restore all tabs when logged out
+                document.querySelectorAll('aside.sidebar .nav-tab').forEach(tab => tab.style.display = '');
+            }
+        }
+    });
+});
+
+// Initialize the observer
+const authBar = document.getElementById('auth-status-bar');
+if (authBar) {
+    authObserver.observe(authBar, { attributes: true });
+    // Safety check in case the session loaded faster than the observer
+    if (authBar.style.display === 'flex') applyRoleVisibility();
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
     </script>
