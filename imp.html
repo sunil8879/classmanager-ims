@@ -6410,6 +6410,78 @@ async function listAllByBatch() {
     listArea.style.display = 'block';
     listArea.scrollIntoView({ behavior: 'smooth' });
 }
+
+
+
+
+
+
+
+
+/* ==========================================
+   ROLE-BASED UI RESTRICTIONS (ADD-ONLY)
+   ========================================== */
+
+let sessionRole = ""; // Store role globally
+
+// This listens in the background. It fires automatically on page load or login.
+db.auth.onAuthStateChange(async (event, session) => {
+    if (session && session.user) {
+        // 1. Fetch the user's role from the database
+        const { data: profile } = await db.from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+            
+        if (profile) {
+            sessionRole = profile.role;
+            const tabs = document.querySelectorAll('.nav-tab');
+            
+            // 2. Loop through all sidebar buttons and hide based on role
+            tabs.forEach(tab => {
+                const tabText = tab.innerText.toLowerCase();
+                
+                // Reset to default flex display just in case
+                tab.style.display = 'flex'; 
+                
+                // --- STUDENT RESTRICTIONS ---
+                if (sessionRole === 'Student') {
+                    // Hide everything EXCEPT these 5 tabs
+                    if (!tabText.includes('home') && 
+                        !tabText.includes('login') && 
+                        !tabText.includes('students portal') && 
+                        !tabText.includes('message corner') && 
+                        !tabText.includes('academic calendar')) {
+                        tab.style.display = 'none';
+                    }
+                }
+                
+                // --- TEACHER RESTRICTIONS ---
+                if (sessionRole === 'Teacher') {
+                    // Hide financial, admin, and owner-only tabs
+                    if (tabText.includes('fee') || 
+                        tabText.includes('admin') || 
+                        tabText.includes('lead') || 
+                        tabText.includes('expense') || 
+                        tabText.includes('id card') || 
+                        tabText.includes('certificate') || 
+                        tabText.includes('alumni') || 
+                        tabText.includes('inventory') || 
+                        tabText.includes('scholarship') ||
+                        tabText.includes('teacher portal') || 
+                        tabText.includes('student management') ||
+                        tabText.includes('allocation')) {
+                        tab.style.display = 'none';
+                    }
+                }
+            });
+        }
+    } else {
+        // If logged out, reset all tabs to visible
+        document.querySelectorAll('.nav-tab').forEach(tab => tab.style.display = 'flex');
+        sessionRole = "";
+    }
+});
     </script>
 <script>
 if ('serviceWorker' in navigator) {
