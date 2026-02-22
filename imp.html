@@ -6419,83 +6419,76 @@ async function listAllByBatch() {
 
 
 /* ==========================================
-   ROLE-BASED UI RESTRICTIONS (ADD-ONLY)
+   ADD-ONLY: SAFE ROLE RESTRICTIONS & UI SWAPPER
    ========================================== */
+setTimeout(() => {
+    try {
+        db.auth.onAuthStateChange(async (event, session) => {
+            if (session && session.user) {
+                // 1. Fetch user role safely without altering your global variables
+                const { data: profile } = await db.from('profiles').select('role').eq('id', session.user.id).single();
+                
+                if (profile) {
+                    const userRole = profile.role;
+                    
+                    // 2. FORCE HOME PAGE SWAP (Hide Visitor Image, Show Numbers Dashboard)
+                    const visitorView = document.getElementById('home-visitor-view');
+                    const userView = document.getElementById('home-user-view');
+                    if (visitorView) visitorView.style.display = 'none';
+                    if (userView) userView.style.display = 'block';
 
-/* ==========================================
-   MASTER AUTHENTICATION & UI CONTROLLER
-   ========================================== */
-let sessionRole = ""; // Store role globally
+                    // 3. FORCE DASHBOARD NUMBERS TO LOAD
+                    setTimeout(() => {
+                        if (typeof loadHomeDashboardStats === 'function') {
+                            loadHomeDashboardStats();
+                        }
+                    }, 500); // Slight delay to ensure your main code sets sessionInstID first
 
-// This runs automatically the exact moment someone logs in, logs out, or reloads the page.
-db.auth.onAuthStateChange(async (event, session) => {
-    if (session && session.user) {
-        // 1. Fetch the user's complete profile
-        const { data: profile } = await db.from('profiles')
-            .select('role, full_name, institute_id')
-            .eq('id', session.user.id)
-            .single();
-            
-        if (profile) {
-            // 2. Set Global Variables required for data fetching
-            sessionRole = profile.role;
-            sessionUserName = profile.full_name;
-            sessionInstID = profile.institute_id;
-            
-            // 3. Show Welcome Bar & Logout Button
-            document.getElementById('auth-status-bar').style.display = 'flex';
-            document.getElementById('logout-btn').style.display = 'block';
-            document.getElementById('user-greeting').innerText = `Welcome ${sessionUserName} (${sessionRole})`;
-            
-            // 4. Switch Home Page from Visitor Image to Dashboard Stats
-            document.getElementById('home-visitor-view').style.display = 'none';
-            document.getElementById('home-user-view').style.display = 'block';
-            
-            // 5. Fetch and display the actual numbers in the dashboard
-            if (typeof loadHomeDashboardStats === 'function') {
-                loadHomeDashboardStats();
+                    // 4. HIDE TABS BASED ON ROLE
+                    const allTabs = document.querySelectorAll('.nav-tab');
+                    allTabs.forEach(tab => {
+                        const text = tab.innerText.toLowerCase();
+                        
+                        // Hide Login tab for ALL logged-in users
+                        if (text.includes('login')) {
+                            tab.style.display = 'none';
+                            return; 
+                        }
+
+                        // Student Restrictions
+                        if (userRole === 'Student') {
+                            if (!text.includes('home') && !text.includes('students portal') && 
+                                !text.includes('message corner') && !text.includes('academic calendar')) {
+                                tab.style.display = 'none';
+                            }
+                        }
+                        
+                        // Teacher Restrictions
+                        if (userRole === 'Teacher') {
+                            if (text.includes('fee') || text.includes('admin') || text.includes('lead') || 
+                                text.includes('expense') || text.includes('id card') || text.includes('certificate') || 
+                                text.includes('alumni') || text.includes('inventory') || text.includes('scholarship') || 
+                                text.includes('teacher portal') || text.includes('student management') || 
+                                text.includes('allocation')) {
+                                tab.style.display = 'none';
+                            }
+                        }
+                    });
+                }
+            } else {
+                // 5. IF LOGGED OUT: REVERT EVERYTHING TO VISITOR VIEW
+                const visitorView = document.getElementById('home-visitor-view');
+                const userView = document.getElementById('home-user-view');
+                if (visitorView) visitorView.style.display = 'block';
+                if (userView) userView.style.display = 'none';
+                
+                document.querySelectorAll('.nav-tab').forEach(tab => tab.style.display = 'flex');
             }
-
-            // 6. Apply Sidebar Tab Restrictions
-            const tabs = document.querySelectorAll('.nav-tab');
-            tabs.forEach(tab => {
-                const tabText = tab.innerText.toLowerCase();
-                tab.style.display = 'flex'; // Reset to visible first
-                
-                // --- STUDENT RESTRICTIONS ---
-                if (sessionRole === 'Student') {
-                    if (!tabText.includes('home') && !tabText.includes('login') && 
-                        !tabText.includes('students portal') && !tabText.includes('message corner') && 
-                        !tabText.includes('academic calendar')) {
-                        tab.style.display = 'none';
-                    }
-                }
-                
-                // --- TEACHER RESTRICTIONS ---
-                if (sessionRole === 'Teacher') {
-                    if (tabText.includes('fee') || tabText.includes('admin') || 
-                        tabText.includes('lead') || tabText.includes('expense') || 
-                        tabText.includes('id card') || tabText.includes('certificate') || 
-                        tabText.includes('alumni') || tabText.includes('inventory') || 
-                        tabText.includes('scholarship') || tabText.includes('teacher portal') || 
-                        tabText.includes('student management') || tabText.includes('allocation')) {
-                        tab.style.display = 'none';
-                    }
-                }
-            });
-        }
-    } else {
-        // 7. LOGGED OUT STATE - Revert everything back to normal
-        document.getElementById('auth-status-bar').style.display = 'none';
-        document.getElementById('home-visitor-view').style.display = 'block';
-        document.getElementById('home-user-view').style.display = 'none';
-        document.querySelectorAll('.nav-tab').forEach(tab => tab.style.display = 'flex');
-        
-        sessionRole = "";
-        sessionInstID = "";
-        sessionUserName = "";
+        });
+    } catch(err) {
+        console.error("UI Restriction Script Error:", err);
     }
-});
+}, 1000); // 1 second delay ensures it doesn't conflict with your existing script loading
     </script>
 <script>
 if ('serviceWorker' in navigator) {
