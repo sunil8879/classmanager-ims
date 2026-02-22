@@ -6429,9 +6429,15 @@ async function applyRoleVisibility() {
     if (!profile) return;
 
     const role = profile.role;
-    const tabs = document.querySelectorAll('aside.sidebar .nav-tab');
+    
+    // --- NEW: HIDE DASHBOARD STATS FOR STUDENTS & TEACHERS ---
+    if (role !== 'Owner') {
+        document.getElementById('home-user-view').style.display = 'none';
+        document.getElementById('home-visitor-view').style.display = 'block';
+    }
+    // ---------------------------------------------------------
 
-    // Define visibility rules based on your prompt
+    const tabs = document.querySelectorAll('aside.sidebar .nav-tab');
     const studentAllowed = ['home', 'login', 'students', 'student-p', 'id-gen', 'cert-gen', 'tracking', 'exam-mod', 'message-corner', 'calendar-mod', 'scholarship-mod', 'ptm-mod'];
     const teacherBlocked = ['fee', 'reminder'];
 
@@ -6453,7 +6459,6 @@ async function applyRoleVisibility() {
         }
     });
 }
-
 // Observe changes to the Auth Status Bar to trigger visibility rules securely on login/page load
 const authObserver = new MutationObserver((mutations) => {
     mutations.forEach(mutation => {
