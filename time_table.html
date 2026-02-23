@@ -753,18 +753,22 @@ if (dayStr.toUpperCase() !== activeDayName) {
             const isBooked = bookings?.some(b =>
                 b.time_slot === timeStr && b.day === dayStr
             );
-
-        if (isBooked) {
+// --- REPLACE ONLY THIS PART INSIDE generateTimeTable() ---
+if (isBooked) {
     td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
     td.classList.add("booked-cell");
 
-    // Robust check: Find the booking
-    const bData = bookings ? bookings.find(b => b.time_slot === timeStr && b.day === dayStr) : null;
-    
-    // Only show button if we actually found the ID in the database
-    if (bData && bData.id) {
-        td.innerHTML += `<br><button type="button" style="background:red; color:white; border:none; padding:3px 6px; font-size:0.7rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE FAKE</button>`;
-    } else {
+    // NEW CLEAN MATCH: trim() removes hidden spaces, toUpperCase() ignores case
+    const bData = bookings.find(b => 
+        b.time_slot.trim().toUpperCase() === timeStr.trim().toUpperCase() && 
+        b.day.trim().toUpperCase() === dayStr.trim().toUpperCase()
+    );
+
+    if (bData) {
+        td.innerHTML += `<br><button type="button" style="background:red; color:white; border:2px solid black; padding:4px 8px; font-size:0.75rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold; display:inline-block;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE FAKE</button>`;
+    }
+}
+ else {
         console.warn("Booking found by 'some' but not by 'find'. Check for time-slot text mismatches.");
     }
 }
@@ -926,18 +930,19 @@ async function bookSlot(day, time, cellId) {
         .select()
         .single();
 
+// --- UPDATE THIS SECTION AT THE END OF bookSlot() ---
     if (insertError) return alert("Error saving booking: " + insertError.message);
 
-    // 6️⃣ Update the timetable cell visually
+    // 6️⃣ Update the timetable cell visually (NOW INCLUDING THE DELETE BUTTON)
     const cell = document.getElementById(cellId);
     cell.innerHTML = `
-        <div class="booked-tag tag-teacher">Teacher: ${teacherName}</div>
-        <div class="booked-tag tag-student">Student: ${student}</div>
-        <div class="booked-tag tag-course">Course: ${course}</div>
+        <div class="booked-tag">Teacher: ${teacherName}</div>
+        <div class="booked-tag">Student: ${student}</div>
+        <button type="button" style="background:red; color:white; border:2px solid black; padding:4px 8px; font-size:0.75rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold;" onclick="deleteFakeBooking('${bookingData.id}')">❌ DELETE FAKE</button>
     `;
     cell.classList.add("booked-cell");
 
-    alert("Booking successfully saved in database and confirmed.");
+    alert("Booking successfully saved. (If this was a test, use the RED button to delete it).");
 }
         function closeModal() {
             document.getElementById('confirm-modal').style.display = 'none';
