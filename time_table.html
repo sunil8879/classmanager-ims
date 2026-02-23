@@ -797,52 +797,36 @@ if (dayStr.toUpperCase() !== activeDayName) {
 
     return `${getOrdinalNum(day)} ${month} ${year}`;
 }
-        // --- 4. BOOKING & CONFIRMATION LOGIC ---
+// --- 4. BOOKING & CONFIRMATION LOGIC ---
 async function bookSlot(day, time, cellId) {
-
-   const roll = document.getElementById('f-roll').value.trim();
+    // 1️⃣ Get values from form
+    const roll = document.getElementById('f-roll').value.trim();
     const student = document.getElementById('f-student-name').value.trim();
     const course = document.getElementById('f-course').value;
     const teacherSelect = document.getElementById("f-teacher");
     const teacherId = teacherSelect.value;
     const dateVal = document.getElementById('f-date').value;
 
+    // --- DATE/DAY SYNC CHECK ---
+    const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const selectedDateObj = new Date(dateVal);
+    const actualDayName = daysOfWeek[selectedDateObj.getDay()];
 
+    if (day.toUpperCase() !== actualDayName) {
+        alert(`❌ DATE CONFLICT: ${dateVal} is a ${actualDayName}. \n\nYou cannot book this in the ${day} column.`);
+        return;
+    }
 
+    // --- ONLY TOMORROW CHECK ---
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    selectedDateObj.setHours(0, 0, 0, 0);
 
-
-// --- ADD THIS AT THE START OF bookSlot() ---
-const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-const selectedDateObj = new Date(dateVal);
-const actualDayName = daysOfWeek[selectedDateObj.getDay()]; // Gets "WEDNESDAY" etc.
-
-// 1. Logic Check: Does the column clicked match the actual day of the date?
-if (day.toUpperCase() !== actualDayName) {
-    alert(`❌ DATE CONFLICT: ${dateVal} is a ${actualDayName}. \n\nYou cannot book this in the ${day} column.`);
-    return;
-}
-
-// 2. "Only Tomorrow" Check: Is the selected date actually tomorrow?
-const tomorrow = new Date();
-tomorrow.setDate(tomorrow.getDate() + 1);
-tomorrow.setHours(0, 0, 0, 0);
-selectedDateObj.setHours(0, 0, 0, 0);
-
-if (selectedDateObj.getTime() !== tomorrow.getTime()) {
-    alert(`❌ INVALID DATE: Bookings are ONLY allowed for Tomorrow (${tomorrow.toDateString()}).`);
-    return;
-}
-// --- END OF ADDITION ---
-
-
-
-
-
-
-
-
-
-
+    if (selectedDateObj.getTime() !== tomorrow.getTime()) {
+        alert(`❌ INVALID DATE: Bookings are ONLY allowed for Tomorrow (${tomorrow.toDateString()}).`);
+        return;
+    }
 
     // 2️⃣ Standard Form Validation
     if (!roll || !student) return alert("Please enter and fetch student details.");
@@ -850,35 +834,28 @@ if (selectedDateObj.getTime() !== tomorrow.getTime()) {
     if (!teacherId) return alert("Please select a teacher.");
     if (!dateVal) return alert("Please select booking date.");
 
-    // 🔴 Past date check (Prevents booking for yesterday)
-    const selectedDate = new Date(dateVal);
+    // 🔴 Past date check
     const today = new Date();
-    today.setHours(0,0,0,0); // ignore time
-    if (selectedDate < today) {
+    today.setHours(0,0,0,0);
+    if (selectedDateObj < today) {
         return alert("Booking date cannot be in the past.");
     }
 
-    // ============================================
     // 🚨 RULE 1: STRICT AVAILABILITY ENFORCEMENT
-    // ============================================
     const selectedOption = teacherSelect.options[teacherSelect.selectedIndex];
     const allowedSlots = selectedOption.dataset.timeslots || "";
     const availStatus = selectedOption.dataset.availability || "No";
 
-    // If the teacher said "No" to availability OR the specific time clicked is not in their allowed list
     if (availStatus !== "Yes" || !allowedSlots.includes(time)) {
         return alert("BOOKING NOT AVAILABLE FOR THIS TIME SLOT.");
     }
 
-    // 3️⃣ Auth Check
+    // 3️⃣ Pre-Check: Is teacher already booked?
     if (!sessionInstID) {
         const isAuth = await authenticateForBooking();
         if (!isAuth) return;
     }
 
-
-
-    // 4️⃣ Check if teacher is already booked at this time by someone else
     const { data: existingBooking } = await db
         .from("class_bookings")
         .select("id")
@@ -890,7 +867,34 @@ if (selectedDateObj.getTime() !== tomorrow.getTime()) {
 
     if (existingBooking) return alert("This teacher is already booked in this time slot.");
 
-    // 5️⃣ Insert booking into Supabase (ONLY happens if all rules passed!)
+    // ============================================================
+    // 4️⃣ WHATSAPP FIRST (THE "SEND" VERIFICATION)
+    // ============================================================
+    const teacherPhone = selectedOption.dataset.mobile;
+    const teacherName = selectedOption.dataset.name;
+
+    if (teacherPhone) {
+        const message = `📚 New Class Booking\n\nStudent: ${student}\nCourse: ${course}\nDate: ${dateVal}\nTime: ${time}`;
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
+        
+        // Open WhatsApp in a new tab
+        window.open(whatsappURL, "_blank");
+
+        // IMMEDIATELY ASK THE USER IF THEY SENT IT
+        const userConfirmed = confirm(`WhatsApp has been opened for ${teacherName}.\n\nDID YOU SEND THE MESSAGE?\n\nClick OK ONLY if you clicked 'Send' in WhatsApp. If you closed WhatsApp without sending, click CANCEL.`);
+
+        if (!userConfirmed) {
+            alert("Booking Cancelled. The slot will remain open because the message was not sent.");
+            return; // ⛔ STOP HERE. DO NOT SAVE TO DATABASE.
+        }
+    } else {
+        return alert("Teacher mobile number not found. Cannot proceed with booking.");
+    }
+
+    // ============================================================
+    // 5️⃣ SAVE TO DATABASE (Only reached if user clicks OK)
+    // ============================================================
     const { data: bookingData, error: insertError } = await db
         .from("class_bookings")
         .insert({
@@ -907,24 +911,15 @@ if (selectedDateObj.getTime() !== tomorrow.getTime()) {
     if (insertError) return alert("Error saving booking: " + insertError.message);
 
     // 6️⃣ Update the timetable cell visually
-    const teacherName = teacherSelect.selectedOptions[0].dataset.name || '';
     const cell = document.getElementById(cellId);
     cell.innerHTML = `
         <div class="booked-tag tag-teacher">Teacher: ${teacherName}</div>
         <div class="booked-tag tag-student">Student: ${student}</div>
         <div class="booked-tag tag-course">Course: ${course}</div>
     `;
+    cell.classList.add("booked-cell");
 
-    // 7️⃣ WhatsApp Notification to teacher
-    const teacherPhone = teacherSelect.selectedOptions[0].dataset.mobile; 
-  if (teacherPhone && confirm("Booking saved in Database. Open WhatsApp to notify the teacher?")) {
-        const message = `📚 New Class Booking\n\nStudent: ${student}\nCourse: ${course}\nDate: ${dateVal}\nTime: ${time}\nBooking ID: ${bookingData.id}`;
-        const encodedMessage = encodeURIComponent(message);
-        const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
-        window.open(whatsappURL, "_blank"); 
-    }
-
-    alert("Booking saved successfully and teacher notified via WhatsApp.");
+    alert("Booking successfully saved in database and confirmed.");
 }
         function closeModal() {
             document.getElementById('confirm-modal').style.display = 'none';
