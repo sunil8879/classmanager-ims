@@ -440,6 +440,13 @@ input[readonly] {
         
         </div>
 
+
+
+<div id="preferred-slot-status" style="text-align: center; font-weight: 900; margin-bottom: 15px; font-size: 1.1rem;"></div>
+
+
+
+
         <button type="button" class="btn-generate" onclick="generateTimeTable()">GENERATE AUTO TIME TABLE</button>
     </div>
 
@@ -594,6 +601,35 @@ const DAYS = [
         .select("*")
         .eq("institute_id", sessionInstID)
         .eq("booking_date", dateVal);
+
+
+
+
+// --- ADD THIS BLOCK INSIDE generateTimeTable() after "const { data: bookings, error } = await ..." ---
+
+const preferredTime = document.getElementById('f-time').value;
+const selectedTeacherId = document.getElementById('f-teacher').value;
+const statusDiv = document.getElementById('preferred-slot-status');
+
+// Filter the results specifically for the selected teacher and selected time slot
+const isPreferredTaken = bookings?.some(b => 
+    b.time_slot === preferredTime && 
+    b.teacher_id === selectedTeacherId
+);
+
+if (isPreferredTaken) {
+    statusDiv.innerText = "❌ THE PREFERRED SLOT IS NOT AVAILABLE. TRY OTHER SLOTS.";
+    statusDiv.style.color = "#ff4757"; // Red
+} else {
+    statusDiv.innerText = "✅ THE PREFERRED SLOT IS AVAILABLE";
+    statusDiv.style.color = "#2ed573"; // Green
+}
+// --- END OF ADDITION ---
+
+
+
+
+
 
     if (error) {
         console.error("Error fetching bookings:", error);
