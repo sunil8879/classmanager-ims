@@ -6568,6 +6568,42 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 
+
+
+
+/* --- FINAL FIREFOX & DESKTOP STABILITY FIX --- */
+window.onload = function() {
+    // 1. Check if the URL contains the recovery tokens
+    const isRecovery = window.location.hash.includes("type=recovery") || 
+                       window.location.href.includes("type=recovery");
+
+    if (isRecovery) {
+        console.log("Recovery mode detected. Initializing prompt...");
+        
+        // 2. We use a 1.5 second delay specifically for Firefox
+        setTimeout(async () => {
+            const newPass = window.prompt("ACTION REQUIRED: Please enter your NEW password:");
+            
+            if (newPass && newPass.length >= 6) {
+                const { error } = await db.auth.updateUser({ password: newPass });
+                if (error) {
+                    alert("Error: " + error.message);
+                } else {
+                    alert("Success! Password updated.");
+                    // Clean the URL and redirect to login
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    showSection('login');
+                }
+            } else if (newPass) {
+                alert("Password must be at least 6 characters.");
+            }
+        }, 1500); 
+    }
+};
+
+
+
+
 /* ==========================================
    ROLE-BASED TAB VISIBILITY (ADD-ON)
    ========================================== */
