@@ -647,8 +647,8 @@ const DAYS = [
         }
 
         // --- 3. GRID GENERATOR LOGIC ---
- async function generateTimeTable() {
-
+// --- 3. GRID GENERATOR LOGIC (FIXED BRACES) ---
+async function generateTimeTable() {
     const dateVal = document.getElementById('f-date').value;
 
     if (!dateVal) {
@@ -660,41 +660,28 @@ const DAYS = [
         if (!isAuth) return;
     }
 
-    // 🔵 Fetch all bookings for selected date
+    // Fetch all bookings for selected date
     const { data: bookings, error } = await db
         .from("class_bookings")
         .select("*")
         .eq("institute_id", sessionInstID)
         .eq("booking_date", dateVal);
 
-
-
-
-
-
-
-
-
-
-
-// --- UPDATED BLOCK FOR PREFERRED SLOT CHECK ---
+    // --- PREFERRED SLOT CHECK ---
     const preferredTime = document.getElementById('f-time').value;
     const teacherSelect = document.getElementById('f-teacher');
     const selectedTeacherId = teacherSelect.value;
     const statusDiv = document.getElementById('preferred-slot-status');
 
-    // 1. Get the Teacher's allowed slots and availability status
     const selectedOption = teacherSelect.options[teacherSelect.selectedIndex];
     const allowedSlots = selectedOption ? (selectedOption.dataset.timeslots || "") : "";
     const isAvailableToday = selectedOption ? (selectedOption.dataset.availability === "Yes") : false;
 
-    // 2. Check the fetched bookings to see if THIS teacher is already busy at THIS time
     const isTakenByBooking = bookings?.some(b => 
         b.time_slot === preferredTime && 
         b.teacher_id === selectedTeacherId
     );
 
-    // 3. Display the message
     if (!selectedTeacherId) {
         statusDiv.innerText = "⚠️ PLEASE SELECT A TEACHER FIRST.";
         statusDiv.style.color = "orange";
@@ -708,14 +695,6 @@ const DAYS = [
         statusDiv.innerText = "✅ THE PREFERRED SLOT IS AVAILABLE";
         statusDiv.style.color = "#2ed573";
     }
-    // --- END OF UPDATED BLOCK ---
-
-
-
-
-
-
-
 
     if (error) {
         console.error("Error fetching bookings:", error);
@@ -726,7 +705,6 @@ const DAYS = [
     tbody.innerHTML = '';
 
     TIME_SLOTS.forEach((timeStr, rowIndex) => {
-
         const tr = document.createElement('tr');
 
         // TIME COLUMN
@@ -736,56 +714,45 @@ const DAYS = [
         tr.appendChild(tdTime);
 
         DAYS.forEach((dayStr, colIndex) => {
-
             const td = document.createElement('td');
             const cellId = `cell-${rowIndex}-${colIndex}`;
-// --- ADD THIS INSIDE THE DAYS.forEach LOOP in generateTimeTable() ---
-const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-const activeDayName = daysOfWeek[new Date(dateVal).getDay()];
-
-if (dayStr.toUpperCase() !== activeDayName) {
-    td.style.opacity = "0.3"; // Dim out the other days
-    td.style.pointerEvents = "none"; // Disable clicking other days
-}
             td.id = cellId;
 
-            // 🔴 Check if this slot is booked for this day & time
+            // Sync Date/Day logic
+            const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+            const activeDayName = daysOfWeek[new Date(dateVal).getDay()];
+
+            if (dayStr.toUpperCase() !== activeDayName) {
+                td.style.opacity = "0.3";
+                td.style.pointerEvents = "none";
+            }
+
+            // Check if booked
             const isBooked = bookings?.some(b =>
                 b.time_slot === timeStr && b.day === dayStr
             );
-// --- REPLACE ONLY THIS PART INSIDE generateTimeTable() ---
-if (isBooked) {
-    td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
-    td.classList.add("booked-cell");
 
-    // NEW CLEAN MATCH: trim() removes hidden spaces, toUpperCase() ignores case
-    const bData = bookings.find(b => 
-        b.time_slot.trim().toUpperCase() === timeStr.trim().toUpperCase() && 
-        b.day.trim().toUpperCase() === dayStr.trim().toUpperCase()
-    );
+            if (isBooked) {
+                td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
+                td.classList.add("booked-cell");
 
-    if (bData) {
-        td.innerHTML += `<br><button type="button" style="background:red; color:white; border:2px solid black; padding:4px 8px; font-size:0.75rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold; display:inline-block;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE FAKE</button>`;
-    }
-}
- else {
-        console.warn("Booking found by 'some' but not by 'find'. Check for time-slot text mismatches.");
-    }
-}
- else {
+                // Case-insensitive find for Firefox
+                const bData = bookings.find(b => 
+                    b.time_slot.trim().toUpperCase() === timeStr.trim().toUpperCase() && 
+                    b.day.trim().toUpperCase() === dayStr.trim().toUpperCase()
+                );
+
+                if (bData) {
+                    td.innerHTML += `<br><button type="button" style="background:red; color:white; border:2px solid black; padding:4px 8px; font-size:0.75rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold; display:inline-block;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE FAKE</button>`;
+                }
+            } else {
                 td.innerHTML = `
                     <span class="open-slot">OPEN SLOT</span>
-                    <button type="button"
-                        class="btn-book"
-                        onclick="bookSlot('${dayStr}', '${timeStr}', '${cellId}')">
-                        BOOK
-                    </button>
+                    <button type="button" class="btn-book" onclick="bookSlot('${dayStr}', '${timeStr}', '${cellId}')">BOOK</button>
                 `;
             }
-
             tr.appendChild(td);
         });
-
         tbody.appendChild(tr);
     });
 
