@@ -353,6 +353,21 @@ input[readonly] {
         #print-area { position: absolute; top: 0; left: 0; width: 100%; border: none; box-shadow: none; }
         .no-print { display: none !important; }
     }
+
+
+
+
+
+
+/* ADD THIS TO YOUR STYLE TAG */
+.btn-fetch {
+    min-width: 100px; /* Ensures the button doesn't shrink to zero */
+    flex-shrink: 0;   /* Prevents the input from pushing the button out */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0 !important; /* Forces background color */
+}
 </style>
 </head>
 <body>
@@ -608,41 +623,45 @@ const DAYS = [
 
 
 
+
+
+
+
 // --- UPDATED BLOCK FOR PREFERRED SLOT CHECK ---
-const preferredTime = document.getElementById('f-time').value;
-const teacherSelect = document.getElementById('f-teacher');
-const selectedTeacherId = teacherSelect.value;
-const statusDiv = document.getElementById('preferred-slot-status');
+    const preferredTime = document.getElementById('f-time').value;
+    const teacherSelect = document.getElementById('f-teacher');
+    const selectedTeacherId = teacherSelect.value;
+    const statusDiv = document.getElementById('preferred-slot-status');
 
-// 1. Get the Teacher's allowed slots from the dropdown data
-const selectedOption = teacherSelect.options[teacherSelect.selectedIndex];
-const allowedSlots = selectedOption ? (selectedOption.dataset.timeslots || "") : "";
-const isAvailableToday = selectedOption ? (selectedOption.dataset.availability === "Yes") : false;
+    // 1. Get the Teacher's allowed slots and availability status
+    const selectedOption = teacherSelect.options[teacherSelect.selectedIndex];
+    const allowedSlots = selectedOption ? (selectedOption.dataset.timeslots || "") : "";
+    const isAvailableToday = selectedOption ? (selectedOption.dataset.availability === "Yes") : false;
 
-// 2. Check if it's already booked in the database
-const isTakenByBooking = bookings?.some(b => 
-    b.time_slot === preferredTime && 
-    b.teacher_id === selectedTeacherId
-);
+    // 2. Check the fetched bookings to see if THIS teacher is already busy at THIS time
+    const isTakenByBooking = bookings?.some(b => 
+        b.time_slot === preferredTime && 
+        b.teacher_id === selectedTeacherId
+    );
 
-// 3. Final Availability Logic
-if (!selectedTeacherId) {
-    statusDiv.innerText = "⚠️ PLEASE SELECT A TEACHER FIRST.";
-    statusDiv.style.color = "orange";
-} else if (isAvailableToday === false || !allowedSlots.includes(preferredTime)) {
-    // Teacher doesn't work during this time
-    statusDiv.innerText = "❌ THE PREFERRED SLOT IS NOT IN TEACHER'S WORK HOURS.";
-    statusDiv.style.color = "#ff4757";
-} else if (isTakenByBooking) {
-    // Teacher works then, but someone else already booked it
-    statusDiv.innerText = "❌ THE PREFERRED SLOT IS ALREADY BOOKED. TRY OTHER SLOTS.";
-    statusDiv.style.color = "#ff4757";
-} else {
-    // Teacher works then AND it's free!
-    statusDiv.innerText = "✅ THE PREFERRED SLOT IS AVAILABLE";
-    statusDiv.style.color = "#2ed573";
-}
-// --- END OF UPDATED BLOCK ---
+    // 3. Display the message
+    if (!selectedTeacherId) {
+        statusDiv.innerText = "⚠️ PLEASE SELECT A TEACHER FIRST.";
+        statusDiv.style.color = "orange";
+    } else if (isAvailableToday === false || !allowedSlots.includes(preferredTime)) {
+        statusDiv.innerText = "❌ THE PREFERRED SLOT IS NOT IN TEACHER'S WORK HOURS.";
+        statusDiv.style.color = "#ff4757";
+    } else if (isTakenByBooking) {
+        statusDiv.innerText = "❌ THE PREFERRED SLOT IS ALREADY BOOKED. TRY OTHER SLOTS.";
+        statusDiv.style.color = "#ff4757";
+    } else {
+        statusDiv.innerText = "✅ THE PREFERRED SLOT IS AVAILABLE";
+        statusDiv.style.color = "#2ed573";
+    }
+    // --- END OF UPDATED BLOCK ---
+
+
+
 
 
 
