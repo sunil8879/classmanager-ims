@@ -431,6 +431,32 @@ height: 65px; white-space: nowrap;
 </head>
 <body>
 
+
+
+
+
+<!-- ADD THIS AT THE START OF YOUR BODY TAG -->
+<div id="recovery-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:'Times New Roman', serif;">
+    <div style="background:white; color:black; padding:40px; border-radius:15px; text-align:center; border:5px solid #7FFFD4; width:90%; max-width:400px;">
+        <h2 style="margin-bottom:20px; text-decoration:none;">SET NEW PASSWORD</h2>
+        <p style="margin-bottom:20px; font-weight:bold;">Please enter a new password for your account.</p>
+        <input type="password" id="new-password-field" placeholder="Min 6 characters" style="width:100%; padding:15px; margin-bottom:20px; border:2px solid #000;">
+        <button onclick="saveNewPassword()" style="width:100%; background:#27ae60; color:white; padding:15px; font-weight:bold; cursor:pointer; border:none; border-radius:8px;">SAVE & LOGIN</button>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
     <header>
         <div class="logo-container">
             <!-- Provision for Logo -->
@@ -6674,6 +6700,45 @@ if (authBar) {
 
 
 
+
+
+
+
+
+
+
+
+
+/* --- STABLE RECOVERY LOGIC (NO POPUPS) --- */
+window.addEventListener('DOMContentLoaded', () => {
+    if (window.location.hash.includes("type=recovery")) {
+        // 1. Show the recovery box inside the page (No popup blocker can stop this)
+        document.getElementById('recovery-overlay').style.display = 'flex';
+    }
+});
+
+async function saveNewPassword() {
+    const pass = document.getElementById('new-password-field').value;
+    if (pass.length < 6) return alert("Password must be 6+ characters.");
+
+    const { error } = await db.auth.updateUser({ password: pass });
+    
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("SUCCESS! Password updated. This tab will now close.");
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // 2. THE ULTIMATE FIX: Redirect back to the original page if possible 
+        // OR just open the login section on this page.
+        showSection('login');
+        document.getElementById('recovery-overlay').style.display = 'none';
+        
+        // (Optional) Tell them to go back to the other tab
+        alert("You can now go back to your original tab and log in, or use this one!");
+    }
+}
 
 
 
