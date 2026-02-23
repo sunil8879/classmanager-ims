@@ -754,20 +754,21 @@ if (dayStr.toUpperCase() !== activeDayName) {
                 b.time_slot === timeStr && b.day === dayStr
             );
 
-            if (isBooked) {
-                td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
-                td.classList.add("booked-cell");
+        if (isBooked) {
+    td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
+    td.classList.add("booked-cell");
 
-
-// --- ADD THIS RIGHT AFTER: td.classList.add("booked-cell"); ---
-const bData = bookings.find(b => b.time_slot === timeStr && b.day === dayStr);
-td.innerHTML += `<br><button type="button" style="background:red; color:white; border:none; padding:3px 6px; font-size:0.7rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE FAKE</button>`;
-// --- END OF ADDITION ---
-
-
-
-
-            } else {
+    // Robust check: Find the booking
+    const bData = bookings ? bookings.find(b => b.time_slot === timeStr && b.day === dayStr) : null;
+    
+    // Only show button if we actually found the ID in the database
+    if (bData && bData.id) {
+        td.innerHTML += `<br><button type="button" style="background:red; color:white; border:none; padding:3px 6px; font-size:0.7rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE FAKE</button>`;
+    } else {
+        console.warn("Booking found by 'some' but not by 'find'. Check for time-slot text mismatches.");
+    }
+}
+ else {
                 td.innerHTML = `
                     <span class="open-slot">OPEN SLOT</span>
                     <button type="button"
