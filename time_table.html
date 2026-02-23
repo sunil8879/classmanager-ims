@@ -373,6 +373,34 @@ input[readonly] {
 
 
 #f-teacher-available-slots { color: #000000 !important; font-weight: 900 !important; opacity: 1 !important; -webkit-text-fill-color: #000000; }
+
+
+
+
+
+
+/* FIREFOX VISIBILITY FIX */
+.input-group > div {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    width: 100% !important;
+}
+
+#f-roll {
+    flex: 1 1 auto !important;
+    min-width: 0 !important; /* Critical for Firefox to allow shrinking */
+    width: 100% !important;
+}
+
+.btn-fetch {
+    flex: 0 0 100px !important; /* Fixes button width at 100px, no shrinking */
+    height: 55px !important;
+    margin-left: 5px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
 </style>
 </head>
 <body>
