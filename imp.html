@@ -692,6 +692,23 @@ height: 65px; white-space: nowrap;
                     <button class="btn-add" onclick="handleLogin()">Login</button>
                     <button class="btn-edit" style="background:#666;" onclick="clearForm('login-form')">Clear</button>
                 </div>
+
+
+
+
+<!-- ADD THIS IMMEDIATELY AFTER THE LOGIN BUTTON ROW -->
+<div style="margin-top: 20px; font-size: 0.9rem; border-top: 1px dashed #ccc; padding-top: 10px;">
+    <p>
+        <a href="javascript:void(0)" onclick="handleForgotPassword()" style="color: #ff0000; font-weight: bold; text-decoration: none;">Forgot Password?</a>
+    </p>
+    <p style="margin-top: 10px;">
+        <a href="javascript:void(0)" onclick="handleRecoverEmail()" style="color: #007bff; font-weight: bold; text-decoration: none;">Forgot Email? (Find via Mobile)</a>
+    </p>
+</div>
+
+
+
+
             </div>
         </div>
     </div>
@@ -6456,6 +6473,62 @@ async function listAllByBatch() {
     listArea.style.display = 'block';
     listArea.scrollIntoView({ behavior: 'smooth' });
 }
+
+
+
+
+
+
+/* --- FORGOT PASSWORD & EMAIL RECOVERY LOGIC --- */
+
+// 1. Send Reset Email
+async function handleForgotPassword() {
+    const email = prompt("Enter your registered Email ID to receive a reset link:");
+    if (!email) return;
+
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+        // This will bring them back to your GoDaddy/GitHub site
+        redirectTo: window.location.href, 
+    });
+
+    if (error) alert("Error: " + error.message);
+    else alert("Success! A password reset link has been sent to " + email);
+}
+
+// 2. Recover Email using Mobile Number from Profiles
+async function handleRecoverEmail() {
+    const mobile = prompt("Enter your registered 10-digit Mobile Number:");
+    if (!mobile) return;
+
+    const { data, error } = await db
+        .from('profiles')
+        .select('email')
+        .eq('mobile_number', mobile) // In your signup code, you saved it as mobile_number
+        .maybeSingle();
+
+    if (error) {
+        alert("Database Error: " + error.message);
+    } else if (!data) {
+        alert("Account Not Found: No email is linked to this mobile number.");
+    } else {
+        alert("FOUND! Your registered Email ID is: " + data.email);
+    }
+}
+
+// 3. Catch the user returning from email to update password
+db.auth.onAuthStateChange(async (event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+        const newPassword = prompt("Enter your NEW password (minimum 6 characters):");
+        if (newPassword && newPassword.length >= 6) {
+            const { error } = await db.auth.updateUser({ password: newPassword });
+            if (error) alert("Update Failed: " + error.message);
+            else alert("Success! Your password has been updated. You can now login.");
+        } else {
+            alert("Password update cancelled or too short.");
+        }
+    }
+});
+
 
 
 
