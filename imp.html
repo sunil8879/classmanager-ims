@@ -6523,6 +6523,12 @@ db.auth.onAuthStateChange(async (event, session) => {
             const { error } = await db.auth.updateUser({ password: newPassword });
             if (error) alert("Update Failed: " + error.message);
             else alert("Success! Your password has been updated. You can now login.");
+
+
+
+
+window.history.replaceState({}, document.title, window.location.pathname); // Cleans the address bar
+showSection('login'); // Automatically opens the login box
         } else {
             alert("Password update cancelled or too short.");
         }
@@ -6531,7 +6537,10 @@ db.auth.onAuthStateChange(async (event, session) => {
 
 
 
-
+// --- ADD THIS AT THE BOTTOM OF YOUR SCRIPT ---
+if (window.location.hash.includes("type=recovery")) {
+    alert("NOTICE: This is your active Password Reset tab. You can safely close the previous tab you were using.");
+}
 
 
 
