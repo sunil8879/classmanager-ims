@@ -757,6 +757,16 @@ if (dayStr.toUpperCase() !== activeDayName) {
             if (isBooked) {
                 td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
                 td.classList.add("booked-cell");
+
+
+// --- ADD THIS RIGHT AFTER: td.classList.add("booked-cell"); ---
+const bData = bookings.find(b => b.time_slot === timeStr && b.day === dayStr);
+td.innerHTML += `<br><button type="button" style="background:red; color:white; border:none; padding:3px 6px; font-size:0.7rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE FAKE</button>`;
+// --- END OF ADDITION ---
+
+
+
+
             } else {
                 td.innerHTML = `
                     <span class="open-slot">OPEN SLOT</span>
@@ -1046,6 +1056,22 @@ document.getElementById("f-teacher").addEventListener("change", function () {
 
 
 
+
+
+// --- ADD THIS AT THE VERY BOTTOM OF YOUR SCRIPT TAG ---
+async function deleteFakeBooking(bookingId) {
+    const pin = prompt("TEACHER ONLY: Enter Security PIN to delete:");
+    if (pin !== "1234") return alert("Invalid PIN.");
+
+    if (confirm("Delete this fake booking and open the slot?")) {
+        const { error } = await db.from('class_bookings').delete().eq('id', bookingId);
+        if (error) alert("Error: " + error.message);
+        else {
+            alert("Slot Freed!");
+            generateTimeTable(); // Refresh the grid
+        }
+    }
+}
 
 
 
