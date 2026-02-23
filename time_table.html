@@ -886,7 +886,9 @@ async function bookSlot(day, time, cellId) {
     if (teacherPhone) {
         const message = `📚 New Class Booking\n\nStudent: ${student}\nCourse: ${course}\nDate: ${dateVal}\nTime: ${time}`;
         const encodedMessage = encodeURIComponent(message);
-        const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
+    // This checks if the phone starts with 91, if not, it adds it.
+const formattedPhone = teacherPhone.startsWith('91') ? teacherPhone : '91' + teacherPhone;
+const whatsappURL = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
         
         // Open WhatsApp in a new tab
         window.open(whatsappURL, "_blank");
