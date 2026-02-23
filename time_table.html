@@ -888,6 +888,17 @@ async function bookSlot(day, time, cellId) {
             alert("Booking Cancelled. The slot will remain open because the message was not sent.");
             return; // ⛔ STOP HERE. DO NOT SAVE TO DATABASE.
         }
+
+
+
+
+
+// --- ADD THIS BLOCK IMMEDIATELY AFTER the line: if (!userConfirmed) { return; } ---
+
+const mischiefMsg = `⚠️ MISCHIEF/VERIFICATION ALERT\n\nStudent: ${student}\nRoll No: ${roll}\n\nThis student has just clicked 'CONFIRM' on the website for the ${time} slot. \n\nTeacher, if you did NOT receive the detailed booking message before this, this student is doing mischief.`;
+window.open(`https://wa.me/${teacherPhone}?text=${encodeURIComponent(mischiefMsg)}`, "_blank");
+
+// --- END OF ADDITION ---
     } else {
         return alert("Teacher mobile number not found. Cannot proceed with booking.");
     }
