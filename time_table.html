@@ -772,7 +772,12 @@ if (dayStr.toUpperCase() !== activeDayName) {
         // --- 4. BOOKING & CONFIRMATION LOGIC ---
 async function bookSlot(day, time, cellId) {
 
-
+   const roll = document.getElementById('f-roll').value.trim();
+    const student = document.getElementById('f-student-name').value.trim();
+    const course = document.getElementById('f-course').value;
+    const teacherSelect = document.getElementById("f-teacher");
+    const teacherId = teacherSelect.value;
+    const dateVal = document.getElementById('f-date').value;
 
 
 
@@ -809,13 +814,7 @@ if (selectedDateObj.getTime() !== tomorrow.getTime()) {
 
 
 
-    // 1️⃣ Get values from form
-    const roll = document.getElementById('f-roll').value.trim();
-    const student = document.getElementById('f-student-name').value.trim();
-    const course = document.getElementById('f-course').value;
-    const teacherSelect = document.getElementById("f-teacher");
-    const teacherId = teacherSelect.value;
-    const dateVal = document.getElementById('f-date').value;
+
 
     // 2️⃣ Standard Form Validation
     if (!roll || !student) return alert("Please enter and fetch student details.");
