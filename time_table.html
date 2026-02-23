@@ -878,44 +878,38 @@ async function bookSlot(day, time, cellId) {
 
     if (existingBooking) return alert("This teacher is already booked in this time slot.");
 
-    // ============================================================
-    // 4️⃣ WHATSAPP FIRST (THE "SEND" VERIFICATION)
+// ============================================================
+    // 4️⃣ WHATSAPP & MISCHIEF CHECK (FIREFOX COMPATIBLE)
     // ============================================================
     const teacherPhone = selectedOption.dataset.mobile;
     const teacherName = selectedOption.dataset.name;
 
     if (teacherPhone) {
+        // ADDED: Country Code Fix for your 10-digit issue
+        const cleanPhone = teacherPhone.replace(/\D/g, '');
+        const finalPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+
         const message = `📚 New Class Booking\n\nStudent: ${student}\nCourse: ${course}\nDate: ${dateVal}\nTime: ${time}`;
-        const encodedMessage = encodeURIComponent(message);
-    // This checks if the phone starts with 91, if not, it adds it.
-const formattedPhone = teacherPhone.startsWith('91') ? teacherPhone : '91' + teacherPhone;
-const whatsappURL = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+        const whatsappURL = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
         
-        // Open WhatsApp in a new tab
+        // Open WhatsApp
         window.open(whatsappURL, "_blank");
 
-        // IMMEDIATELY ASK THE USER IF THEY SENT IT
-        const userConfirmed = confirm(`WhatsApp has been opened for ${teacherName}.\n\nDID YOU SEND THE MESSAGE?\n\nClick OK ONLY if you clicked 'Send' in WhatsApp. If you closed WhatsApp without sending, click CANCEL.`);
+        // FIREFOX FIX: Explicitly wait for the user to answer the prompt
+        const userConfirmed = window.confirm(`DID YOU SEND THE MESSAGE TO ${teacherName}?\n\nClick OK only if you sent it. Click CANCEL to stop.`);
 
-        if (!userConfirmed) {
-            alert("Booking Cancelled. The slot will remain open because the message was not sent.");
-            return; // ⛔ STOP HERE. DO NOT SAVE TO DATABASE.
+        if (userConfirmed === false) {
+            alert("Booking Cancelled by User.");
+            return; // This stops Firefox from saving to the DB
         }
 
+        // Mischief Alert
+        const alertMsg = `⚠️ MISCHIEF ALERT: Student ${student} (Roll: ${roll}) clicked CONFIRM but may not have sent the message.`;
+        window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(alertMsg)}`, "_blank");
 
-
-
-
-// --- ADD THIS BLOCK IMMEDIATELY AFTER the line: if (!userConfirmed) { return; } ---
-
-const mischiefMsg = `⚠️ MISCHIEF/VERIFICATION ALERT\n\nStudent: ${student}\nRoll No: ${roll}\n\nThis student has just clicked 'CONFIRM' on the website for the ${time} slot. \n\nTeacher, if you did NOT receive the detailed booking message before this, this student is doing mischief.`;
-window.open(`https://wa.me/${teacherPhone}?text=${encodeURIComponent(mischiefMsg)}`, "_blank");
-
-// --- END OF ADDITION ---
     } else {
-        return alert("Teacher mobile number not found. Cannot proceed with booking.");
+        return alert("Teacher phone missing.");
     }
-
     // ============================================================
     // 5️⃣ SAVE TO DATABASE (Only reached if user clicks OK)
     // ============================================================
