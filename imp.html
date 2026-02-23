@@ -6542,7 +6542,30 @@ if (window.location.hash.includes("type=recovery")) {
     alert("NOTICE: This is your active Password Reset tab. You can safely close the previous tab you were using.");
 }
 
-
+/* --- CHROME & FIREFOX RECOVERY FIX --- */
+window.addEventListener('DOMContentLoaded', () => {
+    // Check if the URL contains the recovery token
+    if (window.location.hash.includes("type=recovery")) {
+        // Wait 1 second so Chrome/Firefox don't block the prompt
+        setTimeout(async () => {
+            const newPass = prompt("BROWSER VERIFICATION: Please enter your NEW password (min 6 chars):");
+            
+            if (newPass && newPass.length >= 6) {
+                const { error } = await db.auth.updateUser({ password: newPass });
+                if (error) {
+                    alert("Error: " + error.message);
+                } else {
+                    alert("Password updated successfully! You can now login.");
+                    // Clean URL and move to login section
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    showSection('login');
+                }
+            } else if (newPass) {
+                alert("Password too short! Please try the email link again.");
+            }
+        }, 1000); // The 1000ms (1 second) delay fixes the Chrome/Firefox issue
+    }
+});
 
 
 /* ==========================================
