@@ -917,7 +917,7 @@ if (selectedDateObj.getTime() !== tomorrow.getTime()) {
 
     // 7️⃣ WhatsApp Notification to teacher
     const teacherPhone = teacherSelect.selectedOptions[0].dataset.mobile; 
-    if (teacherPhone) {
+  if (teacherPhone && confirm("Booking saved in Database. Open WhatsApp to notify the teacher?")) {
         const message = `📚 New Class Booking\n\nStudent: ${student}\nCourse: ${course}\nDate: ${dateVal}\nTime: ${time}\nBooking ID: ${bookingData.id}`;
         const encodedMessage = encodeURIComponent(message);
         const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
