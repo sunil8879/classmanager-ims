@@ -519,6 +519,23 @@ input[readonly] {
         }
         checkCurrentSession();
 
+
+
+
+
+
+// --- ADD THIS AT THE BOTTOM OF YOUR SCRIPT ---
+window.onload = function() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateInput = document.getElementById('f-date');
+    dateInput.value = tomorrow.toISOString().split('T')[0];
+    
+    // Optional: Lock the input so they can ONLY book for tomorrow
+    dateInput.setAttribute('min', dateInput.value);
+    dateInput.setAttribute('max', dateInput.value);
+};
+
       const TIME_SLOTS = [
     "09:00 AM to 10:00 AM",
     "10:00 AM to 11:00 AM",
@@ -694,6 +711,14 @@ const DAYS = [
 
             const td = document.createElement('td');
             const cellId = `cell-${rowIndex}-${colIndex}`;
+// --- ADD THIS INSIDE THE DAYS.forEach LOOP in generateTimeTable() ---
+const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+const activeDayName = daysOfWeek[new Date(dateVal).getDay()];
+
+if (dayStr.toUpperCase() !== activeDayName) {
+    td.style.opacity = "0.3"; // Dim out the other days
+    td.style.pointerEvents = "none"; // Disable clicking other days
+}
             td.id = cellId;
 
             // 🔴 Check if this slot is booked for this day & time
@@ -746,6 +771,44 @@ const DAYS = [
 }
         // --- 4. BOOKING & CONFIRMATION LOGIC ---
 async function bookSlot(day, time, cellId) {
+
+
+
+
+
+
+
+// --- ADD THIS AT THE START OF bookSlot() ---
+const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+const selectedDateObj = new Date(dateVal);
+const actualDayName = daysOfWeek[selectedDateObj.getDay()]; // Gets "WEDNESDAY" etc.
+
+// 1. Logic Check: Does the column clicked match the actual day of the date?
+if (day.toUpperCase() !== actualDayName) {
+    alert(`❌ DATE CONFLICT: ${dateVal} is a ${actualDayName}. \n\nYou cannot book this in the ${day} column.`);
+    return;
+}
+
+// 2. "Only Tomorrow" Check: Is the selected date actually tomorrow?
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+tomorrow.setHours(0, 0, 0, 0);
+selectedDateObj.setHours(0, 0, 0, 0);
+
+if (selectedDateObj.getTime() !== tomorrow.getTime()) {
+    alert(`❌ INVALID DATE: Bookings are ONLY allowed for Tomorrow (${tomorrow.toDateString()}).`);
+    return;
+}
+// --- END OF ADDITION ---
+
+
+
+
+
+
+
+
+
     // 1️⃣ Get values from form
     const roll = document.getElementById('f-roll').value.trim();
     const student = document.getElementById('f-student-name').value.trim();
