@@ -750,6 +750,11 @@ height: 65px; white-space: nowrap;
         <div class="form-grid">
             <div class="input-group"><label>Admission Date</label><input type="date" id="stu-date"></div>
             <div class="input-group"><label>Full Name</label><input type="text" id="stu-name" placeholder="Full Name"></div>
+<!-- ADD THIS IN STUDENT MANAGEMENT FORM GRID -->
+<div class="input-group">
+    <label>Email Address</label>
+    <input type="email" id="stu-email" readonly style="background:#eee;" placeholder="Auto-populated from Profile">
+</div>
 
             <div class="input-group"><label>Mobile Number (10 Digits)</label><input type="text" id="stu-mobile" placeholder="Mobile" maxlength="10"></div>
             <div class="input-group"><label>Father's Mobile</label><input type="text" id="stu-father" maxlength="10"></div>
@@ -2539,7 +2544,9 @@ if (!sessionInstID || sessionInstID === "") {
         roll_number: roll,
         user_id: (await db.auth.getUser()).data.user?.id ,
 due_dates: document.getElementById('stu-due-dates').value,
-status: document.getElementById('stu-status').value 
+status: document.getElementById('stu-status').value ,
+// ADD THIS LINE inside the stuData object in addStudent()
+email: document.getElementById('stu-email').value
 
     };
 
@@ -6898,6 +6905,40 @@ async function saveNewPassword() {
 
 
 
+/* ==========================================
+   AUTO-POPULATE EMAIL/MOBILE FROM PROFILES
+   ========================================== */
+
+// 1. Logic for Student Management
+document.getElementById('stu-name').addEventListener('blur', async function() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return; // 🛡️ Safety: Don't fetch if not logged in!
+
+    const enteredName = this.value.trim();
+    if (!enteredName || !sessionInstID) return;
+
+    const { data } = await db.from('profiles').select('email')
+        .ilike('full_name', enteredName).eq('role', 'Student').eq('institute_id', sessionInstID).maybeSingle();
+
+    if (data) document.getElementById('stu-email').value = data.email;
+});
+
+// 2. Logic for Teacher Portal
+document.getElementById('tch-name').addEventListener('blur', async function() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return; // 🛡️ Safety: Don't fetch if not logged in!
+
+    const enteredName = this.value.trim();
+    if (!enteredName || !sessionInstID) return;
+
+    const { data } = await db.from('profiles').select('email, mobile_number')
+        .ilike('full_name', enteredName).eq('role', 'Teacher').eq('institute_id', sessionInstID).maybeSingle();
+
+    if (data) {
+        document.getElementById('tch-email').value = data.email;
+        document.getElementById('tch-mobile').value = data.mobile_number;
+    }
+});
 
 
 

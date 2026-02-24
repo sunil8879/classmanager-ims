@@ -33,6 +33,10 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event: Serving cached content when offline
 self.addEventListener('fetch', (event) => {
+// --- ADD THIS TO THE TOP OF THE FETCH EVENT IN sw.js ---
+if (event.request.url.includes('supabase.co')) {
+    return; // Bypass the cache for all database/auth calls
+}
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return cachedResponse || fetch(event.request);
