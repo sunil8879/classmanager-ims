@@ -4116,7 +4116,7 @@ async function fetchTeacher() {
     const { data: { user } } = await db.auth.getUser();
     const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
     
-    
+    let id;
     if (profile.role === 'Teacher') {
         // If it's a teacher, we find them by their login email automatically
         const { data: self } = await db.from('teacher_details').select('id').eq('email', profile.email).maybeSingle();
@@ -4131,7 +4131,7 @@ async function fetchTeacher() {
 
 
 
-    const id = prompt("Enter Teacher ID to fetch:");
+    
     if (!id) return;
 
     const { data, error } = await db.from('teacher_details')
