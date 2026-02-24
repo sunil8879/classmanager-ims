@@ -6709,8 +6709,8 @@ async function applyRoleVisibility() {
     // ---------------------------------------------------------
 
     const tabs = document.querySelectorAll('aside.sidebar .nav-tab');
-    const studentAllowed = ['home', 'login', 'student-p', 'message-corner', 'calendar-mod'];
-    const teacherBlocked = ['fee', 'expense', 'reminder', 'admin'];
+    const studentAllowed = ['home', 'login', 'student-p', 'message-corner', 'calendar-mod', 'reviews-mod'];
+    const teacherBlocked = ['fee', 'expense', 'reminder', 'admin','reviews-mod'];
 
     // Apply the rules by reading the 'onclick' attribute of each tab
     tabs.forEach(tab => {
