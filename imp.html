@@ -4109,6 +4109,28 @@ time_of_slot: (document.getElementById('tch-availability').value === 'Yes') ? ge
 
 // 2. UPDATED: FETCH TEACHER (Now includes Mobile)
 async function fetchTeacher() {
+
+
+
+// --- ADD THIS AT THE START OF fetchTeacher() ---
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+    
+    
+    if (profile.role === 'Teacher') {
+        // If it's a teacher, we find them by their login email automatically
+        const { data: self } = await db.from('teacher_details').select('id').eq('email', profile.email).maybeSingle();
+        if (!self) return alert("Error: No teacher profile found for your account email.");
+        id = self.id; 
+    } else {
+        // If it's the Owner, we ask for an ID as usual
+        id = prompt("Enter Teacher ID to fetch:");
+    }
+    if (!id) return;
+    // --- END OF ADDITION ---
+
+
+
     const id = prompt("Enter Teacher ID to fetch:");
     if (!id) return;
 
@@ -6770,6 +6792,29 @@ async function applyRoleVisibility() {
                 tab.style.display = ''; 
             } else if (role === 'Teacher') {
                 tab.style.display = teacherBlocked.includes(sectionId) ? 'none' : '';
+
+
+// --- ADD THIS TO RESTORE BUTTONS FOR TEACHERS ---
+        // Show Fetch and Update, but keep 'Add' and 'Pay' hidden
+        const teacherButtons = [
+            'button[onclick="fetchTeacher()"]',
+            'button[onclick="editTeacher()"]'
+        ];
+        teacherButtons.forEach(sel => { if(document.querySelector(sel)) document.querySelector(sel).style.display = ''; });
+
+        // Make Salary Visible but Greyed Out (Read-Only)
+        const salField = document.getElementById('tch-salary');
+        if (salField && salField.parentElement) {
+            salField.parentElement.style.display = ''; 
+            salField.readOnly = true; 
+            salField.style.background = '#f0f0f0'; // Grey look
+            salField.placeholder = "Locked by Admin";
+        }
+
+
+
+
+
             } else if (role === 'Student') {
                 tab.style.display = studentAllowed.includes(sectionId) ? '' : 'none';
             }
