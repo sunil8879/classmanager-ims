@@ -518,6 +518,7 @@ height: 65px; white-space: nowrap;
 <button class="nav-tab" onclick="showSection('scholarship-mod')"><i class="fas fa-award"></i> 23. Scholarship Tracker</button>
 <button class="nav-tab" onclick="showSection('ptm-mod')"><i class="fas fa-handshake"></i> 24. PTM Schedule</button>
 <button class="nav-tab" onclick="showSection('batch-master')"><i class="fas fa-users-cog"></i> 25. Batch Master</button>
+<button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
 
 
         </aside>
@@ -2072,6 +2073,42 @@ height: 65px; white-space: nowrap;
                     <!-- Rows will be injected here -->
                 </tbody>
             </table>
+        </div>
+    </div>
+</section>
+
+
+
+
+
+
+
+
+
+
+<!-- 26. REVIEWS MODULE -->
+<section id="reviews-mod" class="content-section">
+    <div class="card" style="border-top: 5px solid #f1c40f;">
+        <h3><i class="fas fa-star-half-alt"></i> Student Feedback & Reviews</h3>
+        <div class="form-grid">
+            <div class="input-group">
+                <label>1. Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="rev-roll" placeholder="IMS-XXXX">
+                    <button class="btn-fetch" onclick="autopopulateReviewForm()" style="padding: 5px 10px;"><i class="fas fa-magic"></i> Auto-Fill</button>
+                </div>
+            </div>
+            <div class="input-group"><label>2. Student Name</label><input type="text" id="rev-sname" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>3. Teacher ID</label><input type="text" id="rev-tid" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>4. Teacher Name</label><input type="text" id="rev-tname" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>5. Review Score (Max 5)</label><input type="number" step="0.1" id="rev-score" placeholder="e.g. 4.5"></div>
+            <div class="input-group" style="grid-column: 1/-1;"><label>6. Message from Student</label><textarea id="rev-msg" rows="3" placeholder="Write your feedback here..."></textarea></div>
+        </div>
+
+        <div class="button-row">
+            <button class="btn-add" onclick="addTeacherReview()">ADD REVIEW</button>
+            <button class="btn-fetch" onclick="fetchReviewByRoll()">FETCH (by Roll No)</button>
+            <button class="btn-edit" onclick="editTeacherReview()">UPDATE (by Roll No)</button>
         </div>
     </div>
 </section>
@@ -6499,6 +6536,96 @@ async function listAllByBatch() {
     listArea.style.display = 'block';
     listArea.scrollIntoView({ behavior: 'smooth' });
 }
+
+
+
+
+
+
+
+
+/* ==========================================
+   26. TEACHER REVIEWS LOGIC
+   ========================================== */
+
+// 1. Auto-populate based on Roll Number
+async function autopopulateReviewForm() {
+    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Please enter Roll Number first.");
+
+    // Step A: Fetch Student Name
+    const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if(!stu) return alert("Student not found.");
+    document.getElementById('rev-sname').value = stu.full_name;
+
+    // Step B: Fetch Allotted Teacher ID from Module 18's table
+    const { data: alloc } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    
+    if(alloc) {
+        document.getElementById('rev-tid').value = alloc.teacher_id;
+        document.getElementById('rev-tname').value = alloc.teacher_name;
+    } else {
+        alert("This student is not linked to any teacher yet. Please allot a teacher in Module 18.");
+    }
+}
+
+// 2. ADD Review
+async function addTeacherReview() {
+    const score = parseFloat(document.getElementById('rev-score').value);
+    if(score > 5) return alert("Error: Review score cannot be more than 5.");
+    
+    const data = {
+        institute_id: sessionInstID,
+        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
+        student_name: document.getElementById('rev-sname').value,
+        teacher_id: document.getElementById('rev-tid').value,
+        teacher_name: document.getElementById('rev-tname').value,
+        rating: score,
+        message: document.getElementById('rev-msg').value
+    };
+
+    const { error } = await db.from('reviews').insert([data]);
+    if(error) alert(error.message);
+    else alert("Review Added! Teacher Portal rating will update automatically.");
+}
+
+// 3. FETCH Review
+async function fetchReviewByRoll() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const { data, error } = await db.from('reviews').select('*').eq('student_roll', roll).eq('institute_id', sessionInstID).maybeSingle();
+    
+    if(data) {
+        document.getElementById('rev-sname').value = data.student_name;
+        document.getElementById('rev-tid').value = data.teacher_id;
+        document.getElementById('rev-tname').value = data.teacher_name;
+        document.getElementById('rev-score').value = data.rating;
+        document.getElementById('rev-msg').value = data.message;
+        alert("Review loaded.");
+    } else alert("No review found for this roll number.");
+}
+
+// 4. UPDATE Review
+async function editTeacherReview() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const score = parseFloat(document.getElementById('rev-score').value);
+    if(score > 5) return alert("Error: Score cannot exceed 5.");
+
+    const { error } = await db.from('reviews').update({
+        rating: score,
+        message: document.getElementById('rev-msg').value
+    }).eq('student_roll', roll).eq('institute_id', sessionInstID);
+
+    if(error) alert(error.message);
+    else alert("Review Updated successfully!");
+}
+
+
+
+
+
+
+
+
 
 
 
