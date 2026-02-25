@@ -5398,26 +5398,52 @@ window.showHomeChartPage = function(page) {
 async function generateFinancialForecast(students) {
     const monthsToShow = 6;
     const forecastData = {};
-    const chartRows = [];
+    const chartRows =[];
+    
+    // Bulletproof Month Naming Array (Bypasses all language/locale bugs)
+    const monthNames =["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    // 1. Initialize the next 6 months in the object
+    // 1. Initialize the next 6 months safely
+    let today = new Date();
     for (let i = 0; i < monthsToShow; i++) {
-        let d = new Date();
-        d.setMonth(d.getMonth() + i);
-        let monthName = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-        forecastData[monthName] = 0;
+        // Safe month iteration (handles year overlap perfectly)
+        let futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        let standardMonth = monthNames[futureDate.getMonth()] + " " + futureDate.getFullYear();
+        forecastData[standardMonth] = 0;
     }
 
     // 2. Parse Student Due Dates and distribute Pending Amounts
     students.forEach(s => {
         if (s.pending_amount > 0 && s.due_dates) {
-            // Split "March 2026, July 2026" into an array
             const dates = s.due_dates.split(',').map(d => d.trim());
-            const perInstallment = s.pending_amount / dates.length;
+            let validFutureKeys =[];
 
-            dates.forEach(d => {
-                if (forecastData.hasOwnProperty(d)) {
-                    forecastData[d] += perInstallment;
+            const todayForFilter = new Date();
+            todayForFilter.setHours(0, 0, 0, 0);
+
+            // Check each date securely
+            for (let k = 0; k < dates.length; k++) {
+                // Remove st/nd/rd/th
+                let cleanDateStr = dates[k].replace(/(st|nd|rd|th)/i, ''); 
+                let parsedDate = new Date(cleanDateStr);
+                
+                // Keep only dates that are valid and in the future/today
+                if (!isNaN(parsedDate) && parsedDate >= todayForFilter) {
+                    // Extract standard "Month Year" exactly like our initialized keys!
+                    let key = monthNames[parsedDate.getMonth()] + " " + parsedDate.getFullYear();
+                    validFutureKeys.push(key);
+                }
+            }
+
+            if (validFutureKeys.length === 0) return; 
+
+            // Distribute the pending amount evenly across the remaining valid dates
+            const perInstallment = s.pending_amount / validFutureKeys.length;
+
+            validFutureKeys.forEach(key => {
+                // Only add if the date falls exactly within our 6-month forecast window
+                if (forecastData.hasOwnProperty(key)) {
+                    forecastData[key] += perInstallment;
                 }
             });
         }
@@ -5443,38 +5469,13 @@ async function generateFinancialForecast(students) {
         chartRows.push([month, totalAdmissions, totalReceived, totalPending, Math.round(forecastData[month])]);
     });
 
-
-
-
-
-
-
-// -- START OF ADDED PAGINATION FUNCTION --
-function showHomeChartPage(page) {
-    var c1 = document.getElementById('home_stacked_chart');
-    var c2 = document.getElementById('home_pie_chart');
-    var c3 = document.getElementById('home_line_chart');
-
-    // We toggle the heights to 0 to "hide" them without breaking Google Charts' SVG dimensions
-    if (c1) c1.style.height = (page === 1) ? '400px' : '0px';
-    if (c2) c2.style.height = (page === 2) ? '400px' : '0px';
-    if (c3) {
-        c3.style.height = (page === 3) ? '400px' : '0px';
-        c3.style.overflow = 'hidden';
-    }
-}
-// -- END OF ADDED PAGINATION FUNCTION --
-
-
-
-
-/* --- START OF ADDED DYNAMIC FORECAST FORMULA --- */
+    /* --- DYNAMIC FORECAST FORMULA --- */
     let runningCollection = totalReceived;
     let runningPending = totalPending;
 
     for (let i = 0; i < chartRows.length; i++) {
         let incoming = chartRows[i][4]; // Forecast amount for this month
-        let pieSliceAmount = 0; // Isolated chunk specifically for the pie chart
+        let pieSliceAmount = 0; 
         
         if (i === 0 || incoming > 0) {
             runningCollection += incoming;
@@ -5484,7 +5485,6 @@ function showHomeChartPage(page) {
             chartRows[i][2] = runningCollection; 
             chartRows[i][3] = runningPending;  
             
-            // Set base month to actual collected, and future months to the forecast installment
             pieSliceAmount = (i === 0) ? totalReceived : incoming; 
         } else {
             chartRows[i][2] = 0; 
@@ -5494,23 +5494,8 @@ function showHomeChartPage(page) {
         // Append this isolated amount as a brand new column (Index 5) for the Pie Chart
         chartRows[i].push(pieSliceAmount);
     }
-    /* --- END OF ADDED DYNAMIC FORECAST FORMULA --- */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* --- START OF ADDED DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
-    // Fetch course_end_dates for all active students safely in the background
+    /* --- DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
     const { data: dynStudents } = await db.from('students')
         .select('student_details(course_end_date)')
         .eq('institute_id', sessionInstID)
@@ -5518,21 +5503,18 @@ function showHomeChartPage(page) {
 
     if (dynStudents) {
         for (let i = 0; i < chartRows.length; i++) {
-            let monthName = chartRows[i][0]; // e.g., "February 2026"
-            let chartMonthDate = new Date(monthName + " 1"); // Parses to the 1st of that month
+            let monthName = chartRows[i][0]; 
+            let chartMonthDate = new Date(monthName + " 1"); 
             let activeCount = 0;
 
             dynStudents.forEach(s => {
-                // Supabase joins can sometimes return arrays or objects, this handles both
                 let details = Array.isArray(s.student_details) ? s.student_details[0] : s.student_details;
                 let endStr = details ? details.course_end_date : null;
 
                 if (!endStr) {
-                    // If no end date is set, assume they are active indefinitely
                     activeCount++; 
                 } else {
                     let endDate = new Date(endStr);
-                    // Check if the student's end date is IN or AFTER this chart month
                     if (endDate.getFullYear() > chartMonthDate.getFullYear() || 
                        (endDate.getFullYear() === chartMonthDate.getFullYear() && endDate.getMonth() >= chartMonthDate.getMonth())) {
                         activeCount++;
@@ -5540,19 +5522,9 @@ function showHomeChartPage(page) {
                 }
             });
             
-            // Overwrite the flat Admissions count (Index 1) with our new dynamic count!
             chartRows[i][1] = activeCount;
         }
     }
-    /* --- END OF ADDED DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
-
-
-
-
-
-
-
-
 
     // 4. Draw the Google Chart with Slicer
     drawHomeForecastingChart(chartRows);
