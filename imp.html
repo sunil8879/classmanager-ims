@@ -5855,33 +5855,40 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
 
 // --- START OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
-// --- FINAL CORRECT DASHBOARD REVERSAL LOGIC ---
-setTimeout(() => {
+// --- FINAL PAST-DATE SAFE DASHBOARD LOGIC ---
+setTimeout(async () => {
 
     let dColl = document.getElementById('home-total-coll');
     let dPend = document.getElementById('home-total-pend');
 
     if (!dColl || !dPend) return;
 
-    // ✅ Use YOUR existing variable names
-    let baseCollection = totalColl;   // from students.reduce
-    let basePending    = totalPend;   // from students.reduce
+    // 1️⃣ Base values already calculated from students table
+    let baseCollection = totalColl;   // 97000
+    let basePending    = totalPend;   // 103000
 
-    // ✅ Calculate total incoming Feb–July
-    let incomingTotal = 0;
+    // 2️⃣ Get CURRENT month payments (example: Feb 2026)
+    let now = new Date();
+    let firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    let lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    if (chartRows && chartRows.length > 0) {
-        chartRows.forEach(row => {
-            incomingTotal += Number(row[4]) || 0;
-        });
-    }
+    const { data: monthPayments } = await db.from('payment_history')
+        .select('amount')
+        .eq('institute_id', sessionInstID)
+        .gte('payment_date', firstDay.toISOString().split('T')[0])
+        .lte('payment_date', lastDay.toISOString().split('T')[0]);
 
-    // ✅ Apply your required rule
-    let finalCollection = baseCollection - incomingTotal;
-    let finalPending    = basePending + incomingTotal;
+    let currentMonthPaid = monthPayments
+        ? monthPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+        : 0;
+
+    // 3️⃣ Apply YOUR required rule
+    let finalCollection = baseCollection - currentMonthPaid;
+    let finalPending    = basePending + currentMonthPaid;
 
     if (finalCollection < 0) finalCollection = 0;
 
+    // 4️⃣ Update dashboard
     dColl.innerText = "₹ " + Math.round(finalCollection).toLocaleString('en-IN');
     dPend.innerText = "₹ " + Math.round(finalPending).toLocaleString('en-IN');
 
