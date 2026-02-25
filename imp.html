@@ -5855,49 +5855,39 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
 
 // --- START OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
-setTimeout(async () => {
+// --- FINAL CORRECT DASHBOARD REVERSAL LOGIC ---
+setTimeout(() => {
+
     let dColl = document.getElementById('home-total-coll');
     let dPend = document.getElementById('home-total-pend');
-    
-    if (dColl && dPend) {
 
-        // 1️⃣ Calculate TOTAL incoming from Feb to July dynamically
-        let incomingTotal = 0;
+    if (!dColl || !dPend) return;
 
-        if (chartRows && chartRows.length > 0) {
-            chartRows.forEach(row => {
-                // row[4] = incoming forecast value (as per your structure)
-                incomingTotal += Number(row[4]) || 0;
-            });
-        }
+    // 1️⃣ Base values already calculated earlier in this function
+    let baseCollection = totalCollection;   // from students reduce()
+    let basePending    = totalPending;      // from students reduce()
 
-        // 2️⃣ Base pending already calculated earlier in this function
-        let basePending = totalPending; 
+    // 2️⃣ Calculate TOTAL incoming from Feb–July dynamically
+    let incomingTotal = 0;
 
-        // 3️⃣ Fetch true Year-to-Date collection again (true revenue)
-        let currentYear = new Date().getFullYear();
-        const { data: yearlyPayments } = await db.from('payment_history')
-            .select('amount')
-            .eq('institute_id', sessionInstID)
-            .gte('payment_date', `${currentYear}-01-01`)
-            .lte('payment_date', `${currentYear}-12-31`);
-              
-        let baseCollection = yearlyPayments
-            ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
-            : 0;
-
-        // 4️⃣ Apply your required dynamic rule
-        let finalCollection = baseCollection - incomingTotal;
-        let finalPending = basePending + incomingTotal;
-
-        // Safety guard
-        if (finalCollection < 0) finalCollection = 0;
-
-        // 5️⃣ Update dashboard
-        dColl.innerText = "₹ " + Math.round(finalCollection).toLocaleString('en-IN');
-        dPend.innerText = "₹ " + Math.round(finalPending).toLocaleString('en-IN');
+    if (chartRows && chartRows.length > 0) {
+        chartRows.forEach(row => {
+            incomingTotal += Number(row[4]) || 0;
+        });
     }
+
+    // 3️⃣ Apply YOUR required formula
+    let finalCollection = baseCollection - incomingTotal;
+    let finalPending    = basePending + incomingTotal;
+
+    if (finalCollection < 0) finalCollection = 0;
+
+    // 4️⃣ Update dashboard
+    dColl.innerText = "₹ " + Math.round(finalCollection).toLocaleString('en-IN');
+    dPend.innerText = "₹ " + Math.round(finalPending).toLocaleString('en-IN');
+
 }, 100);
+// --- END FINAL LOGIC ---
 // --- END OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
 
 
