@@ -5450,6 +5450,21 @@ async function generateFinancialForecast(students) {
         if (s.pending_amount > 0 && s.due_dates) {
             // Split "March 2026, July 2026" into an array
             const dates = s.due_dates.split(',').map(d => d.trim());
+
+
+
+// --- START OF ADDED DUE DATE NORMALIZATION FOR FORECAST ---
+                for (let j = 0; j < dates.length; j++) {
+                    let parts = dates[j].split(/\s+/);
+                    if (parts.length >= 3) {
+                        // Converts "27th February 2026" into "February 2026" so it matches the dashboard's chart labels perfectly
+                        dates[j] = parts[parts.length - 2] + " " + parts[parts.length - 1]; 
+                    }
+                }
+                // --- END OF ADDED DUE DATE NORMALIZATION FOR FORECAST ---
+
+
+
             const perInstallment = s.pending_amount / dates.length;
 
             dates.forEach(d => {
