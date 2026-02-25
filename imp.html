@@ -5437,7 +5437,24 @@ function showHomeChartPage(page) {
 
 
 
+/* --- START OF ADDED DYNAMIC FORECAST FORMULA --- */
+    let runningCollection = totalReceived;
+    let runningPending = totalPending;
 
+    for (let i = 0; i < chartRows.length; i++) {
+        let incoming = chartRows[i][4]; // Forecast amount for this month
+        
+        runningCollection += incoming;
+        runningPending -= incoming;
+        
+        // Prevent pending from showing negative numbers if fees are overpaid
+        if (runningPending < 0) runningPending = 0; 
+        
+        // Update the array with the new dynamically calculated values
+        chartRows[i][2] = runningCollection; // Overrides Total Collection
+        chartRows[i][3] = runningPending;    // Overrides Total Pending
+    }
+    /* --- END OF ADDED DYNAMIC FORECAST FORMULA --- */
 
 
 
