@@ -11,16 +11,17 @@
         .pricing-header {
             background: #ff0000;
             color: white;
-            padding: 80px 20px;
+            padding: 80px 20px 100px; /* Added slight bottom padding for the angle */
             clip-path: polygon(0 0, 100% 0, 100% 85%, 0% 100%);
         }
         .pricing-header h1 { font-size: 3rem; margin: 0; }
+        .pricing-header p { font-size: 1.2rem; margin-top: 10px; opacity: 0.9; }
         
         .container {
             display: flex;
             justify-content: center;
             gap: 25px;
-            margin-top: -50px;
+            margin-top: -60px;
             padding: 0 5%;
             flex-wrap: wrap;
         }
@@ -28,25 +29,20 @@
         .price-card {
             background: white;
             border-radius: 20px;
-            width: 320px;
-            padding: 40px 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border-top: 15px solid #7FFFD4;
+            width: 400px; /* Made slightly wider to accommodate the dual buttons */
+            padding: 40px 30px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+            border-top: 15px solid #ff0000;
             transition: 0.3s;
-        }
-
-        .price-card.popular {
-            border-top-color: #ff0000;
-            transform: scale(1.05);
             z-index: 2;
         }
 
-        .price-card:hover { transform: translateY(-10px); }
+        .price-card:hover { transform: translateY(-10px); box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
 
-        .price-name { font-size: 1.5rem; font-weight: bold; color: #333; margin-bottom: 10px; }
-        .currency { font-size: 1.2rem; vertical-align: top; color: #ff0000; }
-        .amount { font-size: 3.5rem; font-weight: 800; color: #ff0000; }
-        .duration { color: #888; }
+        .price-name { font-size: 1.8rem; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .currency { font-size: 1.5rem; vertical-align: top; color: #ff0000; }
+        .amount { font-size: 4rem; font-weight: 900; color: #ff0000; line-height: 1; }
+        .duration { color: #888; font-weight: bold; }
 
         .feature-list {
             list-style: none;
@@ -57,103 +53,151 @@
         .feature-list li {
             padding: 12px 0;
             border-bottom: 1px solid #eee;
-            color: #555;
-            font-size: 0.95rem;
+            color: #444;
+            font-size: 1.05rem;
+            font-weight: 500;
         }
-        .feature-list i { color: #27ae60; margin-right: 10px; }
-        .feature-list i.fa-times { color: #ccc; }
+        .feature-list i { color: #27ae60; margin-right: 10px; font-size: 1.2rem; }
 
-        .buy-btn {
-            display: block;
-            background: #7FFFD4;
-            color: #333;
+        /* Custom Action Buttons Layout */
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        
+        .btn-wa {
+            flex: 1;
+            background: #25D366;
+            color: white;
             text-decoration: none;
-            padding: 15px;
+            padding: 15px 10px;
             border-radius: 10px;
             font-weight: bold;
+            font-size: 1rem;
             transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
         }
-        .popular .buy-btn { background: #ff0000; color: white; }
-        .buy-btn:hover { letter-spacing: 2px; opacity: 0.9; }
+        .btn-wa:hover { background: #128C7E; transform: translateY(-3px); }
+
+        .btn-mail {
+            flex: 1;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            padding: 15px 10px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3);
+        }
+        .btn-mail:hover { background: #0056b3; transform: translateY(-3px); }
+
+        /* Explanatory Text Section */
+        .info-section {
+            max-width: 800px;
+            margin: 50px auto 20px;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            border: 2px dashed #ccc;
+            text-align: left;
+            color: #444;
+            line-height: 1.8;
+            font-size: 1.05rem;
+        }
+        .info-section h3 {
+            color: #000;
+            margin-top: 0;
+            text-align: center;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #ff0000;
+            display: inline-block;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
 
         .trust-badges {
-            margin-top: 60px;
+            margin-top: 40px;
             display: flex;
             justify-content: center;
             gap: 40px;
             color: #777;
+            font-weight: bold;
+            flex-wrap: wrap;
         }
+        .trust-badges i { color: #ff0000; margin-right: 5px; }
     </style>
 </head>
 <body>
 
     <section class="pricing-header">
-        <h1>SIMPLE, HONEST PRICING</h1>
-        <p>No monthly rent. Pay once, use forever.</p>
+        <h1>LIFETIME OWNERSHIP</h1>
+        <p>Ditch the monthly rent. Own the ultimate coaching management system.</p>
     </section>
 
     <div class="container">
-        
-        <!-- Starter Plan -->
+        <!-- Unified Ultimate Plan Card -->
         <div class="price-card">
-            <div class="price-name">STARTER</div>
-            <div class="price-value">
+            <div style="color: #ff0000; font-weight: bold; font-size: 0.85rem; letter-spacing: 2px; margin-bottom: 5px;">THE ULTIMATE DEAL</div>
+            <div class="price-name">FULL SYSTEM ACCESS</div>
+            
+            <div class="price-value" style="margin: 20px 0;">
                 <span class="currency">₹</span>
-                <span class="amount">2,999</span>
-                <span class="duration">/Life</span>
+                <span class="amount">14,999</span>
+                <span class="duration">/-</span>
             </div>
-            <ul class="feature-list">
-                <li><i class="fas fa-check"></i> 50 Students Max</li>
-                <li><i class="fas fa-check"></i> Fee Management</li>
-                <li><i class="fas fa-check"></i> Attendance Tracker</li>
-                <li><i class="fas fa-times"></i> ID Card Generator</li>
-                <li><i class="fas fa-times"></i> Performance Analytics</li>
-            </ul>
-            <a href="mailto:sv@nexusai-group.in" class="buy-btn">GET STARTED</a>
-        </div>
-
-        <!-- Professional Plan -->
-        <div class="price-card popular">
-            <div style="color: #ff0000; font-weight: bold; font-size: 0.8rem; margin-bottom: 5px;">MOST POPULAR</div>
-            <div class="price-name">PROFESSIONAL</div>
-            <div class="price-value">
-                <span class="currency">₹</span>
-                <span class="amount">7,999</span>
-                <span class="duration">/Life</span>
+            
+            <div style="background: #ff0000; color: #fff; padding: 8px; font-weight: 800; border-radius: 5px; font-size: 1rem; letter-spacing: 1px;">
+                AT A NEVER BEFORE PRICE!
             </div>
+            
             <ul class="feature-list">
-                <li><i class="fas fa-check"></i> Unlimited Students</li>
-                <li><i class="fas fa-check"></i> Auto Fee Reminders</li>
-                <li><i class="fas fa-check"></i> ID Card Generator</li>
-                <li><i class="fas fa-check"></i> Certificate Generator</li>
-                <li><i class="fas fa-check"></i> Expense Tracking</li>
+                <li><i class="fas fa-check"></i> Access to all 26+ Modules</li>
+                <li><i class="fas fa-check"></i> Unlimited Student Records</li>
+                <li><i class="fas fa-check"></i> Advanced Analytics & Dashboards</li>
+                <li><i class="fas fa-check"></i> Dedicated Teacher Portals</li>
+                <li><i class="fas fa-check"></i> Lifetime Free Usage</li>
             </ul>
-            <a href="mailto:sv@nexusai-group.in" class="buy-btn">BUY NOW</a>
-        </div>
-
-        <!-- Enterprise Plan -->
-        <div class="price-card">
-            <div class="price-name">ENTERPRISE</div>
-            <div class="price-value">
-                <span class="currency">₹</span>
-                <span class="amount">24,999</span>
-                <span class="duration">/Life</span>
+            
+            <div class="action-buttons">
+                <!-- Replace 'YOUR_WHATSAPP_NUMBER' with your actual number with country code (e.g., 919876543210) -->
+                <a href="https://wa.me/919136516298?text=Hi,%20I%20am%20interested%20in%20the%20ClassManager%20Lifetime%20Deal%20for%2014,999/-" class="btn-wa" target="_blank">
+                    <i class="fab fa-whatsapp"></i> WhatsApp
+                </a>
+                
+                <!-- Replace 'YOUR_EMAIL_ADDRESS' with your actual email -->
+                <a href="mailto:sv@nexusai-group.in?subject=Inquiry: ClassManager Lifetime Deal" class="btn-mail">
+                    <i class="fas fa-envelope"></i> Email Us
+                </a>
             </div>
-            <ul class="feature-list">
-                <li><i class="fas fa-check"></i> Your Own Logo/Branding</li>
-                <li><i class="fas fa-check"></i> Student & Teacher Portals</li>
-                <li><i class="fas fa-check"></i> Priority Setup Help</li>
-                <li><i class="fas fa-check"></i> Data Backup Support</li>
-                <li><i class="fas fa-check"></i> Personalized Training</li>
-            </ul>
-            <a href="mailto:sv@nexusai-group.in" class="buy-btn">CONTACT US</a>
         </div>
+    </div>
 
+    <div class="info-section">
+        <h3><i class="fas fa-shield-alt" style="color: #27ae60;"></i> 100% Secure & Subscription-Free</h3>
+        <p>
+            We believe in software that you actually own. This software is available as a strict <b>One-Time Sale</b>—meaning there is absolutely <b>No Subscription Model</b>, no monthly rent, and no hidden maintenance charges. You pay once, and the system is yours to use forever.
+        </p>
+        <p style="margin-bottom: 0;">
+            Furthermore, this Progressive Web App (PWA) is built on a highly secure <b>Multi-Tenant System architecture</b>. What does that mean for you? It guarantees that your institute gets its own completely isolated and private workspace. <b>No other institute can ever see, access, or interfere with your records.</b> Your data belongs solely to you, locked safely behind your unique Institute ID.
+        </p>
     </div>
 
     <div class="trust-badges">
-        <div><i class="fas fa-shield-halved"></i> 100% Secure Data</div>
-        <div><i class="fas fa-indian-rupee-sign"></i> No Hidden Charges</div>
+        <div><i class="fas fa-lock"></i> Isolated Data Security</div>
+        <div><i class="fas fa-ban"></i> Zero Recurring Fees</div>
         <div><i class="fas fa-heart"></i> Made in India</div>
     </div>
 
