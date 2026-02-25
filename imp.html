@@ -5444,19 +5444,24 @@ function showHomeChartPage(page) {
     for (let i = 0; i < chartRows.length; i++) {
         let incoming = chartRows[i][4]; // Forecast amount for this month
         
-        runningCollection += incoming;
-        runningPending -= incoming;
-        
-        // Prevent pending from showing negative numbers if fees are overpaid
-        if (runningPending < 0) runningPending = 0; 
-        
-        // Update the array with the new dynamically calculated values
-        chartRows[i][2] = runningCollection; // Overrides Total Collection
-        chartRows[i][3] = runningPending;    // Overrides Total Pending
+        if (incoming > 0) {
+            // Accumulate/Deduct for months with installments (March, April, May)
+            runningCollection += incoming;
+            runningPending -= incoming;
+            if (runningPending < 0) runningPending = 0; 
+            
+            chartRows[i][2] = runningCollection; 
+            chartRows[i][3] = runningPending;    
+        } else {
+            // End of installments (June, July, etc.): Set Collection and Pending to 0
+            chartRows[i][2] = 0; 
+            chartRows[i][3] = 0; 
+            
+            // Note: Admissions (chartRows[i][1]) is left untouched so it stays fully dynamic 
+            // and accurately shows your total active students!
+        }
     }
     /* --- END OF ADDED DYNAMIC FORECAST FORMULA --- */
-
-
 
 
     // 4. Draw the Google Chart with Slicer
