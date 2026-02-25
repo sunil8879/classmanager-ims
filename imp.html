@@ -5561,6 +5561,31 @@ function showHomeChartPage(page) {
             
             // Set base month to actual collected, and future months to the forecast installment
             pieSliceAmount = (i === 0) ? totalReceived : incoming; 
+
+
+
+
+// --- START OF DASHBOARD STATS SYNC FIX ---
+            if (i === 0) {
+                let dashColl = document.getElementById('home-total-coll');
+                let dashPend = document.getElementById('home-total-pend');
+                
+                if (dashColl && dashPend) {
+                    // Extract the base Collection value that was just set right before this function
+                    let currentColl = parseInt(dashColl.innerText.replace(/[^\d]/g, '')) || 0;
+                    
+                    // Add the current month's forecasted incoming fees to match the graph
+                    dashColl.innerText = "₹ " + (currentColl + incoming).toLocaleString('en-IN');
+                    dashPend.innerText = "₹ " + runningPending.toLocaleString('en-IN');
+                }
+            }
+            // --- END OF DASHBOARD STATS SYNC FIX ---
+
+
+
+
+
+
         } else {
             chartRows[i][2] = 0; 
             chartRows[i][3] = 0; 
