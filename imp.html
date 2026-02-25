@@ -5343,7 +5343,20 @@ function runPrintTeacher(date, paid, pending, month) {
 }
 
 
+/* --- START OF ADDED GLOBAL FUNCTION FIX --- */
+window.showHomeChartPage = function(page) {
+    var c1 = document.getElementById('home_stacked_chart');
+    var c2 = document.getElementById('home_pie_chart');
+    var c3 = document.getElementById('home_line_chart');
 
+    if (c1) c1.style.height = (page === 1) ? '400px' : '0px';
+    if (c2) c2.style.height = (page === 2) ? '400px' : '0px';
+    if (c3) {
+        c3.style.height = (page === 3) ? '400px' : '0px';
+        c3.style.overflow = 'hidden';
+    }
+};
+/* --- END OF ADDED GLOBAL FUNCTION FIX --- */
 
 
 
@@ -5495,6 +5508,21 @@ function drawHomeForecastingChart(chartRows) {
             'chartArea': { width: '85%', height: '70%' }
         }
     });
+
+
+
+// --- START OF ADDED SCALE FIX FOR ADMISSIONS ---
+    // This gives Admissions its own scale on the right side so it isn't squashed by large fee amounts
+    stackedChart.setOption('vAxes', {
+        0: { title: 'Amount (₹)', minValue: 0 },
+        1: { title: 'Total Admissions (Count)', minValue: 0 }
+    });
+    stackedChart.setOption('series', {
+        0: { targetAxisIndex: 1 } // Maps the first data series (Admissions) to the new right-side axis
+    });
+    // --- END OF ADDED SCALE FIX FOR ADMISSIONS ---
+
+
 
     var pieChart = new google.visualization.ChartWrapper({
         'chartType': 'PieChart',
