@@ -2456,6 +2456,37 @@ async function loadHomeDashboardStats() {
         document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
 loadHomeInventoryStats();
 
+
+
+
+
+
+
+// --- START OF ADDED YEARLY COLLECTION LOGIC ---
+        const currentYear = new Date().getFullYear();
+        const { data: yearlyPayments } = await db.from('payment_history')
+            .select('amount')
+            .eq('institute_id', sessionInstID)
+            .gte('payment_date', `${currentYear}-01-01`)
+            .lte('payment_date', `${currentYear}-12-31`);
+            
+        const actualYearlyCollection = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
+        
+        // This overwrites the flawed "Active only" calculation with the true Year-to-Date revenue
+        document.getElementById('home-total-coll').innerText = "₹ " + actualYearlyCollection.toLocaleString('en-IN');
+        
+        // Updates the tiny text below the number so the owner knows it is Year-to-Date
+        const collSubtext = document.getElementById('home-total-coll').nextElementSibling;
+        if(collSubtext) collSubtext.innerText = "Collected in " + currentYear;
+        // --- END OF ADDED YEARLY COLLECTION LOGIC ---
+
+
+
+
+
+
+
+
         // --- ADDED FOR FORECASTING ---
         generateFinancialForecast(students);
     }
