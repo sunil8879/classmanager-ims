@@ -5631,14 +5631,7 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
     /* --- END OF ADDED FIX --- */
 
 
-/* --- START OF ADDED FIX: PREVENT OVERLAPPING IN MAY --- */
-    // Converts the chart to allow mixed types, keeps money stacked, but floats admissions as a line
-    stackedChart.setChartType('ComboChart');
-    stackedChart.setOption('seriesType', 'bars');
-    stackedChart.setOption('series', {
-        0: { type: 'line', targetAxisIndex: 1, lineWidth: 4, pointSize: 8 } // Admissions is Series 0
-    });
-    /* --- END OF ADDED FIX --- */
+
 
 
 
