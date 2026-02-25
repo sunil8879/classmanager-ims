@@ -5851,46 +5851,7 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
 
 
-// --- START OF NEW STATS SWAP FIX ---
-setTimeout(async () => {
-    let dColl = document.getElementById('home-total-coll');
-    let dPend = document.getElementById('home-total-pend');
-    
-    if (dColl && dPend && chartRows.length > 0) {
-        let incomingThisMonth = chartRows[0][4] || 0; // The incoming amount for the current month
-        
-        // 1. Safely fetch the true Base Pending directly from the database
-        const { data: stuData } = await db.from('students')
-            .select('pending_amount')
-            .eq('institute_id', sessionInstID)
-            .eq('status', 'Active');
-            
-        let trueBasePend = stuData ? stuData.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0) : 0;
-        
-        // 2. Safely fetch the true Base Collection (Year-to-date)
-        const currentYear = new Date().getFullYear();
-        const { data: payData } = await db.from('payment_history')
-            .select('amount')
-            .eq('institute_id', sessionInstID)
-            .gte('payment_date', `${currentYear}-01-01`)
-            .lte('payment_date', `${currentYear}-12-31`);
-            
-        let trueBaseColl = payData ? payData.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
-        
-        // 3. APPLY YOUR REVERSED LOGIC
-        // If Forecast is 5000 -> Collection decreases by 5000, Pending increases by 5000
-        let finalColl = trueBaseColl - incomingThisMonth;
-        let finalPend = trueBasePend + incomingThisMonth;
-        
-        // Ensure values do not drop below 0 natively
-        if (finalColl < 0) finalColl = 0;
-        
-        // Update Dashboard Point 1 securely
-        dColl.innerText = "₹ " + Math.round(finalColl).toLocaleString('en-IN');
-        dPend.innerText = "₹ " + Math.round(finalPend).toLocaleString('en-IN');
-    }
-}, 100); // 100ms timeout ensures it overwrites the previous flawed calculation perfectly
-// --- END OF NEW STATS SWAP FIX ---
+
 }
 
 
