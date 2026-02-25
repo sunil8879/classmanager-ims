@@ -5443,24 +5443,27 @@ function showHomeChartPage(page) {
 
     for (let i = 0; i < chartRows.length; i++) {
         let incoming = chartRows[i][4]; // Forecast amount for this month
+        let pieSliceAmount = 0; // Isolated chunk specifically for the pie chart
         
-        // i === 0 forces the current month (Feb) to always show actual base numbers!
         if (i === 0 || incoming > 0) {
-            // Apply current month's actuals OR accumulate upcoming installments
             runningCollection += incoming;
             runningPending -= incoming;
             if (runningPending < 0) runningPending = 0; 
             
             chartRows[i][2] = runningCollection; 
-            chartRows[i][3] = runningPending;    
+            chartRows[i][3] = runningPending;  
+            
+            // Set base month to actual collected, and future months to the forecast installment
+            pieSliceAmount = (i === 0) ? totalReceived : incoming; 
         } else {
-            // End of installments (June, July, etc.): Set Collection and Pending to 0
             chartRows[i][2] = 0; 
             chartRows[i][3] = 0; 
         }
+        
+        // Append this isolated amount as a brand new column (Index 5) for the Pie Chart
+        chartRows[i].push(pieSliceAmount);
     }
     /* --- END OF ADDED DYNAMIC FORECAST FORMULA --- */
-
 
     // 4. Draw the Google Chart with Slicer
     drawHomeForecastingChart(chartRows);
@@ -5473,6 +5476,9 @@ function drawHomeForecastingChart(chartRows) {
     data.addColumn('number', 'Total Collection');
     data.addColumn('number', 'Total Pending');
     data.addColumn('number', 'Incoming (Forecast)');
+
+
+data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
     data.addRows(chartRows);
 
@@ -5549,7 +5555,7 @@ function drawHomeForecastingChart(chartRows) {
         'containerId': 'home_pie_chart',
         // Pie charts require exactly 2 columns to draw properly. 
         // We configure it to map [Month] against [Total Collection] to maintain proportionality.
-        'view': { 'columns':[0, 2] }, 
+     'view': { 'columns':[0, 5] },
         'options': {
             'title': 'Total Collection Proportion by Month',
             'height': 400,
