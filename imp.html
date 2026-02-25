@@ -2670,14 +2670,16 @@ email: document.getElementById('stu-email').value
         const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
         
         
-        await db.from('payment_history').insert([{
-            institute_id: sessionInstID,
-            student_id: newStu[0].id,
-            roll_number: roll,
-            amount: stuData.paid_amount,
-            payment_date: payDate,
-            month_year: monthYearStr
-        }]);
+        await db.from('payment_history').upsert([{
+    institute_id: sessionInstID,
+    student_id: newStu[0].id,
+    roll_number: roll,
+    amount: stuData.paid_amount,
+    payment_date: payDate,
+    month_year: monthYearStr
+}], { 
+    onConflict: 'student_id,month_year' 
+});
     }
 
     // --- End of New Logic ---
