@@ -2649,8 +2649,8 @@ email: document.getElementById('stu-email').value
 
 // --- NEW LOGIC: Log the initial payment into Payment History ---
   if (parseFloat(stuData.paid_amount) > 0) {
-        const payDate = stuData.admission_date;
-        const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+      const payDate = new Date().toISOString().split('T')[0];  // ✅ TODAY'S DATE
+const monthYearStr = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
         
         await db.from('payment_history').insert([{
             institute_id: sessionInstID,
