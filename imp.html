@@ -5453,6 +5453,29 @@ async function generateFinancialForecast(students) {
 
 
 
+
+// --- START OF ADDED PAST DATE FILTER ---
+                const todayForFilter = new Date();
+                todayForFilter.setHours(0, 0, 0, 0);
+
+                // Loop backwards to safely remove old dates from the array
+                for (let k = dates.length - 1; k >= 0; k--) {
+                    // Temporarily remove st/nd/rd/th so JS can read it as a real date (e.g. "11 February 2026")
+                    let cleanDateStr = dates[k].replace(/(st|nd|rd|th)/i, ''); 
+                    let parsedDate = new Date(cleanDateStr);
+                    
+                    // If the specific day has passed, delete it from the future distribution list
+                    if (!isNaN(parsedDate) && parsedDate < todayForFilter) {
+                        dates.splice(k, 1);
+                    }
+                }
+
+                // If all dates in the string are in the past, stop here so it shows 0 for forecast
+                if (dates.length === 0) return; 
+                // --- END OF ADDED PAST DATE FILTER ---
+
+
+
 // --- START OF ADDED DUE DATE NORMALIZATION FOR FORECAST ---
                 for (let j = 0; j < dates.length; j++) {
                     let parts = dates[j].split(/\s+/);
