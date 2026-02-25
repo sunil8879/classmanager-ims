@@ -5633,6 +5633,24 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
 
 
+/* --- START OF FRESH OVERRIDE FOR ADMISSIONS VISIBILITY --- */
+    stackedChart.setChartType('ComboChart');
+    stackedChart.setOption('isStacked', true);
+    stackedChart.setOption('seriesType', 'bars');
+    
+    // Forces the bottom of the chart to always anchor at 0 so June/July don't disappear
+    stackedChart.setOption('vAxes', {
+        0: { minValue: 0, viewWindow: { min: 0 } },
+        1: { minValue: 0, viewWindow: { min: 0 } }
+    });
+    
+    // Forces Admissions (Series 0) to be a Line so it NEVER gets swallowed by 100k money bars
+    stackedChart.setOption('series', {
+        0: { type: 'line', targetAxisIndex: 1, color: '#27ae60', lineWidth: 4, pointSize: 8 }
+    });
+    /* --- END OF FRESH OVERRIDE --- */
+
+
 
 
     dashboard.bind(slicer, stackedChart);
