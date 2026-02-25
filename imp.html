@@ -554,6 +554,31 @@ height: 65px; white-space: nowrap;
 <!-- GOOGLE CHART & SLICER CONTAINER -->
 <div id="home_dashboard_div" style="width: 100%; max-width: 900px; margin: 0 auto; background: white; padding: 20px; border: 2px solid #000; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
     <div id="home_filter_div" style="background: #f0fdfa; padding: 10px; border-radius: 10px; border: 1px solid #7FFFD4; margin-bottom: 20px;"></div>
+
+
+
+
+
+
+
+<!-- START OF ADDED HTML FOR PAGINATION & CHARTS -->
+    <div id="home_chart_pagination" style="margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <button type="button" class="btn-fetch" onclick="showHomeChartPage(1)" style="background: #27ae60; border: 1px solid #000; color: white;">Page 1: Stacked Bar</button>
+        <button type="button" class="btn-fetch" onclick="showHomeChartPage(2)" style="background: #1877F2; border: 1px solid #000; color: white;">Page 2: Pie Chart</button>
+        <button type="button" class="btn-fetch" onclick="showHomeChartPage(3)" style="background: #f39c12; border: 1px solid #000; color: white;">Page 3: Line Chart</button>
+    </div>
+    <div id="home_stacked_chart" style="width: 100%; height: 400px; overflow: hidden;"></div>
+    <div id="home_pie_chart" style="width: 100%; height: 0px; overflow: hidden;"></div>
+    <!-- END OF ADDED HTML FOR PAGINATION & CHARTS -->
+
+
+
+
+
+
+
+
+
     <div id="home_line_chart" style="height: 400px; width: 100%;"></div>
 </div>
         </div>
@@ -5374,6 +5399,36 @@ async function generateFinancialForecast(students) {
         chartRows.push([month, totalAdmissions, totalReceived, totalPending, Math.round(forecastData[month])]);
     });
 
+
+
+
+
+
+
+// -- START OF ADDED PAGINATION FUNCTION --
+function showHomeChartPage(page) {
+    var c1 = document.getElementById('home_stacked_chart');
+    var c2 = document.getElementById('home_pie_chart');
+    var c3 = document.getElementById('home_line_chart');
+
+    // We toggle the heights to 0 to "hide" them without breaking Google Charts' SVG dimensions
+    if (c1) c1.style.height = (page === 1) ? '400px' : '0px';
+    if (c2) c2.style.height = (page === 2) ? '400px' : '0px';
+    if (c3) {
+        c3.style.height = (page === 3) ? '400px' : '0px';
+        c3.style.overflow = 'hidden';
+    }
+}
+// -- END OF ADDED PAGINATION FUNCTION --
+
+
+
+
+
+
+
+
+
     // 4. Draw the Google Chart with Slicer
     drawHomeForecastingChart(chartRows);
 }
@@ -5417,6 +5472,58 @@ function drawHomeForecastingChart(chartRows) {
             'chartArea': { width: '85%', height: '70%' }
         }
     });
+
+
+
+
+
+// -- START OF ADDED CHARTS & BINDINGS --
+    // Ensure the original line chart maintains its structure when hidden
+    lineChart.setOption('height', 400);
+
+    var stackedChart = new google.visualization.ChartWrapper({
+        'chartType': 'ColumnChart', // Vertical Bar Chart
+        'containerId': 'home_stacked_chart',
+        'options': {
+            'title': 'Financial Outlook (Stacked Bar)',
+            'isStacked': true,
+            'height': 400,
+            'legend': { position: 'bottom' },
+            'colors':['#27ae60', '#1877F2', '#ff0000', '#f39c12'],
+            'vAxis': { title: 'Amount / Count', minValue: 0 },
+            'hAxis': { title: 'Month & Year' },
+            'chartArea': { width: '85%', height: '70%' }
+        }
+    });
+
+    var pieChart = new google.visualization.ChartWrapper({
+        'chartType': 'PieChart',
+        'containerId': 'home_pie_chart',
+        // Pie charts require exactly 2 columns to draw properly. 
+        // We configure it to map [Month] against [Total Collection] to maintain proportionality.
+        'view': { 'columns':[0, 2] }, 
+        'options': {
+            'title': 'Total Collection Proportion by Month',
+            'height': 400,
+            'legend': { position: 'right' },
+            'colors':['#27ae60', '#1877F2', '#ff0000', '#f39c12', '#8e44ad', '#34495e'],
+            'chartArea': { width: '90%', height: '80%' }
+        }
+    });
+
+    dashboard.bind(slicer, stackedChart);
+    dashboard.bind(slicer, pieChart);
+    
+    // Automatically hide Page 2 & Page 3 immediately after setting them up
+    setTimeout(function() { showHomeChartPage(1); }, 100);
+    // -- END OF ADDED CHARTS & BINDINGS --
+
+
+
+
+
+
+
 
     dashboard.bind(slicer, lineChart);
     dashboard.draw(data);
