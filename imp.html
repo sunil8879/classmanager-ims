@@ -5800,6 +5800,53 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
     dashboard.bind(slicer, lineChart);
     dashboard.draw(data);
+
+
+
+
+
+
+
+// --- START OF DASHBOARD STATS REVERSAL & FIX ---
+    setTimeout(() => {
+        let passedDues = 0;
+        let todayFilter = new Date();
+        todayFilter.setHours(0, 0, 0, 0);
+
+        // 1. Calculate ONLY the dues that have actually passed 
+        students.forEach(s => {
+            if (s.pending_amount > 0 && s.due_dates) {
+                let datesArr = s.due_dates.split(',');
+                let instAmt = s.pending_amount / datesArr.length;
+                datesArr.forEach(d => {
+                    let pDate = new Date(d.replace(/(st|nd|rd|th)/i, '').trim());
+                    if (!isNaN(pDate) && pDate < todayFilter) {
+                        passedDues += instAmt;
+                    }
+                });
+            }
+        });
+
+        let dColl = document.getElementById('home-total-coll');
+        let dPend = document.getElementById('home-total-pend');
+        
+        if (dColl && dPend) {
+            let currentWrongColl = parseInt(dColl.innerText.replace(/[^\d]/g, '')) || 0;
+            let incomingThisMonth = chartRows.length > 0 ? chartRows[0][4] : 0;
+            
+            // 2. Undo the wrong "future incoming" addition, and ADD the "passed dues"
+            let trueColl = (currentWrongColl - incomingThisMonth) + passedDues;
+            
+            // 3. Subtract passed dues from Total Pending
+            let basePend = students.reduce((sum, st) => sum + (Number(st.pending_amount) || 0), 0);
+            let truePend = basePend - passedDues;
+            if (truePend < 0) truePend = 0;
+
+            dColl.innerText = "₹ " + Math.round(trueColl).toLocaleString('en-IN');
+            dPend.innerText = "₹ " + Math.round(truePend).toLocaleString('en-IN');
+        }
+    }, 50);
+    // --- END OF DASHBOARD STATS REVERSAL & FIX ---
 }
 
 
