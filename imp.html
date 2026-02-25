@@ -2734,8 +2734,8 @@ async function editStudentByRoll() {
     if (!roll) return alert("Error: Please fetch a student first using Roll Number.");
 
     // Re-validate dates before updating
-    if (new Date(admissionDate).setHours(0,0,0,0) < today) 
-        return alert("Error: Admission Date cannot be in the past.");
+   // if (new Date(admissionDate).setHours(0,0,0,0) < today) 
+        //return alert("Error: Admission Date cannot be in the past.");
     if (new Date(endDate).setHours(0,0,0,0) < today) 
         return alert("Error: Course End Date cannot be in the past.");
 
