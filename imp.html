@@ -5855,42 +5855,40 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
 
 // --- START OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
-    setTimeout(() => {
+    setTimeout(async () => {
         let dColl = document.getElementById('home-total-coll');
         let dPend = document.getElementById('home-total-pend');
         
         if (dColl && dPend) {
-            // Get the current month's incoming forecast
+            // 1. Get the forecast for this month (e.g., 0 or 5000)
             let incomingThisMonth = chartRows.length > 0 ? chartRows[0][4] : 0;
             
-            // Get pure base pending
-            let basePend = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
+            // 2. Base pending is already calculated in this function (e.g., 103000)
+            let basePending = totalPending; 
             
-            // Query actual base collection safely to avoid mathematical conflicts with previous timeouts
+            // 3. Re-fetch the true yearly collection (e.g., 97000) to ensure perfect accuracy
             let currentYear = new Date().getFullYear();
-            db.from('payment_history')
+            const { data: yearlyPayments } = await db.from('payment_history')
               .select('amount')
               .eq('institute_id', sessionInstID)
               .gte('payment_date', `${currentYear}-01-01`)
-              .lte('payment_date', `${currentYear}-12-31`)
-              .then(({ data: yearlyPayments }) => {
-                  let baseYearlyColl = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
-                  
-                  // Apply the exact formula requested to swap relationships:
-                  let finalCollection = baseYearlyColl - incomingThisMonth;
-                  let finalPending = basePend + incomingThisMonth;
-                  
-                  if (finalCollection < 0) finalCollection = 0;
-                  if (finalPending < 0) finalPending = 0;
-
-                  dColl.innerText = "₹ " + Math.round(finalCollection).toLocaleString('en-IN');
-                  dPend.innerText = "₹ " + Math.round(finalPending).toLocaleString('en-IN');
-              });
+              .lte('payment_date', `${currentYear}-12-31`);
+              
+            let baseCollection = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
+            
+            // 4. Apply your exact mathematical rule dynamically
+            let finalCollection = baseCollection - incomingThisMonth; // e.g. 97000 - 5000 = 92000
+            let finalPending = basePending + incomingThisMonth;       // e.g. 103000 + 5000 = 108000
+            
+            // Prevent display of negative values
+            if (finalCollection < 0) finalCollection = 0;
+            
+            // 5. Update the display on the dashboard
+            dColl.innerText = "₹ " + Math.round(finalCollection).toLocaleString('en-IN');
+            dPend.innerText = "₹ " + Math.round(finalPending).toLocaleString('en-IN');
         }
     }, 100);
     // --- END OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
-
-
 
 
 
