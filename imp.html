@@ -5863,11 +5863,11 @@ setTimeout(() => {
 
     if (!dColl || !dPend) return;
 
-    // 1️⃣ Base values already calculated earlier in this function
-    let baseCollection = totalCollection;   // from students reduce()
-    let basePending    = totalPending;      // from students reduce()
+    // ✅ Use YOUR existing variable names
+    let baseCollection = totalColl;   // from students.reduce
+    let basePending    = totalPend;   // from students.reduce
 
-    // 2️⃣ Calculate TOTAL incoming from Feb–July dynamically
+    // ✅ Calculate total incoming Feb–July
     let incomingTotal = 0;
 
     if (chartRows && chartRows.length > 0) {
@@ -5876,18 +5876,17 @@ setTimeout(() => {
         });
     }
 
-    // 3️⃣ Apply YOUR required formula
+    // ✅ Apply your required rule
     let finalCollection = baseCollection - incomingTotal;
     let finalPending    = basePending + incomingTotal;
 
     if (finalCollection < 0) finalCollection = 0;
 
-    // 4️⃣ Update dashboard
     dColl.innerText = "₹ " + Math.round(finalCollection).toLocaleString('en-IN');
     dPend.innerText = "₹ " + Math.round(finalPending).toLocaleString('en-IN');
 
 }, 100);
-// --- END FINAL LOGIC ---
+// --- END ---
 // --- END OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
 
 
