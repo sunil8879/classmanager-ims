@@ -5465,6 +5465,64 @@ function showHomeChartPage(page) {
     }
     /* --- END OF ADDED DYNAMIC FORECAST FORMULA --- */
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* --- START OF ADDED DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
+    // Fetch course_end_dates for all active students safely in the background
+    const { data: dynStudents } = await db.from('students')
+        .select('student_details(course_end_date)')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    if (dynStudents) {
+        for (let i = 0; i < chartRows.length; i++) {
+            let monthName = chartRows[i][0]; // e.g., "February 2026"
+            let chartMonthDate = new Date(monthName + " 1"); // Parses to the 1st of that month
+            let activeCount = 0;
+
+            dynStudents.forEach(s => {
+                // Supabase joins can sometimes return arrays or objects, this handles both
+                let details = Array.isArray(s.student_details) ? s.student_details[0] : s.student_details;
+                let endStr = details ? details.course_end_date : null;
+
+                if (!endStr) {
+                    // If no end date is set, assume they are active indefinitely
+                    activeCount++; 
+                } else {
+                    let endDate = new Date(endStr);
+                    // Check if the student's end date is IN or AFTER this chart month
+                    if (endDate.getFullYear() > chartMonthDate.getFullYear() || 
+                       (endDate.getFullYear() === chartMonthDate.getFullYear() && endDate.getMonth() >= chartMonthDate.getMonth())) {
+                        activeCount++;
+                    }
+                }
+            });
+            
+            // Overwrite the flat Admissions count (Index 1) with our new dynamic count!
+            chartRows[i][1] = activeCount;
+        }
+    }
+    /* --- END OF ADDED DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
+
+
+
+
+
+
+
+
+
     // 4. Draw the Google Chart with Slicer
     drawHomeForecastingChart(chartRows);
 }
