@@ -5444,8 +5444,9 @@ function showHomeChartPage(page) {
     for (let i = 0; i < chartRows.length; i++) {
         let incoming = chartRows[i][4]; // Forecast amount for this month
         
-        if (incoming > 0) {
-            // Accumulate/Deduct for months with installments (March, April, May)
+        // i === 0 forces the current month (Feb) to always show actual base numbers!
+        if (i === 0 || incoming > 0) {
+            // Apply current month's actuals OR accumulate upcoming installments
             runningCollection += incoming;
             runningPending -= incoming;
             if (runningPending < 0) runningPending = 0; 
@@ -5456,9 +5457,6 @@ function showHomeChartPage(page) {
             // End of installments (June, July, etc.): Set Collection and Pending to 0
             chartRows[i][2] = 0; 
             chartRows[i][3] = 0; 
-            
-            // Note: Admissions (chartRows[i][1]) is left untouched so it stays fully dynamic 
-            // and accurately shows your total active students!
         }
     }
     /* --- END OF ADDED DYNAMIC FORECAST FORMULA --- */
