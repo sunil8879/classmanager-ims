@@ -2491,7 +2491,7 @@ loadHomeInventoryStats();
         generateFinancialForecast(students);
 
 
-updateHomeTotalsDynamic();
+
     }
 }
 
@@ -7377,42 +7377,6 @@ document.getElementById('tch-name').addEventListener('blur', async function() {
 
 
 
-
-/* ===== ADD THIS FUNCTION ===== */
-async function updateHomeTotalsDynamic() {
-    if (!currentUserInstituteId) return;
-
-    // 1️⃣ Get February 2026 Pending
-    const { data: febData, error: febError } = await supabase
-        .from('fee_management')
-        .select('pending_amount')
-        .eq('institute_id', currentUserInstituteId)
-        .eq('month', 'Feb 2026');
-
-    if (febError) {
-        console.error(febError);
-        return;
-    }
-
-    let febPending = 0;
-    if (febData && febData.length > 0) {
-        febPending = parseFloat(febData[0].pending_amount) || 0;
-    }
-
-    // 2️⃣ Base values (when Feb Pending = 0)
-    const BASE_COLLECTION = 97000;
-    const BASE_PENDING = 103000;
-
-    // 3️⃣ Dynamic calculation
-    const totalCollection = BASE_COLLECTION - febPending;
-    const totalPending = BASE_PENDING + febPending;
-
-    // 4️⃣ Update dashboard
-    document.getElementById('home-total-coll').innerText = "₹ " + totalCollection.toLocaleString();
-    document.getElementById('home-total-pend').innerText = "₹ " + totalPending.toLocaleString();
-}
-
-/* ===== CALL THIS AFTER YOUR DASHBOARD LOAD FUNCTION ===== */
 
 
 
