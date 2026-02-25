@@ -2550,6 +2550,23 @@ if (!sessionInstID || sessionInstID === "") {
 
 
 
+// --- START OF ADDED DUE DATE FORMAT VALIDATION ---
+const dueDatesFormatCheck = document.getElementById('stu-due-dates').value.trim();
+if (dueDatesFormatCheck) {
+    // Regex for: 1st, 2nd, 3rd, 4th... + Month Name + Year
+    const dateFormatRegex = /^(?:(?:1|21|31)st|(?:2|22)nd|(?:3|23)rd|(?:[4-9]|1[0-9]|20|2[4-9]|30)th)\s(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{4}$/i;
+    
+    const datesArray = dueDatesFormatCheck.split(',');
+    for (let d of datesArray) {
+        if (!dateFormatRegex.test(d.trim())) {
+            return alert("Error: Please enter the date in the shown format only (e.g. 21st February 2026, 11th March 2026).");
+        }
+    }
+}
+// --- END OF ADDED DUE DATE FORMAT VALIDATION ---
+
+
+
 // START OF ADDED VALIDATIONS
     if (fMobile && fMobile.length !== 10) return alert("Error: Father's Mobile Number must be exactly 10 digits.");
     if (mMobile && mMobile.length !== 10) return alert("Error: Mother's Mobile Number must be exactly 10 digits.");
@@ -2738,6 +2755,26 @@ async function editStudentByRoll() {
         //return alert("Error: Admission Date cannot be in the past.");
     if (new Date(endDate).setHours(0,0,0,0) < today) 
         return alert("Error: Course End Date cannot be in the past.");
+
+
+
+// --- START OF ADDED DUE DATE FORMAT VALIDATION ---
+const dueDatesFormatCheck = document.getElementById('stu-due-dates').value.trim();
+if (dueDatesFormatCheck) {
+    // Regex for: 1st, 2nd, 3rd, 4th... + Month Name + Year
+    const dateFormatRegex = /^(?:(?:1|21|31)st|(?:2|22)nd|(?:3|23)rd|(?:[4-9]|1[0-9]|20|2[4-9]|30)th)\s(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{4}$/i;
+    
+    const datesArray = dueDatesFormatCheck.split(',');
+    for (let d of datesArray) {
+        if (!dateFormatRegex.test(d.trim())) {
+            return alert("Error: Please enter the date in the shown format only (e.g. 21st February 2026, 11th March 2026).");
+        }
+    }
+}
+// --- END OF ADDED DUE DATE FORMAT VALIDATION ---
+
+
+
 
     // 1. Find the internal ID linked to this Roll Number
     const { data: detail, error: fetchErr } = await db.from('student_details')
