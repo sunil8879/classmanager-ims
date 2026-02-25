@@ -5623,6 +5623,14 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
         }
     });
 
+
+
+/* --- START OF ADDED FIX: HIDE PIE CHART DATA FROM BAR & LINE CHARTS --- */
+    stackedChart.setView({ 'columns':[0, 1, 2, 3, 4] });
+    lineChart.setView({ 'columns':[0, 1, 2, 3, 4] });
+    /* --- END OF ADDED FIX --- */
+
+
     dashboard.bind(slicer, stackedChart);
     dashboard.bind(slicer, pieChart);
     
