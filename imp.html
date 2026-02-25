@@ -2648,9 +2648,27 @@ email: document.getElementById('stu-email').value
         } else {
 
 // --- NEW LOGIC: Log the initial payment into Payment History ---
-  if (parseFloat(stuData.paid_amount) > 0) {
-      const payDate = new Date().toISOString().split('T')[0];  // ✅ TODAY'S DATE
-const monthYearStr = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    if (parseFloat(stuData.paid_amount) > 0) {
+        let payDate = stuData.admission_date; // Safe fallback just in case
+        
+        // Extract the FIRST date from Due Dates field (e.g., "12th February 2026")
+        if (stuData.due_dates) {
+            let firstDueDate = stuData.due_dates.split(',')[0].trim();
+            // Remove 'st', 'nd', 'rd', 'th' so JS can read it properly
+            let cleanDateStr = firstDueDate.replace(/(st|nd|rd|th)/i, '');
+            let parsedDate = new Date(cleanDateStr);
+            
+            if (!isNaN(parsedDate)) {
+                let y = parsedDate.getFullYear();
+                let m = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                let d = String(parsedDate.getDate()).padStart(2, '0');
+                payDate = `${y}-${m}-${d}`; // Result: "2026-02-12"
+            }
+        }
+
+        // Convert exactly to dashboard format like "February 2026"
+        const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+        
         
         await db.from('payment_history').insert([{
             institute_id: sessionInstID,
