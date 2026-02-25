@@ -2545,6 +2545,25 @@ if (!sessionInstID || sessionInstID === "") {
 
     // 2. Validations
     if (!admissionDate) return alert("Error: Admission Date is required.");
+
+
+
+
+
+// --- START OF ADMISSION DATE VALIDATION (CURRENT MONTH ONLY) ---
+    const adDateObj = new Date(admissionDate);
+    const todayObj = new Date();
+    
+    // Check if the month and year match the current month and year dynamically
+    if (adDateObj.getMonth() !== todayObj.getMonth() || adDateObj.getFullYear() !== todayObj.getFullYear()) {
+        const currentMonthName = todayObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+        return alert("Error: Admission Date must be within the current month (" + currentMonthName + "). Dates from previous or future months are not allowed.");
+    }
+    // --- END OF ADMISSION DATE VALIDATION ---
+
+
+
+
     if (!roll) return alert("Error: Please click 'Gen' to create a Roll Number first.");
     if (mobile.length !== 10) return alert("Error: Mobile Number must be 10 digits.");
 
@@ -2732,6 +2751,21 @@ async function editStudentByRoll() {
     const today = new Date().setHours(0,0,0,0);
 
     if (!roll) return alert("Error: Please fetch a student first using Roll Number.");
+
+
+
+// --- START OF ADMISSION DATE VALIDATION (CURRENT MONTH ONLY) ---
+    const adDateObj = new Date(admissionDate);
+    const todayObj = new Date();
+    
+    if (adDateObj.getMonth() !== todayObj.getMonth() || adDateObj.getFullYear() !== todayObj.getFullYear()) {
+        const currentMonthName = todayObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+        return alert("Error: Admission Date must be within the current month (" + currentMonthName + "). Dates from previous or future months are not allowed.");
+    }
+    // --- END OF ADMISSION DATE VALIDATION ---
+
+
+
 
     // Re-validate dates before updating
     if (new Date(admissionDate).setHours(0,0,0,0) < today) 
