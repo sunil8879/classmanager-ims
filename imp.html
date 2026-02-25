@@ -5849,9 +5849,6 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
     // --- END OF DASHBOARD STATS REVERSAL & FIX ---
 
 
-
-
-
 }
 
 
@@ -7373,6 +7370,43 @@ document.getElementById('tch-name').addEventListener('blur', async function() {
 });
 
 
+
+
+
+// ===== ADD BELOW ALL YOUR EXISTING FUNCTIONS =====
+
+async function updateHomeTotalsDynamic() {
+    try {
+        const { data, error } = await supabase
+            .from('fees')
+            .select('total_fee, amount_paid');
+
+        if (error) {
+            console.error(error);
+            return;
+        }
+
+        let totalCollection = 0;
+        let totalPending = 0;
+
+        data.forEach(row => {
+            const totalFee = Number(row.total_fee) || 0;
+            const paid = Number(row.amount_paid) || 0;
+
+            totalCollection += paid;
+            totalPending += (totalFee - paid);
+        });
+
+        document.getElementById('home-total-coll').innerText = "₹ " + totalCollection;
+        document.getElementById('home-total-pend').innerText = "₹ " + totalPending;
+
+    } catch (err) {
+        console.error("Dashboard calculation error:", err);
+    }
+}
+
+// CALL THIS AFTER YOUR LOGIN SUCCESS OR WHEN HOME LOADS
+updateHomeTotalsDynamic();
 
 
 
