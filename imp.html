@@ -2489,9 +2489,6 @@ loadHomeInventoryStats();
 
         // --- ADDED FOR FORECASTING ---
         generateFinancialForecast(students);
-
-
-
     }
 }
 
@@ -2550,23 +2547,6 @@ if (!sessionInstID || sessionInstID === "") {
     if (!admissionDate) return alert("Error: Admission Date is required.");
     if (!roll) return alert("Error: Please click 'Gen' to create a Roll Number first.");
     if (mobile.length !== 10) return alert("Error: Mobile Number must be 10 digits.");
-
-
-
-// --- START OF ADDED DUE DATE FORMAT VALIDATION ---
-const dueDatesFormatCheck = document.getElementById('stu-due-dates').value.trim();
-if (dueDatesFormatCheck) {
-    // Regex for: 1st, 2nd, 3rd, 4th... + Month Name + Year
-    const dateFormatRegex = /^(?:(?:1|21|31)st|(?:2|22)nd|(?:3|23)rd|(?:[4-9]|1[0-9]|20|2[4-9]|30)th)\s(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{4}$/i;
-    
-    const datesArray = dueDatesFormatCheck.split(',');
-    for (let d of datesArray) {
-        if (!dateFormatRegex.test(d.trim())) {
-            return alert("Error: Please enter the date in the shown format only (e.g. 21st February 2026, 11th March 2026).");
-        }
-    }
-}
-// --- END OF ADDED DUE DATE FORMAT VALIDATION ---
 
 
 
@@ -2648,38 +2628,18 @@ email: document.getElementById('stu-email').value
         } else {
 
 // --- NEW LOGIC: Log the initial payment into Payment History ---
-    if (parseFloat(stuData.paid_amount) > 0) {
-        let payDate = stuData.admission_date; // Safe fallback just in case
-        
-        // Extract the FIRST date from Due Dates field (e.g., "12th February 2026")
-        if (stuData.due_dates) {
-            let firstDueDate = stuData.due_dates.split(',')[0].trim();
-            // Remove 'st', 'nd', 'rd', 'th' so JS can read it properly
-            let cleanDateStr = firstDueDate.replace(/(st|nd|rd|th)/i, '');
-            let parsedDate = new Date(cleanDateStr);
-            
-            if (!isNaN(parsedDate)) {
-                let y = parsedDate.getFullYear();
-                let m = String(parsedDate.getMonth() + 1).padStart(2, '0');
-                let d = String(parsedDate.getDate()).padStart(2, '0');
-                payDate = `${y}-${m}-${d}`; // Result: "2026-02-12"
-            }
-        }
-
-        // Convert exactly to dashboard format like "February 2026"
+  if (parseFloat(stuData.paid_amount) > 0) {
+        const payDate = stuData.admission_date;
         const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
         
-        
-        await db.from('payment_history').upsert([{
-    institute_id: sessionInstID,
-    student_id: newStu[0].id,
-    roll_number: roll,
-    amount: stuData.paid_amount,
-    payment_date: payDate,
-    month_year: monthYearStr
-}], { 
-    onConflict: 'student_id,month_year' 
-});
+        await db.from('payment_history').insert([{
+            institute_id: sessionInstID,
+            student_id: newStu[0].id,
+            roll_number: roll,
+            amount: stuData.paid_amount,
+            payment_date: payDate,
+            month_year: monthYearStr
+        }]);
     }
 
     // --- End of New Logic ---
@@ -2774,30 +2734,10 @@ async function editStudentByRoll() {
     if (!roll) return alert("Error: Please fetch a student first using Roll Number.");
 
     // Re-validate dates before updating
-   // if (new Date(admissionDate).setHours(0,0,0,0) < today) 
-        //return alert("Error: Admission Date cannot be in the past.");
+    if (new Date(admissionDate).setHours(0,0,0,0) < today) 
+        return alert("Error: Admission Date cannot be in the past.");
     if (new Date(endDate).setHours(0,0,0,0) < today) 
         return alert("Error: Course End Date cannot be in the past.");
-
-
-
-// --- START OF ADDED DUE DATE FORMAT VALIDATION ---
-const dueDatesFormatCheck = document.getElementById('stu-due-dates').value.trim();
-if (dueDatesFormatCheck) {
-    // Regex for: 1st, 2nd, 3rd, 4th... + Month Name + Year
-    const dateFormatRegex = /^(?:(?:1|21|31)st|(?:2|22)nd|(?:3|23)rd|(?:[4-9]|1[0-9]|20|2[4-9]|30)th)\s(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{4}$/i;
-    
-    const datesArray = dueDatesFormatCheck.split(',');
-    for (let d of datesArray) {
-        if (!dateFormatRegex.test(d.trim())) {
-            return alert("Error: Please enter the date in the shown format only (e.g. 21st February 2026, 11th March 2026).");
-        }
-    }
-}
-// --- END OF ADDED DUE DATE FORMAT VALIDATION ---
-
-
-
 
     // 1. Find the internal ID linked to this Roll Number
     const { data: detail, error: fetchErr } = await db.from('student_details')
@@ -5473,44 +5413,6 @@ async function generateFinancialForecast(students) {
         if (s.pending_amount > 0 && s.due_dates) {
             // Split "March 2026, July 2026" into an array
             const dates = s.due_dates.split(',').map(d => d.trim());
-
-
-
-
-// --- START OF ADDED PAST DATE FILTER ---
-                const todayForFilter = new Date();
-                todayForFilter.setHours(0, 0, 0, 0);
-
-                // Loop backwards to safely remove old dates from the array
-                for (let k = dates.length - 1; k >= 0; k--) {
-                    // Temporarily remove st/nd/rd/th so JS can read it as a real date (e.g. "11 February 2026")
-                    let cleanDateStr = dates[k].replace(/(st|nd|rd|th)/i, ''); 
-                    let parsedDate = new Date(cleanDateStr);
-                    
-                    // If the specific day has passed, delete it from the future distribution list
-                    if (!isNaN(parsedDate) && parsedDate < todayForFilter) {
-                        dates.splice(k, 1);
-                    }
-                }
-
-                // If all dates in the string are in the past, stop here so it shows 0 for forecast
-                if (dates.length === 0) return; 
-                // --- END OF ADDED PAST DATE FILTER ---
-
-
-
-// --- START OF ADDED DUE DATE NORMALIZATION FOR FORECAST ---
-                for (let j = 0; j < dates.length; j++) {
-                    let parts = dates[j].split(/\s+/);
-                    if (parts.length >= 3) {
-                        // Converts "27th February 2026" into "February 2026" so it matches the dashboard's chart labels perfectly
-                        dates[j] = parts[parts.length - 2] + " " + parts[parts.length - 1]; 
-                    }
-                }
-                // --- END OF ADDED DUE DATE NORMALIZATION FOR FORECAST ---
-
-
-
             const perInstallment = s.pending_amount / dates.length;
 
             dates.forEach(d => {
@@ -5584,31 +5486,6 @@ function showHomeChartPage(page) {
             
             // Set base month to actual collected, and future months to the forecast installment
             pieSliceAmount = (i === 0) ? totalReceived : incoming; 
-
-
-
-
-// --- START OF DASHBOARD STATS SYNC FIX ---
-            if (i === 0) {
-                let dashColl = document.getElementById('home-total-coll');
-                let dashPend = document.getElementById('home-total-pend');
-                
-                if (dashColl && dashPend) {
-                    // Extract the base Collection value that was just set right before this function
-                    let currentColl = parseInt(dashColl.innerText.replace(/[^\d]/g, '')) || 0;
-                    
-                    // Add the current month's forecasted incoming fees to match the graph
-                    dashColl.innerText = "₹ " + (currentColl + incoming).toLocaleString('en-IN');
-                    dashPend.innerText = "₹ " + runningPending.toLocaleString('en-IN');
-                }
-            }
-            // --- END OF DASHBOARD STATS SYNC FIX ---
-
-
-
-
-
-
         } else {
             chartRows[i][2] = 0; 
             chartRows[i][3] = 0; 
@@ -5823,101 +5700,6 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
     dashboard.bind(slicer, lineChart);
     dashboard.draw(data);
-
-
-
-
-
-
-
-// --- START OF DASHBOARD STATS REVERSAL & FIX ---
-    setTimeout(() => {
-        let passedDues = 0;
-        let todayFilter = new Date();
-        todayFilter.setHours(0, 0, 0, 0);
-
-        // 1. Calculate ONLY the dues that have actually passed 
-        students.forEach(s => {
-            if (s.pending_amount > 0 && s.due_dates) {
-                let datesArr = s.due_dates.split(',');
-                let instAmt = s.pending_amount / datesArr.length;
-                datesArr.forEach(d => {
-                    let pDate = new Date(d.replace(/(st|nd|rd|th)/i, '').trim());
-                    if (!isNaN(pDate) && pDate < todayFilter) {
-                        passedDues += instAmt;
-                    }
-                });
-            }
-        });
-
-        let dColl = document.getElementById('home-total-coll');
-        let dPend = document.getElementById('home-total-pend');
-        
-        if (dColl && dPend) {
-            let currentWrongColl = parseInt(dColl.innerText.replace(/[^\d]/g, '')) || 0;
-            let incomingThisMonth = chartRows.length > 0 ? chartRows[0][4] : 0;
-            
-            // 2. Undo the wrong "future incoming" addition, and ADD the "passed dues"
-            let trueColl = (currentWrongColl - incomingThisMonth) + passedDues;
-            
-            // 3. Subtract passed dues from Total Pending
-            let basePend = students.reduce((sum, st) => sum + (Number(st.pending_amount) || 0), 0);
-            let truePend = basePend - passedDues;
-            if (truePend < 0) truePend = 0;
-
-            dColl.innerText = "₹ " + Math.round(trueColl).toLocaleString('en-IN');
-            dPend.innerText = "₹ " + Math.round(truePend).toLocaleString('en-IN');
-        }
-    }, 50);
-    // --- END OF DASHBOARD STATS REVERSAL & FIX ---
-
-
-
-
-// --- START OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
-// --- FINAL PAST-DATE SAFE DASHBOARD LOGIC ---
-setTimeout(async () => {
-
-    let dColl = document.getElementById('home-total-coll');
-    let dPend = document.getElementById('home-total-pend');
-
-    if (!dColl || !dPend) return;
-
-    // 1️⃣ Base values already calculated from students table
-    let baseCollection = totalColl;   // 97000
-    let basePending    = totalPend;   // 103000
-
-    // 2️⃣ Get CURRENT month payments (example: Feb 2026)
-    let now = new Date();
-    let firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    let lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const { data: monthPayments } = await db.from('payment_history')
-        .select('amount')
-        .eq('institute_id', sessionInstID)
-        .gte('payment_date', firstDay.toISOString().split('T')[0])
-        .lte('payment_date', lastDay.toISOString().split('T')[0]);
-
-    let currentMonthPaid = monthPayments
-        ? monthPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
-        : 0;
-
-    // 3️⃣ Apply YOUR required rule
-    let finalCollection = baseCollection - currentMonthPaid;
-    let finalPending    = basePending + currentMonthPaid;
-
-    if (finalCollection < 0) finalCollection = 0;
-
-    // 4️⃣ Update dashboard
-    dColl.innerText = "₹ " + Math.round(finalCollection).toLocaleString('en-IN');
-    dPend.innerText = "₹ " + Math.round(finalPending).toLocaleString('en-IN');
-
-}, 100);
-// --- END ---
-// --- END OF EXACT LOGIC REQUESTED FOR REVERSED DASHBOARD STATS ---
-
-
-
 }
 
 
@@ -7437,13 +7219,6 @@ document.getElementById('tch-name').addEventListener('blur', async function() {
         document.getElementById('tch-mobile').value = data.mobile_number;
     }
 });
-
-
-
-
-
-
-
 
 
 
