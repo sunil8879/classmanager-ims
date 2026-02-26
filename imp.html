@@ -2742,6 +2742,24 @@ document.getElementById('stu-due-dates').value = s.due_dates || "";
     document.getElementById('stu-roll').value = data.roll_number || "";
     document.getElementById('stu-end-date').value = data.course_end_date || "";
 
+
+
+
+// --- START OF AUTO-POPULATE MOBILE & EMAIL FROM PROFILES ---
+    const { data: prof } = await db.from('profiles')
+        .select('mobile_number, email')
+        .ilike('full_name', s.full_name)
+        .eq('role', 'Student')
+        .eq('institute_id', sessionInstID)
+        .limit(1)
+        .maybeSingle();
+
+    if (prof) {
+        if (prof.mobile_number) document.getElementById('stu-mobile').value = prof.mobile_number;
+        if (prof.email) document.getElementById('stu-email').value = prof.email;
+    }
+    // --- END OF AUTO-POPULATE ---
+
     alert("Full Profile Loaded for " + s.full_name);
 }
 // 6. Edit Details by Roll Number
@@ -7159,18 +7177,21 @@ async function saveNewPassword() {
    AUTO-POPULATE EMAIL/MOBILE FROM PROFILES
    ========================================== */
 
-// 1. Logic for Student Management
+// 1. Logic for Student Management (Updated to fetch Mobile too)
 document.getElementById('stu-name').addEventListener('blur', async function() {
     const { data: { session } } = await db.auth.getSession();
-    if (!session) return; // 🛡️ Safety: Don't fetch if not logged in!
+    if (!session) return; 
 
     const enteredName = this.value.trim();
     if (!enteredName || !sessionInstID) return;
 
-    const { data } = await db.from('profiles').select('email')
-        .ilike('full_name', enteredName).eq('role', 'Student').eq('institute_id', sessionInstID).maybeSingle();
+    const { data } = await db.from('profiles').select('email, mobile_number')
+        .ilike('full_name', enteredName).eq('role', 'Student').eq('institute_id', sessionInstID).limit(1).maybeSingle();
 
-    if (data) document.getElementById('stu-email').value = data.email;
+    if (data) {
+        if (data.email) document.getElementById('stu-email').value = data.email;
+        if (data.mobile_number) document.getElementById('stu-mobile').value = data.mobile_number;
+    }
 });
 
 // 2. Logic for Teacher Portal
