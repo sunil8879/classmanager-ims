@@ -2755,28 +2755,29 @@ async function editStudentByRoll() {
 
 
 
-// --- START OF ADMISSION DATE VALIDATION (+/- 30 DAYS DYNAMIC) ---
-    const adDateObj = new Date(admissionDate);
-    const todayObj = new Date();
-    todayObj.setHours(0,0,0,0);
-    adDateObj.setHours(0,0,0,0);
+// --- SMART ADMISSION DATE VALIDATION (+/- 30 DAYS DYNAMIC) ---
+    // Fetch the original record to check if you actually changed the date during this edit
+    const { data: checkStu } = await db.from('students').select('admission_date').eq('roll_number', roll).single();
     
-    const diffTime = adDateObj.getTime() - todayObj.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
-    
-    if (diffDays < -30 || diffDays > 30) {
-        return alert("Error: Admission Date must be within 30 days (before or after) of today's date.");
+    if (checkStu && checkStu.admission_date !== admissionDate) {
+        const adDateObj = new Date(admissionDate);
+        const todayObj = new Date();
+        todayObj.setHours(0,0,0,0);
+        adDateObj.setHours(0,0,0,0);
+        
+        const diffTime = adDateObj.getTime() - todayObj.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+        
+        if (diffDays < -30 || diffDays > 30) {
+            return alert("Error: You can only change the Admission Date to a date within +/- 30 days of today.");
+        }
     }
-    // --- END OF ADMISSION DATE VALIDATION ---
+    // --- END OF SMART ADMISSION DATE VALIDATION ---
 
-
-
-
-    // Re-validate dates before updating
-    if (new Date(admissionDate).setHours(0,0,0,0) < today) 
-        return alert("Error: Admission Date cannot be in the past.");
-    if (new Date(endDate).setHours(0,0,0,0) < today) 
+    // Re-validate End Date before updating
+    if (endDate && new Date(endDate).setHours(0,0,0,0) < today) {
         return alert("Error: Course End Date cannot be in the past.");
+    }
 
     // 1. Find the internal ID linked to this Roll Number
     const { data: detail, error: fetchErr } = await db.from('student_details')
