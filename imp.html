@@ -2550,14 +2550,17 @@ if (!sessionInstID || sessionInstID === "") {
 
 
 
-// --- START OF ADMISSION DATE VALIDATION (CURRENT MONTH ONLY) ---
+// --- START OF ADMISSION DATE VALIDATION (+/- 30 DAYS DYNAMIC) ---
     const adDateObj = new Date(admissionDate);
     const todayObj = new Date();
+    todayObj.setHours(0,0,0,0);
+    adDateObj.setHours(0,0,0,0);
     
-    // Check if the month and year match the current month and year dynamically
-    if (adDateObj.getMonth() !== todayObj.getMonth() || adDateObj.getFullYear() !== todayObj.getFullYear()) {
-        const currentMonthName = todayObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-        return alert("Error: Admission Date must be within the current month (" + currentMonthName + "). Dates from previous or future months are not allowed.");
+    const diffTime = adDateObj.getTime() - todayObj.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+    
+    if (diffDays < -30 || diffDays > 30) {
+        return alert("Error: Admission Date must be within 30 days (before or after) of today's date.");
     }
     // --- END OF ADMISSION DATE VALIDATION ---
 
@@ -2645,10 +2648,9 @@ email: document.getElementById('stu-email').value
         if (detailError) {
             alert("Error in secondary details: " + detailError.message);
         } else {
-
-// --- NEW LOGIC: Log the initial payment into Payment History ---
-  if (parseFloat(stuData.paid_amount) > 0) {
-        const payDate = stuData.admission_date;
+// --- NEW LOGIC: Log the initial payment strictly on Admission Date ---
+    if (parseFloat(stuData.paid_amount) > 0) {
+        const payDate = stuData.admission_date; // Strictly tied to Admission Date
         const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
         
         await db.from('payment_history').insert([{
@@ -2660,7 +2662,6 @@ email: document.getElementById('stu-email').value
             month_year: monthYearStr
         }]);
     }
-
     // --- End of New Logic ---
 
 
@@ -2754,13 +2755,17 @@ async function editStudentByRoll() {
 
 
 
-// --- START OF ADMISSION DATE VALIDATION (CURRENT MONTH ONLY) ---
+// --- START OF ADMISSION DATE VALIDATION (+/- 30 DAYS DYNAMIC) ---
     const adDateObj = new Date(admissionDate);
     const todayObj = new Date();
+    todayObj.setHours(0,0,0,0);
+    adDateObj.setHours(0,0,0,0);
     
-    if (adDateObj.getMonth() !== todayObj.getMonth() || adDateObj.getFullYear() !== todayObj.getFullYear()) {
-        const currentMonthName = todayObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-        return alert("Error: Admission Date must be within the current month (" + currentMonthName + "). Dates from previous or future months are not allowed.");
+    const diffTime = adDateObj.getTime() - todayObj.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+    
+    if (diffDays < -30 || diffDays > 30) {
+        return alert("Error: Admission Date must be within 30 days (before or after) of today's date.");
     }
     // --- END OF ADMISSION DATE VALIDATION ---
 
@@ -5429,24 +5434,27 @@ window.showHomeChartPage = function(page) {
    FINANCIAL INTELLIGENCE: FORECASTING ENGINE
    ========================================== */
 
+/* ==========================================
+   FINANCIAL INTELLIGENCE: FORECASTING ENGINE
+   ========================================== */
+
 async function generateFinancialForecast(students) {
     const monthsToShow = 6;
     const forecastData = {};
     const chartRows =[];
     
-    // Bulletproof Month Naming Array (Bypasses all language/locale bugs)
+    // Bulletproof Month Naming Array
     const monthNames =["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
     // 1. Initialize the next 6 months safely
     let today = new Date();
     for (let i = 0; i < monthsToShow; i++) {
-        // Safe month iteration (handles year overlap perfectly)
         let futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
         let standardMonth = monthNames[futureDate.getMonth()] + " " + futureDate.getFullYear();
         forecastData[standardMonth] = 0;
     }
 
-    // 2. Parse Student Due Dates and distribute Pending Amounts
+    // 2. Parse Student Due Dates and distribute Pending Amounts (ACTIVE STUDENTS ONLY)
     students.forEach(s => {
         if (s.pending_amount > 0 && s.due_dates) {
             const dates = s.due_dates.split(',').map(d => d.trim());
@@ -5455,15 +5463,11 @@ async function generateFinancialForecast(students) {
             const todayForFilter = new Date();
             todayForFilter.setHours(0, 0, 0, 0);
 
-            // Check each date securely
             for (let k = 0; k < dates.length; k++) {
-                // Remove st/nd/rd/th
                 let cleanDateStr = dates[k].replace(/(st|nd|rd|th)/i, ''); 
                 let parsedDate = new Date(cleanDateStr);
                 
-                // Keep only dates that are valid and in the future/today
                 if (!isNaN(parsedDate) && parsedDate >= todayForFilter) {
-                    // Extract standard "Month Year" exactly like our initialized keys!
                     let key = monthNames[parsedDate.getMonth()] + " " + parsedDate.getFullYear();
                     validFutureKeys.push(key);
                 }
@@ -5471,11 +5475,9 @@ async function generateFinancialForecast(students) {
 
             if (validFutureKeys.length === 0) return; 
 
-            // Distribute the pending amount evenly across the remaining valid dates
             const perInstallment = s.pending_amount / validFutureKeys.length;
 
             validFutureKeys.forEach(key => {
-                // Only add if the date falls exactly within our 6-month forecast window
                 if (forecastData.hasOwnProperty(key)) {
                     forecastData[key] += perInstallment;
                 }
@@ -5487,9 +5489,19 @@ async function generateFinancialForecast(students) {
     const cardContainer = document.getElementById('forecast-cards');
     cardContainer.innerHTML = "";
     
-    // Total numbers for the Chart
+    // --- REAL YEARLY REVENUE (Active + Inactive) FOR GRAPHS ---
+    const currentYear = new Date().getFullYear();
+    const { data: yearlyPayments } = await db.from('payment_history')
+        .select('amount')
+        .eq('institute_id', sessionInstID)
+        .gte('payment_date', `${currentYear}-01-01`)
+        .lte('payment_date', `${currentYear}-12-31`);
+        
+    const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
+    // --- END ---
+
+    // Stats strictly for Active students
     const totalAdmissions = students.length;
-    const totalReceived = students.reduce((sum, s) => sum + (Number(s.paid_amount) || 0), 0);
     const totalPending = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
 
     Object.keys(forecastData).forEach(month => {
@@ -5499,7 +5511,6 @@ async function generateFinancialForecast(students) {
                 <h4 style="font-size: 1.2rem !important; color: #000;">₹${Math.round(forecastData[month]).toLocaleString()}</h4>
             </div>
         `;
-        // Prepare row for chart: [Month, Admissions, Collection, Pending, Incoming]
         chartRows.push([month, totalAdmissions, totalReceived, totalPending, Math.round(forecastData[month])]);
     });
 
@@ -5508,7 +5519,7 @@ async function generateFinancialForecast(students) {
     let runningPending = totalPending;
 
     for (let i = 0; i < chartRows.length; i++) {
-        let incoming = chartRows[i][4]; // Forecast amount for this month
+        let incoming = chartRows[i][4]; 
         let pieSliceAmount = 0; 
         
         if (i === 0 || incoming > 0) {
@@ -5525,7 +5536,6 @@ async function generateFinancialForecast(students) {
             chartRows[i][3] = 0; 
         }
         
-        // Append this isolated amount as a brand new column (Index 5) for the Pie Chart
         chartRows[i].push(pieSliceAmount);
     }
 
@@ -5560,7 +5570,7 @@ async function generateFinancialForecast(students) {
         }
     }
 
-    // 4. Draw the Google Chart with Slicer
+    // 4. Draw the Google Chart
     drawHomeForecastingChart(chartRows);
 }
 
@@ -5571,9 +5581,7 @@ function drawHomeForecastingChart(chartRows) {
     data.addColumn('number', 'Total Collection');
     data.addColumn('number', 'Total Pending');
     data.addColumn('number', 'Incoming (Forecast)');
-
-
-data.addColumn('number', 'Monthly Revenue'); // Column Index 5
+    data.addColumn('number', 'Monthly Revenue'); // Column Index 5
 
     data.addRows(chartRows);
 
@@ -5584,11 +5592,7 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
         'containerId': 'home_filter_div',
         'options': {
             'filterColumnLabel': 'Month',
-            'ui': {
-                'label': 'Filter Specific Month:',
-                'allowTyping': false,
-                'allowMultiple': true
-            }
+            'ui': { 'label': 'Filter Specific Month:', 'allowTyping': false, 'allowMultiple': true }
         }
     });
 
@@ -5599,7 +5603,7 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
             'title': 'Financial Outlook (Next 6 Months)',
             'curveType': 'function',
             'legend': { position: 'bottom' },
-            'colors': ['#27ae60', '#1877F2', '#ff0000', '#f39c12'],
+            'colors':['#27ae60', '#1877F2', '#ff0000', '#f39c12'],
             'pointSize': 7,
             'vAxis': { title: 'Amount / Count', minValue: 0 },
             'hAxis': { title: 'Timeline' },
@@ -5607,16 +5611,10 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
         }
     });
 
-
-
-
-
-// -- START OF ADDED CHARTS & BINDINGS --
-    // Ensure the original line chart maintains its structure when hidden
     lineChart.setOption('height', 400);
 
     var stackedChart = new google.visualization.ChartWrapper({
-        'chartType': 'ColumnChart', // Vertical Bar Chart
+        'chartType': 'ColumnChart', 
         'containerId': 'home_stacked_chart',
         'options': {
             'title': 'Financial Outlook (Stacked Bar)',
@@ -5630,27 +5628,18 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
         }
     });
 
-
-
-// --- START OF ADDED SCALE FIX FOR ADMISSIONS ---
-    // This gives Admissions its own scale on the right side so it isn't squashed by large fee amounts
     stackedChart.setOption('vAxes', {
         0: { title: 'Amount (₹)', minValue: 0 },
         1: { title: 'Total Admissions (Count)', minValue: 0 }
     });
     stackedChart.setOption('series', {
-        0: { targetAxisIndex: 1 } // Maps the first data series (Admissions) to the new right-side axis
+        0: { targetAxisIndex: 1 } 
     });
-    // --- END OF ADDED SCALE FIX FOR ADMISSIONS ---
-
-
 
     var pieChart = new google.visualization.ChartWrapper({
         'chartType': 'PieChart',
         'containerId': 'home_pie_chart',
-        // Pie charts require exactly 2 columns to draw properly. 
-        // We configure it to map [Month] against [Total Collection] to maintain proportionality.
-     'view': { 'columns':[0, 5] },
+        'view': { 'columns':[0, 5] },
         'options': {
             'title': 'Total Collection Proportion by Month',
             'height': 400,
@@ -5660,54 +5649,28 @@ data.addColumn('number', 'Monthly Revenue'); // Column Index 5
         }
     });
 
-
-
-/* --- START OF ADDED FIX: HIDE PIE CHART DATA FROM BAR & LINE CHARTS --- */
     stackedChart.setView({ 'columns':[0, 1, 2, 3, 4] });
     lineChart.setView({ 'columns':[0, 1, 2, 3, 4] });
-    /* --- END OF ADDED FIX --- */
 
-
-
-
-/* --- START OF FRESH OVERRIDE FOR ADMISSIONS VISIBILITY --- */
     stackedChart.setChartType('ComboChart');
     stackedChart.setOption('isStacked', true);
     stackedChart.setOption('seriesType', 'bars');
-    
-    // Forces the bottom of the chart to always anchor at 0 so June/July don't disappear
     stackedChart.setOption('vAxes', {
         0: { minValue: 0, viewWindow: { min: 0 } },
         1: { minValue: 0, viewWindow: { min: 0 } }
     });
-    
-    // Forces Admissions (Series 0) to be a Line so it NEVER gets swallowed by 100k money bars
     stackedChart.setOption('series', {
         0: { type: 'line', targetAxisIndex: 1, color: '#27ae60', lineWidth: 4, pointSize: 8 }
     });
-    /* --- END OF FRESH OVERRIDE --- */
-
-
-
 
     dashboard.bind(slicer, stackedChart);
     dashboard.bind(slicer, pieChart);
     
-    // Automatically hide Page 2 & Page 3 immediately after setting them up
     setTimeout(function() { showHomeChartPage(1); }, 100);
-    // -- END OF ADDED CHARTS & BINDINGS --
-
-
-
-
-
-
-
 
     dashboard.bind(slicer, lineChart);
     dashboard.draw(data);
 }
-
 
 
 
