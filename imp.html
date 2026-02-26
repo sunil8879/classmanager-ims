@@ -2523,10 +2523,31 @@ function clearStudentForm() {
 }
 
 // 3. Generate Roll Number Immediately
-function generateRollNow() {
+// 3. Generate Roll Number Immediately & Auto-Populate Mobile/Email
+async function generateRollNow() {
+    // 1. Generate Roll Number
     const year = new Date().getFullYear();
     const random = Math.floor(1000 + Math.random() * 9000);
     document.getElementById('stu-roll').value = `IMS-${year}-${random}`;
+
+    // 2. Fetch Mobile & Email from the Profiles table based on the entered name
+    const stuName = document.getElementById('stu-name').value.trim();
+    
+    if (stuName && sessionInstID) {
+        const { data: prof, error } = await db.from('profiles')
+            .select('email, mobile_number')
+            .ilike('full_name', stuName)
+            .eq('role', 'Student')
+            .eq('institute_id', sessionInstID)
+            .limit(1)
+            .maybeSingle();
+
+        // 3. Populate the fields if data is found
+        if (prof) {
+            if (prof.email) document.getElementById('stu-email').value = prof.email;
+            if (prof.mobile_number) document.getElementById('stu-mobile').value = prof.mobile_number;
+        }
+    }
 }
 
 // 4. Validation & Add Student
