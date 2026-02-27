@@ -5554,29 +5554,24 @@ async function generateFinancialForecast(students) {
         chartRows.push([month, totalAdmissions, totalReceived, totalPending, Math.round(forecastData[month])]);
     });
 
-    /* --- DYNAMIC FORECAST FORMULA --- */
+/* --- DYNAMIC FORECAST & CHART DATA SYNC --- */
     let runningCollection = totalReceived;
     let runningPending = totalPending;
 
     for (let i = 0; i < chartRows.length; i++) {
-        let incoming = chartRows[i][4]; 
-        let pieSliceAmount = 0; 
+        let monthlyIncoming = chartRows[i][4]; // This is the value from forecastData
+
+        // Update the Line/Bar chart values (Running totals)
+        runningCollection += monthlyIncoming;
+        runningPending -= monthlyIncoming;
+        if (runningPending < 0) runningPending = 0; 
+
+        // Update the columns for the Line/Bar Chart
+        chartRows[i][2] = runningCollection; // Cumulative Collection
+        chartRows[i][3] = runningPending;    // Remaining Pending
         
-        if (i === 0 || incoming > 0) {
-            runningCollection += incoming;
-            runningPending -= incoming;
-            if (runningPending < 0) runningPending = 0; 
-            
-            chartRows[i][2] = runningCollection; 
-            chartRows[i][3] = runningPending;  
-            
-            pieSliceAmount = (i === 0) ? totalReceived : incoming; 
-        } else {
-            chartRows[i][2] = 0; 
-            chartRows[i][3] = 0; 
-        }
-        
-        chartRows[i].push(pieSliceAmount);
+        // IMPORTANT: We keep chartRows[i][4] as the monthlyIncoming 
+        // because the Pie Chart is now pointing specifically to this column.
     }
 
     /* --- DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
@@ -5676,16 +5671,20 @@ function drawHomeForecastingChart(chartRows) {
         0: { targetAxisIndex: 1 } 
     });
 
-    var pieChart = new google.visualization.ChartWrapper({
+var pieChart = new google.visualization.ChartWrapper({
         'chartType': 'PieChart',
         'containerId': 'home_pie_chart',
-        'view': { 'columns':[0, 5] },
+        'view': { 'columns':[0, 4] }, // Index 0 is Month, Index 4 is Incoming Forecast
         'options': {
-            'title': 'Total Collection Proportion by Month',
+            'title': 'Distribution of Incoming Forecast (Next 6 Months)',
             'height': 400,
             'legend': { position: 'right' },
-            'colors':['#27ae60', '#1877F2', '#ff0000', '#f39c12', '#8e44ad', '#34495e'],
-            'chartArea': { width: '90%', height: '80%' }
+            'pieSliceText': 'percentage', // Shows the % you calculated automatically
+            'colors':['#f39c12', '#e67e22', '#d35400', '#c0392b', '#16a085', '#27ae60'],
+            'chartArea': { width: '90%', height: '80%' },
+            'slices': {  
+                0: {offset: 0.1}, // Slightly offsets the first slice (Current Month)
+            }
         }
     });
 
