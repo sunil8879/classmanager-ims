@@ -3244,7 +3244,7 @@ async function fetchStudentForAttn() {
    FIXED ATTENDANCE & STATISTICS LOGIC
    ========================================== */
 
-// 1. TRIGGER CALENDAR (Cleaned up to prevent double-clicks)
+// 1. TRIGGER CALENDAR (Cleaned up)
 let currentAttnStatus = "";
 function triggerAttendance(status) {
     const name = document.getElementById('attn-name').value;
@@ -3253,22 +3253,21 @@ function triggerAttendance(status) {
     currentAttnStatus = status;
     const picker = document.getElementById('attn-date-picker');
     
-    // Clear old listeners so it doesn't fire twice
-    picker.onchange = null;
+    picker.onchange = null; // Prevent double clicks
     
     picker.onchange = async function() {
         if (this.value) {
             await saveAttendance(this.value, currentAttnStatus);
-            this.value = ""; // Reset for next click
+            this.value = ""; 
         }
     };
     
     picker.showPicker(); 
 }
 
-// 2. SAVE ATTENDANCE (With Bulletproof Month Names)
+// 2. SAVE ATTENDANCE 
 async function saveAttendance(dateValue, status) {
-    const roll = document.getElementById('attn-roll').value.trim();
+    const roll = document.getElementById('attn-roll').value.trim().toUpperCase(); // GUARANTEE UPPERCASE
     if (!roll) return alert("Enter Roll Number first.");
 
     const { data: student } = await db.from('students').select('id').eq('roll_number', roll).single();
@@ -3277,12 +3276,12 @@ async function saveAttendance(dateValue, status) {
     if (!student) return alert("Student record not found.");
     if (!user) return alert("Error: You must be logged in to mark attendance.");
 
-    // BULLETPROOF FIX: Hardcoded array guarantees it ALWAYS says "March 2026"
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const dateParts = dateValue.split('-'); // Splits "2026-03-01" into [2026, 03, 01]
+    const dateParts = dateValue.split('-'); 
     const monthIndex = parseInt(dateParts[1], 10) - 1; 
     const monthYearStr = monthNames[monthIndex] + " " + dateParts[0]; 
 
+    // Insert into table
     const { error } = await db.from('attendance').insert([{
         institute_id: sessionInstID,
         student_id: student.id,
@@ -3298,13 +3297,13 @@ async function saveAttendance(dateValue, status) {
     } else {
         alert(`Success: Marked ${status} for ${dateValue}`);
         
-        // Instantly refresh the UI boxes
-        const monthViewValue = dateValue.substring(0, 7); // Extracts "2026-03"
+        const monthViewValue = dateValue.substring(0, 7); 
         document.getElementById('attn-month-view').value = monthViewValue; 
+        
+        // INSTANT REFRESH CALL
         await autoRefreshAttendanceStats(roll, monthViewValue);
     }
 
-    // WHATSAPP ALERT LOGIC
     if (status === "Absent") {
         const stuName = document.getElementById('attn-name').value;
         const { data: stuData } = await db.from('students').select('mobile, father_mobile, mother_mobile').eq('roll_number', roll).single();
@@ -3325,39 +3324,41 @@ async function saveAttendance(dateValue, status) {
     }
 }
 
-// 3. AUTO-REFRESH HELPER
+// 3. AUTO-REFRESH HELPER (Directly connected to the Database Table)
 async function autoRefreshAttendanceStats(roll, yyyy_mm) {
-    // Rebuild the exact same text ("March 2026")
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const parts = yyyy_mm.split('-');
     const targetMonthYear = monthNames[parseInt(parts[1], 10) - 1] + " " + parts[0];
 
-    const { count: pCount } = await db.from('attendance')
-        .select('*', { count: 'exact', head: true })
-        .eq('roll_number', roll)
+    // FETCHING THE ACTUAL RECORDS FROM THE TABLE
+    const { data, error } = await db.from('attendance')
+        .select('status')
+        .eq('roll_number', roll.toUpperCase())
         .eq('month_year', targetMonthYear)
-        .eq('institute_id', sessionInstID)
-        .eq('status', 'Present');
+        .eq('institute_id', sessionInstID);
 
-    const { count: aCount } = await db.from('attendance')
-        .select('*', { count: 'exact', head: true })
-        .eq('roll_number', roll)
-        .eq('month_year', targetMonthYear)
-        .eq('institute_id', sessionInstID)
-        .eq('status', 'Absent');
+    if (error) {
+        console.error("Fetch Error:", error.message);
+        return;
+    }
 
-    document.getElementById('attn-total-p').value = pCount || 0;
-    document.getElementById('attn-total-a').value = aCount || 0;
+    // ACCURATE JAVASCRIPT COUNTING (Bypasses Supabase count bugs)
+    const pCount = data ? data.filter(r => r.status === 'Present').length : 0;
+    const aCount = data ? data.filter(r => r.status === 'Absent').length : 0;
+
+    // UPDATE UI FIELDS
+    document.getElementById('attn-total-p').value = pCount;
+    document.getElementById('attn-total-a').value = aCount;
 }
 
 // 4. FETCH STATISTICS BUTTON
 async function fetchAttendanceByPrompt() {
-    let roll = document.getElementById('attn-roll').value.trim();
+    let roll = document.getElementById('attn-roll').value.trim().toUpperCase();
     
     if (!roll) {
         roll = prompt("Enter Student Roll Number to see statistics:");
         if (!roll) return;
-        document.getElementById('attn-roll').value = roll;
+        document.getElementById('attn-roll').value = roll.toUpperCase();
         fetchStudentForAttn(); 
     }
 
@@ -3367,7 +3368,6 @@ async function fetchAttendanceByPrompt() {
     await autoRefreshAttendanceStats(roll, monthView);
     alert(`Statistics updated successfully!`);
 }
-
 
 
 /* ==========================================
