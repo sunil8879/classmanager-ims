@@ -6000,6 +6000,7 @@ async function saveInventoryMaster() {
 }
 
 // 2. LOAD DB AND FIX OLD CORRUPT ZEROS AUTOMATICALLY
+// 2. LOAD DB AND FIX OLD TEST SALES AUTOMATICALLY
 async function loadMasterInventory() {
     const { data } = await db.from('inventory_master').select('*').eq('institute_id', sessionInstID);
     
@@ -6014,14 +6015,17 @@ async function loadMasterInventory() {
                 let stock = item.current_stock;
                 let price = item.item_price;
 
-                // THIS FIXES THE BUG: If the database has broken 0s, we force reset them to your defaults!
-                if (price === 0 || price === null) {
+                // Calculate what the exact price SHOULD be
+                let expectedPrice = 100;
+                if (item.item_name === 'Uniforms') expectedPrice = 150;
+                else if (item.item_name === 'Bags') expectedPrice = 350;
+                else if (item.item_name === 'Calendars') expectedPrice = 75;
+
+                // THE FIX: If the price doesn't match the new rules, OR if stock is suspiciously low from old tests, WIPE IT CLEAN TO 100!
+                if (price !== expectedPrice || stock <= 1 || price === 0) {
                     stock = 100;
-                    if (item.item_name === 'Uniforms') price = 150;
-                    else if (item.item_name === 'Bags') price = 350;
-                    else if (item.item_name === 'Calendars') price = 75;
-                    else price = 100;
-                    needsDatabaseFix = true;
+                    price = expectedPrice;
+                    needsDatabaseFix = true; // Flag it to sync to the database
                 }
 
                 row.querySelector('.inv-stock-val').value = stock;
@@ -6030,13 +6034,14 @@ async function loadMasterInventory() {
         });
         checkLowStockGlobal();
 
-        // Push the correct fixed numbers back to the database silently
+        // Push the perfectly clean 100s back to the database silently
         if (needsDatabaseFix) saveInventoryMaster();
     } else {
         // If DB is completely empty, save the 100s automatically.
         saveInventoryMaster();
     }
 }
+
 
 // PROCESS SALE
 async function processInventorySale() {
