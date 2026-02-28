@@ -248,80 +248,52 @@ async function loadTableData(searchQuery) {
     const dateInfo = parseSearchString(searchQuery);
     document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
     const tbody = document.getElementById('table-body');
-    tbody.innerHTML = "<tr><td colspan='5'>Processing Monthly Subject Reports...</td></tr>";
+    tbody.innerHTML = "<tr><td colspan='5'>Loading Chronological Report...</td></tr>";
 
     try {
-        // 1. Fetch ALL Payments for the year (to get the 58,000)
-        // We link students to get the correct course name if it's missing in history
-        const { data: payments, error: payErr } = await db.from('payment_history')
-            .select(`
-                amount, 
-                month_year, 
-                course_name,
-                students (course)
-            `)
+        const { data: payments } = await db.from('payment_history')
+            .select('amount, month_year, course_name, total_fees, pending_fees, payment_date')
             .eq('institute_id', sessionInstID)
             .gte('payment_date', dateInfo.start)
             .lte('payment_date', dateInfo.end);
 
-        // 2. Fetch ALL Active Students (to get the 14,000 pending)
-        const { data: students, error: stuErr } = await db.from('students')
-            .select('course, total_fees, pending_amount')
-            .eq('institute_id', sessionInstID)
-            .eq('status', 'Active');
-
-        if (payErr || stuErr) throw (payErr || stuErr);
+        const { data: students } = await db.from('students')
+            .select('total_fees, pending_amount').eq('institute_id', sessionInstID).eq('status', 'Active');
 
         const groupedMap = new Map();
-
-        // STEP A: Group Payments by Subject + Month
         payments.forEach(p => {
-            // Priority: Payment Record Course > Student Master Course > "Uncategorized"
-            const subName = p.course_name || (p.students ? p.students.course : "Uncategorized");
-            const month = p.month_year || "Unknown Month";
-            const key = `${subName}_${month}`;
-
+            const key = `${p.course_name}_${p.month_year}`;
             if (!groupedMap.has(key)) {
                 groupedMap.set(key, { 
-                    course: subName, 
-                    month: month, 
-                    received: 0, 
-                    totalFees: 0, 
-                    pending: 0 
+                    course: p.course_name, month: p.month_year, date: new Date(p.payment_date),
+                    received: 0, total: 0, pending: 0 
                 });
             }
-            groupedMap.get(key).received += parseFloat(p.amount) || 0;
+            const item = groupedMap.get(key);
+            item.received += parseFloat(p.amount) || 0;
+            // Capture snapshot of fees/pending for that specific payment context
+            item.total = Math.max(item.total, parseFloat(p.total_fees) || 0);
+            item.pending = Math.max(item.pending, parseFloat(p.pending_fees) || 0);
         });
 
-        // Convert Map to Array
         portalData = Array.from(groupedMap.values());
+        // SORT CHRONOLOGICALLY (Jan -> Dec)
+        portalData.sort((a, b) => a.date - b.date);
 
-        // Sort by Month (Newest first)
-        portalData.sort((a, b) => b.month.localeCompare(a.month));
-
-        // STEP B: Store global stats in a hidden variable for the Grand Total
-        window.globalTotalFees = students.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
-        window.globalTotalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
-        window.globalTotalReceived = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        window.gTotals = {
+            f: students.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0),
+            p: students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0),
+            r: payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+        };
 
         currentPage = 1;
         renderPagination();
-
-    } catch (err) {
-        tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>${err.message}</td></tr>`;
-    }
+    } catch (err) { tbody.innerHTML = err.message; }
 }
 
 function renderPagination() {
     const tbody = document.getElementById('table-body');
     const info = document.getElementById('page-info');
-
-    if (portalData.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5'>No records found.</td></tr>";
-        return;
-    }
-
-    const maxPages = Math.ceil(portalData.length / rowsPerPage);
     const startIndex = (currentPage - 1) * rowsPerPage;
     const rowsToDisplay = portalData.slice(startIndex, startIndex + rowsPerPage);
 
@@ -330,28 +302,27 @@ function renderPagination() {
         html += `
             <tr>
                 <td><b>${row.course}</b></td>
-                <td style="color:#888;">-</td> <!-- Fees are shown in Grand Total -->
-                <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
-                <td style="color:#888;">-</td> <!-- Pending is shown in Grand Total -->
+                <td>₹ ${row.total.toLocaleString()}</td>
+                <td class="money-received">₹ ${row.received.toLocaleString()}</td>
+                <td class="money-pending">₹ ${row.pending.toLocaleString()}</td>
                 <td><b>${row.month.toUpperCase()}</b></td>
-            </tr>
-        `;
+            </tr>`;
     });
 
-    // FOOTER: GRAND TOTAL (Matches Dashboard 58,000 and 14,000)
+    // GRAND TOTAL FOOTER (Syncs with Dashboard 58,000 / 14,000)
     html += `
-        <tr style="background: #000; color: #fff; font-weight: 900; font-size: 1.1rem;">
-            <td style="color: #7FFFD4;">GRAND TOTAL (2026)</td>
-            <td>₹ ${window.globalTotalFees.toLocaleString('en-IN')}</td>
-            <td style="color: #7FFFD4;">₹ ${window.globalTotalReceived.toLocaleString('en-IN')}</td>
-            <td style="color: #ff6b6b;">₹ ${window.globalTotalPending.toLocaleString('en-IN')}</td>
-            <td style="font-size:0.8rem;">TOTAL ASSET VALUE</td>
-        </tr>
-    `;
+        <tr style="background: #000; color: #fff; font-weight: 900;">
+            <td>GRAND TOTAL (2026)</td>
+            <td>₹ ${window.gTotals.f.toLocaleString()}</td>
+            <td style="color: #7FFFD4;">₹ ${window.gTotals.r.toLocaleString()}</td>
+            <td style="color: #ff6b6b;">₹ ${window.gTotals.p.toLocaleString()}</td>
+            <td>YEAR SUMMARY</td>
+        </tr>`;
 
     tbody.innerHTML = html;
-    info.innerText = `Page ${currentPage} of ${maxPages}`;
+    info.innerText = `Page ${currentPage} of ${Math.ceil(portalData.length / rowsPerPage)}`;
 }
+
 
 function handleGenerateClick() {
     loadTableData(document.getElementById('search-input').value);
