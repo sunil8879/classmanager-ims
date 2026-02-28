@@ -928,9 +928,10 @@ height: 65px; white-space: nowrap;
             <input type="number" id="batch-students" placeholder="Students Allotted">
             <input type="text" id="batch-remarks" placeholder="Remarks">
         </div>
-        <div class="button-row">
+      <div class="button-row">
             <button class="btn-add" onclick="addBatch()">ADD Batch</button>
             <button class="btn-fetch" onclick="fetchBatch()">FETCH (by Name)</button>
+            <button class="btn-edit" onclick="updateBatch()">UPDATE (by Name)</button>
         </div>
     </div>
 </section>
@@ -3199,6 +3200,39 @@ async function fetchBatch() {
     document.getElementById('batch-remarks').value = data.remarks;
     alert("Batch details loaded!");
 }
+
+
+
+// NEW: UPDATE BATCH FUNCTION
+async function updateBatch() {
+    const batchName = document.getElementById('batch-name').value.trim();
+    if (!batchName) return alert("Please fetch a Batch first using FETCH (by Name).");
+
+    // Gather updated data from UI
+    const batchData = {
+        teacher_id: document.getElementById('batch-teacher-id').value,
+        teacher_name: document.getElementById('batch-teacher-name').value,
+        batch_time: document.getElementById('batch-time').value,
+        subject_name: document.getElementById('batch-subject').value,
+        students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
+        remarks: document.getElementById('batch-remarks').value
+    };
+
+    // Update the database matching the Batch Name and Institute ID
+    const { error } = await db.from('batches')
+        .update(batchData)
+        .eq('batch_name', batchName)
+        .eq('institute_id', sessionInstID);
+
+    if (error) {
+        alert("Update Error: " + error.message);
+    } else {
+        alert("Success! Batch '" + batchName + "' has been updated.");
+    }
+}
+
+
+
 async function editBatch() {
     const tID = val('#batch', 'input[placeholder="Teacher ID"]');
     const updateData = {
