@@ -5895,19 +5895,17 @@ const INVENTORY_ITEMS = [
 ];
 
 // Initialize Grid on Load
+// 1. INITIALIZE GRID WITH LOCKED DEFAULTS
 function initInventoryGrid() {
     const tbody = document.getElementById('inventory-items-body');
     tbody.innerHTML = INVENTORY_ITEMS.map(item => {
         const id = item.replace(/\s+/g, '-').toLowerCase();
         
-        // 1. SET YOUR FIXED DEFAULT PRICES
-        let defaultPrice = 100; // Default for all books & others
+        // SET FIXED PRICES
+        let defaultPrice = 100; 
         if (item === 'Uniforms') defaultPrice = 150;
         if (item === 'Bags') defaultPrice = 350;
         if (item === 'Calendars') defaultPrice = 75;
-
-        // 2. SET DEFAULT STOCK
-        let defaultStock = 100;
 
         return `
             <tr id="row-${id}">
@@ -5916,14 +5914,14 @@ function initInventoryGrid() {
                 </td>
                 <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold; color: #000;">${item}</td>
                 
-                <!-- GREYED OUT & LOCKED STOCK BOX -->
+                <!-- GREYED OUT & LOCKED STOCK (STARTS AT 100) -->
                 <td style="padding: 10px; border: 1px solid #ccc;">
-                    <input type="number" class="inv-stock-val" style="width: 70px; background: #e9ecef; border: 1px solid #bbb; color: #555; text-align: center; font-weight: bold;" value="${defaultStock}" disabled>
+                    <input type="number" class="inv-stock-val" style="width: 70px; background: #e9ecef; border: 1px solid #999; color: #333; text-align: center; font-weight: bold;" value="100" disabled>
                 </td>
                 
-                <!-- GREYED OUT & LOCKED PRICE BOX -->
+                <!-- GREYED OUT & LOCKED PRICE -->
                 <td style="padding: 10px; border: 1px solid #ccc;">
-                    <input type="number" class="inv-price-val" style="width: 70px; background: #e9ecef; border: 1px solid #bbb; color: #555; text-align: center; font-weight: bold;" value="${defaultPrice}" disabled>
+                    <input type="number" class="inv-price-val" style="width: 70px; background: #e9ecef; border: 1px solid #999; color: #333; text-align: center; font-weight: bold;" value="${defaultPrice}" disabled>
                 </td>
                 
                 <td style="padding: 10px; border: 1px solid #ccc;">
@@ -5941,7 +5939,6 @@ function initInventoryGrid() {
         `;
     }).join('');
 }
-
 
 
 function toggleInventoryGrid() {
@@ -6002,22 +5999,41 @@ async function saveInventoryMaster() {
     if(error) alert(error.message); else alert("Catalog and Master Stock updated!");
 }
 
+// 2. LOAD DB AND FIX OLD CORRUPT ZEROS AUTOMATICALLY
 async function loadMasterInventory() {
     const { data } = await db.from('inventory_master').select('*').eq('institute_id', sessionInstID);
     
+    let needsDatabaseFix = false;
+
     if (data && data.length > 0) {
-        // CARRY FORWARD LOGIC: If items exist in the database, lock them into the grey boxes automatically
         data.forEach(item => {
             const id = item.item_name.replace(/\s+/g, '-').toLowerCase();
             const row = document.getElementById(`row-${id}`);
+            
             if(row) {
-                row.querySelector('.inv-stock-val').value = item.current_stock;
-                row.querySelector('.inv-price-val').value = item.item_price;
+                let stock = item.current_stock;
+                let price = item.item_price;
+
+                // THIS FIXES THE BUG: If the database has broken 0s, we force reset them to your defaults!
+                if (price === 0 || price === null) {
+                    stock = 100;
+                    if (item.item_name === 'Uniforms') price = 150;
+                    else if (item.item_name === 'Bags') price = 350;
+                    else if (item.item_name === 'Calendars') price = 75;
+                    else price = 100;
+                    needsDatabaseFix = true;
+                }
+
+                row.querySelector('.inv-stock-val').value = stock;
+                row.querySelector('.inv-price-val').value = price;
             }
         });
         checkLowStockGlobal();
+
+        // Push the correct fixed numbers back to the database silently
+        if (needsDatabaseFix) saveInventoryMaster();
     } else {
-        // FIRST TIME SETUP: Database is completely empty. We push your new 100 defaults into the DB automatically!
+        // If DB is completely empty, save the 100s automatically.
         saveInventoryMaster();
     }
 }
