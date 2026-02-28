@@ -3003,6 +3003,34 @@ async function saveFeeUpdate() {
 
     const newPaidTotal = prevPaidVal + nowPaying;
 
+
+
+
+// --- ADD THIS TRULY DYNAMIC LOGIC ---
+let dueDatesStr = document.getElementById('fee-due-dates').value;
+// Calculate remaining balance + current payment to find the 'starting' balance for this transaction
+const totalPendingAtStart = parseFloat(document.getElementById('fee-pending').value) + nowPaying;
+
+if (dueDatesStr && nowPaying > 0 && totalPendingAtStart > 0) {
+    let dueDatesArr = dueDatesStr.split(',').map(d => d.trim()).filter(d => d !== "");
+    
+    // 1. Find the value of one installment
+    const installmentValue = totalPendingAtStart / dueDatesArr.length;
+    
+    // 2. Calculate how many full months this payment covers
+    const installmentsToClear = Math.floor(nowPaying / installmentValue);
+    
+    // 3. Remove that specific number of months
+    for (let i = 0; i < installmentsToClear; i++) {
+        dueDatesArr.shift();
+    }
+    
+    // 4. Update the text box (if empty, it clears the box)
+    document.getElementById('fee-due-dates').value = dueDatesArr.join(', ');
+}
+
+
+
     // 4. UPDATE MASTER STUDENTS TABLE
     const { error: upError } = await db.from('students').update({
         paid_amount: newPaidTotal,
