@@ -240,80 +240,60 @@
             }
             return true;
         }
-
-        // 3. SECURE PARSER (Avoids syntax errors caused by chat formatting)
-       function parseSearchString(input) {
+// 3. YEARLY PARSER (Defaults to current year, e.g., 2026)
+        function parseSearchString(input) {
             const now = new Date();
-            const year = input && input.length === 4 ? input : now.getFullYear();
+            // If user types a 4-digit year, use it; otherwise use current year
+            const year = (input && input.trim().length === 4) ? input.trim() : now.getFullYear();
             return {
                 start: `${year}-01-01`,
                 end: `${year}-12-31`,
                 label: `YEAR ${year} (JANUARY - DECEMBER)`
             };
         }
-            const parts = input.trim().toLowerCase().split(/\s+/);
-            if (parts.length < 2) return null;
 
-            // Using .at() completely bypasses the markdown formatting issues
-            let monthStr = parts.at(0).replace(/,/g, '');
-            let yearStr = parts.at(1).replace(/,/g, '');
-
-            const dictionary = {
-                january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
-                july: "07", august: "08", september: "09", october: "10", november: "11", december: "12",
-                jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
-            };
-
-            // Using Reflect.get bypasses square brackets for object lookups
-            const monthNum = Reflect.get(dictionary, monthStr);
-            if (!monthNum || yearStr.length !== 4) return null;
-
-            const dateObj = new Date(`${yearStr}-${monthNum}-01`);
-            const label = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
-
-            // Returns a valid date range to prevent the Supabase Operator Error
-        const lastDay = new Date(yearStr, monthNum, 0).getDate();
-return { 
-    startDate: `${yearStr}-${monthNum}-01`, 
-    endDate: `${yearStr}-${monthNum}-${lastDay}`, 
-    label: label 
-};
-        }
-
-async function loadTableData(searchQuery) {
+        // 4. FETCH AND PROCESS DATA (SYNCED TO YEARLY DASHBOARD)
+        async function loadTableData(searchQuery) {
             const dateInfo = parseSearchString(searchQuery);
             document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
             const tbody = document.getElementById('table-body');
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Syncing with Dashboard...</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Syncing with Master Dashboard...</td></tr>";
 
             try {
-                // 1. Get ALL Active Students for Total Fees & Current Pending (Dashboard: 14,000)
-                const { data: students } = await db.from('students')
+                // A. Get ALL Active Students (For Pending: ₹14,000)
+                const { data: students, error: stuErr } = await db.from('students')
                     .select('course, total_fees, pending_amount')
-                    .eq('institute_id', sessionInstID).eq('status', 'Active');
+                    .eq('institute_id', sessionInstID)
+                    .eq('status', 'Active');
 
-                // 2. Get ALL Payments made this year (Dashboard: 58,000)
-                const { data: payments } = await db.from('payment_history')
+                // B. Get ALL Payments for the WHOLE YEAR (For Collection: ₹58,000)
+                const { data: payments, error: payErr } = await db.from('payment_history')
                     .select('amount, course_name')
                     .eq('institute_id', sessionInstID)
                     .gte('payment_date', dateInfo.start)
                     .lte('payment_date', dateInfo.end);
 
+                if (stuErr || payErr) throw (stuErr || payErr);
+
                 const groupedMap = new Map();
 
-                // Step A: Build subjects from active students
+                // Initialize map with subjects from student list
                 students.forEach(s => {
                     const sub = s.course || "General";
-                    if (!groupedMap.has(sub)) groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
+                    if (!groupedMap.has(sub)) {
+                        groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
+                    }
                     const stats = groupedMap.get(sub);
                     stats.total += parseFloat(s.total_fees) || 0;
                     stats.pending += parseFloat(s.pending_amount) || 0;
                 });
 
-                // Step B: Build/Update subjects from cash received
+                // Add received cash from payment history
                 payments.forEach(p => {
                     const sub = p.course_name || "General";
-                    if (!groupedMap.has(sub)) groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
+                    if (!groupedMap.has(sub)) {
+                        groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
+                    }
                     groupedMap.get(sub).received += parseFloat(p.amount) || 0;
                 });
 
@@ -321,15 +301,19 @@ async function loadTableData(searchQuery) {
                 portalData.sort((a, b) => b.received - a.received);
                 currentPage = 1;
                 renderPagination();
-            } catch (e) { alert(e.message); }
+
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan='5' style='text-align: center; color: red;'>Error: ${err.message}</td></tr>`;
+            }
         }
 
-        // 5. RENDER TABLE
-      function renderPagination() {
+        // 5. RENDER TABLE WITH GRAND TOTAL
+        function renderPagination() {
             const tbody = document.getElementById('table-body');
             const info = document.getElementById('page-info');
+
             if (portalData.length === 0) {
-                tbody.innerHTML = "<tr><td colspan='5'>No records found.</td></tr>";
+                tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>No records found for this year.</td></tr>";
                 return;
             }
 
@@ -340,27 +324,39 @@ async function loadTableData(searchQuery) {
             let html = "";
             let gTotal = 0, gRecd = 0, gPend = 0;
 
-            // Add Data Rows
+            // Generate subject rows
             rowsToDisplay.forEach(row => {
-                html += `<tr><td><b>${row.course}</b></td><td>₹ ${row.total.toLocaleString()}</td><td class="money-received">₹ ${row.received.toLocaleString()}</td><td class="money-pending">₹ ${row.pending.toLocaleString()}</td><td>${row.year}</td></tr>`;
+                html += `
+                    <tr>
+                        <td><b>${row.course}</b></td>
+                        <td>₹ ${row.total.toLocaleString('en-IN')}</td>
+                        <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
+                        <td class="money-pending">₹ ${row.pending.toLocaleString('en-IN')}</td>
+                        <td style="font-size: 0.8rem; color: #666;">${row.year}</td>
+                    </tr>
+                `;
             });
 
-            // Calculate Grand Totals for the whole dataset (Not just current page)
-            portalData.forEach(d => { gTotal += d.total; gRecd += d.received; gPend += d.pending; });
+            // Calculate Grand Totals for the entire year
+            portalData.forEach(d => {
+                gTotal += d.total;
+                gRecd += d.received;
+                gPend += d.pending;
+            });
 
-            // ADD THE TOTAL ROW
+            // ADD THE GRAND TOTAL ROW (Matches Dashboard 58k / 14k)
             html += `
                 <tr style="background: #000; color: #fff; font-weight: 900; font-size: 1.1rem;">
-                    <td>GRAND TOTAL</td>
-                    <td>₹ ${gTotal.toLocaleString()}</td>
-                    <td style="color: #7FFFD4;">₹ ${gRecd.toLocaleString()}</td>
-                    <td style="color: #ff6b6b;">₹ ${gPend.toLocaleString()}</td>
-                    <td>2026 (JAN-DEC)</td>
+                    <td style="color: #7FFFD4;">GRAND TOTAL</td>
+                    <td style="color: #fff;">₹ ${gTotal.toLocaleString('en-IN')}</td>
+                    <td style="color: #7FFFD4;">₹ ${gRecd.toLocaleString('en-IN')}</td>
+                    <td style="color: #ff6b6b;">₹ ${gPend.toLocaleString('en-IN')}</td>
+                    <td style="font-size: 0.8rem; color: #7FFFD4;">FULL YEAR</td>
                 </tr>
             `;
 
             tbody.innerHTML = html;
-            info.innerText = `Showing ${portalData.length} Subjects | Page ${currentPage} of ${maxPages}`;
+            info.innerText = `Page ${currentPage} of ${maxPages}`;
         }
 
 
