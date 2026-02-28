@@ -3179,29 +3179,36 @@ async function addBatch() {
 }
 
 // 4. THE MISSING FETCH FUNCTION
+// 4. THE MISSING FETCH FUNCTION (BULLETPROOF VERSION)
 async function fetchBatch() {
-    const name = prompt("Enter Batch Name to search:");
+    let name = prompt("Enter Batch Name to search:");
     if (!name) return;
 
+    name = name.trim(); // Removes accidental spaces before or after the name
+
+    // Use 'ilike' for case-insensitive search and 'limit(1).maybeSingle()' to prevent crashes
     const { data, error } = await db.from('batches')
         .select('*')
-        .eq('batch_name', name)
- .eq('institute_id', sessionInstID)
-        .single();
+        .ilike('batch_name', name) 
+        .eq('institute_id', sessionInstID)
+        .limit(1)
+        .maybeSingle();
 
-    if (error || !data) return alert("Batch not found.");
+    if (error || !data) {
+        return alert(`Batch "${name}" not found. Please check the spelling.`);
+    }
 
+    // Populate UI
     document.getElementById('batch-name').value = data.batch_name;
     document.getElementById('batch-teacher-id').value = data.teacher_id;
     document.getElementById('batch-teacher-name').value = data.teacher_name;
     document.getElementById('batch-time').value = data.batch_time;
     document.getElementById('batch-subject').value = data.subject_name;
     document.getElementById('batch-students').value = data.students_allotted;
-    document.getElementById('batch-remarks').value = data.remarks;
+    document.getElementById('batch-remarks').value = data.remarks || "";
+    
     alert("Batch details loaded!");
 }
-
-
 
 // NEW: UPDATE BATCH FUNCTION
 async function updateBatch() {
