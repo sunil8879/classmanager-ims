@@ -6872,6 +6872,7 @@ function clearBatchMaster() {
 }
 
 // 3. Auto-populate from multiple tables
+// REPLACE existing autopopulateBatchMaster function completely
 async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter a Roll Number first.");
@@ -6885,25 +6886,41 @@ async function autopopulateBatchMaster() {
     document.getElementById('bm-sname').value = stu.full_name;
     document.getElementById('bm-course').value = stu.course || "N/A";
 
-    // B. Fetch linked Teacher ID from STUDENT_ALLOCATIONS
-    const { data: alloc } = await db.from('student_allocations')
-        .select('teacher_id').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    // B. Fetch linked Teacher ID from STUDENT_ALLOCATIONS (SAFE FETCH using .limit)
+    const { data: allocData, error: allocErr } = await db.from('student_allocations')
+        .select('teacher_id')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .limit(1); // Prevents crash if student has multiple subjects/teachers
 
-    if (alloc && alloc.teacher_id) {
+    if (allocData && allocData.length > 0) {
+        const alloc = allocData[0];
         document.getElementById('bm-tid').value = alloc.teacher_id;
 
-        // C. Fetch Teacher Name from TEACHER_DETAILS
-        const { data: teacher } = await db.from('teacher_details')
-            .select('teacher_name').eq('id', alloc.teacher_id).eq('institute_id', sessionInstID).maybeSingle();
+        // C. Fetch Teacher Name from TEACHER_DETAILS (SAFE FETCH)
+        const { data: teacherData } = await db.from('teacher_details')
+            .select('teacher_name')
+            .eq('id', alloc.teacher_id)
+            .eq('institute_id', sessionInstID)
+            .limit(1);
         
-        if (teacher) document.getElementById('bm-tname').value = teacher.teacher_name;
+        if (teacherData && teacherData.length > 0) {
+            document.getElementById('bm-tname').value = teacherData[0].teacher_name;
+        }
 
-        // D. Fetch Batch Name from BATCHES table using Teacher ID
-        const { data: batch } = await db.from('batches')
-            .select('batch_name').eq('teacher_id', alloc.teacher_id).eq('institute_id', sessionInstID).maybeSingle();
+        // D. Fetch Batch Name from BATCHES table (SAFE FETCH)
+        // Prevents crash if a single teacher teaches morning & evening batches
+        const { data: batchData } = await db.from('batches')
+            .select('batch_name')
+            .eq('teacher_id', alloc.teacher_id)
+            .eq('institute_id', sessionInstID)
+            .limit(1);
         
-        if (batch) document.getElementById('bm-bname').value = batch.batch_name;
-        else document.getElementById('bm-bname').value = "No Batch Assigned";
+        if (batchData && batchData.length > 0) {
+            document.getElementById('bm-bname').value = batchData[0].batch_name;
+        } else {
+            document.getElementById('bm-bname').value = "No Batch Assigned";
+        }
 
     } else {
         alert("This student is not allocated to a teacher yet. Go to Module 18 (Student Allocation) first.");
