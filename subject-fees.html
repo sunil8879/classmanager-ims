@@ -242,20 +242,15 @@
         }
 
         // 3. SECURE PARSER (Avoids syntax errors caused by chat formatting)
-        function parseSearchString(input) {
-            if (!input) {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const label = now.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
-               const lastDay = new Date(year, month, 0).getDate();
-return { 
-    startDate: `${year}-${month}-01`, 
-    endDate: `${year}-${month}-${lastDay}`, 
-    label: label 
-};
-            }
-
+       function parseSearchString(input) {
+            const now = new Date();
+            const year = input && input.length === 4 ? input : now.getFullYear();
+            return {
+                start: `${year}-01-01`,
+                end: `${year}-12-31`,
+                label: `YEAR ${year} (JANUARY - DECEMBER)`
+            };
+        }
             const parts = input.trim().toLowerCase().split(/\s+/);
             if (parts.length < 2) return null;
 
@@ -285,82 +280,56 @@ return {
 };
         }
 
-// 4. FETCH AND PROCESS DATA (SYNCED WITH MASTER DASHBOARD)
-        async function loadTableData(searchQuery) {
+async function loadTableData(searchQuery) {
             const dateInfo = parseSearchString(searchQuery);
-            if (!dateInfo) {
-                alert("Invalid format! Please type exactly like 'March 2026'");
-                return;
-            }
-
             document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
             const tbody = document.getElementById('table-body');
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Synchronizing with Master Dashboard...</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Syncing with Dashboard...</td></tr>";
 
             try {
-                // 1. Fetch ALL Active Students (to get absolute Total Fees and Pending)
-                const { data: students, error: stuErr } = await db.from('students')
+                // 1. Get ALL Active Students for Total Fees & Current Pending (Dashboard: 14,000)
+                const { data: students } = await db.from('students')
                     .select('course, total_fees, pending_amount')
-                    .eq('institute_id', sessionInstID)
-                    .eq('status', 'Active');
+                    .eq('institute_id', sessionInstID).eq('status', 'Active');
 
-                // 2. Fetch ALL Payments made in the SEARCHED MONTH
-                const { data: payments, error: payErr } = await db.from('payment_history')
+                // 2. Get ALL Payments made this year (Dashboard: 58,000)
+                const { data: payments } = await db.from('payment_history')
                     .select('amount, course_name')
                     .eq('institute_id', sessionInstID)
-                    .ilike('month_year', `%${dateInfo.label}%`);
-
-                if (stuErr || payErr) throw (stuErr || payErr);
+                    .gte('payment_date', dateInfo.start)
+                    .lte('payment_date', dateInfo.end);
 
                 const groupedMap = new Map();
 
-                // Step A: Initialize Map with Student Data (Value of the Business)
+                // Step A: Build subjects from active students
                 students.forEach(s => {
-                    const subject = s.course || "General / Unassigned";
-                    if (!groupedMap.has(subject)) {
-                        groupedMap.set(subject, { 
-                            course: subject, 
-                            total: 0, 
-                            received: 0, 
-                            pending: 0, 
-                            monthYear: dateInfo.label 
-                        });
-                    }
-                    const stats = groupedMap.get(subject);
+                    const sub = s.course || "General";
+                    if (!groupedMap.has(sub)) groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
+                    const stats = groupedMap.get(sub);
                     stats.total += parseFloat(s.total_fees) || 0;
                     stats.pending += parseFloat(s.pending_amount) || 0;
                 });
 
-                // Step B: Overlay the actual CASH collected in the specific month
+                // Step B: Build/Update subjects from cash received
                 payments.forEach(p => {
-                    const subject = p.course_name || "General / Unassigned";
-                    // If a subject exists in payments but not in active students (e.g. old student paid)
-                    if (!groupedMap.has(subject)) {
-                        groupedMap.set(subject, { 
-                            course: subject, total: 0, received: 0, pending: 0, monthYear: dateInfo.label 
-                        });
-                    }
-                    const stats = groupedMap.get(subject);
-                    stats.received += parseFloat(p.amount) || 0;
+                    const sub = p.course_name || "General";
+                    if (!groupedMap.has(sub)) groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
+                    groupedMap.get(sub).received += parseFloat(p.amount) || 0;
                 });
 
                 portalData = Array.from(groupedMap.values());
                 portalData.sort((a, b) => b.received - a.received);
                 currentPage = 1;
                 renderPagination();
-
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan='5' style='text-align: center; color: red;'>Error: ${err.message}</td></tr>`;
-            }
+            } catch (e) { alert(e.message); }
         }
+
         // 5. RENDER TABLE
-        function renderPagination() {
+      function renderPagination() {
             const tbody = document.getElementById('table-body');
             const info = document.getElementById('page-info');
-
             if (portalData.length === 0) {
-                tbody.innerHTML = "<tr><td colspan='5' style='text-align: center; color: #666;'>No records found for this month.</td></tr>";
-                info.innerText = "Page 1 of 1";
+                tbody.innerHTML = "<tr><td colspan='5'>No records found.</td></tr>";
                 return;
             }
 
@@ -369,21 +338,31 @@ return {
             const rowsToDisplay = portalData.slice(startIndex, startIndex + rowsPerPage);
 
             let html = "";
+            let gTotal = 0, gRecd = 0, gPend = 0;
+
+            // Add Data Rows
             rowsToDisplay.forEach(row => {
-                html += `
-                    <tr>
-                        <td><b>${row.course}</b></td>
-                        <td>₹ ${row.total.toLocaleString('en-IN')}</td>
-                        <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
-                        <td class="money-pending">₹ ${row.pending.toLocaleString('en-IN')}</td>
-                        <td style="font-size: 0.9rem; color: #555;">${row.monthYear}</td>
-                    </tr>
-                `;
+                html += `<tr><td><b>${row.course}</b></td><td>₹ ${row.total.toLocaleString()}</td><td class="money-received">₹ ${row.received.toLocaleString()}</td><td class="money-pending">₹ ${row.pending.toLocaleString()}</td><td>${row.year}</td></tr>`;
             });
 
+            // Calculate Grand Totals for the whole dataset (Not just current page)
+            portalData.forEach(d => { gTotal += d.total; gRecd += d.received; gPend += d.pending; });
+
+            // ADD THE TOTAL ROW
+            html += `
+                <tr style="background: #000; color: #fff; font-weight: 900; font-size: 1.1rem;">
+                    <td>GRAND TOTAL</td>
+                    <td>₹ ${gTotal.toLocaleString()}</td>
+                    <td style="color: #7FFFD4;">₹ ${gRecd.toLocaleString()}</td>
+                    <td style="color: #ff6b6b;">₹ ${gPend.toLocaleString()}</td>
+                    <td>2026 (JAN-DEC)</td>
+                </tr>
+            `;
+
             tbody.innerHTML = html;
-            info.innerText = `Page ${currentPage} of ${maxPages}`;
+            info.innerText = `Showing ${portalData.length} Subjects | Page ${currentPage} of ${maxPages}`;
         }
+
 
         // 6. BUTTON HANDLERS
         function handleGenerateClick() {
