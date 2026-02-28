@@ -3265,9 +3265,9 @@ function triggerAttendance(status) {
     picker.showPicker(); 
 }
 
-// 2. SAVE ATTENDANCE 
+// 2. SAVE ATTENDANCE (FIXED)
 async function saveAttendance(dateValue, status) {
-    const roll = document.getElementById('attn-roll').value.trim().toUpperCase(); // GUARANTEE UPPERCASE
+    const roll = document.getElementById('attn-roll').value.trim().toUpperCase(); 
     if (!roll) return alert("Enter Roll Number first.");
 
     const { data: student } = await db.from('students').select('id').eq('roll_number', roll).single();
@@ -3281,7 +3281,14 @@ async function saveAttendance(dateValue, status) {
     const monthIndex = parseInt(dateParts[1], 10) - 1; 
     const monthYearStr = monthNames[monthIndex] + " " + dateParts[0]; 
 
-    // Insert into table
+    // --- FIX: Delete any existing record for this exact date to prevent duplicates ---
+    await db.from('attendance')
+        .delete()
+        .eq('roll_number', roll)
+        .eq('attendance_date', dateValue)
+        .eq('institute_id', sessionInstID);
+
+    // --- Insert the fresh, accurate status ---
     const { error } = await db.from('attendance').insert([{
         institute_id: sessionInstID,
         student_id: student.id,
@@ -3304,6 +3311,7 @@ async function saveAttendance(dateValue, status) {
         await autoRefreshAttendanceStats(roll, monthViewValue);
     }
 
+    // WhatsApp logic remains exactly the same below...
     if (status === "Absent") {
         const stuName = document.getElementById('attn-name').value;
         const { data: stuData } = await db.from('students').select('mobile, father_mobile, mother_mobile').eq('roll_number', roll).single();
@@ -3323,7 +3331,6 @@ async function saveAttendance(dateValue, status) {
         document.getElementById('whatsapp-alert-area').style.display = 'none'; 
     }
 }
-
 // 3. AUTO-REFRESH HELPER (Directly connected to the Database Table)
 async function autoRefreshAttendanceStats(roll, yyyy_mm) {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -4907,7 +4914,7 @@ function triggerTAttn(status) {
 
     const picker = document.getElementById('t-date-picker');
     
-    // 1. CRITICAL FIX: Reset the picker value so 'onchange' fires every time
+    // 1. Reset the picker value so 'onchange' fires every time
     picker.value = ""; 
 
     // 2. Define what happens when the date is picked
@@ -4917,6 +4924,14 @@ function triggerTAttn(status) {
         const selectedDate = this.value;
         const monthYearStr = new Date(selectedDate).toLocaleString('default', { month: 'long', year: 'numeric' });
 
+        // --- FIX: Delete any existing record for this exact date to prevent duplicates ---
+        await db.from('teachers_attendance')
+            .delete()
+            .eq('teacher_id', tid)
+            .eq('attendance_date', selectedDate)
+            .eq('institute_id', sessionInstID);
+
+        // --- Insert the fresh, accurate status ---
         const { error } = await db.from('teachers_attendance').insert([{
             institute_id: sessionInstID,
             teacher_id: tid,
@@ -4929,7 +4944,6 @@ function triggerTAttn(status) {
         if(error) {
             alert("Database Error: " + error.message);
         } else {
-            // This message will now pop up every single time
             alert(`SUCCESS: ${name} marked ${status} for ${selectedDate}`);
             document.getElementById('t-attn-status').value = status;
         }
@@ -4941,7 +4955,6 @@ function triggerTAttn(status) {
     // 3. Open the calendar
     picker.showPicker();
 }
-
 async function fetchTeacherHistory() {
     const tid = document.getElementById('t-attn-id').value.toUpperCase();
     const month = document.getElementById('t-attn-month').value; // YYYY-MM
