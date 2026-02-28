@@ -5899,23 +5899,31 @@ function initInventoryGrid() {
     const tbody = document.getElementById('inventory-items-body');
     tbody.innerHTML = INVENTORY_ITEMS.map(item => {
         const id = item.replace(/\s+/g, '-').toLowerCase();
+        
+        // 1. SET YOUR FIXED DEFAULT PRICES
+        let defaultPrice = 100; // Default for all books & others
+        if (item === 'Uniforms') defaultPrice = 150;
+        if (item === 'Bags') defaultPrice = 350;
+        if (item === 'Calendars') defaultPrice = 75;
+
+        // 2. SET DEFAULT STOCK
+        let defaultStock = 100;
+
         return `
             <tr id="row-${id}">
                 <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
                     <input type="checkbox" class="inv-check" data-item="${item}" onchange="calculateInvTotal()">
                 </td>
-                
-                <!-- THIS IS THE ITEM NAME (Restored) -->
                 <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold; color: #000;">${item}</td>
                 
-                <!-- UNLOCKED STOCK BOX -->
+                <!-- GREYED OUT & LOCKED STOCK BOX -->
                 <td style="padding: 10px; border: 1px solid #ccc;">
-                    <input type="number" class="inv-stock-val" style="width: 70px; padding: 5px; border: 1px solid #000; border-radius: 4px; text-align: center; font-weight: bold;" placeholder="0">
+                    <input type="number" class="inv-stock-val" style="width: 70px; background: #e9ecef; border: 1px solid #bbb; color: #555; text-align: center; font-weight: bold;" value="${defaultStock}" disabled>
                 </td>
                 
-                <!-- UNLOCKED PRICE BOX -->
+                <!-- GREYED OUT & LOCKED PRICE BOX -->
                 <td style="padding: 10px; border: 1px solid #ccc;">
-                    <input type="number" class="inv-price-val" style="width: 70px; padding: 5px; border: 1px solid #000; border-radius: 4px; text-align: center; font-weight: bold;" placeholder="0">
+                    <input type="number" class="inv-price-val" style="width: 70px; background: #e9ecef; border: 1px solid #bbb; color: #555; text-align: center; font-weight: bold;" value="${defaultPrice}" disabled>
                 </td>
                 
                 <td style="padding: 10px; border: 1px solid #ccc;">
@@ -5933,6 +5941,9 @@ function initInventoryGrid() {
         `;
     }).join('');
 }
+
+
+
 function toggleInventoryGrid() {
     const grid = document.getElementById('inventory-grid-container');
     const isOpening = grid.style.display === 'none';
@@ -5993,7 +6004,9 @@ async function saveInventoryMaster() {
 
 async function loadMasterInventory() {
     const { data } = await db.from('inventory_master').select('*').eq('institute_id', sessionInstID);
-    if(data) {
+    
+    if (data && data.length > 0) {
+        // CARRY FORWARD LOGIC: If items exist in the database, lock them into the grey boxes automatically
         data.forEach(item => {
             const id = item.item_name.replace(/\s+/g, '-').toLowerCase();
             const row = document.getElementById(`row-${id}`);
@@ -6003,6 +6016,9 @@ async function loadMasterInventory() {
             }
         });
         checkLowStockGlobal();
+    } else {
+        // FIRST TIME SETUP: Database is completely empty. We push your new 100 defaults into the DB automatically!
+        saveInventoryMaster();
     }
 }
 
