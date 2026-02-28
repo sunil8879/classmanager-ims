@@ -3237,26 +3237,7 @@ async function fetchStudentForAttn() {
         document.getElementById('attn-name').value = data.full_name;
     }
 }
-// 2. Trigger the calendar popup
-let currentAttnStatus = "";
-function triggerAttendance(status) {
-    const name = document.getElementById('attn-name').value;
-    if (!name) return alert("Please fetch a student by Roll Number first!");
-    
-    currentAttnStatus = status;
-    const picker = document.getElementById('attn-date-picker');
-    
-    // Programmatically open the calendar
-    picker.showPicker(); 
-    
-    // Listen for the date selection
-    picker.onchange = async function() {
-        if (this.value) {
-            await saveAttendance(this.value, currentAttnStatus);
-            this.value = ""; // reset
-        }
-    };
-}
+
 
 // 3. Save to Supabase
 /* ==========================================
