@@ -6965,6 +6965,7 @@ async function autopopulateBatchMaster() {
 }
 
 // 4. ADD RECORD to "list" table
+// 4. ADD RECORD to "list" table (WITH CAPACITY CHECK)
 async function addBatchMasterRecord() {
     const data = {
         institute_id: sessionInstID,
@@ -6980,10 +6981,45 @@ async function addBatchMasterRecord() {
 
     if (!data.roll_number || !data.student_name) return alert("Please Auto-Fill the student details first.");
 
+    // --- NEW: STRICT BATCH CAPACITY CHECK ---
+    if (data.batch_name && data.batch_name !== "No Batch Assigned" && data.batch_name !== "N/A") {
+        
+        // 1. Get the Maximum Capacity set for this batch in Module 5
+        const { data: batchData } = await db.from('batches')
+            .select('students_allotted')
+            .eq('batch_name', data.batch_name)
+            .eq('institute_id', sessionInstID)
+            .single();
+
+        if (batchData) {
+            const maxCapacity = parseInt(batchData.students_allotted) || 0;
+            
+            // Only enforce the limit if a limit greater than 0 was set
+            if (maxCapacity > 0) {
+                
+                // 2. Count how many students are ALREADY in this batch
+                const { data: existingStudents } = await db.from('list')
+                    .select('id')
+                    .eq('batch_name', data.batch_name)
+                    .eq('institute_id', sessionInstID);
+                
+                const currentCount = existingStudents ? existingStudents.length : 0;
+                
+                // 3. Block if full
+                if (currentCount >= maxCapacity) {
+                    return alert(`🛑 ERROR: BATCH FULL!\n\nThe batch "${data.batch_name}" has a maximum limit of ${maxCapacity} students.\nYou cannot add ${data.student_name} to this batch.`);
+                }
+            }
+        }
+    }
+    // --- END CAPACITY CHECK ---
+
+    // If capacity is fine, proceed to save
     const { error } = await db.from('list').insert([data]);
 
-    if (error) alert("Error saving record: " + error.message);
-    else {
+    if (error) {
+        alert("Error saving record: " + error.message);
+    } else {
         alert("Success! Record added to Batch Master.");
         clearBatchMaster();
     }
