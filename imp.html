@@ -6965,62 +6965,78 @@ async function autopopulateBatchMaster() {
 }
 
 // 4. ADD RECORD to "list" table
-// 4. ADD RECORD to "list" table (WITH CAPACITY CHECK)
+// 4. ADD RECORD to "list" table (BULLETPROOF CAPACITY CHECK)
 async function addBatchMasterRecord() {
-    const data = {
-        institute_id: sessionInstID,
-        date_today: document.getElementById('bm-date').value,
-        roll_number: document.getElementById('bm-roll').value.trim().toUpperCase(),
-        student_name: document.getElementById('bm-sname').value,
-        course_name: document.getElementById('bm-course').value,
-        teacher_id: document.getElementById('bm-tid').value,
-        teacher_name: document.getElementById('bm-tname').value,
-        batch_name: document.getElementById('bm-bname').value,
-        remarks: document.getElementById('bm-remarks').value
-    };
+    const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
+    const batchName = document.getElementById('bm-bname').value.trim();
+    const studentName = document.getElementById('bm-sname').value;
 
-    if (!data.roll_number || !data.student_name) return alert("Please Auto-Fill the student details first.");
+    if (!roll || !studentName) return alert("Please Auto-Fill the student details first.");
 
-    // --- NEW: STRICT BATCH CAPACITY CHECK ---
-    if (data.batch_name && data.batch_name !== "No Batch Assigned" && data.batch_name !== "N/A") {
+    // --- 1. PREVENT DUPLICATE ENTRY ---
+    const { data: duplicateCheck } = await db.from('list')
+        .select('id')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (duplicateCheck) {
+        return alert(`Error: ${studentName} (${roll}) is already added to the Batch Master!`);
+    }
+
+    // --- 2. STRICT BATCH CAPACITY CHECK ---
+    if (batchName && batchName !== "No Batch Assigned" && batchName !== "N/A") {
         
-        // 1. Get the Maximum Capacity set for this batch in Module 5
-        const { data: batchData } = await db.from('batches')
+        // Fetch capacity using 'ilike' to ignore uppercase/lowercase mismatches
+        const { data: batchData, error: bErr } = await db.from('batches')
             .select('students_allotted')
-            .eq('batch_name', data.batch_name)
+            .ilike('batch_name', batchName)
             .eq('institute_id', sessionInstID)
-            .single();
+            .limit(1)
+            .maybeSingle();
 
         if (batchData) {
             const maxCapacity = parseInt(batchData.students_allotted) || 0;
             
-            // Only enforce the limit if a limit greater than 0 was set
+            // Only enforce if you actually set a limit greater than 0
             if (maxCapacity > 0) {
                 
-                // 2. Count how many students are ALREADY in this batch
-                const { data: existingStudents } = await db.from('list')
-                    .select('id')
-                    .eq('batch_name', data.batch_name)
+                // Use Supabase's exact counter to see how many are currently in the batch
+                const { count, error: countErr } = await db.from('list')
+                    .select('*', { count: 'exact', head: true })
+                    .ilike('batch_name', batchName)
                     .eq('institute_id', sessionInstID);
                 
-                const currentCount = existingStudents ? existingStudents.length : 0;
+                const currentCount = count || 0;
                 
-                // 3. Block if full
+                // Block if full
                 if (currentCount >= maxCapacity) {
-                    return alert(`🛑 ERROR: BATCH FULL!\n\nThe batch "${data.batch_name}" has a maximum limit of ${maxCapacity} students.\nYou cannot add ${data.student_name} to this batch.`);
+                    return alert(`🛑 ERROR: BATCH FULL!\n\nThe batch "${batchName}" has a maximum limit of ${maxCapacity} students.\nCurrently enrolled: ${currentCount} students.\n\nYou cannot add ${studentName} to this batch.`);
                 }
             }
         }
     }
     // --- END CAPACITY CHECK ---
 
-    // If capacity is fine, proceed to save
+    // --- 3. SAVE THE RECORD ---
+    const data = {
+        institute_id: sessionInstID,
+        date_today: document.getElementById('bm-date').value,
+        roll_number: roll,
+        student_name: studentName,
+        course_name: document.getElementById('bm-course').value,
+        teacher_id: document.getElementById('bm-tid').value,
+        teacher_name: document.getElementById('bm-tname').value,
+        batch_name: batchName,
+        remarks: document.getElementById('bm-remarks').value
+    };
+
     const { error } = await db.from('list').insert([data]);
 
     if (error) {
         alert("Error saving record: " + error.message);
     } else {
-        alert("Success! Record added to Batch Master.");
+        alert(`Success! ${studentName} added to ${batchName}.`);
         clearBatchMaster();
     }
 }
