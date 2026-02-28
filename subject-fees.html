@@ -248,32 +248,57 @@ async function loadTableData(searchQuery) {
     const dateInfo = parseSearchString(searchQuery);
     document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
     const tbody = document.getElementById('table-body');
-    tbody.innerHTML = "<tr><td colspan='5'>Loading Chronological Report...</td></tr>";
+    tbody.innerHTML = "<tr><td colspan='5'>Syncing Historical Data...</td></tr>";
 
     try {
-        const { data: payments } = await db.from('payment_history')
-            .select('amount, month_year, course_name, total_fees, pending_fees, payment_date')
+        // 1. Fetch Payments AND Join with Students table to get names/fees
+        const { data: payments, error: payErr } = await db.from('payment_history')
+            .select(`
+                amount, month_year, payment_date,
+                students (course, total_fees, pending_amount)
+            `)
             .eq('institute_id', sessionInstID)
             .gte('payment_date', dateInfo.start)
             .lte('payment_date', dateInfo.end);
 
-        const { data: students } = await db.from('students')
+        // 2. Fetch Global Totals for the Dashboard sync
+        const { data: allStudents } = await db.from('students')
             .select('total_fees, pending_amount').eq('institute_id', sessionInstID).eq('status', 'Active');
 
+        if (payErr) throw payErr;
+
         const groupedMap = new Map();
+
         payments.forEach(p => {
-            const key = `${p.course_name}_${p.month_year}`;
+            const s = p.students;
+            if (!s) return; // Skip if student record was deleted
+
+            const courseName = s.course || "General";
+            const month = p.month_year || "Unknown";
+            const key = `${courseName}_${month}`;
+
             if (!groupedMap.has(key)) {
                 groupedMap.set(key, { 
-                    course: p.course_name, month: p.month_year, date: new Date(p.payment_date),
-                    received: 0, total: 0, pending: 0 
+                    course: courseName, 
+                    month: month, 
+                    date: new Date(p.payment_date),
+                    received: 0, 
+                    total: 0, 
+                    pending: 0,
+                    uStudents: new Set() // To avoid double-counting fees in the same month
                 });
             }
+
             const item = groupedMap.get(key);
             item.received += parseFloat(p.amount) || 0;
-            // Capture snapshot of fees/pending for that specific payment context
-            item.total = Math.max(item.total, parseFloat(p.total_fees) || 0);
-            item.pending = Math.max(item.pending, parseFloat(p.pending_fees) || 0);
+
+            // Logic: Only add a student's Total/Pending once per row (Subject-Month)
+            const studentId = p.student_id; 
+            if (!item.uStudents.has(studentId)) {
+                item.total += parseFloat(s.total_fees) || 0;
+                item.pending += parseFloat(s.pending_amount) || 0;
+                item.uStudents.add(studentId);
+            }
         });
 
         portalData = Array.from(groupedMap.values());
@@ -281,14 +306,14 @@ async function loadTableData(searchQuery) {
         portalData.sort((a, b) => a.date - b.date);
 
         window.gTotals = {
-            f: students.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0),
-            p: students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0),
+            f: allStudents.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0),
+            p: allStudents.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0),
             r: payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
         };
 
         currentPage = 1;
         renderPagination();
-    } catch (err) { tbody.innerHTML = err.message; }
+    } catch (err) { tbody.innerHTML = `<tr><td colspan="5" style="color:red;">Error: ${err.message}</td></tr>`; }
 }
 
 function renderPagination() {
@@ -302,27 +327,26 @@ function renderPagination() {
         html += `
             <tr>
                 <td><b>${row.course}</b></td>
-                <td>₹ ${row.total.toLocaleString()}</td>
-                <td class="money-received">₹ ${row.received.toLocaleString()}</td>
-                <td class="money-pending">₹ ${row.pending.toLocaleString()}</td>
+                <td>₹ ${row.total.toLocaleString('en-IN')}</td>
+                <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
+                <td class="money-pending">₹ ${row.pending.toLocaleString('en-IN')}</td>
                 <td><b>${row.month.toUpperCase()}</b></td>
             </tr>`;
     });
 
-    // GRAND TOTAL FOOTER (Syncs with Dashboard 58,000 / 14,000)
+    // GRAND TOTAL FOOTER (Matches Dashboard 58,000 / 14,000)
     html += `
-        <tr style="background: #000; color: #fff; font-weight: 900;">
+        <tr style="background: #000; color: #fff; font-weight: 900; font-size: 1.1rem;">
             <td>GRAND TOTAL (2026)</td>
-            <td>₹ ${window.gTotals.f.toLocaleString()}</td>
-            <td style="color: #7FFFD4;">₹ ${window.gTotals.r.toLocaleString()}</td>
-            <td style="color: #ff6b6b;">₹ ${window.gTotals.p.toLocaleString()}</td>
-            <td>YEAR SUMMARY</td>
+            <td>₹ ${window.gTotals.f.toLocaleString('en-IN')}</td>
+            <td style="color: #7FFFD4;">₹ ${window.gTotals.r.toLocaleString('en-IN')}</td>
+            <td style="color: #ff6b6b;">₹ ${window.gTotals.p.toLocaleString('en-IN')}</td>
+            <td style="font-size: 0.8rem; color: #7FFFD4;">YEAR TO DATE</td>
         </tr>`;
 
     tbody.innerHTML = html;
-    info.innerText = `Page ${currentPage} of ${Math.ceil(portalData.length / rowsPerPage)}`;
+    info.innerText = `Page ${currentPage} of ${Math.ceil(portalData.length / rowsPerPage) || 1}`;
 }
-
 
 function handleGenerateClick() {
     loadTableData(document.getElementById('search-input').value);
