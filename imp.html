@@ -2895,7 +2895,7 @@ async function fetchFeeByRoll() {
 
     // ADDED 'pending_amount' to your original select below
     const { data: s } = await db.from('students')
-        .select('full_name, course, total_fees, paid_amount, pending_amount, due_dates, status')
+        .select('full_name, course, total_fees, paid_amount, pending_amount, due_dates, status,admission_date')
         .eq('id', detail.student_id).maybeSingle();
 
     if (s) {
@@ -2903,6 +2903,7 @@ async function fetchFeeByRoll() {
         document.getElementById('fee-course').value = s.course;
         document.getElementById('fee-total').value = s.total_fees;
         document.getElementById('fee-prev-paid').value = s.paid_amount;
+document.getElementById('fee-join-date').value = s.admission_date;
         // POPULATING the 3rd greyed field
         document.getElementById('fee-pending').value = s.pending_amount; 
         
