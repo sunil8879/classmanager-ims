@@ -285,10 +285,9 @@ return {
 };
         }
 
-      // 4. FETCH AND PROCESS DATA (MATCHED TO DASHBOARD COLLECTION)
+ // 4. FETCH AND PROCESS DATA (FIXED: Pulls missing labels from Students table)
         async function loadTableData(searchQuery) {
             const dateInfo = parseSearchString(searchQuery);
-            
             if (!dateInfo) {
                 alert("Invalid format! Please type exactly like 'March 2026'");
                 return;
@@ -298,10 +297,16 @@ return {
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Loading records...</td></tr>";
 
-            // TARGET PAYMENT_HISTORY to catch all cash flow (Installments + New Admissions)
-            // Note: We use .ilike for month_year to match your "March 2026" search format
+            // We fetch the amount, and "join" with the students table to get the course name
             const { data, error } = await db.from('payment_history')
-                .select('amount, course_name, total_fees, pending_fees')
+                .select(`
+                    amount,
+                    students (
+                        course,
+                        total_fees,
+                        pending_amount
+                    )
+                `)
                 .eq('institute_id', sessionInstID)
                 .ilike('month_year', `%${dateInfo.label}%`);
 
@@ -312,8 +317,10 @@ return {
 
             const groupedMap = new Map();
 
-            data.forEach(payment => {
-                const courseName = payment.course_name || "General / Unassigned";
+            data.forEach(item => {
+                // Get course info from the linked student record
+                const s = item.students; 
+                const courseName = (s && s.course) ? s.course : "General / Unassigned";
                 
                 if (!groupedMap.has(courseName)) {
                     groupedMap.set(courseName, { 
@@ -326,22 +333,23 @@ return {
                 }
                 
                 const stats = groupedMap.get(courseName);
-                // amount is the actual cash collected this month
-                stats.received += parseFloat(payment.amount) || 0;
+                stats.received += parseFloat(item.amount) || 0;
                 
-                // For Total and Pending, we take the most recent snapshot values
-                // We update these only if they are larger to avoid adding course fees multiple times
-                stats.total = Math.max(stats.total, parseFloat(payment.total_fees) || 0);
-                stats.pending = Math.max(stats.pending, parseFloat(payment.pending_fees) || 0);
+                // Pull the most accurate Total/Pending from the linked student
+                if (s) {
+                    stats.total = Math.max(stats.total, parseFloat(s.total_fees) || 0);
+                    stats.pending = Math.max(stats.pending, parseFloat(s.pending_amount) || 0);
+                }
             });
 
             portalData = Array.from(groupedMap.values());
-            // Sort by Received (Highest collection first)
             portalData.sort((a, b) => b.received - a.received);
-
             currentPage = 1;
             renderPagination();
         }
+
+
+
         // 5. RENDER TABLE
         function renderPagination() {
             const tbody = document.getElementById('table-body');

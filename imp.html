@@ -3050,7 +3050,10 @@ if (dueDatesStr && nowPaying > 0 && totalPendingAtStart > 0) {
         roll_number: roll,
         amount: nowPaying,
         payment_date: payDate,
-        month_year: monthYearStr
+        month_year: monthYearStr,
+course_name: document.getElementById('fee-course').value,
+        total_fees: totalFees,
+        pending_fees: totalFees - newPaidTotal
     }]);
 
     if (histError) {
