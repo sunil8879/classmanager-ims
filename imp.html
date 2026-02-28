@@ -3263,103 +3263,104 @@ function triggerAttendance(status) {
    FIXED ATTENDANCE & STATISTICS LOGIC
    ========================================== */
 
-// 1. SAVE ATTENDANCE (Fixing the NULL user_id)
+// 1. SAVE ATTENDANCE (With Auto-Update & Timezone Fix)
 async function saveAttendance(dateValue, status) {
     const roll = document.getElementById('attn-roll').value.trim();
     if (!roll) return alert("Enter Roll Number first.");
 
     // Get Student ID and current User Session
     const { data: student } = await db.from('students').select('id').eq('roll_number', roll).single();
-    const { data: { user } } = await db.auth.getUser(); // Fetches active login session
+    const { data: { user } } = await db.auth.getUser(); 
 
     if (!student) return alert("Student record not found.");
     if (!user) return alert("Error: You must be logged in to mark attendance.");
 
-    const monthYear = new Date(dateValue).toLocaleString('default', { month: 'long', year: 'numeric' });
+    // TIMEZONE FIX: Extract the exact year, month, and day without letting JS shift the hours
+    const dateParts = dateValue.split('-'); 
+    const exactDateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]); 
+    const monthYearStr = exactDateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     const { error } = await db.from('attendance').insert([{
- institute_id: sessionInstID,
+        institute_id: sessionInstID,
         student_id: student.id,
         roll_number: roll,
         attendance_date: dateValue,
         status: status,
-        month_year: monthYear,
-        user_id: user.id // Captures the ID of the person (Owner/Teacher) marking it
+        month_year: monthYearStr,
+        user_id: user.id 
     }]);
 
-    if (error) alert("Error: " + error.message);
-    else alert(`Success: Marked ${status} for ${dateValue}`);
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert(`Success: Marked ${status} for ${dateValue}`);
+        
+        // AUTO-UPDATE FIX: Instantly refresh the stats on the screen!
+        const monthViewValue = dateValue.substring(0, 7); // Gets "YYYY-MM"
+        document.getElementById('attn-month-view').value = monthViewValue; 
+        autoRefreshAttendanceStats(roll, monthViewValue);
+    }
 
-
-// NEW ALERT LOGIC
-      // REFINED ALERT LOGIC: Connects to Parent Mobile Numbers
-        if (status === "Absent") {
-            const stuName = document.getElementById('attn-name').value;
-            
-            // 1. Fetch Father, Mother, and Student mobile numbers from the database
-            const { data: stuData } = await db.from('students')
-                .select('mobile, father_mobile, mother_mobile')
-                .eq('roll_number', roll)
-                .single();
-            
-            if (stuData) {
-                // 2. Priority Logic: Use Father's mobile, if empty use Mother's, if empty use Student's
-                const targetMobile = stuData.father_mobile || stuData.mother_mobile || stuData.mobile;
+    // PARENT WHATSAPP ALERT LOGIC
+    if (status === "Absent") {
+        const stuName = document.getElementById('attn-name').value;
+        const { data: stuData } = await db.from('students').select('mobile, father_mobile, mother_mobile').eq('roll_number', roll).single();
+        
+        if (stuData) {
+            const targetMobile = stuData.father_mobile || stuData.mother_mobile || stuData.mobile;
+            if (targetMobile) {
+                const alertArea = document.getElementById('whatsapp-alert-area');
+                const waLink = document.getElementById('absent-wa-link');
+                const msg = encodeURIComponent(`Dear Parent, this is to inform you that your child ${stuName} was ABSENT for class on ${dateValue}. Please ensure their regular attendance. Regards, ClassManager IMS.`);
                 
-                if (targetMobile) {
-                    const alertArea = document.getElementById('whatsapp-alert-area');
-                    const waLink = document.getElementById('absent-wa-link');
-                    
-                    // Formulate the message to the Parent
-                    const msg = encodeURIComponent(`Dear Parent, this is to inform you that your child ${stuName} was ABSENT for class on ${dateValue}. Please ensure their regular attendance. Regards, ClassManager IMS.`);
-                    
-                    waLink.href = `https://wa.me/91${targetMobile}?text=${msg}`;
-                    alertArea.style.display = 'block'; 
-                }
+                waLink.href = `https://wa.me/91${targetMobile}?text=${msg}`;
+                alertArea.style.display = 'block'; 
             }
-        } else {
-            document.getElementById('whatsapp-alert-area').style.display = 'none'; 
         }
+    } else {
+        document.getElementById('whatsapp-alert-area').style.display = 'none'; 
+    }
 }
 
-// 2. FETCH STATISTICS (Displaying data in UI)
-async function fetchAttendanceByPrompt() {
-    // A. Input Verification
-    const roll = prompt("Enter Student Roll Number to see statistics:");
-    if (!roll) return;
+// 2. NEW HELPER: Silently updates the numbers without annoying prompts
+async function autoRefreshAttendanceStats(roll, yyyy_mm) {
+    const parts = yyyy_mm.split('-');
+    const dObj = new Date(parts[0], parts[1] - 1, 1);
+    const targetMonthYear = dObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    const monthView = document.getElementById('attn-month-view').value; // YYYY-MM from calendar
-    if (!monthView) return alert("Please select a month in the 'View Monthly Record' calendar first.");
-
-    // B. Format the month string to match database (e.g., "March 2026")
-    const dateObj = new Date(monthView + "-01");
-    const targetMonthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-    // C. Query Database for Present Days
-    const { count: pCount, error: pErr } = await db.from('attendance')
+    const { count: pCount } = await db.from('attendance')
         .select('*', { count: 'exact', head: true })
         .eq('roll_number', roll)
         .eq('month_year', targetMonthYear)
         .eq('status', 'Present');
 
-    // D. Query Database for Absent Days
-    const { count: aCount, error: aErr } = await db.from('attendance')
+    const { count: aCount } = await db.from('attendance')
         .select('*', { count: 'exact', head: true })
         .eq('roll_number', roll)
         .eq('month_year', targetMonthYear)
         .eq('status', 'Absent');
 
-    if (pErr || aErr) return alert("Error fetching stats.");
-
-    // E. Update UI Fields
     document.getElementById('attn-total-p').value = pCount || 0;
     document.getElementById('attn-total-a').value = aCount || 0;
-    document.getElementById('attn-roll').value = roll;
+}
+
+// 3. FETCH STATISTICS (Upgraded to read directly from the Roll No box)
+async function fetchAttendanceByPrompt() {
+    let roll = document.getElementById('attn-roll').value.trim();
     
-    // Automatically fetch name so user knows who the stats belong to
-    fetchStudentForAttn(); 
-    
-    alert(`Statistics for ${roll} in ${targetMonthYear} updated successfully!`);
+    // If the box is empty, ONLY then ask for the prompt
+    if (!roll) {
+        roll = prompt("Enter Student Roll Number to see statistics:");
+        if (!roll) return;
+        document.getElementById('attn-roll').value = roll;
+        fetchStudentForAttn(); // Fetch the name automatically
+    }
+
+    const monthView = document.getElementById('attn-month-view').value; 
+    if (!monthView) return alert("Please select a month in the 'View Monthly Record' calendar first.");
+
+    await autoRefreshAttendanceStats(roll, monthView);
+    alert(`Statistics updated successfully!`);
 }
 /* ==========================================
    7. ADMIN DASHBOARD (Dynamic Counts)
