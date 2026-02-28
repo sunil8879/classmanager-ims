@@ -285,7 +285,7 @@ return {
 };
         }
 
-// 4. FETCH AND PROCESS DATA (MATCHED TO MASTER DASHBOARD)
+// 4. FETCH AND PROCESS DATA (SYNCED WITH MASTER DASHBOARD)
         async function loadTableData(searchQuery) {
             const dateInfo = parseSearchString(searchQuery);
             if (!dateInfo) {
@@ -295,68 +295,64 @@ return {
 
             document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
             const tbody = document.getElementById('table-body');
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Loading records...</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Synchronizing with Master Dashboard...</td></tr>";
 
-            // 1. Fetch payments for the SELECTED MONTH
-            const { data, error } = await db.from('payment_history')
-                .select(`
-                    amount,
-                    student_id,
-                    students (
-                        course,
-                        total_fees,
-                        pending_amount
-                    )
-                `)
-                .eq('institute_id', sessionInstID)
-                .ilike('month_year', `%${dateInfo.label}%`);
+            try {
+                // 1. Fetch ALL Active Students (to get absolute Total Fees and Pending)
+                const { data: students, error: stuErr } = await db.from('students')
+                    .select('course, total_fees, pending_amount')
+                    .eq('institute_id', sessionInstID)
+                    .eq('status', 'Active');
 
-            if (error) {
-                tbody.innerHTML = `<tr><td colspan='5' style='text-align: center; color: red;'>Database Error: ${error.message}</td></tr>`;
-                return;
-            }
+                // 2. Fetch ALL Payments made in the SEARCHED MONTH
+                const { data: payments, error: payErr } = await db.from('payment_history')
+                    .select('amount, course_name')
+                    .eq('institute_id', sessionInstID)
+                    .ilike('month_year', `%${dateInfo.label}%`);
 
-            const groupedMap = new Map();
-            const studentTracker = new Set(); // Prevents double-counting Total/Pending fees
+                if (stuErr || payErr) throw (stuErr || payErr);
 
-            data.forEach(item => {
-                const s = item.students;
-                if (!s) return;
+                const groupedMap = new Map();
 
-                const courseName = s.course || "General / Unassigned";
-                const studentId = item.student_id;
-
-                if (!groupedMap.has(courseName)) {
-                    groupedMap.set(courseName, { 
-                        course: courseName, 
-                        total: 0, 
-                        received: 0, 
-                        pending: 0, 
-                        monthYear: dateInfo.label 
-                    });
-                }
-                
-                const stats = groupedMap.get(courseName);
-                
-                // A. ALWAYS sum the cash received in this month
-                stats.received += parseFloat(item.amount) || 0;
-                
-                // B. ONLY sum Total/Pending once per student to avoid inflation
-                // (Even if student paid 3 times this month, we only add their course fee once)
-                const uniqueKey = `${courseName}-${studentId}`;
-                if (!studentTracker.has(uniqueKey)) {
+                // Step A: Initialize Map with Student Data (Value of the Business)
+                students.forEach(s => {
+                    const subject = s.course || "General / Unassigned";
+                    if (!groupedMap.has(subject)) {
+                        groupedMap.set(subject, { 
+                            course: subject, 
+                            total: 0, 
+                            received: 0, 
+                            pending: 0, 
+                            monthYear: dateInfo.label 
+                        });
+                    }
+                    const stats = groupedMap.get(subject);
                     stats.total += parseFloat(s.total_fees) || 0;
                     stats.pending += parseFloat(s.pending_amount) || 0;
-                    studentTracker.add(uniqueKey);
-                }
-            });
+                });
 
-            portalData = Array.from(groupedMap.values());
-            portalData.sort((a, b) => b.received - a.received);
-            currentPage = 1;
-            renderPagination();
+                // Step B: Overlay the actual CASH collected in the specific month
+                payments.forEach(p => {
+                    const subject = p.course_name || "General / Unassigned";
+                    // If a subject exists in payments but not in active students (e.g. old student paid)
+                    if (!groupedMap.has(subject)) {
+                        groupedMap.set(subject, { 
+                            course: subject, total: 0, received: 0, pending: 0, monthYear: dateInfo.label 
+                        });
+                    }
+                    const stats = groupedMap.get(subject);
+                    stats.received += parseFloat(p.amount) || 0;
+                });
+
+                portalData = Array.from(groupedMap.values());
+                portalData.sort((a, b) => b.received - a.received);
+                currentPage = 1;
+                renderPagination();
+
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan='5' style='text-align: center; color: red;'>Error: ${err.message}</td></tr>`;
+            }
         }
-
         // 5. RENDER TABLE
         function renderPagination() {
             const tbody = document.getElementById('table-body');
