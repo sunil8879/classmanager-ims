@@ -113,6 +113,7 @@
         .total-row td { border: none; padding: 20px 18px; }
         .text-recd { color: #27ae60; font-weight: 700; }
         .text-pend { color: #e74c3c; font-weight: 700; }
+        .subject-col { text-transform: capitalize; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -130,11 +131,11 @@
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Subject Name</th>
-                    <th>Total Fees</th>
-                    <th>Total Received</th>
-                    <th>Total Pending</th>
+                    <th>Subject name</th>
+                    <th>Total fees</th>
+                    <th>Total paid</th>
+                    <th>Total pending</th>
+                    <th>Remarks</th>
                 </tr>
             </thead>
             <tbody id="portal-body">
@@ -171,83 +172,91 @@
         }
 
         // --- 3. DATA ENGINE ---
-      // --- 3. DATA ENGINE (FIXED MONTHLY FILTER) ---
         async function loadPortalData() {
-            const filterInput = document.getElementById('month-input').value.trim(); // e.g., "February 2026"
+            const filterText = document.getElementById('month-input').value.trim().toLowerCase();
             const tbody = document.getElementById('portal-body');
             const tfoot = document.getElementById('portal-footer');
 
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Syncing with Dashboard...</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Calculating Fees...</td></tr>";
 
             try {
-                // 1. Fetch Payments (To get the $58,000 collection breakdown)
-                let payQuery = db.from('payment_history').select('amount, month_year, course_name, student_id');
-                if (filterInput) {
-                    payQuery = payQuery.ilike('month_year', `%${filterInput}%`);
-                }
-                const { data: payments, error: payErr } = await payQuery.eq('institute_id', sessionInstID);
-
-                // 2. Fetch Students (To get the $72,000 Total Fees and $14,000 Pending)
-                const { data: students, error: stuErr } = await db.from('students')
-                    .select('id, course, total_fees, pending_amount')
+                // Fetch ALL active students belonging to this institute
+                const { data: students, error } = await db.from('students')
+                    .select('course, total_fees, paid_amount, pending_amount, admission_date')
                     .eq('institute_id', sessionInstID)
                     .eq('status', 'Active');
 
-                if (payErr || stuErr) throw (payErr || stuErr);
+                if (error) throw error;
 
+                // Grouping Logic
                 const grouped = {};
-                const studentsInView = new Set();
+                let hasData = false;
 
-                // Step A: Calculate "Total Received" from Payment History for that month/year
-                payments.forEach(p => {
-                    const sub = p.course_name || "General";
-                    if (!grouped[sub]) grouped[sub] = { fees: 0, recd: 0, pend: 0 };
-                    grouped[sub].recd += parseFloat(p.amount || 0);
-                    studentsInView.add(p.student_id);
-                });
-
-                // Step B: Calculate "Total Fees" and "Pending" from Students table
                 students.forEach(s => {
-                    const sub = s.course || "General";
-                    
-                    // If filter is active, only show stats for students who paid in that month
-                    // If filter is empty, show everyone (Yearly View)
-                    if (!filterInput || studentsInView.has(s.id)) {
-                        if (!grouped[sub]) grouped[sub] = { fees: 0, recd: 0, pend: 0 };
-                        grouped[sub].fees += parseFloat(s.total_fees || 0);
-                        grouped[sub].pend += parseFloat(s.pending_amount || 0);
+                    // Apply Month/Year Filter if provided by user
+                    if (filterText) {
+                        if (!s.admission_date) return; // Skip if no admission date
+                        
+                        const adDate = new Date(s.admission_date);
+                        const monthName = adDate.toLocaleString('default', { month: 'long' }).toLowerCase();
+                        const yearName = adDate.getFullYear().toString();
+                        const formattedMonthYear = `${monthName} ${yearName}`; // e.g., "february 2026"
+                        
+                        // Check if the typed text matches the admission month/year
+                        if (!formattedMonthYear.includes(filterText)) return;
                     }
+
+                    hasData = true;
+                    // Group by Subject Name
+                    const sub = (s.course || "Unassigned").toLowerCase();
+                    
+                    if (!grouped[sub]) {
+                        grouped[sub] = { fees: 0, paid: 0, pend: 0 };
+                    }
+                    grouped[sub].fees += parseFloat(s.total_fees || 0);
+                    grouped[sub].paid += parseFloat(s.paid_amount || 0);
+                    grouped[sub].pend += parseFloat(s.pending_amount || 0);
                 });
 
-                // Render Table
+                // Render Rows
                 tbody.innerHTML = "";
-                let count = 1;
                 let grandF = 0, grandR = 0, grandP = 0;
+
+                if (!hasData) {
+                    tbody.innerHTML = `<tr><td colspan='5' style='text-align:center;'>No records found for the given selection.</td></tr>`;
+                    tfoot.innerHTML = "";
+                    return;
+                }
 
                 for (const sub in grouped) {
                     const row = grouped[sub];
                     grandF += row.fees;
-                    grandR += row.recd;
+                    grandR += row.paid;
                     grandP += row.pend;
+
+                    // Generate Dynamic Remarks
+                    let remarks = "Pending Dues";
+                    if (row.pend === 0 && row.fees > 0) remarks = "Fully Paid";
+                    else if (row.fees === 0) remarks = "-";
 
                     tbody.innerHTML += `
                         <tr>
-                            <td>${count++}.</td>
-                            <td><b>${sub.toUpperCase()}</b></td>
+                            <td class="subject-col">${sub}</td>
                             <td>₹ ${row.fees.toLocaleString('en-IN')}</td>
-                            <td class="text-recd">₹ ${row.recd.toLocaleString('en-IN')}</td>
+                            <td class="text-recd">₹ ${row.paid.toLocaleString('en-IN')}</td>
                             <td class="text-pend">₹ ${row.pend.toLocaleString('en-IN')}</td>
+                            <td><small style="color:#666; font-style:italic;">${remarks}</small></td>
                         </tr>
                     `;
                 }
 
-                // Render Footer (This will match your Dashboard figures)
-                const footerLabel = filterInput ? filterInput.toUpperCase() : "YEAR 2026";
+                // Render Grand Total Footer
                 tfoot.innerHTML = `
-                    <td colspan="2">TOTAL (${footerLabel})</td>
+                    <td>TOTAL</td>
                     <td>₹ ${grandF.toLocaleString('en-IN')}</td>
                     <td style="color:var(--aquamarine)">₹ ${grandR.toLocaleString('en-IN')}</td>
                     <td style="color:#ff6b6b">₹ ${grandP.toLocaleString('en-IN')}</td>
+                    <td></td>
                 `;
 
             } catch (err) {
