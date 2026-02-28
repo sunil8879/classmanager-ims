@@ -6980,35 +6980,32 @@ async function addBatchMasterRecord() {
 
     if (!roll || !studentName) return alert("Please Auto-Fill the student details first.");
 
-    // --- 1. PREVENT DUPLICATE ENTRY ---
-    const { data: duplicateCheck } = await db.from('list')
+    // 1. PREVENT DUPLICATE ENTRY
+    const { data: existingEntry } = await db.from('list')
         .select('id')
         .eq('roll_number', roll)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (duplicateCheck) {
+    if (existingEntry) {
         return alert(`Error: ${studentName} (${roll}) is already added to the Batch Master!`);
     }
 
-    // --- 2. STRICT BATCH CAPACITY CHECK ---
+    // 2. STRICT BATCH CAPACITY CHECK
     if (batchName && batchName !== "No Batch Assigned" && batchName !== "N/A") {
         
-        // Fetch capacity using 'ilike' to ignore uppercase/lowercase mismatches
+        // Fetch the capacity limit from Section 5 (batches table)
         const { data: batchData, error: bErr } = await db.from('batches')
             .select('students_allotted')
             .ilike('batch_name', batchName)
             .eq('institute_id', sessionInstID)
-            .limit(1)
             .maybeSingle();
 
         if (batchData) {
             const maxCapacity = parseInt(batchData.students_allotted) || 0;
             
-            // Only enforce if you actually set a limit greater than 0
             if (maxCapacity > 0) {
-                
-                // Use Supabase's exact counter to see how many are currently in the batch
+                // Count how many students are ALREADY in this batch in Section 25 (list table)
                 const { count, error: countErr } = await db.from('list')
                     .select('*', { count: 'exact', head: true })
                     .ilike('batch_name', batchName)
@@ -7016,16 +7013,15 @@ async function addBatchMasterRecord() {
                 
                 const currentCount = count || 0;
                 
-                // Block if full
+                // If it's full, STOP THE PROCESS immediately.
                 if (currentCount >= maxCapacity) {
-                    return alert(`🛑 ERROR: BATCH FULL!\n\nThe batch "${batchName}" has a maximum limit of ${maxCapacity} students.\nCurrently enrolled: ${currentCount} students.\n\nYou cannot add ${studentName} to this batch.`);
+                    return alert(`🛑 ERROR: BATCH FULL!\n\nThe batch "${batchName}" has a maximum limit of ${maxCapacity} students.\nCurrently enrolled: ${currentCount} students.\n\nYou CANNOT add ${studentName} to this batch.`);
                 }
             }
         }
     }
-    // --- END CAPACITY CHECK ---
 
-    // --- 3. SAVE THE RECORD ---
+    // 3. SAVE THE RECORD (If capacity check passes)
     const data = {
         institute_id: sessionInstID,
         date_today: document.getElementById('bm-date').value,
@@ -7071,11 +7067,11 @@ async function fetchBatchMasterRecord() {
 }
 
 // 6. LIST ALL STUDENTS (By Batch Name - Case Insensitive)
+// 6. LIST ALL STUDENTS (With Delete Button)
 async function listAllByBatch() {
     const bName = prompt("Enter Batch Name to view list of students:");
     if (!bName) return;
 
-    // Use .ilike() for Case Insensitive matching
     const { data, error } = await db.from('list')
         .select('*')
         .eq('institute_id', sessionInstID)
@@ -7093,15 +7089,26 @@ async function listAllByBatch() {
         return alert("No students found assigned to Batch matching: " + bName);
     }
 
-    // Render Table Rows
+    // Ensure the table header has the 'Action' column
+    const thead = document.querySelector('#bm-list-area thead tr');
+    if (thead && !thead.innerHTML.includes('Action')) {
+        thead.innerHTML += `<th style="padding:10px; border:1px solid #ccc; text-align:center;">Action</th>`;
+    }
+
+    // Render Table Rows with DELETE BUTTON
     tbody.innerHTML = data.map(row => `
-        <tr style="border-bottom: 1px solid #ddd;">
+        <tr style="border-bottom: 1px solid #ddd;" id="bm-row-${row.id}">
             <td style="padding:10px;"><b>${row.batch_name}</b></td>
             <td style="padding:10px;">${row.roll_number}</td>
             <td style="padding:10px;">${row.student_name}</td>
             <td style="padding:10px;">${row.teacher_id}</td>
             <td style="padding:10px;">${row.teacher_name}</td>
             <td style="padding:10px;">${row.course_name}</td>
+            <td style="padding:10px; text-align:center;">
+                <button onclick="deleteBatchMasterRecord('${row.id}', '${row.student_name}')" style="background:#ff0000; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-trash"></i> Remove
+                </button>
+            </td>
         </tr>
     `).join('');
 
@@ -7111,9 +7118,32 @@ async function listAllByBatch() {
 }
 
 
+// 7. DELETE BATCH MASTER RECORD
+async function deleteBatchMasterRecord(recordId, studentName) {
+    if (!confirm(`Are you sure you want to remove ${studentName} from this batch?`)) return;
 
+    const { error } = await db.from('list')
+        .delete()
+        .eq('id', recordId)
+        .eq('institute_id', sessionInstID);
 
-
+    if (error) {
+        alert("Error deleting record: " + error.message);
+    } else {
+        alert(`${studentName} removed from the batch successfully.`);
+        
+        // Visually remove the row from the table
+        const row = document.getElementById(`bm-row-${recordId}`);
+        if (row) row.remove();
+        
+        // Update the student count in the title
+        const title = document.getElementById('bm-list-title');
+        let currentCount = parseInt(title.innerText.match(/\d+/)[0]);
+        if (currentCount > 0) {
+            title.innerText = title.innerText.replace(currentCount, currentCount - 1);
+        }
+    }
+}
 
 
 
