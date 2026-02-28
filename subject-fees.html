@@ -211,178 +211,163 @@
     </div>
 
     <script>
-        // 1. SUPABASE INITIALIZATION
-        const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-        const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-        const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+      // 1. SUPABASE INITIALIZATION
+const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
-        let sessionInstID = ""; 
-        let portalData = new Array();
-        let currentPage = 1;
-        const rowsPerPage = 5;
+let sessionInstID = "";
+let portalData = [];
+let currentPage = 1;
+const rowsPerPage = 10; // Increased to show more months
 
-        // 2. AUTHENTICATION CHECK
-        async function authenticateUser() {
-            const authResponse = await db.auth.getUser();
-            const user = authResponse.data.user;
-            
-            if (user) {
-                const profileResponse = await db.from('profiles').select('institute_id').eq('id', user.id).single();
-                if (profileResponse.data) {
-                    sessionInstID = profileResponse.data.institute_id;
-                }
-            }
-            
-            if (!sessionInstID) {
-                document.getElementById('table-body').innerHTML = "<tr><td colspan='5' style='text-align:center; color:red;'><b>Error: Not logged in. Please log in from the main app first.</b></td></tr>";
-                document.getElementById('dynamic-subtitle').innerText = "ACCESS DENIED";
-                return false;
-            }
-            return true;
-        }
-// 3. YEARLY PARSER (Defaults to current year, e.g., 2026)
-        function parseSearchString(input) {
-            const now = new Date();
-            // If user types a 4-digit year, use it; otherwise use current year
-            const year = (input && input.trim().length === 4) ? input.trim() : now.getFullYear();
-            return {
-                start: `${year}-01-01`,
-                end: `${year}-12-31`,
-                label: `YEAR ${year} (JANUARY - DECEMBER)`
-            };
-        }
+async function authenticateUser() {
+    const { data: { user } } = await db.auth.getUser();
+    if (user) {
+        const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+        if (profile) sessionInstID = profile.institute_id;
+    }
+    if (!sessionInstID) {
+        document.getElementById('table-body').innerHTML = "<tr><td colspan='5' style='color:red;'>Log in required.</td></tr>";
+        return false;
+    }
+    return true;
+}
 
-        // 4. FETCH AND PROCESS DATA (SYNCED TO YEARLY DASHBOARD)
-        async function loadTableData(searchQuery) {
-            const dateInfo = parseSearchString(searchQuery);
-            document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
-            const tbody = document.getElementById('table-body');
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Syncing with Master Dashboard...</td></tr>";
+function parseSearchString(input) {
+    const now = new Date();
+    const year = (input && input.trim().length === 4) ? input.trim() : now.getFullYear();
+    return {
+        start: `${year}-01-01`,
+        end: `${year}-12-31`,
+        label: `CALENDAR YEAR ${year}`
+    };
+}
 
-            try {
-                // A. Get ALL Active Students (For Pending: ₹14,000)
-                const { data: students, error: stuErr } = await db.from('students')
-                    .select('course, total_fees, pending_amount')
-                    .eq('institute_id', sessionInstID)
-                    .eq('status', 'Active');
+async function loadTableData(searchQuery) {
+    const dateInfo = parseSearchString(searchQuery);
+    document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = "<tr><td colspan='5'>Processing Monthly Subject Reports...</td></tr>";
 
-                // B. Get ALL Payments for the WHOLE YEAR (For Collection: ₹58,000)
-                const { data: payments, error: payErr } = await db.from('payment_history')
-                    .select('amount, course_name')
-                    .eq('institute_id', sessionInstID)
-                    .gte('payment_date', dateInfo.start)
-                    .lte('payment_date', dateInfo.end);
+    try {
+        // 1. Fetch ALL Payments for the year (to get the 58,000)
+        // We link students to get the correct course name if it's missing in history
+        const { data: payments, error: payErr } = await db.from('payment_history')
+            .select(`
+                amount, 
+                month_year, 
+                course_name,
+                students (course)
+            `)
+            .eq('institute_id', sessionInstID)
+            .gte('payment_date', dateInfo.start)
+            .lte('payment_date', dateInfo.end);
 
-                if (stuErr || payErr) throw (stuErr || payErr);
+        // 2. Fetch ALL Active Students (to get the 14,000 pending)
+        const { data: students, error: stuErr } = await db.from('students')
+            .select('course, total_fees, pending_amount')
+            .eq('institute_id', sessionInstID)
+            .eq('status', 'Active');
 
-                const groupedMap = new Map();
+        if (payErr || stuErr) throw (payErr || stuErr);
 
-                // Initialize map with subjects from student list
-                students.forEach(s => {
-                    const sub = s.course || "General";
-                    if (!groupedMap.has(sub)) {
-                        groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
-                    }
-                    const stats = groupedMap.get(sub);
-                    stats.total += parseFloat(s.total_fees) || 0;
-                    stats.pending += parseFloat(s.pending_amount) || 0;
+        const groupedMap = new Map();
+
+        // STEP A: Group Payments by Subject + Month
+        payments.forEach(p => {
+            // Priority: Payment Record Course > Student Master Course > "Uncategorized"
+            const subName = p.course_name || (p.students ? p.students.course : "Uncategorized");
+            const month = p.month_year || "Unknown Month";
+            const key = `${subName}_${month}`;
+
+            if (!groupedMap.has(key)) {
+                groupedMap.set(key, { 
+                    course: subName, 
+                    month: month, 
+                    received: 0, 
+                    totalFees: 0, 
+                    pending: 0 
                 });
-
-                // Add received cash from payment history
-                payments.forEach(p => {
-                    const sub = p.course_name || "General";
-                    if (!groupedMap.has(sub)) {
-                        groupedMap.set(sub, { course: sub, total: 0, received: 0, pending: 0, year: dateInfo.label });
-                    }
-                    groupedMap.get(sub).received += parseFloat(p.amount) || 0;
-                });
-
-                portalData = Array.from(groupedMap.values());
-                portalData.sort((a, b) => b.received - a.received);
-                currentPage = 1;
-                renderPagination();
-
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan='5' style='text-align: center; color: red;'>Error: ${err.message}</td></tr>`;
             }
-        }
+            groupedMap.get(key).received += parseFloat(p.amount) || 0;
+        });
 
-        // 5. RENDER TABLE WITH GRAND TOTAL
-        function renderPagination() {
-            const tbody = document.getElementById('table-body');
-            const info = document.getElementById('page-info');
+        // Convert Map to Array
+        portalData = Array.from(groupedMap.values());
 
-            if (portalData.length === 0) {
-                tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>No records found for this year.</td></tr>";
-                return;
-            }
+        // Sort by Month (Newest first)
+        portalData.sort((a, b) => b.month.localeCompare(a.month));
 
-            const maxPages = Math.ceil(portalData.length / rowsPerPage);
-            const startIndex = (currentPage - 1) * rowsPerPage;
-            const rowsToDisplay = portalData.slice(startIndex, startIndex + rowsPerPage);
+        // STEP B: Store global stats in a hidden variable for the Grand Total
+        window.globalTotalFees = students.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
+        window.globalTotalPending = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+        window.globalTotalReceived = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
-            let html = "";
-            let gTotal = 0, gRecd = 0, gPend = 0;
+        currentPage = 1;
+        renderPagination();
 
-            // Generate subject rows
-            rowsToDisplay.forEach(row => {
-                html += `
-                    <tr>
-                        <td><b>${row.course}</b></td>
-                        <td>₹ ${row.total.toLocaleString('en-IN')}</td>
-                        <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
-                        <td class="money-pending">₹ ${row.pending.toLocaleString('en-IN')}</td>
-                        <td style="font-size: 0.8rem; color: #666;">${row.year}</td>
-                    </tr>
-                `;
-            });
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>${err.message}</td></tr>`;
+    }
+}
 
-            // Calculate Grand Totals for the entire year
-            portalData.forEach(d => {
-                gTotal += d.total;
-                gRecd += d.received;
-                gPend += d.pending;
-            });
+function renderPagination() {
+    const tbody = document.getElementById('table-body');
+    const info = document.getElementById('page-info');
 
-            // ADD THE GRAND TOTAL ROW (Matches Dashboard 58k / 14k)
-            html += `
-                <tr style="background: #000; color: #fff; font-weight: 900; font-size: 1.1rem;">
-                    <td style="color: #7FFFD4;">GRAND TOTAL</td>
-                    <td style="color: #fff;">₹ ${gTotal.toLocaleString('en-IN')}</td>
-                    <td style="color: #7FFFD4;">₹ ${gRecd.toLocaleString('en-IN')}</td>
-                    <td style="color: #ff6b6b;">₹ ${gPend.toLocaleString('en-IN')}</td>
-                    <td style="font-size: 0.8rem; color: #7FFFD4;">FULL YEAR</td>
-                </tr>
-            `;
+    if (portalData.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='5'>No records found.</td></tr>";
+        return;
+    }
 
-            tbody.innerHTML = html;
-            info.innerText = `Page ${currentPage} of ${maxPages}`;
-        }
+    const maxPages = Math.ceil(portalData.length / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const rowsToDisplay = portalData.slice(startIndex, startIndex + rowsPerPage);
 
+    let html = "";
+    rowsToDisplay.forEach(row => {
+        html += `
+            <tr>
+                <td><b>${row.course}</b></td>
+                <td style="color:#888;">-</td> <!-- Fees are shown in Grand Total -->
+                <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
+                <td style="color:#888;">-</td> <!-- Pending is shown in Grand Total -->
+                <td><b>${row.month.toUpperCase()}</b></td>
+            </tr>
+        `;
+    });
 
-        // 6. BUTTON HANDLERS
-        function handleGenerateClick() {
-            const searchVal = document.getElementById('search-input').value;
-            loadTableData(searchVal);
-        }
+    // FOOTER: GRAND TOTAL (Matches Dashboard 58,000 and 14,000)
+    html += `
+        <tr style="background: #000; color: #fff; font-weight: 900; font-size: 1.1rem;">
+            <td style="color: #7FFFD4;">GRAND TOTAL (2026)</td>
+            <td>₹ ${window.globalTotalFees.toLocaleString('en-IN')}</td>
+            <td style="color: #7FFFD4;">₹ ${window.globalTotalReceived.toLocaleString('en-IN')}</td>
+            <td style="color: #ff6b6b;">₹ ${window.globalTotalPending.toLocaleString('en-IN')}</td>
+            <td style="font-size:0.8rem;">TOTAL ASSET VALUE</td>
+        </tr>
+    `;
 
-        function changePage(direction) {
-            const maxPages = Math.ceil(portalData.length / rowsPerPage);
-            const newPage = currentPage + direction;
-            if (newPage >= 1 && newPage <= maxPages) {
-                currentPage = newPage;
-                renderPagination();
-            }
-        }
+    tbody.innerHTML = html;
+    info.innerText = `Page ${currentPage} of ${maxPages}`;
+}
 
-        // 7. INITIALIZE PAGE ON LOAD
-        window.onload = async () => {
-            const isAuth = await authenticateUser();
-            if (isAuth) {
-                // Pass empty string to trigger current month natively
-                loadTableData("");
-            }
-        };
+function handleGenerateClick() {
+    loadTableData(document.getElementById('search-input').value);
+}
+
+function changePage(direction) {
+    const maxPages = Math.ceil(portalData.length / rowsPerPage);
+    if (currentPage + direction >= 1 && currentPage + direction <= maxPages) {
+        currentPage += direction;
+        renderPagination();
+    }
+}
+
+window.onload = async () => {
+    if (await authenticateUser()) loadTableData("");
+};
     </script>
 
 
