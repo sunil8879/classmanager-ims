@@ -2989,6 +2989,20 @@ async function saveFeeUpdate() {
            // return alert("Error: Due Date '" + d.trim() + "' cannot be in the past.");
        //}
     //}
+
+
+
+// ADDED VALIDATION: Maximum 3 installments allowed
+    if (dueDatesVal) {
+        const dateArray = dueDatesVal.split(',').filter(d => d.trim() !== "");
+        if (dateArray.length > 3) {
+            return alert("Error: Payment Due Dates cannot exceed 3 installments.");
+        }
+    }
+
+
+
+
     
     // --- END OF NEW ADDED VALIDATIONS ---
 
@@ -7284,6 +7298,21 @@ if ('serviceWorker' in navigator) {
 async function editFeeRecordByRoll() {
     const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter and FETCH a Roll Number first.");
+
+
+
+// ADDED VALIDATION: Maximum 3 installments allowed
+    const checkDueDates = document.getElementById('fee-due-dates').value.trim();
+    if (checkDueDates) {
+        const dateArr = checkDueDates.split(',').filter(d => d.trim() !== "");
+        if (dateArr.length > 3) {
+            return alert("Error: Payment Due Dates cannot exceed 3 installments.");
+        }
+    }
+
+
+
+
 
     // Step 1: Find the internal Student ID
     const { data: detail, error: fetchErr } = await db.from('student_details')
