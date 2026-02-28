@@ -2981,14 +2981,14 @@ async function saveFeeUpdate() {
     }
 
     // 4. Due dates cannot be in the past (Validates format like "March 2026")
-    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-    const dateArray = dueDatesVal.split(',');
-    for (let d of dateArray) {
-        const parsedD = new Date(d.trim() + " 1"); // Parses "March 2026" as "March 1, 2026"
-        if (parsedD.toString() !== "Invalid Date" && parsedD.getTime() < currentMonthStart) {
-            return alert("Error: Due Date '" + d.trim() + "' cannot be in the past.");
-        }
-    }
+    //const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    //const dateArray = dueDatesVal.split(',');
+    //for (let d of dateArray) {
+        //const parsedD = new Date(d.trim() + " 1"); // Parses "March 2026" as "March 1, 2026"
+       // if (parsedD.toString() !== "Invalid Date" && parsedD.getTime() < currentMonthStart) {
+           // return alert("Error: Due Date '" + d.trim() + "' cannot be in the past.");
+       //}
+    //}
     
     // --- END OF NEW ADDED VALIDATIONS ---
 
