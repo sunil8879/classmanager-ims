@@ -3,116 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subject Wise Fees Portal - Analytics</title>
-    
-    <!-- Supabase JS & Icons -->
+    <title>Subject Wise Fees Portal</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
     <style>
-        :root {
-            --aquamarine: #7FFFD4;
-            --white: #ffffff;
-            --black: #000000;
-        }
-
-        body {
-            background-color: var(--white);
-            color: var(--black);
-            font-family: 'Poppins', sans-serif;
-            margin: 0;
-            padding: 40px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
+        :root { --aquamarine: #7FFFD4; --white: #ffffff; --black: #000000; }
+        body { background-color: var(--white); font-family: 'Poppins', sans-serif; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; }
         .header-section { text-align: center; margin-bottom: 30px; }
-        h1 { font-size: 2.2rem; font-weight: 800; text-transform: uppercase; margin: 0; letter-spacing: 2px; }
-        h2#dynamic-subtitle { font-size: 1.3rem; font-weight: 600; color: #333; margin-top: 10px; text-decoration: underline; text-decoration-color: var(--aquamarine); }
-
-        .card {
-            background: var(--white);
-            border: 3px solid var(--black);
-            border-radius: 15px;
-            padding: 25px;
-            width: 100%;
-            max-width: 1100px;
-            box-shadow: 8px 8px 0px var(--aquamarine);
-        }
-
-        .search-bar {
-            display: flex; gap: 15px; justify-content: center; margin-bottom: 30px;
-            background: #f9f9f9; padding: 15px; border-radius: 10px; border: 1px dashed #ccc;
-        }
-
-        .search-input-box {
-            padding: 10px 15px; font-size: 1rem; border: 2px solid var(--black);
-            border-radius: 8px; width: 250px; font-family: 'Poppins', sans-serif;
-        }
-
-        .btn-generate {
-            background: var(--black); color: var(--white); border: none;
-            padding: 10px 25px; font-size: 1rem; font-weight: 600;
-            border-radius: 8px; cursor: pointer; transition: 0.2s;
-        }
-
-        .btn-generate:hover { background: var(--aquamarine); color: var(--black); transform: translateY(-2px); }
-
+        h1 { font-size: 2.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+        h2 { font-size: 1.2rem; font-weight: 600; color: #333; margin-top: 10px; text-decoration: underline; text-decoration-color: var(--aquamarine); }
+        .card { background: var(--white); border: 3px solid var(--black); border-radius: 15px; padding: 25px; width: 100%; max-width: 1100px; box-shadow: 8px 8px 0px var(--aquamarine); }
+        .search-bar { display: flex; gap: 15px; justify-content: center; margin-bottom: 30px; background: #f9f9f9; padding: 15px; border-radius: 10px; border: 1px dashed #ccc; }
+        .search-input-box { padding: 10px 15px; border: 2px solid var(--black); border-radius: 8px; width: 200px; }
+        .btn-generate { background: var(--black); color: var(--white); border: none; padding: 10px 25px; font-weight: 600; border-radius: 8px; cursor: pointer; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background: var(--black); color: var(--white); padding: 12px; text-align: left; font-size: 0.9rem; text-transform: uppercase; }
-        td { padding: 12px; border-bottom: 1px solid #ddd; font-size: 1rem; }
-        tr:hover { background: #f0fffb; }
-
+        th { background: var(--black); color: var(--white); padding: 12px; text-align: left; font-size: 0.9rem; }
+        td { padding: 12px; border-bottom: 1px solid #ddd; }
         .money-received { color: #27ae60; font-weight: bold; }
         .money-pending { color: #e74c3c; font-weight: bold; }
-
-        .grand-total-row {
-            background: #000 !important;
-            color: #fff !important;
-            font-weight: 900;
-            font-size: 1.1rem;
-        }
-
-        .pagination { display: flex; justify-content: center; align-items: center; margin-top: 20px; gap: 20px; }
-        .btn-page { background: #eee; border: 2px solid var(--black); padding: 5px 15px; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        .grand-total-row { background: #000 !important; color: #fff !important; font-weight: 900; }
     </style>
 </head>
 <body>
 
     <div class="header-section">
-        <h1><i class="fas fa-chart-line"></i> Subject-Wise Annual Revenue</h1>
-        <h2 id="dynamic-subtitle">LOADING...</h2>
+        <h1><i class="fas fa-wallet"></i> Subject Revenue Portal</h1>
+        <h2 id="dynamic-subtitle">YEARLY FINANCIAL DATA</h2>
     </div>
 
     <div class="card">
         <div class="search-bar">
             <input type="text" id="search-input" class="search-input-box" placeholder="Enter Year (e.g. 2026)">
-            <button class="btn-generate" onclick="handleGenerateClick()">GENERATE REPORT</button>
+            <button class="btn-generate" onclick="loadTableData(document.getElementById('search-input').value)">GENERATE</button>
         </div>
 
         <div style="overflow-x: auto;">
-            <table id="fees-table">
+            <table>
                 <thead>
                     <tr>
                         <th>Subject Name</th>
-                        <th>Monthly Total Fee</th>
+                        <th>Month Opening Bal.</th>
                         <th>Cash Received</th>
-                        <th>Month Balance</th>
+                        <th>Month Closing Bal.</th>
                         <th>Month & Year</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    <tr><td colspan="5" style="text-align: center;">Fetching secure data from Cloudflare...</td></tr>
+                    <tr><td colspan="5" style="text-align: center;">Ready to sync...</td></tr>
                 </tbody>
             </table>
-        </div>
-
-        <div class="pagination">
-            <button class="btn-page" onclick="changePage(-1)">PREV</button>
-            <span id="page-info">Page 1</span>
-            <button class="btn-page" onclick="changePage(1)">NEXT</button>
         </div>
     </div>
 
@@ -121,165 +61,91 @@
         const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
         const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
-        let sessionInstID = ""; 
-        let portalData = [];
-        let currentPage = 1;
-        const rowsPerPage = 12;
+        let sessionInstID = "";
 
-        async function authenticateUser() {
+        async function init() {
             const { data: { user } } = await db.auth.getUser();
             if (user) {
-                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
-                if (profile) sessionInstID = profile.institute_id;
+                const { data: prof } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+                sessionInstID = prof.institute_id;
+                loadTableData("2026");
             }
-            if (!sessionInstID) {
-                document.getElementById('table-body').innerHTML = "<tr><td colspan='5' style='color:red;'>Not Logged In.</td></tr>";
-                return false;
-            }
-            return true;
         }
 
-        function parseSearchString(input) {
-            const now = new Date();
-            const year = (input && input.trim().length === 4) ? input.trim() : now.getFullYear();
-            return {
-                start: `${year}-01-01`,
-                end: `${year}-12-31`,
-                label: `JANUARY TO DECEMBER ${year}`,
-                yearNum: year
-            };
-        }
-
-        async function loadTableData(searchQuery) {
-            const dateInfo = parseSearchString(searchQuery);
-            document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
+        async function loadTableData(year) {
+            if(!year) year = "2026";
+            document.getElementById('dynamic-subtitle').innerText = `FINANCIAL YEAR ${year}`;
             const tbody = document.getElementById('table-body');
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Syncing Month-Wise Records...</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Syncing with Master Dashboard...</td></tr>";
 
             try {
-                // 1. Fetch History records AND join Students to fix "null" data
-                const { data: payments, error: payErr } = await db.from('payment_history')
-                    .select(`
-                        amount, month_year, payment_date, student_id,
-                        students (course, total_fees, pending_amount)
-                    `)
-                    .eq('institute_id', sessionInstID)
-                    .gte('payment_date', dateInfo.start)
-                    .lte('payment_date', dateInfo.end);
+                // 1. Get current snapshot of all active students
+                const { data: students } = await db.from('students').select('course, total_fees, pending_amount').eq('institute_id', sessionInstID).eq('status', 'Active');
+                
+                // 2. Get all payments for the year
+                const { data: payments } = await db.from('payment_history').select('amount, month_year, payment_date, course_name').eq('institute_id', sessionInstID).gte('payment_date', `${year}-01-01`).lte('payment_date', `${year}-12-31`);
 
-                // 2. Fetch Active Students to match Dashboard Pending (₹14,000)
-                const { data: activeStudents, error: stuErr } = await db.from('students')
-                    .select('total_fees, pending_amount')
-                    .eq('institute_id', sessionInstID)
-                    .eq('status', 'Active');
+                const subjects = [...new Set(students.map(s => s.course || "General"))];
+                let html = "";
+                let grandRecd = 0;
 
-                if (payErr || stuErr) throw (payErr || stuErr);
+                subjects.forEach(sub => {
+                    const subStudents = students.filter(s => (s.course || "General") === sub);
+                    const subPayments = payments.filter(p => (p.course_name || "General") === sub);
+                    
+                    // Sort payments by date to calculate running balance
+                    subPayments.sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date));
+                    
+                    const subTotalPendingNow = subStudents.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+                    const subTotalFees = subStudents.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
 
-                const groupedMap = new Map();
+                    // Group payments by month
+                    const monthsMap = new Map();
+                    subPayments.forEach(p => {
+                        if(!monthsMap.has(p.month_year)) monthsMap.set(p.month_year, { recd: 0, date: new Date(p.payment_date) });
+                        monthsMap.get(p.month_year).recd += parseFloat(p.amount);
+                    });
 
-                payments.forEach(p => {
-                    const s = p.students;
-                    if (!s) return;
+                    const monthEntries = Array.from(monthsMap.entries()).sort((a, b) => a[1].date - b[1].date);
 
-                    const subject = s.course || "General";
-                    const month = p.month_year || "Unknown";
-                    const key = `${subject}_${month}`;
+                    // REVERSE CALCULATION: Start from today's balance and work backwards
+                    let runningBalance = subTotalPendingNow;
+                    let rows = [];
 
-                    if (!groupedMap.has(key)) {
-                        groupedMap.set(key, { 
-                            course: subject, 
-                            month: month, 
-                            date: new Date(p.payment_date),
-                            received: 0, 
-                            total: 0, 
-                            pending: 0,
-                            processedStudents: new Set()
-                        });
+                    for (let i = monthEntries.length - 1; i >= 0; i--) {
+                        let [mName, mData] = monthEntries[i];
+                        let cashRecd = mData.recd;
+                        let closingBal = runningBalance;
+                        let openingBal = closingBal + cashRecd;
+
+                        rows.unshift({ sub, openingBal, cashRecd, closingBal, mName });
+                        runningBalance = openingBal; // Move back in time
+                        grandRecd += cashRecd;
                     }
 
-                    const item = groupedMap.get(key);
-                    item.received += parseFloat(p.amount) || 0;
-
-                    // Only add a student's profile fee context once per month-subject row to prevent inflation
-                    if (!item.processedStudents.has(p.student_id)) {
-                        item.total += parseFloat(s.total_fees) || 0;
-                        item.pending += parseFloat(s.pending_amount) || 0;
-                        item.processedStudents.add(p.student_id);
-                    }
+                    rows.forEach(r => {
+                        html += `<tr><td><b>${r.sub}</b></td><td>₹ ${r.openingBal.toLocaleString()}</td><td class="money-received">₹ ${r.cashRecd.toLocaleString()}</td><td class="money-pending">₹ ${r.closingBal.toLocaleString()}</td><td>${r.mName}</td></tr>`;
+                    });
                 });
 
-                portalData = Array.from(groupedMap.values());
-                // Sort by Date (Jan -> Dec)
-                portalData.sort((a, b) => a.date - b.date);
+                // GRAND TOTALS
+                const totalFees = students.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
+                const totalPend = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
 
-                // Define Grand Totals
-                window.grandCollection = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-                window.grandPending = activeStudents.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
-                window.grandFees = activeStudents.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
+                html += `<tr class="grand-total-row">
+                    <td>GRAND TOTAL (${year})</td>
+                    <td>₹ ${totalFees.toLocaleString()}</td>
+                    <td style="color:var(--aquamarine)">₹ ${grandRecd.toLocaleString()}</td>
+                    <td style="color:#ff6b6b">₹ ${totalPend.toLocaleString()}</td>
+                    <td>YEAR SUMMARY</td>
+                </tr>`;
 
-                renderPagination(dateInfo.yearNum);
+                tbody.innerHTML = html;
 
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>Error: ${err.message}</td></tr>`;
-            }
+            } catch (err) { tbody.innerHTML = `Error: ${err.message}`; }
         }
 
-        function renderPagination(year) {
-            const tbody = document.getElementById('table-body');
-            const info = document.getElementById('page-info');
-            const startIndex = (currentPage - 1) * rowsPerPage;
-            const rowsToDisplay = portalData.slice(startIndex, startIndex + rowsPerPage);
-
-            if (portalData.length === 0) {
-                tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>No payments found for this year.</td></tr>";
-                return;
-            }
-
-            let html = "";
-            rowsToDisplay.forEach(row => {
-                html += `
-                    <tr>
-                        <td><b>${row.course}</b></td>
-                        <td>₹ ${row.total.toLocaleString('en-IN')}</td>
-                        <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
-                        <td class="money-pending">₹ ${row.pending.toLocaleString('en-IN')}</td>
-                        <td><b>${row.month.toUpperCase()}</b></td>
-                    </tr>
-                `;
-            });
-
-            // ADD THE FOOTER TOTAL (MATCHED TO DASHBOARD)
-            html += `
-                <tr class="grand-total-row">
-                    <td style="color: var(--aquamarine);">GRAND TOTAL (${year})</td>
-                    <td>₹ ${window.grandFees.toLocaleString('en-IN')}</td>
-                    <td style="color: var(--aquamarine);">₹ ${window.grandCollection.toLocaleString('en-IN')}</td>
-                    <td style="color: #ff6b6b;">₹ ${window.grandPending.toLocaleString('en-IN')}</td>
-                    <td style="font-size: 0.8rem; letter-spacing: 1px;">SYNCED WITH DASHBOARD</td>
-                </tr>
-            `;
-
-            tbody.innerHTML = html;
-            const maxPages = Math.ceil(portalData.length / rowsPerPage) || 1;
-            info.innerText = `Page ${currentPage} of ${maxPages}`;
-        }
-
-        function handleGenerateClick() {
-            currentPage = 1;
-            loadTableData(document.getElementById('search-input').value);
-        }
-
-        function changePage(dir) {
-            const max = Math.ceil(portalData.length / rowsPerPage);
-            if (currentPage + dir >= 1 && currentPage + dir <= max) {
-                currentPage += dir;
-                renderPagination();
-            }
-        }
-
-        window.onload = async () => {
-            if (await authenticateUser()) loadTableData("");
-        };
+        init();
     </script>
 </body>
 </html>
