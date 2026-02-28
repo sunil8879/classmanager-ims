@@ -4,148 +4,248 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subject Wise Fees Portal</title>
+    
+    <!-- Supabase JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Fonts and Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <style>
-        :root { --aquamarine: #7FFFD4; --white: #ffffff; --black: #000000; }
-        body { background-color: var(--white); font-family: 'Poppins', sans-serif; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; }
-        .header-section { text-align: center; margin-bottom: 30px; }
-        h1 { font-size: 2.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
-        h2 { font-size: 1.2rem; font-weight: 600; color: #333; margin-top: 10px; text-decoration: underline; text-decoration-color: var(--aquamarine); }
-        .card { background: var(--white); border: 3px solid var(--black); border-radius: 15px; padding: 25px; width: 100%; max-width: 1100px; box-shadow: 8px 8px 0px var(--aquamarine); }
-        .search-bar { display: flex; gap: 15px; justify-content: center; margin-bottom: 30px; background: #f9f9f9; padding: 15px; border-radius: 10px; border: 1px dashed #ccc; }
-        .search-input-box { padding: 10px 15px; border: 2px solid var(--black); border-radius: 8px; width: 200px; }
-        .btn-generate { background: var(--black); color: var(--white); border: none; padding: 10px 25px; font-weight: 600; border-radius: 8px; cursor: pointer; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background: var(--black); color: var(--white); padding: 12px; text-align: left; font-size: 0.9rem; }
-        td { padding: 12px; border-bottom: 1px solid #ddd; }
-        .money-received { color: #27ae60; font-weight: bold; }
-        .money-pending { color: #e74c3c; font-weight: bold; }
-        .grand-total-row { background: #000 !important; color: #fff !important; font-weight: 900; }
+        :root {
+            --aquamarine: #7FFFD4;
+            --white: #ffffff;
+            --black: #000000;
+        }
+
+        body {
+            background-color: var(--white);
+            color: var(--black);
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { font-size: 2.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+
+        .search-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 40px;
+            background: #f4f4f4;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid var(--black);
+            box-shadow: 5px 5px 0px var(--aquamarine);
+        }
+
+        input {
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: 2px solid var(--black);
+            border-radius: 8px;
+            width: 300px;
+            font-family: inherit;
+        }
+
+        .btn-generate {
+            background: var(--black);
+            color: var(--white);
+            border: none;
+            padding: 12px 30px;
+            font-weight: 800;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        .btn-generate:hover {
+            background: var(--aquamarine);
+            color: var(--black);
+        }
+
+        .table-container {
+            width: 100%;
+            max-width: 1100px;
+            background: white;
+            border: 3px solid var(--black);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 10px 10px 0px var(--aquamarine);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--black);
+            color: var(--white);
+            padding: 18px;
+            text-align: left;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        td {
+            padding: 15px 18px;
+            border-bottom: 1px solid #eee;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        tr:nth-child(even) { background: #fafafa; }
+
+        /* Footer Row Styling */
+        .total-row {
+            background: var(--black) !important;
+            color: var(--white);
+            font-weight: 900;
+            font-size: 1.1rem;
+        }
+
+        .total-row td { border: none; padding: 20px 18px; }
+        .text-recd { color: #27ae60; font-weight: 700; }
+        .text-pend { color: #e74c3c; font-weight: 700; }
     </style>
 </head>
 <body>
 
-    <div class="header-section">
-        <h1><i class="fas fa-wallet"></i> Subject Revenue Portal</h1>
-        <h2 id="dynamic-subtitle">YEARLY FINANCIAL DATA</h2>
+    <header>
+        <h1><i class="fas fa-file-invoice-dollar"></i> Subject Wise Fees Portal</h1>
+    </header>
+
+    <div class="search-container">
+        <input type="text" id="month-input" placeholder="e.g. February 2026">
+        <button class="btn-generate" onclick="loadPortalData()">Generate</button>
     </div>
 
-    <div class="card">
-        <div class="search-bar">
-            <input type="text" id="search-input" class="search-input-box" placeholder="Enter Year (e.g. 2026)">
-            <button class="btn-generate" onclick="loadTableData(document.getElementById('search-input').value)">GENERATE</button>
-        </div>
-
-        <div style="overflow-x: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Subject Name</th>
-                        <th>Month Opening Bal.</th>
-                        <th>Cash Received</th>
-                        <th>Month Closing Bal.</th>
-                        <th>Month & Year</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body">
-                    <tr><td colspan="5" style="text-align: center;">Ready to sync...</td></tr>
-                </tbody>
-            </table>
-        </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Subject Name</th>
+                    <th>Total Fees</th>
+                    <th>Total Received</th>
+                    <th>Total Pending</th>
+                </tr>
+            </thead>
+            <tbody id="portal-body">
+                <!-- Data injected here -->
+            </tbody>
+            <tfoot>
+                <tr class="total-row" id="portal-footer">
+                    <!-- Totals injected here -->
+                </tr>
+            </tfoot>
+        </table>
     </div>
 
     <script>
+        // --- 1. CONFIGURATION ---
         const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
         const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
         const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
         let sessionInstID = "";
 
-        async function init() {
+        // --- 2. AUTHENTICATION ---
+        async function checkAuth() {
             const { data: { user } } = await db.auth.getUser();
             if (user) {
-                const { data: prof } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
-                sessionInstID = prof.institute_id;
-                loadTableData("2026");
+                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+                if (profile) {
+                    sessionInstID = profile.institute_id;
+                    loadPortalData(); // Initial load
+                }
+            } else {
+                alert("Please log in to access this portal.");
             }
         }
 
-        async function loadTableData(year) {
-            if(!year) year = "2026";
-            document.getElementById('dynamic-subtitle').innerText = `FINANCIAL YEAR ${year}`;
-            const tbody = document.getElementById('table-body');
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Syncing with Master Dashboard...</td></tr>";
+        // --- 3. DATA ENGINE ---
+        async function loadPortalData() {
+            const filterText = document.getElementById('month-input').value.trim().toLowerCase();
+            const tbody = document.getElementById('portal-body');
+            const tfoot = document.getElementById('portal-footer');
+
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Calculating Fees...</td></tr>";
 
             try {
-                // 1. Get current snapshot of all active students
-                const { data: students } = await db.from('students').select('course, total_fees, pending_amount').eq('institute_id', sessionInstID).eq('status', 'Active');
-                
-                // 2. Get all payments for the year
-                const { data: payments } = await db.from('payment_history').select('amount, month_year, payment_date, course_name').eq('institute_id', sessionInstID).gte('payment_date', `${year}-01-01`).lte('payment_date', `${year}-12-31`);
+                // Fetch ALL active students belonging to this institute
+                const { data: students, error } = await db.from('students')
+                    .select('course, total_fees, paid_amount, pending_amount, admission_date')
+                    .eq('institute_id', sessionInstID)
+                    .eq('status', 'Active');
 
-                const subjects = [...new Set(students.map(s => s.course || "General"))];
-                let html = "";
-                let grandRecd = 0;
+                if (error) throw error;
 
-                subjects.forEach(sub => {
-                    const subStudents = students.filter(s => (s.course || "General") === sub);
-                    const subPayments = payments.filter(p => (p.course_name || "General") === sub);
-                    
-                    // Sort payments by date to calculate running balance
-                    subPayments.sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date));
-                    
-                    const subTotalPendingNow = subStudents.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
-                    const subTotalFees = subStudents.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
+                // Grouping Logic
+                const grouped = {};
+                let filteredYear = "2026"; // Default for footer
 
-                    // Group payments by month
-                    const monthsMap = new Map();
-                    subPayments.forEach(p => {
-                        if(!monthsMap.has(p.month_year)) monthsMap.set(p.month_year, { recd: 0, date: new Date(p.payment_date) });
-                        monthsMap.get(p.month_year).recd += parseFloat(p.amount);
-                    });
-
-                    const monthEntries = Array.from(monthsMap.entries()).sort((a, b) => a[1].date - b[1].date);
-
-                    // REVERSE CALCULATION: Start from today's balance and work backwards
-                    let runningBalance = subTotalPendingNow;
-                    let rows = [];
-
-                    for (let i = monthEntries.length - 1; i >= 0; i--) {
-                        let [mName, mData] = monthEntries[i];
-                        let cashRecd = mData.recd;
-                        let closingBal = runningBalance;
-                        let openingBal = closingBal + cashRecd;
-
-                        rows.unshift({ sub, openingBal, cashRecd, closingBal, mName });
-                        runningBalance = openingBal; // Move back in time
-                        grandRecd += cashRecd;
+                students.forEach(s => {
+                    // Apply Month Filter if provided
+                    if (filterText) {
+                        const adDate = new Date(s.admission_date);
+                        const monthName = adDate.toLocaleString('default', { month: 'long' }).toLowerCase();
+                        const yearName = adDate.getFullYear().toString();
+                        if (!filterText.includes(monthName) && !filterText.includes(yearName)) return;
+                        filteredYear = yearName;
                     }
 
-                    rows.forEach(r => {
-                        html += `<tr><td><b>${r.sub}</b></td><td>₹ ${r.openingBal.toLocaleString()}</td><td class="money-received">₹ ${r.cashRecd.toLocaleString()}</td><td class="money-pending">₹ ${r.closingBal.toLocaleString()}</td><td>${r.mName}</td></tr>`;
-                    });
+                    const sub = s.course || "General";
+                    if (!grouped[sub]) {
+                        grouped[sub] = { fees: 0, recd: 0, pend: 0 };
+                    }
+                    grouped[sub].fees += parseFloat(s.total_fees || 0);
+                    grouped[sub].recd += parseFloat(s.paid_amount || 0);
+                    grouped[sub].pend += parseFloat(s.pending_amount || 0);
                 });
 
-                // GRAND TOTALS
-                const totalFees = students.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
-                const totalPend = students.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+                // Render Rows
+                tbody.innerHTML = "";
+                let count = 1;
+                let grandF = 0, grandR = 0, grandP = 0;
 
-                html += `<tr class="grand-total-row">
-                    <td>GRAND TOTAL (${year})</td>
-                    <td>₹ ${totalFees.toLocaleString()}</td>
-                    <td style="color:var(--aquamarine)">₹ ${grandRecd.toLocaleString()}</td>
-                    <td style="color:#ff6b6b">₹ ${totalPend.toLocaleString()}</td>
-                    <td>YEAR SUMMARY</td>
-                </tr>`;
+                for (const sub in grouped) {
+                    const row = grouped[sub];
+                    grandF += row.fees;
+                    grandR += row.recd;
+                    grandP += row.pend;
 
-                tbody.innerHTML = html;
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${count++}.</td>
+                            <td><b>${sub.toUpperCase()}</b></td>
+                            <td>₹ ${row.fees.toLocaleString('en-IN')}</td>
+                            <td class="text-recd">₹ ${row.recd.toLocaleString('en-IN')}</td>
+                            <td class="text-pend">₹ ${row.pend.toLocaleString('en-IN')}</td>
+                        </tr>
+                    `;
+                }
 
-            } catch (err) { tbody.innerHTML = `Error: ${err.message}`; }
+                // Render Grand Total Footer
+                tfoot.innerHTML = `
+                    <td colspan="2">TOTAL (${filteredYear})</td>
+                    <td>₹ ${grandF.toLocaleString('en-IN')}</td>
+                    <td style="color:var(--aquamarine)">₹ ${grandR.toLocaleString('en-IN')}</td>
+                    <td style="color:#ff6b6b">₹ ${grandP.toLocaleString('en-IN')}</td>
+                `;
+
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>Error: ${err.message}</td></tr>`;
+            }
         }
 
-        init();
+        window.onload = checkAuth;
     </script>
 </body>
 </html>
