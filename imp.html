@@ -6972,15 +6972,16 @@ async function autopopulateBatchMaster() {
 }
 
 // 4. ADD RECORD to "list" table
-// 4. ADD RECORD to "list" table (BULLETPROOF CAPACITY CHECK)
+// 4. ADD RECORD to "list" table (BUG-FREE CAPACITY CHECK)
 async function addBatchMasterRecord() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
     const batchName = document.getElementById('bm-bname').value.trim();
     const studentName = document.getElementById('bm-sname').value;
+    const teacherId = document.getElementById('bm-tid').value; // Added Teacher ID for exact matching
 
     if (!roll || !studentName) return alert("Please Auto-Fill the student details first.");
 
-    // 1. PREVENT DUPLICATE ENTRY
+    // --- 1. PREVENT DUPLICATE ENTRY ---
     const { data: existingEntry } = await db.from('list')
         .select('id')
         .eq('roll_number', roll)
@@ -6991,44 +6992,50 @@ async function addBatchMasterRecord() {
         return alert(`Error: ${studentName} (${roll}) is already added to the Batch Master!`);
     }
 
-    // 2. STRICT BATCH CAPACITY CHECK
+    // --- 2. STRICT BATCH CAPACITY CHECK ---
     if (batchName && batchName !== "No Batch Assigned" && batchName !== "N/A") {
         
-        // Fetch the capacity limit from Section 5 (batches table)
+        // Step A: Fetch the capacity limit from Section 5 (matches Teacher AND Batch Name exactly)
         const { data: batchData, error: bErr } = await db.from('batches')
             .select('students_allotted')
-            .ilike('batch_name', batchName)
+            .eq('teacher_id', teacherId)
+            .eq('batch_name', batchName)
             .eq('institute_id', sessionInstID)
             .maybeSingle();
 
         if (batchData) {
             const maxCapacity = parseInt(batchData.students_allotted) || 0;
             
+            // Only enforce if you set a limit greater than 0
             if (maxCapacity > 0) {
-                // Count how many students are ALREADY in this batch in Section 25 (list table)
-                const { count, error: countErr } = await db.from('list')
-                    .select('*', { count: 'exact', head: true })
-                    .ilike('batch_name', batchName)
+                
+                // Step B: Manually fetch and count students (Bypasses Supabase count bug)
+                const { data: currentStudents, error: countErr } = await db.from('list')
+                    .select('id')
+                    .eq('batch_name', batchName)
                     .eq('institute_id', sessionInstID);
                 
-                const currentCount = count || 0;
+                const currentCount = currentStudents ? currentStudents.length : 0;
                 
-                // If it's full, STOP THE PROCESS immediately.
+                // Step C: Block if full
                 if (currentCount >= maxCapacity) {
                     return alert(`🛑 ERROR: BATCH FULL!\n\nThe batch "${batchName}" has a maximum limit of ${maxCapacity} students.\nCurrently enrolled: ${currentCount} students.\n\nYou CANNOT add ${studentName} to this batch.`);
                 }
             }
+        } else {
+            console.log("System note: Could not find a specific capacity limit for this batch.");
         }
     }
+    // --- END CAPACITY CHECK ---
 
-    // 3. SAVE THE RECORD (If capacity check passes)
+    // --- 3. SAVE THE RECORD ---
     const data = {
         institute_id: sessionInstID,
         date_today: document.getElementById('bm-date').value,
         roll_number: roll,
         student_name: studentName,
         course_name: document.getElementById('bm-course').value,
-        teacher_id: document.getElementById('bm-tid').value,
+        teacher_id: teacherId,
         teacher_name: document.getElementById('bm-tname').value,
         batch_name: batchName,
         remarks: document.getElementById('bm-remarks').value
@@ -7043,6 +7050,7 @@ async function addBatchMasterRecord() {
         clearBatchMaster();
     }
 }
+
 
 // 5. FETCH RECORD (By Roll Number)
 async function fetchBatchMasterRecord() {
