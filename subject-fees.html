@@ -285,7 +285,7 @@ return {
 };
         }
 
- // 4. FETCH AND PROCESS DATA (FIXED: Pulls missing labels from Students table)
+// 4. FETCH AND PROCESS DATA (MATCHED TO MASTER DASHBOARD)
         async function loadTableData(searchQuery) {
             const dateInfo = parseSearchString(searchQuery);
             if (!dateInfo) {
@@ -297,10 +297,11 @@ return {
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Loading records...</td></tr>";
 
-            // We fetch the amount, and "join" with the students table to get the course name
+            // 1. Fetch payments for the SELECTED MONTH
             const { data, error } = await db.from('payment_history')
                 .select(`
                     amount,
+                    student_id,
                     students (
                         course,
                         total_fees,
@@ -316,12 +317,15 @@ return {
             }
 
             const groupedMap = new Map();
+            const studentTracker = new Set(); // Prevents double-counting Total/Pending fees
 
             data.forEach(item => {
-                // Get course info from the linked student record
-                const s = item.students; 
-                const courseName = (s && s.course) ? s.course : "General / Unassigned";
-                
+                const s = item.students;
+                if (!s) return;
+
+                const courseName = s.course || "General / Unassigned";
+                const studentId = item.student_id;
+
                 if (!groupedMap.has(courseName)) {
                     groupedMap.set(courseName, { 
                         course: courseName, 
@@ -333,12 +337,17 @@ return {
                 }
                 
                 const stats = groupedMap.get(courseName);
+                
+                // A. ALWAYS sum the cash received in this month
                 stats.received += parseFloat(item.amount) || 0;
                 
-                // Pull the most accurate Total/Pending from the linked student
-                if (s) {
-                    stats.total = Math.max(stats.total, parseFloat(s.total_fees) || 0);
-                    stats.pending = Math.max(stats.pending, parseFloat(s.pending_amount) || 0);
+                // B. ONLY sum Total/Pending once per student to avoid inflation
+                // (Even if student paid 3 times this month, we only add their course fee once)
+                const uniqueKey = `${courseName}-${studentId}`;
+                if (!studentTracker.has(uniqueKey)) {
+                    stats.total += parseFloat(s.total_fees) || 0;
+                    stats.pending += parseFloat(s.pending_amount) || 0;
+                    studentTracker.add(uniqueKey);
                 }
             });
 
@@ -347,8 +356,6 @@ return {
             currentPage = 1;
             renderPagination();
         }
-
-
 
         // 5. RENDER TABLE
         function renderPagination() {
