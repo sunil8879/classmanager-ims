@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subject Wise Fees Portal</title>
+    <title>Subject Wise Fees Portal - Analytics</title>
     
     <!-- Supabase JS & Icons -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -15,7 +15,6 @@
             --aquamarine: #7FFFD4;
             --white: #ffffff;
             --black: #000000;
-            --shadow: rgba(0,0,0,0.15);
         }
 
         body {
@@ -29,375 +28,258 @@
             align-items: center;
         }
 
-        .header-section {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        h1 {
-            font-size: 2.5rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            margin: 0;
-            letter-spacing: 2px;
-            text-shadow: 2px 2px 0px var(--aquamarine);
-        }
-
-        h2#dynamic-subtitle {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #333;
-            margin-top: 10px;
-            text-decoration: underline;
-            text-decoration-color: var(--aquamarine);
-            text-decoration-thickness: 4px;
-        }
+        .header-section { text-align: center; margin-bottom: 30px; }
+        h1 { font-size: 2.2rem; font-weight: 800; text-transform: uppercase; margin: 0; letter-spacing: 2px; }
+        h2#dynamic-subtitle { font-size: 1.3rem; font-weight: 600; color: #333; margin-top: 10px; text-decoration: underline; text-decoration-color: var(--aquamarine); }
 
         .card {
             background: var(--white);
             border: 3px solid var(--black);
             border-radius: 15px;
-            padding: 30px;
+            padding: 25px;
             width: 100%;
-            max-width: 1000px;
-            box-shadow: 8px 8px 0px var(--aquamarine), 15px 15px 30px var(--shadow);
+            max-width: 1100px;
+            box-shadow: 8px 8px 0px var(--aquamarine);
         }
 
         .search-bar {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-bottom: 30px;
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px dashed #ccc;
+            display: flex; gap: 15px; justify-content: center; margin-bottom: 30px;
+            background: #f9f9f9; padding: 15px; border-radius: 10px; border: 1px dashed #ccc;
         }
 
         .search-input-box {
-            padding: 12px 20px;
-            font-size: 1rem;
-            border: 2px solid var(--black);
-            border-radius: 8px;
-            width: 300px;
-            font-family: 'Poppins', sans-serif;
-            outline: none;
-        }
-
-        .search-input-box:focus {
-            border-color: var(--aquamarine);
-            box-shadow: 0 0 10px var(--aquamarine);
+            padding: 10px 15px; font-size: 1rem; border: 2px solid var(--black);
+            border-radius: 8px; width: 250px; font-family: 'Poppins', sans-serif;
         }
 
         .btn-generate {
-            background: var(--black);
-            color: var(--white);
-            border: none;
-            padding: 12px 25px;
-            font-size: 1rem;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            font-family: 'Poppins', sans-serif;
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            background: var(--black); color: var(--white); border: none;
+            padding: 10px 25px; font-size: 1rem; font-weight: 600;
+            border-radius: 8px; cursor: pointer; transition: 0.2s;
         }
 
-        .btn-generate:hover {
-            background: var(--aquamarine);
-            color: var(--black);
-            box-shadow: 0 4px 0px var(--black);
-            transform: translateY(-2px);
-        }
+        .btn-generate:hover { background: var(--aquamarine); color: var(--black); transform: translateY(-2px); }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        th {
-            background: var(--black);
-            color: var(--white);
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        td {
-            padding: 15px;
-            border-bottom: 1px solid #ddd;
-            font-size: 1.05rem;
-        }
-
-        tr:hover {
-            background: #f0fffb;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: var(--black); color: var(--white); padding: 12px; text-align: left; font-size: 0.9rem; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #ddd; font-size: 1rem; }
+        tr:hover { background: #f0fffb; }
 
         .money-received { color: #27ae60; font-weight: bold; }
         .money-pending { color: #e74c3c; font-weight: bold; }
 
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 25px;
-            gap: 20px;
-        }
-
-        .btn-page {
-            background: #eee;
-            border: 2px solid var(--black);
-            padding: 8px 20px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: 0.2s;
-        }
-
-        .btn-page:hover {
-            background: var(--aquamarine);
-        }
-
-        #page-info {
-            font-weight: bold;
+        .grand-total-row {
+            background: #000 !important;
+            color: #fff !important;
+            font-weight: 900;
             font-size: 1.1rem;
         }
+
+        .pagination { display: flex; justify-content: center; align-items: center; margin-top: 20px; gap: 20px; }
+        .btn-page { background: #eee; border: 2px solid var(--black); padding: 5px 15px; cursor: pointer; border-radius: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="header-section">
-        <h1><i class="fas fa-book-open"></i> Subject Wise Fees Portal</h1>
+        <h1><i class="fas fa-chart-line"></i> Subject-Wise Annual Revenue</h1>
         <h2 id="dynamic-subtitle">LOADING...</h2>
     </div>
 
     <div class="card">
         <div class="search-bar">
-            <input type="text" id="search-input" class="search-input-box" placeholder="Type month & year (e.g. March 2026)">
-            <button class="btn-generate" onclick="handleGenerateClick()">
-                <i class="fas fa-bolt"></i> GENERATE
-            </button>
-<input type="date" id="admission_date" name="admission_date" required>
+            <input type="text" id="search-input" class="search-input-box" placeholder="Enter Year (e.g. 2026)">
+            <button class="btn-generate" onclick="handleGenerateClick()">GENERATE REPORT</button>
         </div>
 
-
-
         <div style="overflow-x: auto;">
-            <table>
+            <table id="fees-table">
                 <thead>
                     <tr>
                         <th>Subject Name</th>
-                        <th>Total Fees</th>
-                        <th>Total Received</th>
-                        <th>Total Pending</th>
+                        <th>Monthly Total Fee</th>
+                        <th>Cash Received</th>
+                        <th>Month Balance</th>
                         <th>Month & Year</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    <tr><td colspan="5" style="text-align: center;">Fetching secure data...</td></tr>
+                    <tr><td colspan="5" style="text-align: center;">Fetching secure data from Cloudflare...</td></tr>
                 </tbody>
             </table>
         </div>
 
         <div class="pagination">
-            <button class="btn-page" onclick="changePage(-1)"><i class="fas fa-chevron-left"></i> PREV</button>
+            <button class="btn-page" onclick="changePage(-1)">PREV</button>
             <span id="page-info">Page 1</span>
-            <button class="btn-page" onclick="changePage(1)">NEXT <i class="fas fa-chevron-right"></i></button>
+            <button class="btn-page" onclick="changePage(1)">NEXT</button>
         </div>
     </div>
 
     <script>
-      // 1. SUPABASE INITIALIZATION
-const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+        const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+        const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+        const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
-let sessionInstID = "";
-let portalData = [];
-let currentPage = 1;
-const rowsPerPage = 10; // Increased to show more months
+        let sessionInstID = ""; 
+        let portalData = [];
+        let currentPage = 1;
+        const rowsPerPage = 12;
 
-async function authenticateUser() {
-    const { data: { user } } = await db.auth.getUser();
-    if (user) {
-        const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
-        if (profile) sessionInstID = profile.institute_id;
-    }
-    if (!sessionInstID) {
-        document.getElementById('table-body').innerHTML = "<tr><td colspan='5' style='color:red;'>Log in required.</td></tr>";
-        return false;
-    }
-    return true;
-}
+        async function authenticateUser() {
+            const { data: { user } } = await db.auth.getUser();
+            if (user) {
+                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+                if (profile) sessionInstID = profile.institute_id;
+            }
+            if (!sessionInstID) {
+                document.getElementById('table-body').innerHTML = "<tr><td colspan='5' style='color:red;'>Not Logged In.</td></tr>";
+                return false;
+            }
+            return true;
+        }
 
-function parseSearchString(input) {
-    const now = new Date();
-    const year = (input && input.trim().length === 4) ? input.trim() : now.getFullYear();
-    return {
-        start: `${year}-01-01`,
-        end: `${year}-12-31`,
-        label: `CALENDAR YEAR ${year}`
-    };
-}
+        function parseSearchString(input) {
+            const now = new Date();
+            const year = (input && input.trim().length === 4) ? input.trim() : now.getFullYear();
+            return {
+                start: `${year}-01-01`,
+                end: `${year}-12-31`,
+                label: `JANUARY TO DECEMBER ${year}`,
+                yearNum: year
+            };
+        }
 
-async function loadTableData(searchQuery) {
-    const dateInfo = parseSearchString(searchQuery);
-    document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
-    const tbody = document.getElementById('table-body');
-    tbody.innerHTML = "<tr><td colspan='5'>Syncing Historical Data...</td></tr>";
+        async function loadTableData(searchQuery) {
+            const dateInfo = parseSearchString(searchQuery);
+            document.getElementById('dynamic-subtitle').innerText = dateInfo.label;
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align: center;'>Syncing Month-Wise Records...</td></tr>";
 
-    try {
-        // 1. Fetch Payments AND Join with Students table to get names/fees
-        const { data: payments, error: payErr } = await db.from('payment_history')
-            .select(`
-                amount, month_year, payment_date,
-                students (course, total_fees, pending_amount)
-            `)
-            .eq('institute_id', sessionInstID)
-            .gte('payment_date', dateInfo.start)
-            .lte('payment_date', dateInfo.end);
+            try {
+                // 1. Fetch History records AND join Students to fix "null" data
+                const { data: payments, error: payErr } = await db.from('payment_history')
+                    .select(`
+                        amount, month_year, payment_date, student_id,
+                        students (course, total_fees, pending_amount)
+                    `)
+                    .eq('institute_id', sessionInstID)
+                    .gte('payment_date', dateInfo.start)
+                    .lte('payment_date', dateInfo.end);
 
-        // 2. Fetch Global Totals for the Dashboard sync
-        const { data: allStudents } = await db.from('students')
-            .select('total_fees, pending_amount').eq('institute_id', sessionInstID).eq('status', 'Active');
+                // 2. Fetch Active Students to match Dashboard Pending (₹14,000)
+                const { data: activeStudents, error: stuErr } = await db.from('students')
+                    .select('total_fees, pending_amount')
+                    .eq('institute_id', sessionInstID)
+                    .eq('status', 'Active');
 
-        if (payErr) throw payErr;
+                if (payErr || stuErr) throw (payErr || stuErr);
 
-        const groupedMap = new Map();
+                const groupedMap = new Map();
 
-        payments.forEach(p => {
-            const s = p.students;
-            if (!s) return; // Skip if student record was deleted
+                payments.forEach(p => {
+                    const s = p.students;
+                    if (!s) return;
 
-            const courseName = s.course || "General";
-            const month = p.month_year || "Unknown";
-            const key = `${courseName}_${month}`;
+                    const subject = s.course || "General";
+                    const month = p.month_year || "Unknown";
+                    const key = `${subject}_${month}`;
 
-            if (!groupedMap.has(key)) {
-                groupedMap.set(key, { 
-                    course: courseName, 
-                    month: month, 
-                    date: new Date(p.payment_date),
-                    received: 0, 
-                    total: 0, 
-                    pending: 0,
-                    uStudents: new Set() // To avoid double-counting fees in the same month
+                    if (!groupedMap.has(key)) {
+                        groupedMap.set(key, { 
+                            course: subject, 
+                            month: month, 
+                            date: new Date(p.payment_date),
+                            received: 0, 
+                            total: 0, 
+                            pending: 0,
+                            processedStudents: new Set()
+                        });
+                    }
+
+                    const item = groupedMap.get(key);
+                    item.received += parseFloat(p.amount) || 0;
+
+                    // Only add a student's profile fee context once per month-subject row to prevent inflation
+                    if (!item.processedStudents.has(p.student_id)) {
+                        item.total += parseFloat(s.total_fees) || 0;
+                        item.pending += parseFloat(s.pending_amount) || 0;
+                        item.processedStudents.add(p.student_id);
+                    }
                 });
+
+                portalData = Array.from(groupedMap.values());
+                // Sort by Date (Jan -> Dec)
+                portalData.sort((a, b) => a.date - b.date);
+
+                // Define Grand Totals
+                window.grandCollection = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                window.grandPending = activeStudents.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0);
+                window.grandFees = activeStudents.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0);
+
+                renderPagination(dateInfo.yearNum);
+
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderPagination(year) {
+            const tbody = document.getElementById('table-body');
+            const info = document.getElementById('page-info');
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const rowsToDisplay = portalData.slice(startIndex, startIndex + rowsPerPage);
+
+            if (portalData.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>No payments found for this year.</td></tr>";
+                return;
             }
 
-            const item = groupedMap.get(key);
-            item.received += parseFloat(p.amount) || 0;
+            let html = "";
+            rowsToDisplay.forEach(row => {
+                html += `
+                    <tr>
+                        <td><b>${row.course}</b></td>
+                        <td>₹ ${row.total.toLocaleString('en-IN')}</td>
+                        <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
+                        <td class="money-pending">₹ ${row.pending.toLocaleString('en-IN')}</td>
+                        <td><b>${row.month.toUpperCase()}</b></td>
+                    </tr>
+                `;
+            });
 
-            // Logic: Only add a student's Total/Pending once per row (Subject-Month)
-            const studentId = p.student_id; 
-            if (!item.uStudents.has(studentId)) {
-                item.total += parseFloat(s.total_fees) || 0;
-                item.pending += parseFloat(s.pending_amount) || 0;
-                item.uStudents.add(studentId);
+            // ADD THE FOOTER TOTAL (MATCHED TO DASHBOARD)
+            html += `
+                <tr class="grand-total-row">
+                    <td style="color: var(--aquamarine);">GRAND TOTAL (${year})</td>
+                    <td>₹ ${window.grandFees.toLocaleString('en-IN')}</td>
+                    <td style="color: var(--aquamarine);">₹ ${window.grandCollection.toLocaleString('en-IN')}</td>
+                    <td style="color: #ff6b6b;">₹ ${window.grandPending.toLocaleString('en-IN')}</td>
+                    <td style="font-size: 0.8rem; letter-spacing: 1px;">SYNCED WITH DASHBOARD</td>
+                </tr>
+            `;
+
+            tbody.innerHTML = html;
+            const maxPages = Math.ceil(portalData.length / rowsPerPage) || 1;
+            info.innerText = `Page ${currentPage} of ${maxPages}`;
+        }
+
+        function handleGenerateClick() {
+            currentPage = 1;
+            loadTableData(document.getElementById('search-input').value);
+        }
+
+        function changePage(dir) {
+            const max = Math.ceil(portalData.length / rowsPerPage);
+            if (currentPage + dir >= 1 && currentPage + dir <= max) {
+                currentPage += dir;
+                renderPagination();
             }
-        });
+        }
 
-        portalData = Array.from(groupedMap.values());
-        // SORT CHRONOLOGICALLY (Jan -> Dec)
-        portalData.sort((a, b) => a.date - b.date);
-
-        window.gTotals = {
-            f: allStudents.reduce((sum, s) => sum + (parseFloat(s.total_fees) || 0), 0),
-            p: allStudents.reduce((sum, s) => sum + (parseFloat(s.pending_amount) || 0), 0),
-            r: payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+        window.onload = async () => {
+            if (await authenticateUser()) loadTableData("");
         };
-
-        currentPage = 1;
-        renderPagination();
-    } catch (err) { tbody.innerHTML = `<tr><td colspan="5" style="color:red;">Error: ${err.message}</td></tr>`; }
-}
-
-function renderPagination() {
-    const tbody = document.getElementById('table-body');
-    const info = document.getElementById('page-info');
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const rowsToDisplay = portalData.slice(startIndex, startIndex + rowsPerPage);
-
-    let html = "";
-    rowsToDisplay.forEach(row => {
-        html += `
-            <tr>
-                <td><b>${row.course}</b></td>
-                <td>₹ ${row.total.toLocaleString('en-IN')}</td>
-                <td class="money-received">₹ ${row.received.toLocaleString('en-IN')}</td>
-                <td class="money-pending">₹ ${row.pending.toLocaleString('en-IN')}</td>
-                <td><b>${row.month.toUpperCase()}</b></td>
-            </tr>`;
-    });
-
-    // GRAND TOTAL FOOTER (Matches Dashboard 58,000 / 14,000)
-    html += `
-        <tr style="background: #000; color: #fff; font-weight: 900; font-size: 1.1rem;">
-            <td>GRAND TOTAL (2026)</td>
-            <td>₹ ${window.gTotals.f.toLocaleString('en-IN')}</td>
-            <td style="color: #7FFFD4;">₹ ${window.gTotals.r.toLocaleString('en-IN')}</td>
-            <td style="color: #ff6b6b;">₹ ${window.gTotals.p.toLocaleString('en-IN')}</td>
-            <td style="font-size: 0.8rem; color: #7FFFD4;">YEAR TO DATE</td>
-        </tr>`;
-
-    tbody.innerHTML = html;
-    info.innerText = `Page ${currentPage} of ${Math.ceil(portalData.length / rowsPerPage) || 1}`;
-}
-
-function handleGenerateClick() {
-    loadTableData(document.getElementById('search-input').value);
-}
-
-function changePage(direction) {
-    const maxPages = Math.ceil(portalData.length / rowsPerPage);
-    if (currentPage + direction >= 1 && currentPage + direction <= maxPages) {
-        currentPage += direction;
-        renderPagination();
-    }
-}
-
-window.onload = async () => {
-    if (await authenticateUser()) loadTableData("");
-};
     </script>
-
-
-<script>
-document.querySelector("form").addEventListener("submit", function (e) {
-
-    const dateInput = document.getElementById("fee_date").value;
-
-    // Try creating a real date object
-    const enteredDate = new Date(dateInput);
-    const parts = dateInput.split("-");
-
-    if (parts.length !== 3) {
-        alert("Invalid date format. Use YYYY-MM-DD.");
-        e.preventDefault();
-        return;
-    }
-
-    const year = parseInt(parts[0]);
-    const month = parseInt(parts[1]) - 1; // JS months start from 0
-    const day = parseInt(parts[2]);
-
-    const checkDate = new Date(year, month, day);
-
-    // Check if date is valid
-    if (
-        checkDate.getFullYear() !== year ||
-        checkDate.getMonth() !== month ||
-        checkDate.getDate() !== day
-    ) {
-        alert("Invalid date entered. Please enter a valid calendar date.");
-        e.preventDefault(); // stop form submission
-    }
-
-});
-</script>
 </body>
 </html>
