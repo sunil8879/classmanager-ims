@@ -3245,6 +3245,7 @@ async function fetchStudentForAttn() {
    ========================================== */
 
 // 1. TRIGGER CALENDAR (Cleaned up)
+// REPLACE your existing triggerAttendance function with this:
 let currentAttnStatus = "";
 function triggerAttendance(status) {
     const name = document.getElementById('attn-name').value;
@@ -3252,6 +3253,10 @@ function triggerAttendance(status) {
     
     currentAttnStatus = status;
     const picker = document.getElementById('attn-date-picker');
+    
+    // --- NEW: Disable future dates (Local Timezone Safe) ---
+    const todayLocal = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    picker.max = todayLocal;
     
     picker.onchange = null; // Prevent double clicks
     
@@ -3264,7 +3269,6 @@ function triggerAttendance(status) {
     
     picker.showPicker(); 
 }
-
 // 2. SAVE ATTENDANCE (FIXED)
 async function saveAttendance(dateValue, status) {
     const roll = document.getElementById('attn-roll').value.trim().toUpperCase(); 
@@ -4906,6 +4910,7 @@ async function fetchTeacherForTAttn() {
     else alert("Teacher ID not found.");
 }
 
+// REPLACE your existing triggerTAttn function with this:
 function triggerTAttn(status) {
     const name = document.getElementById('t-attn-name').value;
     const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
@@ -4914,24 +4919,27 @@ function triggerTAttn(status) {
 
     const picker = document.getElementById('t-date-picker');
     
-    // 1. Reset the picker value so 'onchange' fires every time
+    // --- NEW: Disable future dates (Local Timezone Safe) ---
+    const todayLocal = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    picker.max = todayLocal;
+
+    // Reset the picker value so 'onchange' fires every time
     picker.value = ""; 
 
-    // 2. Define what happens when the date is picked
     picker.onchange = async function() {
         if(!this.value) return;
         
         const selectedDate = this.value;
         const monthYearStr = new Date(selectedDate).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        // --- FIX: Delete any existing record for this exact date to prevent duplicates ---
+        // Delete any existing record for this exact date to prevent duplicates
         await db.from('teachers_attendance')
             .delete()
             .eq('teacher_id', tid)
             .eq('attendance_date', selectedDate)
             .eq('institute_id', sessionInstID);
 
-        // --- Insert the fresh, accurate status ---
+        // Insert the fresh, accurate status
         const { error } = await db.from('teachers_attendance').insert([{
             institute_id: sessionInstID,
             teacher_id: tid,
@@ -4952,20 +4960,30 @@ function triggerTAttn(status) {
         this.onchange = null; 
     };
 
-    // 3. Open the calendar
+    // Open the calendar
     picker.showPicker();
 }
+// REPLACE your existing fetchTeacherHistory function with this:
 async function fetchTeacherHistory() {
     const tid = document.getElementById('t-attn-id').value.toUpperCase();
     const month = document.getElementById('t-attn-month').value; // YYYY-MM
     if(!tid || !month) return alert("Select Teacher ID and Month");
+    
     const monthYear = new Date(month + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
     
-    const { count } = await db.from('teachers_attendance')
-        .select('*', { count: 'exact', head: true })
-        .eq('teacher_id', tid).eq('month_year', monthYear).eq('status', 'Present');
+    // Fetch records instead of using Supabase 'count'
+    const { data, error } = await db.from('teachers_attendance')
+        .select('status')
+        .eq('teacher_id', tid)
+        .eq('month_year', monthYear)
+        .eq('institute_id', sessionInstID);
+        
+    if (error) return alert("Error: " + error.message);
+
+    // Accurately count 'Present' records in JS
+    const presentCount = data ? data.filter(r => r.status === 'Present').length : 0;
     
-    alert(`Teacher ${tid} was Present for ${count} days in ${monthYear}`);
+    alert(`Teacher ${tid} was Present for ${presentCount} days in ${monthYear}`);
 }
 
 // 1. Fetch Teacher Info
