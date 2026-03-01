@@ -529,29 +529,6 @@ height: 65px; white-space: nowrap;
 
 
 
-/* --- SIDEBAR TABS SPACING FIX (STRETCH TO FOOTER) --- */
-@media (min-width: 993px) {
-    /* 1. Remove bottom padding from the sidebar to allow the last tab to touch the footer */
-    nav.sidebar {
-        padding-bottom: 0 !important; 
-        justify-content: space-between; 
-    }
-    
-    /* 2. Allow all tabs to grow dynamically and share the empty vertical space */
-    .nav-tab {
-        flex-grow: 1; 
-        height: auto !important; 
-        min-height: 50px; /* Ensures they don't get too squished on smaller screens */
-        margin-bottom: 10px !important; /* Slightly smaller gap to balance the stretching */
-    }
-    
-    /* 3. Target the 'Leave Management' tab specifically to sit flush against the footer */
-    .nav-tab:last-child {
-        margin-bottom: 0 !important; 
-        border-bottom-left-radius: 0; 
-        border-bottom-right-radius: 0;
-    }
-}
 
     </style>
 </head>
