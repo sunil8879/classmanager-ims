@@ -434,17 +434,14 @@ height: 65px; white-space: nowrap;
 
 
 
-
-
-main.content {
-    background-image: url('classmanager.png');
-    background-repeat: no-repeat;
-    /* Horizontally centered, Vertically placed at 75% (the exact middle of the empty space) */
-    background-position: center 75%; 
-    background-size: 750px; 
-    background-blend-mode: overlay;
-    background-color: rgba(127, 255, 212, 0.90); 
+.content-section.active {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 70vh; /* Forces the section to be tall, pushing the card to the middle */
 }
+
+
     </style>
 </head>
 <body>
