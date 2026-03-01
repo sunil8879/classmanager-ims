@@ -8156,7 +8156,7 @@ async function validateAndAddLeave() {
 
     if (!tid || !tname || !start || !end || !daysReq) return alert("Please fill all required fields and calculate days.");
 
-    // --- RULE 2 CHECK: Leave Balance ---
+    // --- RULE 2: Leave Balance Check ---
     const balance = Number(document.getElementById('lv-days').dataset.balance || 0);
     if (status === 'Approved' && daysReq > balance) {
         const proceed = confirm(`WARNING: ${tname} only has ${balance} paid leaves left, but requested ${daysReq}. Approve anyway as unpaid leave?`);
@@ -8168,64 +8168,47 @@ async function validateAndAddLeave() {
         }
     }
 
-    // --- RULE 1 CHECK: 80% Minimum Presence Check (Only if approving) ---
+    // --- RULE 1: 80% Minimum Presence Check ---
     if (status === 'Approved') {
-        // A. Get Total Active Teachers
-        const { data: allTeachers } = await db.from('teacher_details')
-            .select('id')
-            .eq('status', 'Active')
-            .eq('institute_id', sessionInstID);
-        
+        const { data: allTeachers } = await db.from('teacher_details').select('id').eq('status', 'Active').eq('institute_id', sessionInstID);
         const totalActive = allTeachers ? allTeachers.length : 0;
         
-        // Math: Total * 0.2 gives the exact max number of teachers allowed on leave.
-        const maxAllowedOnLeave = Math.floor(totalActive * 0.2);
+        const { data: approvedLeaves } = await db.from('leave_management').select('start_date, end_date').eq('status', 'Approved').eq('institute_id', sessionInstID);
 
-        // B. Fetch ALL currently approved leaves for accurate JS filtering
-        const { data: approvedLeaves } = await db.from('leave_management')
-            .select('start_date, end_date')
-            .eq('status', 'Approved')
-            .eq('institute_id', sessionInstID);
+        // Safe Date Parsing (Prevents timezone bugs)
+        let dt = new Date(start + "T00:00:00");
+        let endDt = new Date(end + "T00:00:00");
+        let rejectReason = "";
 
-        // Safely generate exact YYYY-MM-DD string array for the requested dates to avoid Timezone bugs
-        let requestedDates = [];
-        let tempDate = new Date(start + "T12:00:00Z"); // Forcing noon UTC prevents backward shifting
-        let lastDate = new Date(end + "T12:00:00Z");
-        
-        while (tempDate <= lastDate) {
-            requestedDates.push(tempDate.toISOString().split('T')[0]);
-            tempDate.setDate(tempDate.getDate() + 1);
-        }
-
-        let maxConcurrent = 0;
-        let blockingDate = "";
-
-        // Check day by day strictly against strings
-        for (let i = 0; i < requestedDates.length; i++) {
-            let checkDate = requestedDates[i];
+        while (dt <= endDt) {
+            let yyyy = dt.getFullYear();
+            let mm = String(dt.getMonth() + 1).padStart(2, '0');
+            let dd = String(dt.getDate()).padStart(2, '0');
+            let checkDate = `${yyyy}-${mm}-${dd}`;
+            
             let onLeaveToday = 0;
-
             if (approvedLeaves) {
                 approvedLeaves.forEach(lv => {
-                    if (checkDate >= lv.start_date && checkDate <= lv.end_date) {
-                        onLeaveToday++;
-                    }
+                    if (checkDate >= lv.start_date && checkDate <= lv.end_date) onLeaveToday++;
                 });
             }
 
-            // If approving THIS request puts the concurrent leaves OVER the max allowed
-            if (onLeaveToday + 1 > maxAllowedOnLeave) {
-                maxConcurrent = onLeaveToday + 1;
-                blockingDate = checkDate;
+            // Math: (Total Active - (Currently on leave + 1)) / Total Active * 100
+            let presenceAfterLeave = totalActive - (onLeaveToday + 1);
+            let presencePct = totalActive > 0 ? (presenceAfterLeave / totalActive) * 100 : 0;
+
+            if (presencePct < 80) {
+                rejectReason = `On ${checkDate}, approving this leaves only ${presenceAfterLeave} out of ${totalActive} teachers (${presencePct.toFixed(1)}% presence). Minimum 80% required.`;
                 break;
             }
+            dt.setDate(dt.getDate() + 1);
         }
 
-        if (maxConcurrent > maxAllowedOnLeave) {
-            alert(`🛑 LEAVE REJECTED BY SYSTEM RULE!\n\nInstitute requires 80% staff presence.\nTotal Staff: ${totalActive}\nMax allowed on leave simultaneously: ${maxAllowedOnLeave}\n\nOn ${blockingDate}, approving this would put ${maxConcurrent} teachers on leave.\n\nStatus automatically set to Rejected.`);
+        if (rejectReason !== "") {
+            alert(`🛑 LEAVE REJECTED BY 80% PRESENCE RULE!\n\n${rejectReason}\n\nStatus automatically set to Rejected.`);
             document.getElementById('lv-status').value = 'Rejected';
             status = 'Rejected';
-            remarks = "System Rejected: 80% Staff Presence Rule violation on " + blockingDate + ". " + remarks;
+            remarks = "System Rejected: " + rejectReason + " | " + remarks;
         }
     }
 
@@ -8251,7 +8234,6 @@ async function validateAndAddLeave() {
         fetchTeacherForLeave(); // Refresh balance
     }
 }
-
 
 // 5. Fetch Latest Record
 async function fetchLeaveRecord() {
@@ -8281,20 +8263,68 @@ async function fetchLeaveRecord() {
     alert("Latest Leave Record Loaded.");
 }
 
-// 6. Update Record
+// 6. Update Record (Now includes the 80% Rule Security Check)
 async function updateLeaveRecord() {
     const tid = document.getElementById('lv-tid').value.toUpperCase();
     const start = document.getElementById('lv-start').value;
     const end = document.getElementById('lv-end').value;
+    let status = document.getElementById('lv-status').value;
+    let remarks = document.getElementById('lv-remarks').value;
 
     if (!tid || !start) return alert("Please fetch a record first.");
 
-    // Note: We match by Teacher ID + Start Date to update the specific leave
+    // Retrieve the exact record ID so we don't count it against itself during validation
+    const { data: currentRecord } = await db.from('leave_management').select('id').eq('teacher_id', tid).eq('start_date', start).eq('institute_id', sessionInstID).maybeSingle();
+
+    // --- RULE 1: 80% Minimum Presence Check (For Updates) ---
+    if (status === 'Approved') {
+        const { data: allTeachers } = await db.from('teacher_details').select('id').eq('status', 'Active').eq('institute_id', sessionInstID);
+        const totalActive = allTeachers ? allTeachers.length : 0;
+        
+        const { data: approvedLeaves } = await db.from('leave_management').select('id, start_date, end_date').eq('status', 'Approved').eq('institute_id', sessionInstID);
+
+        let dt = new Date(start + "T00:00:00");
+        let endDt = new Date(end + "T00:00:00");
+        let rejectReason = "";
+
+        while (dt <= endDt) {
+            let yyyy = dt.getFullYear();
+            let mm = String(dt.getMonth() + 1).padStart(2, '0');
+            let dd = String(dt.getDate()).padStart(2, '0');
+            let checkDate = `${yyyy}-${mm}-${dd}`;
+            
+            let onLeaveToday = 0;
+            if (approvedLeaves) {
+                approvedLeaves.forEach(lv => {
+                    // Skip checking the record we are currently trying to update
+                    if (currentRecord && lv.id === currentRecord.id) return;
+                    if (checkDate >= lv.start_date && checkDate <= lv.end_date) onLeaveToday++;
+                });
+            }
+
+            let presenceAfterLeave = totalActive - (onLeaveToday + 1);
+            let presencePct = totalActive > 0 ? (presenceAfterLeave / totalActive) * 100 : 0;
+
+            if (presencePct < 80) {
+                rejectReason = `On ${checkDate}, approving this leaves only ${presenceAfterLeave} out of ${totalActive} teachers (${presencePct.toFixed(1)}%).`;
+                break;
+            }
+            dt.setDate(dt.getDate() + 1);
+        }
+
+        if (rejectReason !== "") {
+            alert(`🛑 UPDATE REJECTED BY 80% RULE!\n\n${rejectReason}\n\nStatus automatically reverted to Pending.`);
+            document.getElementById('lv-status').value = 'Pending';
+            status = 'Pending';
+            remarks = "Update Blocked: " + rejectReason + " | " + remarks;
+        }
+    }
+
     const updateData = {
         no_of_days: document.getElementById('lv-days').value,
         end_date: end,
-        status: document.getElementById('lv-status').value,
-        remarks: document.getElementById('lv-remarks').value
+        status: status,
+        remarks: remarks
     };
 
     const { error } = await db.from('leave_management')
@@ -8304,7 +8334,7 @@ async function updateLeaveRecord() {
         .eq('institute_id', sessionInstID);
 
     if (error) alert("Update Error: " + error.message);
-    else alert("Record Updated Successfully!");
+    else alert(`Record Updated Successfully as [${status}]!`);
 }
 
 // 7. List of All Teachers on Leave (Popup)
