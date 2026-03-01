@@ -8144,7 +8144,7 @@ function calculateLeaveDays() {
 }
 
 // 4. Validate Rules & Save Record
-// 4. Validate Rules & Save Record
+// 4. Validate Rules & Save Record (With Rounding Math)
 async function validateAndAddLeave() {
     const tid = document.getElementById('lv-tid').value.toUpperCase();
     const tname = document.getElementById('lv-tname').value;
@@ -8168,14 +8168,16 @@ async function validateAndAddLeave() {
         }
     }
 
-    // --- RULE 1: 80% Minimum Presence Check ---
+    // --- RULE 1: 80% Minimum Presence Check (With .5 Rounding) ---
     if (status === 'Approved') {
         const { data: allTeachers } = await db.from('teacher_details').select('id').eq('status', 'Active').eq('institute_id', sessionInstID);
         const totalActive = allTeachers ? allTeachers.length : 0;
         
+        // NEW MATH: Standard rounding (0.6 becomes 1, 1.4 becomes 1)
+        const maxAllowedOnLeave = Math.round(totalActive * 0.2);
+        
         const { data: approvedLeaves } = await db.from('leave_management').select('start_date, end_date').eq('status', 'Approved').eq('institute_id', sessionInstID);
 
-        // Safe Date Parsing (Prevents timezone bugs)
         let dt = new Date(start + "T00:00:00");
         let endDt = new Date(end + "T00:00:00");
         let rejectReason = "";
@@ -8193,12 +8195,9 @@ async function validateAndAddLeave() {
                 });
             }
 
-            // Math: (Total Active - (Currently on leave + 1)) / Total Active * 100
-            let presenceAfterLeave = totalActive - (onLeaveToday + 1);
-            let presencePct = totalActive > 0 ? (presenceAfterLeave / totalActive) * 100 : 0;
-
-            if (presencePct < 80) {
-                rejectReason = `On ${checkDate}, approving this leaves only ${presenceAfterLeave} out of ${totalActive} teachers (${presencePct.toFixed(1)}% presence). Minimum 80% required.`;
+            // Check against our rounded max allowed number
+            if ((onLeaveToday + 1) > maxAllowedOnLeave) {
+                rejectReason = `On ${checkDate}, approving this puts ${onLeaveToday + 1} teachers on leave out of ${totalActive}. Maximum allowed by the rounded 80% rule is ${maxAllowedOnLeave}.`;
                 break;
             }
             dt.setDate(dt.getDate() + 1);
@@ -8235,6 +8234,7 @@ async function validateAndAddLeave() {
     }
 }
 
+
 // 5. Fetch Latest Record
 async function fetchLeaveRecord() {
     const tid = prompt("Enter Teacher ID to fetch last leave record:");
@@ -8263,7 +8263,7 @@ async function fetchLeaveRecord() {
     alert("Latest Leave Record Loaded.");
 }
 
-// 6. Update Record (Now includes the 80% Rule Security Check)
+// 6. Update Record (With Rounding Math)
 async function updateLeaveRecord() {
     const tid = document.getElementById('lv-tid').value.toUpperCase();
     const start = document.getElementById('lv-start').value;
@@ -8273,13 +8273,15 @@ async function updateLeaveRecord() {
 
     if (!tid || !start) return alert("Please fetch a record first.");
 
-    // Retrieve the exact record ID so we don't count it against itself during validation
     const { data: currentRecord } = await db.from('leave_management').select('id').eq('teacher_id', tid).eq('start_date', start).eq('institute_id', sessionInstID).maybeSingle();
 
     // --- RULE 1: 80% Minimum Presence Check (For Updates) ---
     if (status === 'Approved') {
         const { data: allTeachers } = await db.from('teacher_details').select('id').eq('status', 'Active').eq('institute_id', sessionInstID);
         const totalActive = allTeachers ? allTeachers.length : 0;
+        
+        // NEW MATH: Standard rounding (0.6 becomes 1, 1.4 becomes 1)
+        const maxAllowedOnLeave = Math.round(totalActive * 0.2);
         
         const { data: approvedLeaves } = await db.from('leave_management').select('id, start_date, end_date').eq('status', 'Approved').eq('institute_id', sessionInstID);
 
@@ -8296,17 +8298,14 @@ async function updateLeaveRecord() {
             let onLeaveToday = 0;
             if (approvedLeaves) {
                 approvedLeaves.forEach(lv => {
-                    // Skip checking the record we are currently trying to update
                     if (currentRecord && lv.id === currentRecord.id) return;
                     if (checkDate >= lv.start_date && checkDate <= lv.end_date) onLeaveToday++;
                 });
             }
 
-            let presenceAfterLeave = totalActive - (onLeaveToday + 1);
-            let presencePct = totalActive > 0 ? (presenceAfterLeave / totalActive) * 100 : 0;
-
-            if (presencePct < 80) {
-                rejectReason = `On ${checkDate}, approving this leaves only ${presenceAfterLeave} out of ${totalActive} teachers (${presencePct.toFixed(1)}%).`;
+            // Check against our rounded max allowed number
+            if ((onLeaveToday + 1) > maxAllowedOnLeave) {
+                rejectReason = `On ${checkDate}, approving this puts ${onLeaveToday + 1} teachers on leave out of ${totalActive}. Maximum allowed by the rounded 80% rule is ${maxAllowedOnLeave}.`;
                 break;
             }
             dt.setDate(dt.getDate() + 1);
@@ -8336,7 +8335,6 @@ async function updateLeaveRecord() {
     if (error) alert("Update Error: " + error.message);
     else alert(`Record Updated Successfully as [${status}]!`);
 }
-
 // 7. List of All Teachers on Leave (Popup)
 async function listTeachersOnLeave() {
     const monthYearStr = prompt("Enter Month & Year (e.g., 2026-03 for March 2026):");
