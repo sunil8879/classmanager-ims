@@ -7510,7 +7510,7 @@ document.getElementById('tch-name').addEventListener('blur', async function() {
 
 
 /* ==========================================
-   AUTO-POPULATE BATCH TIME FROM COURSE
+   AUTO-POPULATE BATCH TIME & CHECK CAPACITY
    ========================================== */
 document.getElementById('stu-course').addEventListener('blur', async function() {
     const courseName = this.value.trim();
@@ -7522,24 +7522,46 @@ document.getElementById('stu-course').addEventListener('blur', async function() 
         return;
     }
 
-    // Look up the batch time from Section 5 (Batches table) based on the Subject Name
+    // 1. Look up the batch details (including capacity) from Section 5
     const { data: batchData, error } = await db.from('batches')
-        .select('batch_time')
-        .ilike('subject_name', courseName) // Case-insensitive match for the subject
+        .select('batch_name, batch_time, students_allotted')
+        .ilike('subject_name', courseName) // Matches the course name
         .eq('institute_id', sessionInstID)
         .limit(1)
         .maybeSingle();
 
-    if (batchData && batchData.batch_time) {
-        // Success: Fill the time automatically
+    if (batchData) {
+        const maxCapacity = parseInt(batchData.students_allotted) || 0;
+        const batchName = batchData.batch_name;
+
+        // 2. CHECK CAPACITY (If a limit was set)
+        if (maxCapacity > 0 && batchName) {
+            
+            // Count how many students are currently in this batch in the Batch Master (list table)
+            const { data: currentStudents } = await db.from('list')
+                .select('id')
+                .ilike('batch_name', batchName)
+                .eq('institute_id', sessionInstID);
+
+            const currentCount = currentStudents ? currentStudents.length : 0;
+
+            // 3. IF FULL -> Block it and show error
+            if (currentCount >= maxCapacity) {
+                batchTimeInput.value = ""; // Keep time empty
+                this.value = ""; // Clear the course box so they can't proceed
+                return alert(`🛑 BATCH ALREADY FULL!\n\nThe batch for "${courseName}" (${batchName}) has reached its maximum capacity of ${maxCapacity} students.\n\nYou cannot admit any more students to this course right now.`);
+            }
+        }
+
+        // 4. IF NOT FULL -> Success: Fill the time automatically
         batchTimeInput.value = batchData.batch_time;
+        
     } else {
         // Warning: No batch exists for this course yet
         batchTimeInput.value = "";
         console.log(`No batch found for course "${courseName}". Create it in Section 5 first.`);
     }
 });
-
 
 
 
