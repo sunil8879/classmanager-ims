@@ -613,6 +613,7 @@ height: 65px; white-space: nowrap;
 <button class="nav-tab" onclick="showSection('ptm-mod')"><i class="fas fa-handshake"></i> 24. PTM Schedule</button>
 <button class="nav-tab" onclick="showSection('batch-master')"><i class="fas fa-users-cog"></i> 25. Batch Master</button>
 <button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
+<button class="nav-tab" onclick="showSection('leave-mod')"><i class="fas fa-user-clock"></i> 27. Leave Management</button>
 
 
         </aside>
@@ -2247,6 +2248,64 @@ height: 65px; white-space: nowrap;
         </div>
     </div>
 </section>
+
+
+
+
+
+<!-- 27. LEAVE MANAGEMENT MODULE -->
+<section id="leave-mod" class="content-section">
+    <div class="card" style="border-top: 5px solid #e67e22; max-width: 1100px;">
+        <h3><i class="fas fa-user-clock"></i> Staff Leave Management</h3>
+        
+        <!-- Smart Balance Indicator -->
+        <div id="leave-balance-indicator" style="display:none; width:100%; padding:15px; margin-bottom:20px; background:#f8f9fa; border:2px solid #e67e22; border-radius:10px; text-align:left; font-size:1.1rem; color:#000;">
+            <b>Leave Balance Analysis:</b> <span id="lv-analysis-text">Please fetch a teacher first.</span>
+        </div>
+
+        <div class="form-grid">
+            <div class="input-group"><label>1. Date Today</label><input type="date" id="lv-today"></div>
+            
+            <div class="input-group">
+                <label>2. Teacher ID</label>
+                <div style="display: flex; gap: 5px; width: 100%;">
+                    <input type="text" id="lv-tid" placeholder="TCH-XXXX" style="flex:1;">
+                    <button class="btn-fetch" onclick="fetchTeacherForLeave()" style="padding: 5px 15px;"><i class="fas fa-search"></i> Fetch</button>
+                </div>
+            </div>
+            
+            <div class="input-group"><label>3. Teacher Name</label><input type="text" id="lv-tname" readonly style="background:#eee;"></div>
+            <div class="input-group"><label>4. Course / Subject</label><input type="text" id="lv-course" readonly style="background:#eee;"></div>
+            
+            <div class="input-group"><label>6. Start Date</label><input type="date" id="lv-start" onchange="calculateLeaveDays()"></div>
+            <div class="input-group"><label>7. End Date</label><input type="date" id="lv-end" onchange="calculateLeaveDays()"></div>
+            <div class="input-group"><label>5. No. of Days</label><input type="number" id="lv-days" readonly style="background:#eee; font-weight:bold; color:#e67e22;"></div>
+            
+            <div class="input-group">
+                <label>8. Status</label>
+                <select id="lv-status">
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+            
+            <div class="input-group" style="grid-column: 1/-1;">
+                <label>9. Remarks (Encashment, Emergency, Adjustments)</label>
+                <input type="text" id="lv-remarks" placeholder="e.g. Leave encashed / Cannot approve due to 80% rule...">
+            </div>
+        </div>
+
+        <div class="button-row" style="margin-top: 25px;">
+            <button class="btn-add" onclick="validateAndAddLeave()"><i class="fas fa-check"></i> PROCESS & ADD RECORD</button>
+            <button class="btn-fetch" onclick="fetchLeaveRecord()"><i class="fas fa-folder-open"></i> FETCH RECORD (ID)</button>
+            <button class="btn-edit" onclick="updateLeaveRecord()"><i class="fas fa-edit"></i> UPDATE RECORD (ID)</button>
+            <button class="btn-fetch" style="background:#8e44ad;" onclick="listTeachersOnLeave()"><i class="fas fa-list"></i> LIST LEAVES (Month)</button>
+        </div>
+    </div>
+</section>
+
+
 
 
 
@@ -7997,6 +8056,320 @@ if (document.getElementById('giant-clock-container')) {
     updateGiantClock();
     setInterval(updateGiantClock, 1000);
 }
+
+
+
+
+/* ==========================================
+   27. LEAVE MANAGEMENT LOGIC (80% Rule & Carry Forward)
+   ========================================== */
+
+// 1. Initialize Dates
+document.addEventListener('DOMContentLoaded', () => {
+    const lvToday = document.getElementById('lv-today');
+    if(lvToday) lvToday.value = new Date().toISOString().split('T')[0];
+});
+
+// 2. Fetch Teacher & Calculate Available Balance
+async function fetchTeacherForLeave() {
+    const tid = document.getElementById('lv-tid').value.trim().toUpperCase();
+    if (!tid) return alert("Please enter a Teacher ID first.");
+
+    // A. Fetch Teacher Details
+    const { data: teacher, error: tErr } = await db.from('teacher_details')
+        .select('teacher_name, subject_taught, joining_date')
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (tErr || !teacher) return alert("Teacher not found!");
+
+    document.getElementById('lv-tname').value = teacher.teacher_name;
+    document.getElementById('lv-course').value = teacher.subject_taught || "N/A";
+
+    // B. Calculate Leave Balance (2 per month from joining date)
+    const joinDate = new Date(teacher.joining_date);
+    const today = new Date();
+    
+    // Calculate total months worked (minimum 1)
+    let monthsWorked = (today.getFullYear() - joinDate.getFullYear()) * 12 + (today.getMonth() - joinDate.getMonth()) + 1;
+    if (monthsWorked < 1) monthsWorked = 1;
+    const totalEarnedLeaves = monthsWorked * 2;
+
+    // C. Fetch all historically 'Approved' leaves for this teacher
+    const { data: pastLeaves } = await db.from('leave_management')
+        .select('no_of_days')
+        .eq('teacher_id', tid)
+        .eq('status', 'Approved')
+        .eq('institute_id', sessionInstID);
+
+    const totalTaken = pastLeaves ? pastLeaves.reduce((sum, lv) => sum + Number(lv.no_of_days), 0) : 0;
+    const balance = totalEarnedLeaves - totalTaken;
+
+    // Update UI Indicator
+    const indicator = document.getElementById('leave-balance-indicator');
+    const analysisText = document.getElementById('lv-analysis-text');
+    indicator.style.display = 'block';
+    
+    analysisText.innerHTML = `
+        <br>• Joined on: ${teacher.joining_date} (${monthsWorked} months ago)
+        <br>• Total Leaves Earned (2/month): ${totalEarnedLeaves}
+        <br>• Leaves Taken: ${totalTaken}
+        <br>• <b>Current Available Balance: <span style="color:${balance > 0 ? 'green' : 'red'};">${balance} Days</span></b>
+    `;
+    
+    // Store balance in element dataset for validation later
+    document.getElementById('lv-days').dataset.balance = balance;
+}
+
+// 3. Auto-Calculate Days
+function calculateLeaveDays() {
+    const start = document.getElementById('lv-start').value;
+    const end = document.getElementById('lv-end').value;
+    if (start && end) {
+        const d1 = new Date(start);
+        const d2 = new Date(end);
+        const diffTime = Math.abs(d2 - d1);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive of both days
+        
+        if (d2 < d1) {
+            alert("End date cannot be before Start date.");
+            document.getElementById('lv-days').value = "";
+            return;
+        }
+        document.getElementById('lv-days').value = diffDays;
+    }
+}
+
+// 4. Validate Rules & Save Record
+async function validateAndAddLeave() {
+    const tid = document.getElementById('lv-tid').value.toUpperCase();
+    const tname = document.getElementById('lv-tname').value;
+    const start = document.getElementById('lv-start').value;
+    const end = document.getElementById('lv-end').value;
+    const daysReq = Number(document.getElementById('lv-days').value);
+    let status = document.getElementById('lv-status').value;
+    let remarks = document.getElementById('lv-remarks').value;
+
+    if (!tid || !tname || !start || !end || !daysReq) return alert("Please fill all required fields and calculate days.");
+
+    // --- RULE 2 CHECK: Leave Balance ---
+    const balance = Number(document.getElementById('lv-days').dataset.balance || 0);
+    if (status === 'Approved' && daysReq > balance) {
+        const proceed = confirm(`WARNING: ${tname} only has ${balance} paid leaves left, but requested ${daysReq}. Approve anyway as unpaid leave?`);
+        if (!proceed) {
+            document.getElementById('lv-status').value = 'Rejected';
+            return;
+        } else {
+            remarks = "(Unpaid Over-Limit) " + remarks;
+        }
+    }
+
+    // --- RULE 1 CHECK: 80% Minimum Presence Check (Only if approving) ---
+    if (status === 'Approved') {
+        // A. Get Total Active Teachers
+        const { data: allTeachers } = await db.from('teacher_details')
+            .select('id')
+            .eq('status', 'Active')
+            .eq('institute_id', sessionInstID);
+        
+        const totalActive = allTeachers ? allTeachers.length : 0;
+        
+        // Math: Total - (80% of Total). 
+        // e.g. 5 total -> 80% is 4. Allowed on leave = 5 - 4 = 1.
+        // e.g. 4 total -> 80% is 3.2. Allowed on leave = 4 - 3.2 = 0.8 (Since < 1, 0 allowed).
+        const maxAllowedOnLeave = Math.floor(totalActive - (totalActive * 0.8));
+
+        // B. Fetch all currently approved leaves overlapping requested dates
+        const { data: overlappingLeaves } = await db.from('leave_management')
+            .select('start_date, end_date')
+            .eq('status', 'Approved')
+            .eq('institute_id', sessionInstID)
+            .lte('start_date', end)  // Starts before our requested end
+            .gte('end_date', start); // Ends after our requested start
+
+        // Check day by day in the requested period to find max concurrent leaves
+        let d = new Date(start);
+        const endD = new Date(end);
+        let maxConcurrent = 0;
+        let blockingDate = "";
+
+        while (d <= endD) {
+            let onLeaveToday = 0;
+            const checkDateStr = d.toISOString().split('T')[0];
+
+            if (overlappingLeaves) {
+                overlappingLeaves.forEach(lv => {
+                    if (lv.start_date <= checkDateStr && lv.end_date >= checkDateStr) {
+                        onLeaveToday++;
+                    }
+                });
+            }
+
+            // If approving THIS request puts the concurrent leaves OVER the max allowed
+            if (onLeaveToday + 1 > maxAllowedOnLeave) {
+                maxConcurrent = onLeaveToday + 1;
+                blockingDate = checkDateStr;
+                break;
+            }
+            d.setDate(d.getDate() + 1);
+        }
+
+        if (maxConcurrent > maxAllowedOnLeave) {
+            alert(`🛑 LEAVE REJECTED BY SYSTEM RULE!\n\nInstitute requires 80% staff presence.\nTotal Staff: ${totalActive}\nMax allowed on leave: ${maxAllowedOnLeave}\n\nOn ${blockingDate}, approving this would put ${maxConcurrent} teachers on leave.\n\nStatus automatically set to Rejected.`);
+            document.getElementById('lv-status').value = 'Rejected';
+            status = 'Rejected';
+            remarks = "System Rejected: 80% Staff Presence Rule violation on " + blockingDate + ". " + remarks;
+        }
+    }
+
+    // --- EXECUTE SAVE ---
+    const dataObj = {
+        institute_id: sessionInstID,
+        date_today: document.getElementById('lv-today').value,
+        teacher_id: tid,
+        teacher_name: tname,
+        course: document.getElementById('lv-course').value,
+        no_of_days: daysReq,
+        start_date: start,
+        end_date: end,
+        status: status,
+        remarks: remarks
+    };
+
+    const { error } = await db.from('leave_management').insert([dataObj]);
+    if (error) {
+        alert("Database Error: " + error.message);
+    } else {
+        alert(`Success! Leave Record for ${tname} processed as [${status}].`);
+        fetchTeacherForLeave(); // Refresh balance
+    }
+}
+
+// 5. Fetch Latest Record
+async function fetchLeaveRecord() {
+    const tid = prompt("Enter Teacher ID to fetch last leave record:");
+    if (!tid) return;
+
+    const { data, error } = await db.from('leave_management')
+        .select('*')
+        .eq('teacher_id', tid.toUpperCase())
+        .eq('institute_id', sessionInstID)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error || !data) return alert("No leave records found for this Teacher ID.");
+
+    document.getElementById('lv-today').value = data.date_today;
+    document.getElementById('lv-tid').value = data.teacher_id;
+    document.getElementById('lv-tname').value = data.teacher_name;
+    document.getElementById('lv-course').value = data.course;
+    document.getElementById('lv-start').value = data.start_date;
+    document.getElementById('lv-end').value = data.end_date;
+    document.getElementById('lv-days').value = data.no_of_days;
+    document.getElementById('lv-status').value = data.status;
+    document.getElementById('lv-remarks').value = data.remarks || "";
+    
+    alert("Latest Leave Record Loaded.");
+}
+
+// 6. Update Record
+async function updateLeaveRecord() {
+    const tid = document.getElementById('lv-tid').value.toUpperCase();
+    const start = document.getElementById('lv-start').value;
+    const end = document.getElementById('lv-end').value;
+
+    if (!tid || !start) return alert("Please fetch a record first.");
+
+    // Note: We match by Teacher ID + Start Date to update the specific leave
+    const updateData = {
+        no_of_days: document.getElementById('lv-days').value,
+        end_date: end,
+        status: document.getElementById('lv-status').value,
+        remarks: document.getElementById('lv-remarks').value
+    };
+
+    const { error } = await db.from('leave_management')
+        .update(updateData)
+        .eq('teacher_id', tid)
+        .eq('start_date', start)
+        .eq('institute_id', sessionInstID);
+
+    if (error) alert("Update Error: " + error.message);
+    else alert("Record Updated Successfully!");
+}
+
+// 7. List of All Teachers on Leave (Popup)
+async function listTeachersOnLeave() {
+    const monthYearStr = prompt("Enter Month & Year (e.g., 2026-03 for March 2026):");
+    if (!monthYearStr) return;
+
+    // Build Date bounds
+    const startDate = `${monthYearStr}-01`;
+    const endDate = `${monthYearStr}-31`;
+
+    const { data, error } = await db.from('leave_management')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .gte('start_date', startDate)
+        .lte('start_date', endDate)
+        .order('start_date', { ascending: true });
+
+    if (error) return alert("Database Error: " + error.message);
+    
+    let tableRows = "";
+    if (data && data.length > 0) {
+        data.forEach(lv => {
+            const color = lv.status === 'Approved' ? 'green' : (lv.status === 'Rejected' ? 'red' : 'orange');
+            tableRows += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${lv.teacher_id}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${lv.teacher_name}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${lv.start_date} to ${lv.end_date}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; font-weight:bold;">${lv.no_of_days}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; color:${color}; font-weight:bold;">${lv.status}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; font-size:0.85rem;">${lv.remarks || '-'}</td>
+                </tr>
+            `;
+        });
+    } else {
+        tableRows = `<tr><td colspan="6" style="padding:20px;">No leave records found for this month.</td></tr>`;
+    }
+
+    const modalHtml = `
+        <div id="leave-popup-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:95%; max-width:850px; max-height:85vh; overflow-y:auto; text-align:center; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin-top:0; color:#e67e22; text-decoration:underline;">Staff Leave Register</h3>
+                <p style="font-weight:bold; font-size:1.1rem; margin-bottom: 20px;">Period: ${monthYearStr}</p>
+                
+                <table style="width:100%; border-collapse:collapse; text-align:left;">
+                    <thead style="background:#f8f9fa;">
+                        <tr>
+                            <th style="border: 1px solid #ccc; padding: 10px;">ID</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Name</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Dates</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Days</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Status</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+
+                <button onclick="document.getElementById('leave-popup-overlay').remove()" style="margin-top:25px; background:#e67e22; color:white; border:2px solid #000; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; font-family:'Times New Roman', serif;">CLOSE WINDOW</button>
+            </div>
+        </div>
+    `;
+
+    const existing = document.getElementById('leave-popup-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+
 
 
 
