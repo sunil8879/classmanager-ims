@@ -3409,6 +3409,7 @@ async function autoRefreshAttendanceStats(roll, yyyy_mm) {
 
 
 // 4. FETCH STATISTICS BUTTON
+// 4. FETCH STATISTICS BUTTON (DYNAMIC POP-UP OVERLAY)
 async function fetchAttendanceByPrompt() {
     let roll = document.getElementById('attn-roll').value.trim().toUpperCase();
     
@@ -3419,11 +3420,114 @@ async function fetchAttendanceByPrompt() {
         fetchStudentForAttn(); 
     }
 
-    const monthView = document.getElementById('attn-month-view').value; 
+    const monthView = document.getElementById('attn-month-view').value; // e.g., "2026-02"
     if (!monthView) return alert("Please select a month in the 'View Monthly Record' calendar first.");
 
-    await autoRefreshAttendanceStats(roll, monthView);
-    alert(`Statistics updated successfully!`);
+    // 1. Calculate Month Details
+    const parts = monthView.split('-');
+    const year = parseInt(parts[0]);
+    const monthNum = parseInt(parts[1], 10);
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const targetMonthYear = monthNames[monthNum - 1] + " " + year;
+    
+    // Calculate exact total days in that specific month (e.g., 28 for Feb, 31 for March)
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+
+    // 2. Fetch Data (Case-Insensitive)
+    const { data, error } = await db.from('attendance')
+        .select('attendance_date, status')
+        .ilike('roll_number', roll)
+        .ilike('month_year', targetMonthYear)
+        .eq('institute_id', sessionInstID)
+        .order('attendance_date', { ascending: true });
+
+    if (error) return alert("Error fetching data: " + error.message);
+
+    // 3. Process Data into the Map
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let dayMap = {}; // Will store the status for each day
+    
+    if (data) {
+        data.forEach(record => {
+            const day = parseInt(record.attendance_date.split('-')[2], 10);
+            const status = record.status ? record.status.toLowerCase() : "";
+            
+            if (status === 'present') {
+                dayMap[day] = 'P';
+                totalPresent++;
+            } else if (status === 'absent') {
+                dayMap[day] = 'A';
+                totalAbsent++;
+            }
+        });
+    }
+
+    // 4. Calculate Percentage: (Total Present / Total Days in Month) * 100
+    const attendancePct = ((totalPresent / daysInMonth) * 100).toFixed(2);
+
+    // 5. Build the Table Rows
+    let tableRows = "";
+    for (let i = 1; i <= daysInMonth; i++) {
+        if (dayMap[i]) {
+            let pVal = dayMap[i] === 'P' ? 1 : 0;
+            let aVal = dayMap[i] === 'A' ? 1 : 0;
+            tableRows += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${i}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; color: green; font-weight: bold;">${pVal}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; color: red; font-weight: bold;">${aVal}</td>
+                </tr>
+            `;
+        }
+    }
+
+    if (tableRows === "") {
+        tableRows = `<tr><td colspan="3" style="padding:15px; color:#666;">No attendance marked for ${targetMonthYear}.</td></tr>`;
+    }
+
+    // 6. Build and Inject the Popup Overlay HTML
+    const modalHtml = `
+        <div id="attn-popup-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:90%; max-width:400px; max-height:85vh; overflow-y:auto; text-align:center; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin-top:0; color:#000; text-decoration:underline;">Attendance Report</h3>
+                <p style="font-weight:bold; font-size:1.1rem; color:#007bff;">Month selected : ${targetMonthYear}</p>
+                
+                <table style="width:100%; border-collapse:collapse; margin-bottom:20px; text-align:center;">
+                    <thead style="background:#eee;">
+                        <tr>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Date</th>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Present</th>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Absent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+                
+                <div style="text-align:left; background:#f8f9fa; padding:15px; border-radius:8px; border:2px solid #000; font-size:1.1rem; line-height:1.8;">
+                    <p style="margin:0; color:green;"><b>TOTAL PRESENT :</b> ${totalPresent}</p>
+                    <p style="margin:0; color:red;"><b>TOTAL ABSENT :</b> ${totalAbsent}</p>
+                    <p style="margin:0; color:#007bff; border-top:1px dashed #ccc; padding-top:10px; margin-top:10px;">
+                        <b>Attendance % :</b> ${attendancePct}%
+                    </p>
+                    <small style="color:#666; font-size:0.85rem; display:block; margin-top:5px;">(Calculated as ${totalPresent} / ${daysInMonth} days in ${targetMonthYear})</small>
+                </div>
+
+                <button onclick="document.getElementById('attn-popup-overlay').remove()" style="margin-top:20px; background:#ff0000; color:white; border:2px solid #000; padding:12px 20px; border-radius:8px; font-weight:bold; cursor:pointer; width:100%; font-family:'Times New Roman', serif; font-size:1.1rem;">CLOSE</button>
+            </div>
+        </div>
+    `;
+
+    // Remove old popup if it exists, then show new one
+    const existing = document.getElementById('attn-popup-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Update the background input boxes too so the main page looks right
+    document.getElementById('attn-total-p').value = totalPresent;
+    document.getElementById('attn-total-a').value = totalAbsent;
 }
 
 
