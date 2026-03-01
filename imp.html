@@ -444,7 +444,7 @@ height: 65px; white-space: nowrap;
     border: 2px solid #000;
     border-radius: 15px; /* Softer stylish corners */
     padding: 20px 30px;
-    margin: auto auto 800px auto; /* 60px pushes it slightly up from the bottom */
+    margin: auto auto 60px auto; /* 60px pushes it slightly up from the bottom */
     width: 90%;
     max-width: 700px;
     min-height: 90px;
@@ -474,6 +474,50 @@ height: 65px; white-space: nowrap;
     pointer-events: none;
     z-index: 11;
 }
+
+
+
+
+
+/* --- GIANT DIGITAL CLOCK --- */
+#giant-clock-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: auto; /* This automatically pushes it to the dead center of the empty space */
+    text-align: center;
+    font-family: 'Times New Roman', Times, serif;
+    color: #000;
+    z-index: 5;
+}
+
+#time-display {
+    font-size: 5.5rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 2px;
+    /* Stylish 3D Aquamarine shadow */
+    text-shadow: 3px 3px 0px #7FFFD4, 6px 6px 15px rgba(0,0,0,0.15);
+}
+
+#date-display {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 15px;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    #time-display { font-size: 3.2rem; text-shadow: 2px 2px 0px #7FFFD4; }
+    #date-display { font-size: 1rem; letter-spacing: 2px; margin-top: 10px; }
+    #giant-clock-container { margin: 30px auto; }
+}
+
+
 
 
 
@@ -2203,6 +2247,19 @@ height: 65px; white-space: nowrap;
         </div>
     </div>
 </section>
+
+
+
+
+
+<!-- GIANT DIGITAL CLOCK -->
+        <div id="giant-clock-container">
+            <div id="time-display">00:00:00</div>
+            <div id="date-display">Loading date...</div>
+        </div>
+
+
+
 
 
 
@@ -7903,6 +7960,42 @@ function triggerBlastEffect() {
 // Start the 5-second loop
 if (featureBox) {
     setInterval(triggerBlastEffect, 5000);
+}
+
+
+
+
+
+/* --- GIANT CLOCK & DATE LOGIC --- */
+function updateGiantClock() {
+    const timeDisplay = document.getElementById('time-display');
+    const dateDisplay = document.getElementById('date-display');
+    if (!timeDisplay || !dateDisplay) return;
+
+    const now = new Date();
+    
+    // 1. Format Time (HH:MM:SS AM/PM)
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    let seconds = now.getSeconds();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // Convert hour '0' to '12'
+    minutes = minutes < 10 ? '0' + minutes : minutes;
+    seconds = seconds < 10 ? '0' + seconds : seconds;
+    
+    timeDisplay.innerText = `${hours}:${minutes}:${seconds} ${ampm}`;
+
+    // 2. Format Date (e.g., Wednesday, October 25, 2026)
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    dateDisplay.innerText = now.toLocaleDateString('en-US', options);
+}
+
+// Start the clock instantly, then update it every second
+if (document.getElementById('giant-clock-container')) {
+    updateGiantClock();
+    setInterval(updateGiantClock, 1000);
 }
 
 
