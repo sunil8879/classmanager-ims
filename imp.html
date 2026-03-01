@@ -5113,27 +5113,115 @@ function triggerTAttn(status) {
     // Open the calendar
     picker.showPicker();
 }
-// REPLACE your existing fetchTeacherHistory function with this:
+// REPLACE your existing fetchTeacherHistory function with this Dynamic Pop-up version:
 async function fetchTeacherHistory() {
-    const tid = document.getElementById('t-attn-id').value.toUpperCase();
-    const month = document.getElementById('t-attn-month').value; // YYYY-MM
-    if(!tid || !month) return alert("Select Teacher ID and Month");
-    
-    const monthYear = new Date(month + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
-    
-    // Fetch records instead of using Supabase 'count'
-    const { data, error } = await db.from('teachers_attendance')
-        .select('status')
-        .eq('teacher_id', tid)
-        .eq('month_year', monthYear)
-        .eq('institute_id', sessionInstID);
-        
-    if (error) return alert("Error: " + error.message);
+    const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
+    const monthView = document.getElementById('t-attn-month').value; // e.g., "2026-02"
 
-    // Accurately count 'Present' records in JS
-    const presentCount = data ? data.filter(r => r.status === 'Present').length : 0;
+    if (!tid || !monthView) return alert("Please select a Teacher ID and Month first.");
+
+    // 1. Calculate Month Details
+    const parts = monthView.split('-');
+    const year = parseInt(parts[0]);
+    const monthNum = parseInt(parts[1], 10);
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const targetMonthYear = monthNames[monthNum - 1] + " " + year;
     
-    alert(`Teacher ${tid} was Present for ${presentCount} days in ${monthYear}`);
+    // Calculate exact total days in that specific month (e.g., 28 for Feb, 31 for March)
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+
+    // 2. Fetch Data (Case-Insensitive)
+    const { data, error } = await db.from('teachers_attendance')
+        .select('attendance_date, status')
+        .ilike('teacher_id', tid)
+        .ilike('month_year', targetMonthYear)
+        .eq('institute_id', sessionInstID)
+        .order('attendance_date', { ascending: true });
+
+    if (error) return alert("Error fetching data: " + error.message);
+
+    // 3. Process Data into the Map
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let dayMap = {}; // Will store the status for each day
+    
+    if (data) {
+        data.forEach(record => {
+            const day = parseInt(record.attendance_date.split('-')[2], 10);
+            const status = record.status ? record.status.toLowerCase() : "";
+            
+            if (status === 'present') {
+                dayMap[day] = 'P';
+                totalPresent++;
+            } else if (status === 'absent') {
+                dayMap[day] = 'A';
+                totalAbsent++;
+            }
+        });
+    }
+
+    // 4. Calculate Percentage: (Total Present / Total Days in Month) * 100
+    const attendancePct = ((totalPresent / daysInMonth) * 100).toFixed(2);
+
+    // 5. Build the Table Rows
+    let tableRows = "";
+    for (let i = 1; i <= daysInMonth; i++) {
+        if (dayMap[i]) {
+            let pVal = dayMap[i] === 'P' ? 1 : 0;
+            let aVal = dayMap[i] === 'A' ? 1 : 0;
+            tableRows += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${i}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; color: green; font-weight: bold;">${pVal}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; color: red; font-weight: bold;">${aVal}</td>
+                </tr>
+            `;
+        }
+    }
+
+    if (tableRows === "") {
+        tableRows = `<tr><td colspan="3" style="padding:15px; color:#666;">No attendance marked for ${targetMonthYear}.</td></tr>`;
+    }
+
+    // 6. Build and Inject the Popup Overlay HTML
+    const modalHtml = `
+        <div id="t-attn-popup-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:90%; max-width:400px; max-height:85vh; overflow-y:auto; text-align:center; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin-top:0; color:#000; text-decoration:underline;">Staff Attendance Report</h3>
+                <p style="font-weight:bold; font-size:1.1rem; color:#007bff;">Teacher ID: ${tid}</p>
+                <p style="font-weight:bold; font-size:1rem; color:#666; margin-bottom:15px;">Month: ${targetMonthYear}</p>
+                
+                <table style="width:100%; border-collapse:collapse; margin-bottom:20px; text-align:center;">
+                    <thead style="background:#eee;">
+                        <tr>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Date</th>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Present</th>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Absent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+                
+                <div style="text-align:left; background:#f8f9fa; padding:15px; border-radius:8px; border:2px solid #000; font-size:1.1rem; line-height:1.8;">
+                    <p style="margin:0; color:green;"><b>TOTAL PRESENT :</b> ${totalPresent}</p>
+                    <p style="margin:0; color:red;"><b>TOTAL ABSENT :</b> ${totalAbsent}</p>
+                    <p style="margin:0; color:#007bff; border-top:1px dashed #ccc; padding-top:10px; margin-top:10px;">
+                        <b>Attendance % :</b> ${attendancePct}%
+                    </p>
+                    <small style="color:#666; font-size:0.85rem; display:block; margin-top:5px;">(Calculated as ${totalPresent} / ${daysInMonth} days in ${targetMonthYear})</small>
+                </div>
+
+                <button onclick="document.getElementById('t-attn-popup-overlay').remove()" style="margin-top:20px; background:#ff0000; color:white; border:2px solid #000; padding:12px 20px; border-radius:8px; font-weight:bold; cursor:pointer; width:100%; font-family:'Times New Roman', serif; font-size:1.1rem;">CLOSE</button>
+            </div>
+        </div>
+    `;
+
+    // Remove old popup if it exists, then show new one
+    const existing = document.getElementById('t-attn-popup-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 // 1. Fetch Teacher Info
