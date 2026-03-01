@@ -436,69 +436,6 @@ height: 65px; white-space: nowrap;
 
 
 
-/* --- PERFECT SYMMETRY & MOBILE RESPONSIVENESS OVERRIDES --- */
-main.content {
-    justify-content: center; /* Vertically centers the section */
-    align-items: center;     /* Horizontally centers the section */
-    min-height: calc(100vh - 120px); /* Takes full height minus header for true vertical centering */
-}
-
-.content-section.active {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    margin: auto; /* Pushes content to exact center */
-}
-
-.card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    margin: auto auto 30px auto; 
-}
-
-.form-grid {
-    justify-content: center;
-    width: 100%;
-}
-
-.input-group {
-    align-items: center; 
-    text-align: center;
-    width: 100%;
-}
-
-.input-group label {
-    text-align: center;
-}
-
-input, select, textarea {
-    text-align: center; /* Symmetrical typing alignment */
-}
-
-.button-row {
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-}
-
-/* Mobile Compatibility */
-@media (max-width: 768px) {
-    main.content {
-        justify-content: flex-start; /* Reverts to top-alignment on mobile so tall forms don't cut off at the top */
-        min-height: auto;
-    }
-    .card {
-        padding: 20px !important;
-        margin: 10px auto !important;
-    }
-}
-
-
 
 
 
