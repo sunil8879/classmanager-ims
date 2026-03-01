@@ -785,7 +785,7 @@ height: 65px; white-space: nowrap;
             <div class="input-group"><label>Father's Mobile</label><input type="text" id="stu-father" maxlength="10"></div>
             <div class="input-group"><label>Mother's Mobile</label><input type="text" id="stu-mother" maxlength="10"></div>
             <div class="input-group"><label>Class / Standard</label><input type="text" id="stu-standard"></div>
-            <div class="input-group"><label>Batch Time</label><input type="time" id="stu-batch"></div>
+          <div class="input-group"><label>Batch Time</label><input type="time" id="stu-batch" readonly style="background:#eee;" title="Auto-populated from Batch Management"></div>
             <div class="input-group"><label>Course</label><input type="text" id="stu-course" placeholder="Course"></div>
             
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
@@ -7505,6 +7505,40 @@ document.getElementById('tch-name').addEventListener('blur', async function() {
 });
 
 
+
+
+
+
+/* ==========================================
+   AUTO-POPULATE BATCH TIME FROM COURSE
+   ========================================== */
+document.getElementById('stu-course').addEventListener('blur', async function() {
+    const courseName = this.value.trim();
+    const batchTimeInput = document.getElementById('stu-batch');
+
+    // If course is empty, clear the time
+    if (!courseName || !sessionInstID) {
+        batchTimeInput.value = "";
+        return;
+    }
+
+    // Look up the batch time from Section 5 (Batches table) based on the Subject Name
+    const { data: batchData, error } = await db.from('batches')
+        .select('batch_time')
+        .ilike('subject_name', courseName) // Case-insensitive match for the subject
+        .eq('institute_id', sessionInstID)
+        .limit(1)
+        .maybeSingle();
+
+    if (batchData && batchData.batch_time) {
+        // Success: Fill the time automatically
+        batchTimeInput.value = batchData.batch_time;
+    } else {
+        // Warning: No batch exists for this course yet
+        batchTimeInput.value = "";
+        console.log(`No batch found for course "${courseName}". Create it in Section 5 first.`);
+    }
+});
 
 
 
