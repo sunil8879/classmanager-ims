@@ -437,34 +437,43 @@ height: 65px; white-space: nowrap;
 
 
 
-/* --- BOTTOM FADING FEATURE BOX --- */
+/* --- STYLISH FEATURE BOX & BLAST EFFECT --- */
 .feature-box {
-    background-color: #ffffff;
+    background: rgba(255, 255, 255, 0.95); /* Crisp white with slight transparency */
     color: #000000;
     border: 2px solid #000;
-    border-radius: 12px;
-    padding: 15px 30px;
-    margin: auto auto 800px auto; /* Pushes to bottom and centers horizontally */
+    border-radius: 15px; /* Softer stylish corners */
+    padding: 20px 30px;
+    margin: auto auto 800px auto; /* 60px pushes it slightly up from the bottom */
     width: 90%;
-    max-width: 650px;
-    min-height: 80px;
+    max-width: 700px;
+    min-height: 90px;
     display: flex;
-    align-items: center; /* Vertically symmetrical text */
-    justify-content: center; /* Horizontally symmetrical text */
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    font-size: 1.1rem;
-    font-weight: bold;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.15);
-    opacity: 1;
-    transition: opacity 0.5s ease-in-out;
+    font-size: 1.2rem;
+    font-weight: 800;
     font-family: 'Times New Roman', Times, serif;
+    /* Stylish 3D drop shadow with Aquamarine inner glow */
+    box-shadow: 0 15px 35px rgba(0,0,0,0.2), inset 0 0 15px rgba(127, 255, 212, 0.4); 
+    position: relative;
+    z-index: 10;
 }
 
-.feature-box.fade-out {
-    opacity: 0;
+#feature-text {
+    opacity: 1;
+    transition: opacity 0.2s ease-out; /* Quick fade out before the blast */
 }
 
-
+/* The Glass Shards for the explosion */
+.shard {
+    position: absolute;
+    background: #000; /* Black glass pieces to match font */
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 11;
+}
 
 
 
@@ -7810,11 +7819,11 @@ document.getElementById('stu-course').addEventListener('blur', async function() 
 /* --- FEATURE HIGHLIGHTER FADE LOGIC --- */
 const imsFeatures = [
     "1. ClassManager : Automated Fee Collection & Pending Dues Tracking",
-    "2.ClassManager :  Comprehensive Student Profile Management",
+    "2. ClassManager :  Comprehensive Student Profile Management",
     "3. ClassManager : Smart Batch & Time-Slot Organization",
     "4. ClassManager : One-Click Daily Attendance with WhatsApp Alerts",
     "5. ClassManager : Advanced Admin Dashboard & Financial Reports",
-    "6.ClassManager :  Automated Fee Reminder System via WhatsApp",
+    "6. ClassManager :  Automated Fee Reminder System via WhatsApp",
     "7. ClassManager : Integrated Lead & Enquiry Management",
     "8. ClassManager : Monthly Expense & Profitability Tracker",
     "9. ClassManager : Dedicated Teacher Portal & Salary Management",
@@ -7822,8 +7831,8 @@ const imsFeatures = [
     "11. ClassManager : Instant ID Card Generator with Photo Support",
     "12. ClassManager : Professional Course Completion Certificate Generator",
     "13. ClassManager : Real-Time Student Exam & Grade Tracking",
-    "14.ClassManager :  Secure Role-Based Access (Owner, Teacher, Student)",
-    "15.ClassManager :  Staff Attendance & Leave Management",
+    "14. ClassManager :  Secure Role-Based Access (Owner, Teacher, Student)",
+    "15. ClassManager :  Staff Attendance & Leave Management",
     "16. ClassManager : Smart Student-to-Teacher Allocation System",
     "17. ClassManager : Global Message Hub for Instant Bulk Broadcasts",
     "18. ClassManager : Digital Academic Calendar & Holiday Manager",
@@ -7841,22 +7850,60 @@ let featureIndex = 0;
 const featureBox = document.getElementById('feature-highlighter');
 const featureText = document.getElementById('feature-text');
 
-if (featureBox && featureText) {
-    setInterval(() => {
-        // Step 1: Fade out
-        featureBox.classList.add('fade-out');
+function triggerBlastEffect() {
+    if (!featureBox || !featureText) return;
+
+    // 1. Hide the text quickly
+    featureText.style.opacity = '0';
+
+    // 2. Generate the "Glass Blast" pieces
+    for (let i = 0; i < 35; i++) {
+        const shard = document.createElement('div');
+        shard.className = 'shard';
         
-        // Step 2: Wait for fade out to finish (500ms), change text, then fade back in
-        setTimeout(() => {
-            featureIndex = (featureIndex + 1) % imsFeatures.length;
-            featureText.innerText = imsFeatures[featureIndex];
-            featureBox.classList.remove('fade-out');
-        }, 500); 
+        // Randomize size of shards
+        const size = Math.random() * 6 + 4; 
+        shard.style.width = size + 'px';
+        shard.style.height = size + 'px';
         
-    }, 5000); // Triggers every 5 seconds
+        // Start in the center
+        shard.style.left = '50%';
+        shard.style.top = '50%';
+        featureBox.appendChild(shard);
+
+        // Calculate explosive trajectory
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = 60 + Math.random() * 120; // How far they fly
+        const tx = Math.cos(angle) * velocity;
+        const ty = Math.sin(angle) * velocity;
+        const rot = Math.random() * 720; // Spin effect
+
+        // Animate the shards flying outwards and fading
+        shard.animate([
+            { transform: 'translate(-50%, -50%) rotate(0deg) scale(1)', opacity: 1 },
+            { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rot}deg) scale(0)`, opacity: 0 }
+        ], {
+            duration: 600 + Math.random() * 400, // 0.6s to 1s
+            easing: 'cubic-bezier(.25, .8, .25, 1)',
+            fill: 'forwards'
+        });
+
+        // Clean up DOM after animation finishes
+        setTimeout(() => shard.remove(), 1100);
+    }
+
+    // 3. Show the next text after the explosion clears
+    setTimeout(() => {
+        featureIndex = (featureIndex + 1) % imsFeatures.length;
+        featureText.innerText = imsFeatures[featureIndex];
+        featureText.style.opacity = '1';
+    }, 600); // 0.6 seconds wait
 }
 
-
+// Start the 5-second loop
+if (featureBox) {
+    setInterval(triggerBlastEffect, 5000);
+}
 
 
 
