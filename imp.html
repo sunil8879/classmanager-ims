@@ -3380,17 +3380,17 @@ async function saveAttendance(dateValue, status) {
         document.getElementById('whatsapp-alert-area').style.display = 'none'; 
     }
 }
-// 3. AUTO-REFRESH HELPER (Directly connected to the Database Table)
+// 3. AUTO-REFRESH HELPER (BULLETPROOF VERSION)
 async function autoRefreshAttendanceStats(roll, yyyy_mm) {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const parts = yyyy_mm.split('-');
     const targetMonthYear = monthNames[parseInt(parts[1], 10) - 1] + " " + parts[0];
 
-    // FETCHING THE ACTUAL RECORDS FROM THE TABLE
+    // FETCHING THE ACTUAL RECORDS FROM THE TABLE using ilike for safety
     const { data, error } = await db.from('attendance')
         .select('status')
-        .eq('roll_number', roll.toUpperCase())
-        .eq('month_year', targetMonthYear)
+        .ilike('roll_number', roll.trim())
+        .ilike('month_year', targetMonthYear)
         .eq('institute_id', sessionInstID);
 
     if (error) {
@@ -3398,14 +3398,15 @@ async function autoRefreshAttendanceStats(roll, yyyy_mm) {
         return;
     }
 
-    // ACCURATE JAVASCRIPT COUNTING (Bypasses Supabase count bugs)
-    const pCount = data ? data.filter(r => r.status === 'Present').length : 0;
-    const aCount = data ? data.filter(r => r.status === 'Absent').length : 0;
+    // ACCURATE JAVASCRIPT COUNTING (Made completely Case-Insensitive)
+    const pCount = data ? data.filter(r => r.status && r.status.toLowerCase() === 'present').length : 0;
+    const aCount = data ? data.filter(r => r.status && r.status.toLowerCase() === 'absent').length : 0;
 
     // UPDATE UI FIELDS
     document.getElementById('attn-total-p').value = pCount;
     document.getElementById('attn-total-a').value = aCount;
 }
+
 
 // 4. FETCH STATISTICS BUTTON
 async function fetchAttendanceByPrompt() {
