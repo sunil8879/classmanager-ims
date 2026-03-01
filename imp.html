@@ -7639,5 +7639,18 @@ async function editFeeRecordByRoll() {
     <i class="fas fa-download"></i> INSTALL APP
 </button>
 
+
+<script>
+/* GLOBAL CASE-INSENSITIVE STANDARDIZER */
+document.addEventListener('blur', function(e) {
+    // Only target text boxes and text areas (Safely ignores passwords, emails, and dates)
+    if (e.target && (e.target.type === 'text' || e.target.tagName === 'TEXTAREA')) {
+        e.target.value = e.target.value.toUpperCase();
+    }
+}, true);
+</script>
+
+
+
 </body>
 </html>
