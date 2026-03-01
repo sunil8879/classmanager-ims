@@ -8071,6 +8071,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 2. Fetch Teacher & Calculate Available Balance
+// 2. Fetch Teacher & Calculate Available Balance
 async function fetchTeacherForLeave() {
     const tid = document.getElementById('lv-tid').value.trim().toUpperCase();
     if (!tid) return alert("Please enter a Teacher ID first.");
@@ -8106,13 +8107,13 @@ async function fetchTeacherForLeave() {
     const totalTaken = pastLeaves ? pastLeaves.reduce((sum, lv) => sum + Number(lv.no_of_days), 0) : 0;
     const balance = totalEarnedLeaves - totalTaken;
 
-    // Update UI Indicator
+    // Update UI Indicator (Fixed Text)
     const indicator = document.getElementById('leave-balance-indicator');
     const analysisText = document.getElementById('lv-analysis-text');
     indicator.style.display = 'block';
     
     analysisText.innerHTML = `
-        <br>• Joined on: ${teacher.joining_date} (${monthsWorked} months ago)
+        <br>• Joined on: ${teacher.joining_date}
         <br>• Total Leaves Earned (2/month): ${totalEarnedLeaves}
         <br>• Leaves Taken: ${totalTaken}
         <br>• <b>Current Available Balance: <span style="color:${balance > 0 ? 'green' : 'red'};">${balance} Days</span></b>
@@ -8121,6 +8122,7 @@ async function fetchTeacherForLeave() {
     // Store balance in element dataset for validation later
     document.getElementById('lv-days').dataset.balance = balance;
 }
+
 
 // 3. Auto-Calculate Days
 function calculateLeaveDays() {
@@ -8141,6 +8143,7 @@ function calculateLeaveDays() {
     }
 }
 
+// 4. Validate Rules & Save Record
 // 4. Validate Rules & Save Record
 async function validateAndAddLeave() {
     const tid = document.getElementById('lv-tid').value.toUpperCase();
@@ -8175,32 +8178,36 @@ async function validateAndAddLeave() {
         
         const totalActive = allTeachers ? allTeachers.length : 0;
         
-        // Math: Total - (80% of Total). 
-        // e.g. 5 total -> 80% is 4. Allowed on leave = 5 - 4 = 1.
-        // e.g. 4 total -> 80% is 3.2. Allowed on leave = 4 - 3.2 = 0.8 (Since < 1, 0 allowed).
-        const maxAllowedOnLeave = Math.floor(totalActive - (totalActive * 0.8));
+        // Math: Total * 0.2 gives the exact max number of teachers allowed on leave.
+        const maxAllowedOnLeave = Math.floor(totalActive * 0.2);
 
-        // B. Fetch all currently approved leaves overlapping requested dates
-        const { data: overlappingLeaves } = await db.from('leave_management')
+        // B. Fetch ALL currently approved leaves for accurate JS filtering
+        const { data: approvedLeaves } = await db.from('leave_management')
             .select('start_date, end_date')
             .eq('status', 'Approved')
-            .eq('institute_id', sessionInstID)
-            .lte('start_date', end)  // Starts before our requested end
-            .gte('end_date', start); // Ends after our requested start
+            .eq('institute_id', sessionInstID);
 
-        // Check day by day in the requested period to find max concurrent leaves
-        let d = new Date(start);
-        const endD = new Date(end);
+        // Safely generate exact YYYY-MM-DD string array for the requested dates to avoid Timezone bugs
+        let requestedDates = [];
+        let tempDate = new Date(start + "T12:00:00Z"); // Forcing noon UTC prevents backward shifting
+        let lastDate = new Date(end + "T12:00:00Z");
+        
+        while (tempDate <= lastDate) {
+            requestedDates.push(tempDate.toISOString().split('T')[0]);
+            tempDate.setDate(tempDate.getDate() + 1);
+        }
+
         let maxConcurrent = 0;
         let blockingDate = "";
 
-        while (d <= endD) {
+        // Check day by day strictly against strings
+        for (let i = 0; i < requestedDates.length; i++) {
+            let checkDate = requestedDates[i];
             let onLeaveToday = 0;
-            const checkDateStr = d.toISOString().split('T')[0];
 
-            if (overlappingLeaves) {
-                overlappingLeaves.forEach(lv => {
-                    if (lv.start_date <= checkDateStr && lv.end_date >= checkDateStr) {
+            if (approvedLeaves) {
+                approvedLeaves.forEach(lv => {
+                    if (checkDate >= lv.start_date && checkDate <= lv.end_date) {
                         onLeaveToday++;
                     }
                 });
@@ -8209,14 +8216,13 @@ async function validateAndAddLeave() {
             // If approving THIS request puts the concurrent leaves OVER the max allowed
             if (onLeaveToday + 1 > maxAllowedOnLeave) {
                 maxConcurrent = onLeaveToday + 1;
-                blockingDate = checkDateStr;
+                blockingDate = checkDate;
                 break;
             }
-            d.setDate(d.getDate() + 1);
         }
 
         if (maxConcurrent > maxAllowedOnLeave) {
-            alert(`🛑 LEAVE REJECTED BY SYSTEM RULE!\n\nInstitute requires 80% staff presence.\nTotal Staff: ${totalActive}\nMax allowed on leave: ${maxAllowedOnLeave}\n\nOn ${blockingDate}, approving this would put ${maxConcurrent} teachers on leave.\n\nStatus automatically set to Rejected.`);
+            alert(`🛑 LEAVE REJECTED BY SYSTEM RULE!\n\nInstitute requires 80% staff presence.\nTotal Staff: ${totalActive}\nMax allowed on leave simultaneously: ${maxAllowedOnLeave}\n\nOn ${blockingDate}, approving this would put ${maxConcurrent} teachers on leave.\n\nStatus automatically set to Rejected.`);
             document.getElementById('lv-status').value = 'Rejected';
             status = 'Rejected';
             remarks = "System Rejected: 80% Staff Presence Rule violation on " + blockingDate + ". " + remarks;
@@ -8245,6 +8251,7 @@ async function validateAndAddLeave() {
         fetchTeacherForLeave(); // Refresh balance
     }
 }
+
 
 // 5. Fetch Latest Record
 async function fetchLeaveRecord() {
