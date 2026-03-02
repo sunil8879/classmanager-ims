@@ -890,20 +890,20 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <div class="input-group"><label>Mother's Mobile</label><input type="text" id="stu-mother" maxlength="10"></div>
             <div class="input-group"><label>Class / Standard</label><input type="text" id="stu-standard"></div>
          <!-- Replace the old Batch Time input with this -->
+
 <!-- Replacement for Batch/Course Slots -->
 <div class="input-group">
-    <label>Batch / Course Slots</label>
+    <label>Batch / Course Slots (Click Select)</label>
     <div style="display: flex; gap: 5px;">
-        <input type="text" id="stu-batch-display" readonly style="background: #eee; flex: 1;" placeholder="No slots selected">
-        <button type="button" onclick="openBatchPicker()" class="btn-fetch" style="padding: 10px; background: #00796b;">SELECT</button>
+        <input type="text" id="stu-batch" readonly style="background: #eee; flex: 1; font-weight:bold;" placeholder="Pick slots from window...">
+        <button type="button" onclick="openBatchPicker()" class="btn-fetch" style="padding: 10px; background: #00796b; color:white; border:none; border-radius:5px; cursor:pointer;">SELECT</button>
     </div>
-    <!-- Hidden input to store the raw data for the database -->
-    <input type="hidden" id="stu-batch"> 
 </div>
+
           <!-- Updated Course Field (Now Greyed Out) -->
 <div class="input-group">
-    <label>Course</label>
-    <input type="text" id="stu-course" readonly style="background: #e9ecef; font-weight: bold; color: #004d40;" placeholder="Auto-filled from batches">
+    <label>Course (Auto-populated)</label>
+    <input type="text" id="stu-course" readonly style="background: #e9ecef; font-weight: bold; color: #004d40;" placeholder="Select batches first">
 </div>
             
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
@@ -3009,7 +3009,7 @@ async function fetchStudentByRoll() {
 
     roll = roll.trim().toUpperCase(); 
 
-    // 2. Fetch all columns from students and course_end_date from details
+    // 2. Fetch data from student_details and join with students table
     const { data, error } = await db
         .from('student_details')
         .select(`
@@ -3027,8 +3027,9 @@ async function fetchStudentByRoll() {
                 total_fees, 
                 paid_amount, 
                 pending_amount,
-due_dates,
-status
+                due_dates,
+                status,
+                email
             )
         `)
         .eq('roll_number', roll)
@@ -3049,39 +3050,38 @@ status
     document.getElementById('stu-father').value = s.father_mobile || "";
     document.getElementById('stu-mother').value = s.mother_mobile || "";
     document.getElementById('stu-standard').value = s.standard || "";
-  const savedBatches = s.batch_time ? s.batch_time.split(', ') : [];
-const batchSelect = document.getElementById('stu-batch');
-Array.from(batchSelect.options).forEach(opt => {
-    opt.selected = savedBatches.includes(opt.value);
-});
+    
+    // --- FIXED BATCH & COURSE POPULATION ---
+    // We simply put the strings directly into the text boxes now.
+    document.getElementById('stu-batch').value = s.batch_time || ""; 
     document.getElementById('stu-course').value = s.course || "";
+    
     document.getElementById('stu-total').value = s.total_fees || 0;
     document.getElementById('stu-paid').value = s.paid_amount || 0;
     document.getElementById('stu-pending').value = s.pending_amount || 0;
-document.getElementById('stu-due-dates').value = s.due_dates || "";
- document.getElementById('stu-status').value = s.status || "Active";
+    document.getElementById('stu-due-dates').value = s.due_dates || "";
+    document.getElementById('stu-status').value = s.status || "Active";
+    document.getElementById('stu-email').value = s.email || "";
     
     // Values from the student_details table
     document.getElementById('stu-roll').value = data.roll_number || "";
     document.getElementById('stu-end-date').value = data.course_end_date || "";
 
+    // --- RE-FETCH EMAIL & MOBILE FROM PROFILES (IF MISSING) ---
+    if (!s.mobile || !s.email) {
+        const { data: prof } = await db.from('profiles')
+            .select('mobile_number, email')
+            .ilike('full_name', s.full_name)
+            .eq('role', 'Student')
+            .eq('institute_id', sessionInstID)
+            .limit(1)
+            .maybeSingle();
 
-
-
-// --- START OF AUTO-POPULATE MOBILE & EMAIL FROM PROFILES ---
-    const { data: prof } = await db.from('profiles')
-        .select('mobile_number, email')
-        .ilike('full_name', s.full_name)
-        .eq('role', 'Student')
-        .eq('institute_id', sessionInstID)
-        .limit(1)
-        .maybeSingle();
-
-    if (prof) {
-        if (prof.mobile_number) document.getElementById('stu-mobile').value = prof.mobile_number;
-        if (prof.email) document.getElementById('stu-email').value = prof.email;
+        if (prof) {
+            if (!s.mobile) document.getElementById('stu-mobile').value = prof.mobile_number || "";
+            if (!s.email) document.getElementById('stu-email').value = prof.email || "";
+        }
     }
-    // --- END OF AUTO-POPULATE ---
 
     alert("Full Profile Loaded for " + s.full_name);
 }
@@ -3179,70 +3179,76 @@ status: document.getElementById('stu-status').value,
 async function openBatchPicker() {
     const modal = document.getElementById('batch-picker-modal');
     const tbody = document.getElementById('batch-picker-body');
-    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>Loading available batches...</td></tr>";
+    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px;'>Fetching Master Schedule...</td></tr>";
     modal.style.display = 'flex';
 
-    // 1. Fetch all batches and current enrollments
+    // 1. Fetch Batches (Master) and List (Enrollments)
     const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
-    const { data: currentEnrollments } = await db.from('list').select('batch_name').eq('institute_id', sessionInstID);
+    const { data: enrollments } = await db.from('list').select('batch_name, roll_number').eq('institute_id', sessionInstID);
 
     if (!batches || batches.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No batches found. Create one in Section 5 first.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px;'>No Batches found in Section 5.</td></tr>";
         return;
     }
 
-    // 2. Alphabetical Sort by Subject Name
-    batches.sort((a, b) => a.subject_name.localeCompare(b.subject_name));
-
-    // 3. Render Table
-    tbody.innerHTML = "";
+    // 2. FLATTEN & SORT: Split comma-separated times into individual rows
+    let flatSchedule = [];
     batches.forEach(b => {
-        const enrolled = currentEnrollments ? currentEnrollments.filter(e => e.batch_name === b.batch_name).length : 0;
-        const isFull = b.students_allotted > 0 && enrolled >= b.students_allotted;
-        const isYes = !isFull;
+        const times = b.batch_time.split(',').map(t => t.trim());
+        times.forEach(t => {
+            flatSchedule.push({
+                subject: b.subject_name,
+                time: t,
+                total: b.students_allotted || 0,
+                batchName: b.batch_name
+            });
+        });
+    });
+
+    // Sort alphabetically by Subject Name
+    flatSchedule.sort((a, b) => a.subject.localeCompare(b.subject));
+
+    // 3. RENDER ROWS
+    tbody.innerHTML = "";
+    flatSchedule.forEach(row => {
+        // Count students specifically in this batch
+        const count = enrollments ? enrollments.filter(e => e.batch_name === row.batchName).length : 0;
+        const available = row.total - count;
+        const isYes = available > 0 || row.total === 0;
 
         tbody.innerHTML += `
-            <tr style="border-bottom:1px solid #eee; background: ${isFull ? '#fff5f5' : 'transparent'};">
-                <td style="padding:12px; font-weight:bold;">${b.subject_name}</td>
-                <td style="padding:12px;">${b.batch_time}</td>
-                <td style="padding:12px; text-align:center;">${enrolled} / ${b.students_allotted || '∞'}</td>
-                <td style="padding:12px; text-align:center; font-weight:bold; color: ${isYes ? 'green' : 'red'};">${isYes ? 'YES' : 'NO (FULL)'}</td>
-                <td style="padding:12px; text-align:center;">
-                    <input type="checkbox" class="batch-select-cb" 
-                           data-subject="${b.subject_name}" 
-                           data-time="${b.batch_time}" 
+            <tr style="background: ${isYes ? '#fff' : '#ffebee'}; border-bottom: 1px solid #ddd;">
+                <td style="padding:15px; font-weight:bold;">${row.subject}</td>
+                <td style="padding:15px;">${row.time}</td>
+                <td style="padding:15px; text-align:center;">${count} / ${row.total || '∞'}</td>
+                <td style="padding:15px; text-align:center; font-weight:bold; color: ${isYes ? 'green' : 'red'};">${isYes ? 'YES' : 'NO'}</td>
+                <td style="padding:15px; text-align:center;">
+                    <input type="checkbox" class="batch-cb" 
+                           data-sub="${row.subject}" 
+                           data-time="${row.time}" 
                            ${!isYes ? 'disabled' : ''} 
-                           style="width:20px; height:20px;">
+                           style="width:22px; height:22px; cursor:pointer;">
                 </td>
             </tr>
         `;
     });
 }
-
 function saveBatchSelection() {
-    const selected = document.querySelectorAll('.batch-select-cb:checked');
-    if (selected.length === 0) {
-        alert("Please select at least one batch.");
-        return;
-    }
+    const selected = document.querySelectorAll('.batch-cb:checked');
+    if (selected.length === 0) return alert("Select at least one slot.");
 
-    let subjects = [];
     let times = [];
+    let subs = [];
 
     selected.forEach(cb => {
-        subjects.push(cb.dataset.subject);
         times.push(cb.dataset.time);
+        subs.push(cb.dataset.sub);
     });
 
-    // Remove duplicates from subjects (in case multiple slots for same subject)
-    const uniqueSubjects = [...new Set(subjects)];
+    // Update Section 3 Fields
+    document.getElementById('stu-batch').value = times.join(', ');
+    document.getElementById('stu-course').value = [...new Set(subs)].join(', '); // Unique subjects only
 
-    // Update Main Form
-    document.getElementById('stu-batch-display').value = times.join(', ');
-    document.getElementById('stu-batch').value = times.join(', '); // For database
-    document.getElementById('stu-course').value = uniqueSubjects.join(', '); // Autopopulated & Greyeout
-
-    // Close Modal
     document.getElementById('batch-picker-modal').style.display = 'none';
 }
 /* ==========================================
@@ -9184,30 +9190,28 @@ document.addEventListener('blur', function(e) {
 </script>
 
 
-<!-- BATCH PICKER MODAL -->
-<div id="batch-picker-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100000; justify-content:center; align-items:center;">
-    <div style="background:white; padding:30px; border-radius:15px; width:90%; max-width:800px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif;">
-        <h2 style="text-align:center; border-bottom:3px solid #7FFFD4; padding-bottom:10px;">INSTITUTE BATCH SCHEDULER</h2>
-        <p style="text-align:center; color:#666;">Select the available slots for the student.</p>
+<div id="batch-picker-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:100000; justify-content:center; align-items:center; padding:20px;">
+    <div style="background:white; padding:30px; border-radius:15px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; font-family:'Times New Roman', serif; border: 5px solid #7FFFD4;">
+        <h2 style="text-align:center; text-decoration:underline; margin-bottom:20px;">STUDENT BATCH SCHEDULER</h2>
         
-        <table style="width:100%; border-collapse:collapse; margin-top:20px; text-align:left;">
+        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
             <thead>
-                <tr style="background:#f0fdfa; border-bottom:2px solid #000;">
-                    <th style="padding:12px;">SUBJECT NAME</th>
-                    <th style="padding:12px;">SLOT AVAILABLE</th>
-                    <th style="padding:12px; text-align:center;">CAPACITY</th>
-                    <th style="padding:12px; text-align:center;">AVAILABLE?</th>
-                    <th style="padding:12px; text-align:center;">SELECT</th>
+                <tr style="background:#000; color:#fff; text-align:left;">
+                    <th style="padding:15px; border:1px solid #ddd;">SUBJECT NAME</th>
+                    <th style="padding:15px; border:1px solid #ddd;">TIME SLOT</th>
+                    <th style="padding:15px; border:1px solid #ddd; text-align:center;">CAPACITY</th>
+                    <th style="padding:15px; border:1px solid #ddd; text-align:center;">YES/NO</th>
+                    <th style="padding:15px; border:1px solid #ddd; text-align:center;">SELECT</th>
                 </tr>
             </thead>
             <tbody id="batch-picker-body">
-                <!-- Data injected by JS -->
+                <!-- Data rows injected here -->
             </tbody>
         </table>
 
-        <div style="display:flex; gap:15px; margin-top:30px;">
-            <button onclick="saveBatchSelection()" style="flex:1; background:#27ae60; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">CONFIRM SELECTION</button>
-            <button onclick="document.getElementById('batch-picker-modal').style.display='none'" style="flex:1; background:#666; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">CANCEL</button>
+        <div style="display:flex; gap:20px; margin-top:30px;">
+            <button onclick="saveBatchSelection()" style="flex:1; background:#27ae60; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1.1rem;">CONFIRM SELECTION</button>
+            <button onclick="document.getElementById('batch-picker-modal').style.display='none'" style="flex:1; background:#666; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1.1rem;">CANCEL</button>
         </div>
     </div>
 </div>
