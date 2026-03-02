@@ -897,10 +897,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     </select>
     <small style="color: #666;">* Hold Ctrl (Win) or Cmd (Mac) to select multiple</small>
 </div>
-           <div class="input-group">
-    <label>Enrolled Course(s)</label>
-    <input type="text" id="stu-course" readonly style="background:#eee;" placeholder="Select slots above to populate">
-</div>
+            <div class="input-group"><label>Course</label><input type="text" id="stu-course" placeholder="Course"></div>
             
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
             <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid" oninput="calcStuPending()"></div>
@@ -1840,16 +1837,14 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     <div class="card">
         <h3><i class="fas fa-link"></i> Student Allocation</h3>
         <div class="form-grid">
-
-
             <!-- TEACHER INFO -->
-           <div class="input-group">
-    <label>Teacher ID</label>
-    <select id="alloc-tid" onchange="fetchTeacherForAlloc()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
-        <option value="">-- Select Teacher --</option>
-    </select>
-</div>
-
+            <div class="input-group">
+                <label>Teacher ID</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="alloc-tid" placeholder="TCH-XXXX">
+                    <button class="btn-fetch" onclick="fetchTeacherForAlloc()" style="padding:5px;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
             <div class="input-group"><label>Teacher Name</label><input type="text" id="alloc-tname" readonly style="background:#eee;"></div>
             
           <!-- REPLACE the old Subjects Taught by Teacher input with this -->
@@ -2497,7 +2492,6 @@ google.charts.load('current', {'packages':['corechart', 'controls']});
 // ADD THESE TWO LINES HERE
 let sessionInstID = ""; 
 let sessionUserName = "";
-let currentRollAllocations = []; // Stores all links for the current student
 
 
 let portalCurrentPage = 1;
@@ -3457,13 +3451,6 @@ async function generateUPIQR() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
-// Inside addBatch()
-const teacherExpertise = document.getElementById('batch-teacher-id').dataset.subjects || "";
-const selectedSubject = document.getElementById('batch-subject').value.toUpperCase();
-
-if (!teacherExpertise.includes(selectedSubject)) {
-    return alert(`🛑 SUBJECT MISMATCH: This teacher is registered for [${teacherExpertise}]. They cannot be assigned to a [${selectedSubject}] batch.`);
-}
     const bName = document.getElementById('batch-name').value.trim();
     const tId = document.getElementById('batch-teacher-id').value.toUpperCase().trim();
     const bTime = document.getElementById('batch-time').value;
@@ -3660,20 +3647,15 @@ async function loadBatchTeacherDropdown() {
 }
 
 // 2. Auto-fill the Teacher Name box when ID is selected
-async function handleBatchTeacherChange() {
+function handleBatchTeacherChange() {
     const select = document.getElementById('batch-teacher-id');
     const nameInput = document.getElementById('batch-teacher-name');
-    const tid = select.value;
+    const selectedOpt = select.options[select.selectedIndex];
     
-    if (!tid) return;
-
-    // Fetch teacher details to get their expertise
-    const { data } = await db.from('teacher_details').select('teacher_name, subject_taught').eq('id', tid).single();
-    
-    if (data) {
-        nameInput.value = data.teacher_name;
-        // Store subjects in a temporary attribute for validation
-        select.dataset.subjects = data.subject_taught.toUpperCase(); 
+    if (selectedOpt && selectedOpt.dataset.name) {
+        nameInput.value = selectedOpt.dataset.name;
+    } else {
+        nameInput.value = "";
     }
 }
 /* ==========================================
@@ -5646,30 +5628,6 @@ async function fetchTeacherHistory() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-
-
-// Fetch all teachers and fill the dropdown for Student Allocation
-async function loadAllocTeacherDropdown() {
-    const select = document.getElementById('alloc-tid');
-    const { data } = await db.from('teacher_details')
-        .select('id, teacher_name')
-        .eq('institute_id', sessionInstID)
-        .eq('status', 'Active');
-
-    select.innerHTML = '<option value="">-- Select Teacher --</option>';
-    if (data) {
-        data.forEach(t => {
-            let opt = document.createElement('option');
-            opt.value = t.id;
-            opt.text = t.id + " (" + t.teacher_name + ")";
-            select.appendChild(opt);
-        });
-    }
-}
-
-
-
-
 async function fetchTeacherForAlloc() {
     const tid = document.getElementById('alloc-tid').value.toUpperCase().trim();
     if (!tid) return alert("Please enter a Teacher ID.");
@@ -5780,19 +5738,6 @@ async function saveAllocation() {
         subject: sCourse, // This is the student's specific course
         batch_name: tBatch // NEW: Saving the link to the specific batch from Section 5
     };
-
-
-
-// Inside saveAllocation()
-const teacherExpertise = document.getElementById('alloc-tbatch').options[document.getElementById('alloc-tbatch').selectedIndex].text.toUpperCase();
-const studentCourse = document.getElementById('alloc-subject').value.toUpperCase();
-
-if (!teacherExpertise.includes(studentCourse)) {
-    return alert(`🛑 ALLOCATION DENIED: You are linking a [${studentCourse}] student to a batch focused on [${teacherExpertise}]. Please select the correct teacher.`);
-}
-
-
-
 
     const { error } = await db.from('student_allocations').insert([data]);
 
@@ -5940,9 +5885,6 @@ case 'batch-master':
     break;
 case 'batch':
     loadBatchTeacherDropdown();
-    break;
-case 'allocation-mod':
-    loadAllocTeacherDropdown();
     break;
 
 // Locate the switch(id) inside showSection(id) and add this:
@@ -7727,19 +7669,6 @@ async function addBatchMasterRecord() {
     const studentName = document.getElementById('bm-sname').value;
     const teacherId = document.getElementById('bm-tid').value;
 
-
-// Inside addBatchMasterRecord()
-const studentCourses = document.getElementById('bm-course').value.toUpperCase();
-const batchInfo = document.getElementById('bm-bname').value.toUpperCase(); // This usually contains the subject name
-
-// Check if the student actually takes the subject that this batch is for
-// Example: If batch is "Evening Physics" and student takes "Maths, Physics", it passes.
-const batchSubjectFound = studentCourses.split(',').some(course => batchInfo.includes(course.trim()));
-
-if (!batchSubjectFound) {
-    return alert(`🛑 INVALID ENROLLMENT: Student is enrolled for [${studentCourses}], but you are trying to add them to the [${batchInfo}] batch. These do not match.`);
-}
-
     if (!roll || !batchName || !teacherId) return alert("Please fill all details (Roll No, Teacher, and Batch).");
 
     // --- 1. MODIFIED DUPLICATE CHECK: Check Roll + Batch Name ---
@@ -8856,61 +8785,45 @@ async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter a Roll Number first.");
 
-    // 1. Fetch Student Base Info from Students Table
-    const { data: stu, error: stuErr } = await db.from('students')
-        .select('full_name, course')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
+    // Load Teacher List first if not already loaded
+    if(document.getElementById('bm-tid').options.length <= 1) await loadBMTeacherDropdown();
 
-    if (stuErr || !stu) return alert("Student not found in admission records.");
+    // A. Fetch from STUDENTS table
+    const { data: stu } = await db.from('students')
+        .select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+
+    if (!stu) return alert("Student not found.");
     
     document.getElementById('bm-sname').value = stu.full_name;
     document.getElementById('bm-course').value = stu.course || "N/A";
 
-    // 2. Fetch ALL Allocations from Student_Allocations (Module 18)
-    const { data: allocs, error: allocErr } = await db.from('student_allocations')
-        .select('teacher_id, teacher_name, batch_name')
+    // B. Fetch Allocation (Which teacher is this student linked to?)
+    const { data: alloc } = await db.from('student_allocations')
+        .select('teacher_id')
         .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID);
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
 
-    const tidSelect = document.getElementById('bm-tid');
-    tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
-
-    // --- THE LOGIC FIX ---
-if (allocs && allocs.length > 0) {
-        // Filter out any records where batch_name is null or empty
-        currentRollAllocations = allocs.filter(a => a.batch_name && a.batch_name !== "null"); 
+    if (alloc) {
+        // Select the teacher in dropdown
+        document.getElementById('bm-tid').value = alloc.teacher_id;
+        // Trigger the change to load that teacher's batches
+        await handleBMTeacherChange();
         
-        const tidSelect = document.getElementById('bm-tid');
-        tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
-
-        // Get UNIQUE Teacher IDs
-        const seenTids = new Set();
-        currentRollAllocations.forEach(a => {
-            if (!seenTids.has(a.teacher_id)) {
-                seenTids.add(a.teacher_id);
-                let opt = document.createElement('option');
-                opt.value = a.teacher_id;
-                opt.text = `${a.teacher_id} - ${a.teacher_name}`;
-                opt.dataset.name = a.teacher_name;
-                tidSelect.appendChild(opt);
+        // C. Try to auto-select the batch if it matches the student's course
+        const bSelect = document.getElementById('bm-bname');
+        for (let i = 0; i < bSelect.options.length; i++) {
+            if (bSelect.options[i].text.includes(stu.course)) {
+                bSelect.selectedIndex = i;
+                break;
             }
-        });
-
-        if (seenTids.size === 1) {
-            tidSelect.selectedIndex = 1;
-            // Manually trigger the fill logic for the single teacher
-            const event = new Event('change');
-            tidSelect.dispatchEvent(event);
-        } else {
-            document.getElementById('bm-bname').innerHTML = '<option value="">-- Pick Teacher First --</option>';
         }
     } else {
-        alert("No specific Teacher Allocation found.");
-        await loadBMTeacherDropdown();
+        alert("Student found, but no Teacher Allocation (Module 18) found. Please select teacher manually.");
     }
 }
+
+
 
 async function refreshStudentBatchDropdown() {
     const batchSelect = document.getElementById('stu-batch');
@@ -8930,65 +8843,14 @@ async function refreshStudentBatchDropdown() {
             // Value is the time, Text is Subject + Time
             opt.value = b.batch_time;
             opt.text = `${b.subject_name} (${b.batch_time})`;
-// ADD THIS LINE: It stores the pure subject name hidden inside the option
-            opt.dataset.subject = b.subject_name; 
             batchSelect.appendChild(opt);
         });
     }
 }
 
-// Add this logic to your script
-document.getElementById('stu-batch').addEventListener('change', function() {
-    const courseInput = document.getElementById('stu-course');
-    
-    // 1. Get all selected options
-    const selectedOptions = Array.from(this.selectedOptions);
-    
-    // 2. Extract the subject names we stored in dataset.subject
-    const subjects = selectedOptions
-        .map(opt => opt.dataset.subject)
-        .filter(s => s); // Remove empty values
-    
-    // 3. Remove duplicates (e.g., if user picks two different times for same subject)
-    const uniqueSubjects = [...new Set(subjects)];
-    
-    // 4. Join with commas and update the greyed-out box
-    courseInput.value = uniqueSubjects.join(', ');
-});
 
 
-document.getElementById('bm-tid').addEventListener('change', function() {
-    const tid = this.value;
-    const bnameSelect = document.getElementById('bm-bname');
-    const nameInput = document.getElementById('bm-tname');
-    
-    const selectedOpt = this.options[this.selectedIndex];
-    nameInput.value = selectedOpt ? (selectedOpt.dataset.name || "") : "";
 
-    bnameSelect.innerHTML = '<option value="">-- Select Linked Batch --</option>';
-
-    if (!tid) return;
-
-    // --- LOGIC TO REMOVE DUPLICATES AND NULLS ---
-    const seenBatches = new Set();
-    
-    currentRollAllocations.forEach(a => {
-        // 1. Check if record belongs to this teacher
-        // 2. Check if batch name is NOT empty/null
-        // 3. Check if we haven't already added this batch name to the list
-        if (a.teacher_id === tid && a.batch_name && !seenBatches.has(a.batch_name)) {
-            seenBatches.add(a.batch_name);
-            let opt = document.createElement('option');
-            opt.value = a.batch_name;
-            opt.text = a.batch_name;
-            bnameSelect.appendChild(opt);
-        }
-    });
-
-    if (seenBatches.size === 1) {
-        bnameSelect.selectedIndex = 1;
-    }
-});
     </script>
 <script>
 if ('serviceWorker' in navigator) {
