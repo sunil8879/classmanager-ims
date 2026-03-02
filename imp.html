@@ -3465,6 +3465,7 @@ async function generateUPIQR() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
+if (document.getElementById('batch-slots-display').innerText.includes("No slots found")) return alert("🛑 ERROR: Teacher-Subject Mismatch! This teacher is not registered to teach " + document.getElementById('batch-subject').value);
     const batchName = document.getElementById('batch-name').value;
     const displaySlots = document.getElementById('batch-slots-display').innerText;
     const subject = document.getElementById('batch-subject').value;
@@ -7802,6 +7803,7 @@ document.getElementById('bm-tid').addEventListener('change', function() {
 // 4. ADD RECORD to "list" table
 // 4. ADD RECORD to "list" table (BUG-FREE CAPACITY CHECK)
 async function addBatchMasterRecord() {
+if (!document.getElementById('bm-course').value.toUpperCase().includes(document.getElementById('bm-bname').options[document.getElementById('bm-bname').selectedIndex].text.toUpperCase().match(/\(([^)]+)\)/)[1])) return alert("🛑 ERROR: Subject Mismatch! Student is not enrolled for the subject taught in this batch.");
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
     const batchName = document.getElementById('bm-bname').value.trim();
     const studentName = document.getElementById('bm-sname').value;
