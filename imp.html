@@ -5051,6 +5051,9 @@ function updateSubjectPages() {
 }
 
 function changeSubjectPage(dir) {
+
+
+if (getSelectedTeacherTimeSlots().split(', ').some(slot => slot && Object.entries(availabilityMap).some(([sub, val]) => sub !== subjectPages[currentSubjectIndex] && val.includes(slot)))) return alert("🛑 Conflict: This slot is already taken by another subject!");
     if (subjectPages.length === 0) return alert("Please type subjects in 'Subject Taught' box first.");
     
     // 1. Get currently selected slots for the current subject
