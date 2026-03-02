@@ -3089,6 +3089,9 @@ function saveBatchSelection() {
         subs.push(cb.dataset.sub);
     });
 
+
+if (new Set(times).size !== times.length) return alert("🛑 TIME CONFLICT: You have selected the same time slot for two different subjects!");
+
     // Update Section 3 Fields
     document.getElementById('stu-batch').value = times.join(', ');
     document.getElementById('stu-course').value = [...new Set(subs)].join(', '); // Unique subjects only
@@ -7681,21 +7684,28 @@ let currentRollAllocations = [];
 
 async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
-    if(!roll) return;
+    if (!roll) return alert("Please enter a Roll Number first.");
 
-    const { data: stu } = await db.from('students').select('full_name, course').eq('roll_number', roll).maybeSingle();
-    if (!stu) return alert("Roll No not found.");
+    // 1. Fetch from STUDENTS table
+    const { data: stu } = await db.from('students').select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if (!stu) return alert("Student not found in main records.");
     
     document.getElementById('bm-sname').value = stu.full_name;
-    document.getElementById('bm-course').value = stu.course;
+    document.getElementById('bm-course').value = stu.course || "N/A";
 
-    const { data: allocs } = await db.from('student_allocations').select('*').eq('roll_number', roll).eq('institute_id', sessionInstID);
+    // 2. Fetch Allocation (Finding the link from Module 18)
+    // We check BOTH roll_number and institute_id to ensure a perfect match
+    const { data: allocs } = await db.from('student_allocations')
+        .select('teacher_id, teacher_name, batch_name')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
 
     const tidSelect = document.getElementById('bm-tid');
     tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
 
     if (allocs && allocs.length > 0) {
-        currentRollAllocations = allocs;
+        // Link found! Populate the Teacher dropdown automatically
+        currentRollAllocations = allocs; 
         const seen = new Set();
         allocs.forEach(a => {
             if (!seen.has(a.teacher_id)) {
@@ -7709,14 +7719,14 @@ async function autopopulateBatchMaster() {
         });
         if (seen.size === 1) {
             tidSelect.selectedIndex = 1;
-            tidSelect.dispatchEvent(new Event('change'));
+            handleBMTeacherChange(); 
         }
     } else {
-        alert("Student found, but link (Section 18) is missing. Loading full teacher list.");
+        // No link found in Module 18, so we load all active teachers as a fallback
+        alert("Notice: No direct Teacher Allocation (Module 18) found for this student. Loading full teacher list.");
         loadBMTeacherDropdown();
     }
 }
-
 // Listener to filter batches per teacher and ELIMINATE DUPLICATE BATCH NAMES
 document.getElementById('bm-tid').addEventListener('change', function() {
     const tid = this.value;
