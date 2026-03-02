@@ -6243,88 +6243,87 @@ async function generateFinancialForecast(students) {
     const forecastData = {};
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    // 1. SCAN ALL STUDENTS TO FIND EVERY "MONTH YEAR" WHERE MONEY IS DUE
     students.forEach(s => {
-        if (s.pending_amount > 0 && s.due_dates) {
-            const dates = s.due_dates.split(',').map(d => d.trim()).filter(d => d !== "");
-            
-            // Calculate how much is due per installment
-            const perInstallment = s.pending_amount / dates.length;
+        const pending = parseFloat(s.pending_amount) || 0;
+        if (pending <= 0) return;
 
-            dates.forEach(dateStr => {
-                // Standardize the format (e.g., "February 2026")
-                // We handle potential "st, nd, rd, th" just in case
-                let cleanDate = dateStr.replace(/(st|nd|rd|th)/i, '');
-                let dObj = new Date(cleanDate);
+        // --- STEP 1: FIND THE DUE MONTHS ---
+        let targetMonths = [];
+        
+        if (s.due_dates && s.due_dates.trim() !== "") {
+            // Split the dates and clean them up
+            targetMonths = s.due_dates.split(',').map(d => d.trim()).filter(d => d !== "");
+        } else {
+            // FALLBACK: If no due_dates, use the month they joined
+            const joinDate = new Date(s.admission_date);
+            if (!isNaN(joinDate)) {
+                targetMonths = [monthNames[joinDate.getMonth()] + " " + joinDate.getFullYear()];
+            }
+        }
+
+        // --- STEP 2: DISTRIBUTE THE PENDING AMOUNT ---
+        if (targetMonths.length > 0) {
+            const perInstallment = pending / targetMonths.length;
+
+            targetMonths.forEach(dateStr => {
+                // Ensure the date is readable by adding a dummy day "01"
+                let cleanStr = dateStr.replace(/(st|nd|rd|th)/i, '');
+                let dObj = new Date("01 " + cleanStr);
                 
+                if (isNaN(dObj)) {
+                    // One last attempt: just use the raw string if it contains a year
+                    dObj = new Date(cleanStr);
+                }
+
                 if (!isNaN(dObj)) {
                     let key = monthNames[dObj.getMonth()] + " " + dObj.getFullYear();
-                    
-                    // Add to the forecast object
-                    if (!forecastData[key]) {
-                        forecastData[key] = 0;
-                    }
-                    forecastData[key] += perInstallment;
+                    forecastData[key] = (forecastData[key] || 0) + perInstallment;
                 }
             });
         }
     });
 
-    // 2. SORT THE MONTHS CHRONOLOGICALLY
-    // We convert the keys back to Date objects to sort them properly
-    const sortedMonths = Object.keys(forecastData).sort((a, b) => {
-        return new Date(a) - new Date(b);
-    });
+    // --- STEP 3: SORT & RENDER ---
+    const sortedMonths = Object.keys(forecastData).sort((a, b) => new Date(a) - new Date(b));
 
-    // 3. UPDATE THE UI CARDS
     const cardContainer = document.getElementById('forecast-cards');
     cardContainer.innerHTML = "";
 
-    // If no money is expected anywhere, show a message
-    if (sortedMonths.length === 0) {
-        cardContainer.innerHTML = "<p style='color:#666;'>No upcoming or overdue fee installments found.</p>";
-    }
-
-    // 4. PREPARE DATA FOR GRAPHS (No changes needed to graph code structure)
-    const chartRows = [];
-    
-    // Get yearly collection for the graph logic
-    const currentYear = new Date().getFullYear();
-    const { data: yearlyPayments } = await db.from('payment_history')
-        .select('amount')
-        .eq('institute_id', sessionInstID)
-        .gte('payment_date', `${currentYear}-01-01`)
-        .lte('payment_date', `${currentYear}-12-31`);
-        
-    const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
-    const totalAdmissions = students.length;
-    const totalPending = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
-
-    let runningCollection = totalReceived;
-    let runningPending = totalPending;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     sortedMonths.forEach(month => {
         const monthlyIncoming = Math.round(forecastData[month]);
-        
-        // Add to UI
+        if (monthlyIncoming <= 0) return;
+
+        const isPast = new Date(month) < new Date(today.getFullYear(), today.getMonth(), 1);
+
         cardContainer.innerHTML += `
-            <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid #f39c12; background: ${new Date(month) < new Date().setHours(0,0,0,0) ? '#fff0f0' : 'white'};">
-                <p style="font-size: 0.7rem; margin-bottom: 5px; color: ${new Date(month) < new Date().setHours(0,0,0,0) ? 'red' : '#666'};">
-                    ${month.toUpperCase()} ${new Date(month) < new Date().setHours(0,0,0,0) ? '(OVERDUE)' : ''}
+            <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid ${isPast ? '#ff0000' : '#f39c12'}; background: ${isPast ? '#fff5f5' : 'white'};">
+                <p style="font-size: 0.7rem; margin-bottom: 5px; color: ${isPast ? '#ff0000' : '#666'}; font-weight: bold;">
+                    ${month.toUpperCase()} ${isPast ? '(PAST DUE)' : ''}
                 </p>
-                <h4 style="font-size: 1.2rem !important; color: #000;">₹${monthlyIncoming.toLocaleString()}</h4>
+                <h4 style="font-size: 1.2rem !important; color: #000;">₹${monthlyIncoming.toLocaleString('en-IN')}</h4>
             </div>
         `;
-
-        // Logic for cumulative graph lines
-        runningCollection += monthlyIncoming;
-        runningPending -= monthlyIncoming;
-        if (runningPending < 0) runningPending = 0;
-
-        chartRows.push([month, totalAdmissions, runningCollection, runningPending, monthlyIncoming, monthlyIncoming]);
     });
 
-    // 5. DRAW THE GRAPH
+    // --- STEP 4: UPDATE GRAPH (Keep structure same) ---
+    const chartRows = [];
+    const currentYear = new Date().getFullYear();
+    const { data: yearlyPayments } = await db.from('payment_history').select('amount').eq('institute_id', sessionInstID).gte('payment_date', `${currentYear}-01-01`).lte('payment_date', `${currentYear}-12-31`);
+    const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
+    
+    let runningColl = totalReceived;
+    let runningPend = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
+
+    sortedMonths.forEach(month => {
+        const amt = Math.round(forecastData[month]);
+        runningColl += amt;
+        runningPend -= amt;
+        chartRows.push([month, students.length, runningColl, Math.max(0, runningPend), amt, amt]);
+    });
+
     drawHomeForecastingChart(chartRows);
 }
 function drawHomeForecastingChart(chartRows) {
