@@ -3642,17 +3642,20 @@ async function loadBatchTeacherDropdown() {
 /* ==========================================
    AUTO-POPULATE BATCH TIMINGS FROM TEACHER PORTAL
    ========================================== */
+/* ==========================================
+   BRIDGE: CONNECTING BATCHES TO TEACHER_DETAILS
+   ========================================== */
 async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
     const selectedSubject = document.getElementById('batch-subject').value;
     const nameInput = document.getElementById('batch-teacher-name');
     const checkboxes = document.querySelectorAll('.batch-time-slot');
 
-    // Reset all checkboxes first
+    // 1. Reset all checkboxes before fetching new data
     checkboxes.forEach(cb => {
         cb.checked = false;
-        cb.parentElement.style.opacity = "0.5"; // Dim unavailable slots
-        cb.parentElement.style.color = "#ccc";
+        cb.parentElement.style.color = "#ccc"; // Grey out by default
+        cb.parentElement.style.fontWeight = "normal";
     });
 
     if (!tid) {
@@ -3660,45 +3663,51 @@ async function handleBatchTeacherChange() {
         return;
     }
 
-    // 1. Fetch the Teacher's specific data
-    const { data: t, error } = await db.from('teacher_details')
+    // 2. THE CONNECTION: Query teacher_details table using the tid from Batch section
+    const { data: teacher, error } = await db.from('teacher_details')
         .select('teacher_name, time_of_slot, availability')
         .eq('id', tid)
-        .eq('institute_id', sessionInstID)
-        .single();
+        .eq('institute_id', sessionInstID) // Ensures data belongs to your institute
+        .maybeSingle();
 
-    if (error || !t) return;
-
-    // 2. Set Teacher Name
-    nameInput.value = t.teacher_name;
-
-    // 3. If teacher is marked as "No" for availability, stop here
-    if (t.availability === "No") {
-        console.log("Teacher is marked unavailable.");
+    if (error) {
+        console.error("Link Error:", error.message);
         return;
     }
 
-    // 4. Parse the availability map (JSON)
-    let slotMap = {};
-    try {
-        slotMap = typeof t.time_of_slot === 'string' ? JSON.parse(t.time_of_slot) : t.time_of_slot;
-    } catch (e) {
-        console.error("Error parsing teacher slots:", e);
-        return;
-    }
+    if (teacher) {
+        // 3. Auto-fill the Teacher Name field in Section 5
+        nameInput.value = teacher.teacher_name;
 
-    // 5. Look for slots matching the selected subject
-    if (selectedSubject && slotMap[selectedSubject]) {
-        const availableSlots = slotMap[selectedSubject]; // This is a string like "09:00 AM..., 10:00 AM..."
-        
-        checkboxes.forEach(cb => {
-            if (availableSlots.includes(cb.value)) {
-                cb.checked = true;
-                cb.parentElement.style.opacity = "1";
-                cb.parentElement.style.color = "#000";
-                cb.parentElement.style.fontWeight = "bold";
-            }
-        });
+        // 4. Check if teacher is available tomorrow
+        if (teacher.availability !== "Yes") {
+            console.log("Teacher is marked unavailable in Portal.");
+            return;
+        }
+
+        // 5. Parse the availability map saved in Section 11
+        let slotMap = {};
+        try {
+            // If it's already an object, use it; if it's a string, parse it.
+            slotMap = (typeof teacher.time_of_slot === 'string') ? JSON.parse(teacher.time_of_slot) : teacher.time_of_slot;
+        } catch (e) {
+            console.warn("No valid slot map found for this teacher.");
+            return;
+        }
+
+        // 6. Match the specific subject selected in Batch Section to the Teacher's Slots
+        if (selectedSubject && slotMap[selectedSubject]) {
+            const savedSlots = slotMap[selectedSubject]; // e.g. "09:00 AM to 10:00 AM, 11:00 AM to 12:00 PM"
+            
+            checkboxes.forEach(cb => {
+                // If the checkbox value exists in the teacher's saved subject slots
+                if (savedSlots.includes(cb.value)) {
+                    cb.checked = true;
+                    cb.parentElement.style.color = "#000"; // Highlight available
+                    cb.parentElement.style.fontWeight = "bold";
+                }
+            });
+        }
     }
 }
 /* ==========================================
