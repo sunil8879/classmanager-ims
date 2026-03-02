@@ -3701,14 +3701,18 @@ async function handleBatchTeacherChange() {
         displayArea.style.color = "#c62828";
     } else {
         // We search the keys of the map (Subjects) in Uppercase to avoid mismatches
-        let foundTiming = null;
-        if (slotMap) {
-            Object.keys(slotMap).forEach(key => {
-                if (key.trim().toUpperCase() === selectedSubject) {
-                    foundTiming = slotMap[key];
-                }
-            });
+    let foundTiming = null;
+if (slotMap) {
+    // Standardize the search term
+    const searchSubject = selectedSubject.trim().toUpperCase();
+    
+    Object.keys(slotMap).forEach(key => {
+        // Standardize the key from the database
+        if (key.trim().toUpperCase() === searchSubject) {
+            foundTiming = slotMap[key];
         }
+    });
+}
 
         if (foundTiming) {
             // SUCCESS
@@ -4851,6 +4855,7 @@ document.getElementById('tch-availability').value = "No";
 // 3. ADD TEACHER
 // 1. UPDATED: ADD TEACHER (Now includes Mobile)
 async function addTeacherDetails() {
+syncCurrentSubjectToMap();
     const id = document.getElementById('tch-id').value;
     const name = document.getElementById('tch-name').value;
     const mobile = document.getElementById('tch-mobile').value;
@@ -4997,6 +5002,7 @@ document.getElementById('tch-availability').value = data.availability || "No";
 
 // 5. EDIT TEACHER
 async function editTeacher() {
+syncCurrentSubjectToMap();
     const id = document.getElementById('tch-id').value;
     if (!id) return alert("Error: Fetch a teacher first using FETCH button.");
 
@@ -5110,25 +5116,25 @@ function updateSubjectPages() {
 function changeSubjectPage(dir) {
     if (subjectPages.length === 0) return alert("Please type subjects in 'Subject Taught' box first.");
 
-    // 1. Save the checkboxes you just picked for the current subject
-    availabilityMap[subjectPages[currentSubjectIndex]] = getSelectedTeacherTimeSlots();
+    // 1. SAVE the currently visible checkboxes to the map
+    syncCurrentSubjectToMap();
 
-    // 2. Calculate the next subject index
+    // 2. Change the index
     let newIndex = currentSubjectIndex + dir;
 
-    // 3. If the next subject exists, move to it
     if (newIndex >= 0 && newIndex < subjectPages.length) {
         currentSubjectIndex = newIndex;
+        const nextSub = subjectPages[currentSubjectIndex];
         
-        // 4. Update the visual Red/Yellow display box
-        document.getElementById('tch-current-subject-display').innerText = subjectPages[currentSubjectIndex];
+        document.getElementById('tch-current-subject-display').innerText = nextSub;
         
-        // 5. Load the checkboxes that were previously saved for THIS subject
-        setTeacherTimeSlots(availabilityMap[subjectPages[currentSubjectIndex]] || "");
+        // 3. LOAD the checkboxes previously saved for the next subject
+        setTeacherTimeSlots(availabilityMap[nextSub] || "");
     } else {
         alert("End of subject list.");
     }
 }
+
 
 function toggleTeacherTimeSlots() {
     const avail = document.getElementById('tch-availability').value;
@@ -5151,7 +5157,14 @@ function setTeacherTimeSlots(slotsStr) {
 }
 
 
-
+function syncCurrentSubjectToMap() {
+    const currentSubject = document.getElementById('tch-current-subject-display').innerText.trim();
+    if (currentSubject && currentSubject !== "---") {
+        const slots = getSelectedTeacherTimeSlots();
+        availabilityMap[currentSubject] = slots;
+        console.log("Synced " + currentSubject + ": " + slots);
+    }
+}
 
 
 /* ==========================================
