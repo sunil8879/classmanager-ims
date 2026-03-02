@@ -2497,6 +2497,7 @@ google.charts.load('current', {'packages':['corechart', 'controls']});
 // ADD THESE TWO LINES HERE
 let sessionInstID = ""; 
 let sessionUserName = "";
+let currentRollAllocations = []; // Stores all links for the current student
 
 
 let portalCurrentPage = 1;
@@ -8878,37 +8879,55 @@ async function autopopulateBatchMaster() {
 
     // --- THE LOGIC FIX ---
 if (allocs && allocs.length > 0) {
-        // --- NEW: Filter to keep only Unique Teacher IDs ---
+        currentRollAllocations = allocs; // Save to global memory for the listener
+        const tidSelect = document.getElementById('bm-tid');
+        tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
+
+        // 1. Create a Unique list of Teachers
         const uniqueAllocs = [];
         const seenIds = new Set();
-
         allocs.forEach(a => {
             if (!seenIds.has(a.teacher_id)) {
                 seenIds.add(a.teacher_id);
-                uniqueAllocs.push(a);
+                uniqueAllocs.push(a); // Define uniqueAllocs here!
+                let opt = document.createElement('option');
+                opt.value = a.teacher_id;
+                opt.text = `${a.teacher_id} - ${a.teacher_name}`;
+                opt.dataset.name = a.teacher_name;
+                tidSelect.appendChild(opt);
             }
         });
 
-        // Use the filtered 'uniqueAllocs' to fill the dropdown
-        uniqueAllocs.forEach(a => {
-            let opt = document.createElement('option');
-            opt.value = a.teacher_id;
-            opt.text = `${a.teacher_id} - ${a.teacher_name}`;
-            opt.dataset.name = a.teacher_name;
-            opt.dataset.batch = a.batch_name || ""; 
-            tidSelect.appendChild(opt);
-        });
-        
-        // Auto-select if only 1 unique teacher exists
+        // 2. Handle Auto-Selection logic
         if (uniqueAllocs.length === 1) {
-            tidSelect.selectedIndex = 1;
+            // Automatically pick the only teacher
+            tidSelect.selectedIndex = 1; 
             document.getElementById('bm-tname').value = uniqueAllocs[0].teacher_name;
-            document.getElementById('bm-bname').value = uniqueAllocs[0].batch_name || "";
+
+            // Immediately fill the batch dropdown for this teacher
+            const relevantBatches = allocs.filter(a => a.teacher_id === uniqueAllocs[0].teacher_id);
+            const bnameSelect = document.getElementById('bm-bname');
+            bnameSelect.innerHTML = '<option value="">-- Select Linked Batch --</option>';
+            
+            relevantBatches.forEach(b => {
+                let opt = document.createElement('option');
+                opt.value = b.batch_name;
+                opt.text = b.batch_name;
+                bnameSelect.appendChild(opt);
+            });
+
+            // If there is only one batch, pick that too
+            if (relevantBatches.length === 1) {
+                bnameSelect.selectedIndex = 1;
+            }
+        } else {
+            // More than 1 teacher: make user pick
+            document.getElementById('bm-bname').innerHTML = '<option value="">-- Pick Teacher First --</option>';
         }
     } else {
-        // NO DATA FOUND: Only now show the alert
-        alert("Notice: No specific Teacher Allocation (Module 18) found for this student. You can select a teacher manually from the full list.");
-        await loadBMTeacherDropdown(); // This loads all teachers as a fallback
+        // NO data found in Module 18
+        alert("Notice: No specific Teacher Allocation (Module 18) found for this student.");
+        await loadBMTeacherDropdown(); // Fallback to full list
     }
 }
 
@@ -8957,27 +8976,32 @@ document.getElementById('stu-batch').addEventListener('change', function() {
 });
 
 
-// Add this inside your script or DOMContentLoaded block
 document.getElementById('bm-tid').addEventListener('change', function() {
-    const selectedOpt = this.options[this.selectedIndex];
+    const tid = this.value;
     const nameInput = document.getElementById('bm-tname');
-    const batchSelect = document.getElementById('bm-bname');
+    const bnameSelect = document.getElementById('bm-bname');
     
-    if (selectedOpt && selectedOpt.value !== "") {
-        // Fill Teacher Name box
-        nameInput.value = selectedOpt.dataset.name || "";
-        
-        // Auto-select the Batch from the dropdown
-        const linkedBatch = selectedOpt.dataset.batch;
-        if (linkedBatch) {
-            batchSelect.value = linkedBatch;
-        }
-    } else {
-        nameInput.value = "";
-        batchSelect.value = "";
+    // 1. Fill Teacher Name
+    const selectedOpt = this.options[this.selectedIndex];
+    nameInput.value = selectedOpt.dataset.name || "";
+
+    // 2. Filter batches for THIS teacher from the saved student allocations
+    const relevantBatches = currentRollAllocations.filter(a => a.teacher_id === tid);
+
+    // 3. Populate the Batch dropdown with only the batches this student is linked to
+    bnameSelect.innerHTML = '<option value="">-- Select Linked Batch --</option>';
+    relevantBatches.forEach(b => {
+        let opt = document.createElement('option');
+        opt.value = b.batch_name;
+        opt.text = b.batch_name; // This will now show the correct batch/subject link
+        bnameSelect.appendChild(opt);
+    });
+
+    // Auto-select if only one batch exists for this teacher
+    if (relevantBatches.length === 1) {
+        bnameSelect.selectedIndex = 1;
     }
 });
-
 
     </script>
 <script>
