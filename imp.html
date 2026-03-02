@@ -1051,7 +1051,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             </div>
             <div class="input-group">
                 <label>Subject</label>
-                <select id="batch-subject">
+                <select id="batch-subject" onchange="handleBatchTeacherChange()">
                     <option value="">-- Select Subject --</option>
                     <option>Algebra</option>
 <option>Geometry</option>
@@ -3639,24 +3639,65 @@ async function loadBatchTeacherDropdown() {
     }
 }
 
+/* ==========================================
+   AUTO-POPULATE BATCH TIMINGS FROM TEACHER PORTAL
+   ========================================== */
 async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
-    const subject = document.getElementById('batch-subject').value;
+    const selectedSubject = document.getElementById('batch-subject').value;
+    const nameInput = document.getElementById('batch-teacher-name');
     const checkboxes = document.querySelectorAll('.batch-time-slot');
 
-    if (!tid || !subject) return;
+    // Reset all checkboxes first
+    checkboxes.forEach(cb => {
+        cb.checked = false;
+        cb.parentElement.style.opacity = "0.5"; // Dim unavailable slots
+        cb.parentElement.style.color = "#ccc";
+    });
 
-    const { data: t } = await db.from('teacher_details').select('teacher_name, time_of_slot').eq('id', tid).single();
+    if (!tid) {
+        nameInput.value = "";
+        return;
+    }
 
-    if (t) {
-        document.getElementById('batch-teacher-name').value = t.teacher_name;
-        // Parse the JSON map and find slots for the picked subject
-        const slotMap = JSON.parse(t.time_of_slot || "{}");
-        const availableSlots = slotMap[subject] || "";
+    // 1. Fetch the Teacher's specific data
+    const { data: t, error } = await db.from('teacher_details')
+        .select('teacher_name, time_of_slot, availability')
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .single();
+
+    if (error || !t) return;
+
+    // 2. Set Teacher Name
+    nameInput.value = t.teacher_name;
+
+    // 3. If teacher is marked as "No" for availability, stop here
+    if (t.availability === "No") {
+        console.log("Teacher is marked unavailable.");
+        return;
+    }
+
+    // 4. Parse the availability map (JSON)
+    let slotMap = {};
+    try {
+        slotMap = typeof t.time_of_slot === 'string' ? JSON.parse(t.time_of_slot) : t.time_of_slot;
+    } catch (e) {
+        console.error("Error parsing teacher slots:", e);
+        return;
+    }
+
+    // 5. Look for slots matching the selected subject
+    if (selectedSubject && slotMap[selectedSubject]) {
+        const availableSlots = slotMap[selectedSubject]; // This is a string like "09:00 AM..., 10:00 AM..."
         
         checkboxes.forEach(cb => {
-            cb.checked = availableSlots.includes(cb.value);
-            cb.parentElement.style.color = cb.checked ? "#000" : "#ccc";
+            if (availableSlots.includes(cb.value)) {
+                cb.checked = true;
+                cb.parentElement.style.opacity = "1";
+                cb.parentElement.style.color = "#000";
+                cb.parentElement.style.fontWeight = "bold";
+            }
         });
     }
 }
