@@ -890,14 +890,21 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <div class="input-group"><label>Mother's Mobile</label><input type="text" id="stu-mother" maxlength="10"></div>
             <div class="input-group"><label>Class / Standard</label><input type="text" id="stu-standard"></div>
          <!-- Replace the old Batch Time input with this -->
+<!-- Replacement for Batch/Course Slots -->
 <div class="input-group">
     <label>Batch / Course Slots</label>
-    <select id="stu-batch" multiple style="height: 100px; padding: 5px; border: 1px solid #000; border-radius: 8px;">
-        <option value="">-- Select Batches --</option>
-    </select>
-    <small style="color: #666;">* Hold Ctrl (Win) or Cmd (Mac) to select multiple</small>
+    <div style="display: flex; gap: 5px;">
+        <input type="text" id="stu-batch-display" readonly style="background: #eee; flex: 1;" placeholder="No slots selected">
+        <button type="button" onclick="openBatchPicker()" class="btn-fetch" style="padding: 10px; background: #00796b;">SELECT</button>
+    </div>
+    <!-- Hidden input to store the raw data for the database -->
+    <input type="hidden" id="stu-batch"> 
 </div>
-            <div class="input-group"><label>Course</label><input type="text" id="stu-course" placeholder="Course"></div>
+          <!-- Updated Course Field (Now Greyed Out) -->
+<div class="input-group">
+    <label>Course</label>
+    <input type="text" id="stu-course" readonly style="background: #e9ecef; font-weight: bold; color: #004d40;" placeholder="Auto-filled from batches">
+</div>
             
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
             <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid" oninput="calcStuPending()"></div>
@@ -3151,6 +3158,92 @@ status: document.getElementById('stu-status').value,
     } else {
         alert("Success: Student details for " + roll + " have been updated.");
     }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ==========================================
+   MODAL BATCH PICKER LOGIC
+   ========================================== */
+
+async function openBatchPicker() {
+    const modal = document.getElementById('batch-picker-modal');
+    const tbody = document.getElementById('batch-picker-body');
+    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>Loading available batches...</td></tr>";
+    modal.style.display = 'flex';
+
+    // 1. Fetch all batches and current enrollments
+    const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+    const { data: currentEnrollments } = await db.from('list').select('batch_name').eq('institute_id', sessionInstID);
+
+    if (!batches || batches.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No batches found. Create one in Section 5 first.</td></tr>";
+        return;
+    }
+
+    // 2. Alphabetical Sort by Subject Name
+    batches.sort((a, b) => a.subject_name.localeCompare(b.subject_name));
+
+    // 3. Render Table
+    tbody.innerHTML = "";
+    batches.forEach(b => {
+        const enrolled = currentEnrollments ? currentEnrollments.filter(e => e.batch_name === b.batch_name).length : 0;
+        const isFull = b.students_allotted > 0 && enrolled >= b.students_allotted;
+        const isYes = !isFull;
+
+        tbody.innerHTML += `
+            <tr style="border-bottom:1px solid #eee; background: ${isFull ? '#fff5f5' : 'transparent'};">
+                <td style="padding:12px; font-weight:bold;">${b.subject_name}</td>
+                <td style="padding:12px;">${b.batch_time}</td>
+                <td style="padding:12px; text-align:center;">${enrolled} / ${b.students_allotted || '∞'}</td>
+                <td style="padding:12px; text-align:center; font-weight:bold; color: ${isYes ? 'green' : 'red'};">${isYes ? 'YES' : 'NO (FULL)'}</td>
+                <td style="padding:12px; text-align:center;">
+                    <input type="checkbox" class="batch-select-cb" 
+                           data-subject="${b.subject_name}" 
+                           data-time="${b.batch_time}" 
+                           ${!isYes ? 'disabled' : ''} 
+                           style="width:20px; height:20px;">
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function saveBatchSelection() {
+    const selected = document.querySelectorAll('.batch-select-cb:checked');
+    if (selected.length === 0) {
+        alert("Please select at least one batch.");
+        return;
+    }
+
+    let subjects = [];
+    let times = [];
+
+    selected.forEach(cb => {
+        subjects.push(cb.dataset.subject);
+        times.push(cb.dataset.time);
+    });
+
+    // Remove duplicates from subjects (in case multiple slots for same subject)
+    const uniqueSubjects = [...new Set(subjects)];
+
+    // Update Main Form
+    document.getElementById('stu-batch-display').value = times.join(', ');
+    document.getElementById('stu-batch').value = times.join(', '); // For database
+    document.getElementById('stu-course').value = uniqueSubjects.join(', '); // Autopopulated & Greyeout
+
+    // Close Modal
+    document.getElementById('batch-picker-modal').style.display = 'none';
 }
 /* ==========================================
    4. FEE MANAGEMENT (Stats & Links)
@@ -9091,6 +9184,32 @@ document.addEventListener('blur', function(e) {
 </script>
 
 
+<!-- BATCH PICKER MODAL -->
+<div id="batch-picker-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100000; justify-content:center; align-items:center;">
+    <div style="background:white; padding:30px; border-radius:15px; width:90%; max-width:800px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif;">
+        <h2 style="text-align:center; border-bottom:3px solid #7FFFD4; padding-bottom:10px;">INSTITUTE BATCH SCHEDULER</h2>
+        <p style="text-align:center; color:#666;">Select the available slots for the student.</p>
+        
+        <table style="width:100%; border-collapse:collapse; margin-top:20px; text-align:left;">
+            <thead>
+                <tr style="background:#f0fdfa; border-bottom:2px solid #000;">
+                    <th style="padding:12px;">SUBJECT NAME</th>
+                    <th style="padding:12px;">SLOT AVAILABLE</th>
+                    <th style="padding:12px; text-align:center;">CAPACITY</th>
+                    <th style="padding:12px; text-align:center;">AVAILABLE?</th>
+                    <th style="padding:12px; text-align:center;">SELECT</th>
+                </tr>
+            </thead>
+            <tbody id="batch-picker-body">
+                <!-- Data injected by JS -->
+            </tbody>
+        </table>
 
+        <div style="display:flex; gap:15px; margin-top:30px;">
+            <button onclick="saveBatchSelection()" style="flex:1; background:#27ae60; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">CONFIRM SELECTION</button>
+            <button onclick="document.getElementById('batch-picker-modal').style.display='none'" style="flex:1; background:#666; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">CANCEL</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
