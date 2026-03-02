@@ -1419,7 +1419,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <div class="input-group"><label>Age</label><input type="number" id="tch-age"></div>
             <div class="input-group"><label>Joining Date</label><input type="date" id="tch-join"></div>
             <div class="input-group"><label>Qualification</label><input type="text" id="tch-qual"></div>
-            <div class="input-group"><label>Subject Taught</label><input type="text" id="tch-subject"></div>
+            <div class="input-group"><label>Subject Taught</label><input type="text" id="tch-subject" onblur="updateSubjectPages()"></div>
             <div class="input-group"><label>Salary</label><input type="number" id="tch-salary"></div>
 			<!-- Inside <section id="teacher"> inside <div class="form-grid"> -->
 
@@ -1449,7 +1449,16 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 
 
-
+<!-- ADD SUBJECT PAGINATION CONTROLS HERE -->
+<div class="input-group" style="grid-column: 1 / -1; background: #e0f2f1; padding: 15px; border-radius: 8px; border: 1px solid #00796b; margin-bottom: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h4 style="margin:0; text-decoration: none;">Set Slots for: <span id="tch-current-subject-display" style="color:#ff0000; font-weight: 900;">---</span></h4>
+        <div>
+            <button type="button" onclick="changeSubjectPage(-1)" class="btn-fetch" style="padding: 5px 15px; background: #00796b;">Prev Subject</button>
+            <button type="button" onclick="changeSubjectPage(1)" class="btn-fetch" style="padding: 5px 15px; background: #00796b;">Next Subject</button>
+        </div>
+    </div>
+</div>
 
 
 
@@ -3630,33 +3639,32 @@ async function loadBatchTeacherDropdown() {
 async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
     const nameInput = document.getElementById('batch-teacher-name');
+    const selectedSub = document.getElementById('batch-subject').value; // Get subject selected in Sec 5
     const checkboxes = document.querySelectorAll('.batch-time-slot');
 
-    // Reset UI
+    // Reset checkboxes
     checkboxes.forEach(cb => { cb.checked = false; cb.parentElement.style.color = "#ccc"; });
     if (!tid) return;
 
-    // Fetch Teacher Info + Availability from Section 11's table
-    const { data: teacher } = await db.from('teacher_details')
-        .select('teacher_name, time_of_slot, availability')
-        .eq('id', tid)
-        .eq('institute_id', sessionInstID)
-        .single();
+    const { data: teacher } = await db.from('teacher_details').select('*').eq('id', tid).single();
 
     if (teacher) {
         nameInput.value = teacher.teacher_name;
-        
-        if (teacher.availability === "Yes" && teacher.time_of_slot) {
-            const slots = teacher.time_of_slot.split(',').map(s => s.trim());
-            checkboxes.forEach(cb => {
-                if (slots.includes(cb.value)) {
-                    cb.checked = true;
-                    cb.parentElement.style.color = "#000"; // Highlight available slots
-                }
-            });
-        } else {
-            alert("This teacher is marked as Unavailable in the Teacher Portal.");
-        }
+        if (!selectedSub) return;
+
+        try {
+            const slotData = JSON.parse(teacher.time_of_slot);
+            const specificSlots = slotData[selectedSub] || "";
+            if (specificSlots) {
+                const slots = specificSlots.split(',').map(s => s.trim());
+                checkboxes.forEach(cb => {
+                    if (slots.includes(cb.value)) {
+                        cb.checked = true;
+                        cb.parentElement.style.color = "#000";
+                    }
+                });
+            }
+        } catch (e) { console.log("Old data format"); }
     }
 }
 
@@ -4866,7 +4874,7 @@ gender: document.getElementById('tch-gender').value,
         rating: parseFloat(document.getElementById('tch-rating').value) || 0,
 availability: document.getElementById('tch-availability').value,
         status: document.getElementById('tch-status').value || "Active",
-time_of_slot: (document.getElementById('tch-availability').value === 'Yes') ? getSelectedTeacherTimeSlots() : ""
+time_of_slot: JSON.stringify(availabilityMap)
     }]);
 
     if (error) alert("DB Error: " + error.message);
@@ -5028,6 +5036,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const labelEl = document.getElementById('tch-tomorrow-date');
     if(labelEl) labelEl.innerText = "For " + tmrw.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 });
+
+
+let subjectPages = [];
+let currentSubjectIndex = 0;
+let availabilityMap = {}; 
+
+function updateSubjectPages() {
+    const subInput = document.getElementById('tch-subject').value;
+    subjectPages = subInput.split(',').map(s => s.trim()).filter(s => s !== "");
+    if(subjectPages.length > 0) {
+        document.getElementById('tch-current-subject-display').innerText = subjectPages[currentSubjectIndex];
+    }
+}
+
+function changeSubjectPage(dir) {
+    if (subjectPages.length === 0) return alert("Please type subjects in 'Subject Taught' box first (comma separated).");
+    
+    // Save current checkboxes to memory
+    const currentSub = subjectPages[currentSubjectIndex];
+    availabilityMap[currentSub] = getSelectedTeacherTimeSlots();
+
+    // Move to next/prev
+    currentSubjectIndex += dir;
+    if (currentSubjectIndex < 0) currentSubjectIndex = 0;
+    if (currentSubjectIndex >= subjectPages.length) currentSubjectIndex = subjectPages.length - 1;
+
+    // Update UI
+    document.getElementById('tch-current-subject-display').innerText = subjectPages[currentSubjectIndex];
+    setTeacherTimeSlots(availabilityMap[subjectPages[currentSubjectIndex]] || "");
+}
+
 
 function toggleTeacherTimeSlots() {
     const avail = document.getElementById('tch-availability').value;
@@ -7624,16 +7663,14 @@ let currentRollAllocations = [];
 
 async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
-    if(!roll) return alert("Please enter a Roll Number.");
+    if(!roll) return;
 
-    // 1. Fetch Student Base Info
-    const { data: stu } = await db.from('students').select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-    if (!stu) return alert("Student not found in admission records.");
+    const { data: stu } = await db.from('students').select('full_name, course').eq('roll_number', roll).maybeSingle();
+    if (!stu) return alert("Roll No not found.");
     
     document.getElementById('bm-sname').value = stu.full_name;
-    document.getElementById('bm-course').value = stu.course || "N/A";
+    document.getElementById('bm-course').value = stu.course;
 
-    // 2. Fetch ALL Unique Allocations (Section 18 link)
     const { data: allocs } = await db.from('student_allocations').select('*').eq('roll_number', roll).eq('institute_id', sessionInstID);
 
     const tidSelect = document.getElementById('bm-tid');
@@ -7641,34 +7678,24 @@ async function autopopulateBatchMaster() {
 
     if (allocs && allocs.length > 0) {
         currentRollAllocations = allocs;
-        
-        // --- ELIMINATE DUPLICATE TEACHER IDS ---
-        const uniqueTids = [];
         const seen = new Set();
         allocs.forEach(a => {
             if (!seen.has(a.teacher_id)) {
                 seen.add(a.teacher_id);
-                uniqueTids.push(a);
+                let opt = document.createElement('option');
+                opt.value = a.teacher_id;
+                opt.text = a.teacher_id + " - " + a.teacher_name;
+                opt.dataset.name = a.teacher_name;
+                tidSelect.appendChild(opt);
             }
         });
-
-        uniqueTids.forEach(a => {
-            let opt = document.createElement('option');
-            opt.value = a.teacher_id;
-            opt.text = `${a.teacher_id} - ${a.teacher_name}`;
-            opt.dataset.name = a.teacher_name;
-            tidSelect.appendChild(opt);
-        });
-
-        // Auto-select if only 1 teacher
-        if (uniqueTids.length === 1) {
+        if (seen.size === 1) {
             tidSelect.selectedIndex = 1;
             tidSelect.dispatchEvent(new Event('change'));
         }
     } else {
-        // This only shows if student_allocations table is actually empty for this roll
-        alert("No Teacher Allocation found for this student. Please go to Section 18 first.");
-        loadBMTeacherDropdown(); // Fallback to all teachers
+        alert("Student found, but link (Section 18) is missing. Loading full teacher list.");
+        loadBMTeacherDropdown();
     }
 }
 
@@ -8884,6 +8911,13 @@ async function refreshStudentBatchDropdown() {
         });
     }
 }
+
+
+
+
+
+
+
 
 
 
