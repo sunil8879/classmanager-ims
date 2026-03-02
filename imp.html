@@ -1037,10 +1037,14 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                 <label>Batch Name (Unique)</label>
                 <input type="text" id="batch-name" placeholder="e.g. Morning-Pro-A">
             </div>
-            <div class="input-group">
-                <label>Teacher ID</label>
-                <input type="text" id="batch-teacher-id" placeholder="TCH-XXXX" onblur="fetchTeacherNameForBatch()">
-            </div>
+
+          <div class="input-group">
+    <label>Teacher ID</label>
+    <select id="batch-teacher-id" onchange="handleBatchTeacherChange()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+        <option value="">-- Select Teacher --</option>
+    </select>
+</div>
+
             <div class="input-group">
                 <label>Teacher Name</label>
                 <input type="text" id="batch-teacher-name" readonly style="background:#eee;">
@@ -3361,6 +3365,15 @@ course_name: document.getElementById('fee-course').value,
 
 
 
+
+
+
+
+
+
+
+
+
 /* ==========================================
    FIXED FEES PORTAL: INSTITUTE-SPECIFIC DATA
    ========================================== */
@@ -3604,6 +3617,45 @@ async function fetchTeacherNameForBatch() {
     } else {
         alert("Teacher ID not found.");
         document.getElementById('batch-teacher-name').value = "";
+    }
+}
+
+
+
+
+
+
+
+// 1. Fetch all teachers and fill the dropdown
+async function loadBatchTeacherDropdown() {
+    const select = document.getElementById('batch-teacher-id');
+    const { data, error } = await db.from('teacher_details')
+        .select('id, teacher_name')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    select.innerHTML = '<option value="">-- Select Teacher --</option>';
+    if (data) {
+        data.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.id + " (" + t.teacher_name + ")";
+            opt.dataset.name = t.teacher_name; // Store name to auto-fill next box
+            select.appendChild(opt);
+        });
+    }
+}
+
+// 2. Auto-fill the Teacher Name box when ID is selected
+function handleBatchTeacherChange() {
+    const select = document.getElementById('batch-teacher-id');
+    const nameInput = document.getElementById('batch-teacher-name');
+    const selectedOpt = select.options[select.selectedIndex];
+    
+    if (selectedOpt && selectedOpt.dataset.name) {
+        nameInput.value = selectedOpt.dataset.name;
+    } else {
+        nameInput.value = "";
     }
 }
 /* ==========================================
@@ -5830,6 +5882,9 @@ function showSection(id) {
 
 case 'batch-master':
     loadBMTeacherDropdown(); // New function
+    break;
+case 'batch':
+    loadBatchTeacherDropdown();
     break;
 
 // Locate the switch(id) inside showSection(id) and add this:
