@@ -8877,25 +8877,34 @@ async function autopopulateBatchMaster() {
     tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
 
     // --- THE LOGIC FIX ---
-    if (allocs && allocs.length > 0) {
-        // DATA FOUND: Populate the dropdown silently
+if (allocs && allocs.length > 0) {
+        // --- NEW: Filter to keep only Unique Teacher IDs ---
+        const uniqueAllocs = [];
+        const seenIds = new Set();
+
         allocs.forEach(a => {
+            if (!seenIds.has(a.teacher_id)) {
+                seenIds.add(a.teacher_id);
+                uniqueAllocs.push(a);
+            }
+        });
+
+        // Use the filtered 'uniqueAllocs' to fill the dropdown
+        uniqueAllocs.forEach(a => {
             let opt = document.createElement('option');
             opt.value = a.teacher_id;
             opt.text = `${a.teacher_id} - ${a.teacher_name}`;
-            opt.dataset.name = a.teacher_name;      // Stores name for auto-fill
-            opt.dataset.batch = a.batch_name || ""; // Stores batch link for auto-fill
+            opt.dataset.name = a.teacher_name;
+            opt.dataset.batch = a.batch_name || ""; 
             tidSelect.appendChild(opt);
         });
         
-        // If there is exactly one allocation, you can auto-select it
-        if (allocs.length === 1) {
+        // Auto-select if only 1 unique teacher exists
+        if (uniqueAllocs.length === 1) {
             tidSelect.selectedIndex = 1;
-            // Manually trigger the fill logic
-            document.getElementById('bm-tname').value = allocs[0].teacher_name;
-            document.getElementById('bm-bname').value = allocs[0].batch_name || "";
+            document.getElementById('bm-tname').value = uniqueAllocs[0].teacher_name;
+            document.getElementById('bm-bname').value = uniqueAllocs[0].batch_name || "";
         }
-        
     } else {
         // NO DATA FOUND: Only now show the alert
         alert("Notice: No specific Teacher Allocation (Module 18) found for this student. You can select a teacher manually from the full list.");
