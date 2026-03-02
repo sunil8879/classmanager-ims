@@ -3659,7 +3659,7 @@ async function loadBatchTeacherDropdown() {
    ========================================== */
 async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
-    const selectedSubject = document.getElementById('batch-subject').value;
+    const selectedSubject = document.getElementById('batch-subject').value.trim().toUpperCase();
     const nameInput = document.getElementById('batch-teacher-name');
     const displayArea = document.getElementById('batch-slots-display');
 
@@ -3670,7 +3670,7 @@ async function handleBatchTeacherChange() {
         return;
     }
 
-    // 1. Fetch Teacher Timings from teacher_details table
+    // 1. Fetch Teacher Timings
     const { data: teacher, error } = await db.from('teacher_details')
         .select('teacher_name, time_of_slot, availability')
         .eq('id', tid)
@@ -3678,35 +3678,51 @@ async function handleBatchTeacherChange() {
         .maybeSingle();
 
     if (error || !teacher) {
-        displayArea.innerText = "Error: Teacher not found in database.";
+        displayArea.innerText = "Error: Teacher ID not found.";
         return;
     }
 
     nameInput.value = teacher.teacher_name;
 
-    // 2. Parse the timing map
+    // 2. Parse the timing map safely
     let slotMap = {};
     try {
-        slotMap = (typeof teacher.time_of_slot === 'string') ? JSON.parse(teacher.time_of_slot) : teacher.time_of_slot;
+        const rawData = teacher.time_of_slot;
+        slotMap = (typeof rawData === 'string') ? JSON.parse(rawData) : rawData;
     } catch (e) {
+        console.error("JSON Parse Error:", e);
         slotMap = {};
     }
 
-    // 3. Logic to show only relevant timings
+    // 3. Logic to show relevant timings (Case-Insensitive Search)
     if (teacher.availability === "No") {
-        displayArea.innerText = "TEACHER UNAVAILABLE (Marked 'No' in Portal)";
+        displayArea.innerText = "TEACHER MARKED UNAVAILABLE IN PORTAL";
         displayArea.style.background = "#ffebee";
         displayArea.style.color = "#c62828";
-    } else if (selectedSubject && slotMap[selectedSubject]) {
-        // SUCCESS: Show only the timings for this specific subject
-        displayArea.innerText = slotMap[selectedSubject];
-        displayArea.style.background = "#7FFFD4"; // Aquamarine highlight
-        displayArea.style.color = "#000";
-        displayArea.style.border = "2px solid #000";
     } else {
-        displayArea.innerText = "No slots assigned for [" + selectedSubject + "] in Teacher Portal.";
-        displayArea.style.background = "#fff3e0";
-        displayArea.style.color = "#e65100";
+        // We search the keys of the map (Subjects) in Uppercase to avoid mismatches
+        let foundTiming = null;
+        if (slotMap) {
+            Object.keys(slotMap).forEach(key => {
+                if (key.trim().toUpperCase() === selectedSubject) {
+                    foundTiming = slotMap[key];
+                }
+            });
+        }
+
+        if (foundTiming) {
+            // SUCCESS
+            displayArea.innerText = foundTiming;
+            displayArea.style.background = "#7FFFD4"; 
+            displayArea.style.color = "#000";
+            displayArea.style.border = "2px solid #000";
+        } else {
+            // FAIL
+            displayArea.innerText = "No slots found for [" + selectedSubject + "] in Teacher's Profile.";
+            displayArea.style.background = "#fff3e0";
+            displayArea.style.color = "#e65100";
+            console.log("Looking for:", selectedSubject, "Available keys:", Object.keys(slotMap || {}));
+        }
     }
 }
 /* ==========================================
@@ -5053,7 +5069,7 @@ mobile: document.getElementById('tch-mobile').value,
         rating: parseFloat(document.getElementById('tch-rating').value) || 0,
         status: document.getElementById('tch-status').value || "Active",
 availability: document.getElementById('tch-availability').value, // <-- ADD THIS
-        time_of_slot: (document.getElementById('tch-availability').value === 'Yes') ? getSelectedTeacherTimeSlots() : "" 
+       time_of_slot: JSON.stringify(availabilityMap) 
     };
 
     const { error } = await db.from('teacher_details').update(tchData).eq('id', id);
