@@ -7512,56 +7512,38 @@ async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter a Roll Number first.");
 
-    // A. Fetch from STUDENTS table
-    const { data: stu, error: stuErr } = await db.from('students')
+    // 1. Fetch Student Base Info
+    const { data: stu } = await db.from('students')
         .select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
 
-    if (stuErr || !stu) return alert("Student not found in admission records.");
+    if (!stu) return alert("Student not found in admission records.");
     
     document.getElementById('bm-sname').value = stu.full_name;
     document.getElementById('bm-course').value = stu.course || "N/A";
 
-    // B. Fetch linked Teacher ID from STUDENT_ALLOCATIONS (SAFE FETCH using .limit)
-    const { data: allocData, error: allocErr } = await db.from('student_allocations')
-        .select('teacher_id')
+    // 2. Fetch ALL Allocations for this student (Support for multiple teachers)
+    const { data: allocs, error: allocErr } = await db.from('student_allocations')
+        .select('teacher_id, teacher_name')
         .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID)
-        .limit(1); // Prevents crash if student has multiple subjects/teachers
+        .eq('institute_id', sessionInstID);
 
-    if (allocData && allocData.length > 0) {
-        const alloc = allocData[0];
-        document.getElementById('bm-tid').value = alloc.teacher_id;
+    const tidSelect = document.getElementById('bm-tid');
+    tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
 
-        // C. Fetch Teacher Name from TEACHER_DETAILS (SAFE FETCH)
-        const { data: teacherData } = await db.from('teacher_details')
-            .select('teacher_name')
-            .eq('id', alloc.teacher_id)
-            .eq('institute_id', sessionInstID)
-            .limit(1);
-        
-        if (teacherData && teacherData.length > 0) {
-            document.getElementById('bm-tname').value = teacherData[0].teacher_name;
-        }
-
-        // D. Fetch Batch Name from BATCHES table (SAFE FETCH)
-        // Prevents crash if a single teacher teaches morning & evening batches
-        const { data: batchData } = await db.from('batches')
-            .select('batch_name')
-            .eq('teacher_id', alloc.teacher_id)
-            .eq('institute_id', sessionInstID)
-            .limit(1);
-        
-        if (batchData && batchData.length > 0) {
-            document.getElementById('bm-bname').value = batchData[0].batch_name;
-        } else {
-            document.getElementById('bm-bname').value = "No Batch Assigned";
-        }
-
+    if (allocs && allocs.length > 0) {
+        // Populate dropdown with ONLY the teachers allocated to this specific student
+        allocs.forEach(a => {
+            let opt = document.createElement('option');
+            opt.value = a.teacher_id;
+            opt.text = `${a.teacher_id} - ${a.teacher_name}`;
+            opt.dataset.name = a.teacher_name;
+            tidSelect.appendChild(opt);
+        });
+        alert(`Found ${allocs.length} teacher allocation(s) for ${stu.full_name}. Please select one.`);
     } else {
-        alert("This student is not allocated to a teacher yet. Go to Module 18 (Student Allocation) first.");
-        document.getElementById('bm-tid').value = "N/A";
-        document.getElementById('bm-tname').value = "N/A";
-        document.getElementById('bm-bname').value = "N/A";
+        // Fallback: If no allocation found, load all teachers for manual selection
+        alert("No specific Teacher Allocation (Module 18) found. Loading full teacher list...");
+        await loadBMTeacherDropdown(); 
     }
 }
 
@@ -7571,56 +7553,40 @@ async function addBatchMasterRecord() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
     const batchName = document.getElementById('bm-bname').value.trim();
     const studentName = document.getElementById('bm-sname').value;
-    const teacherId = document.getElementById('bm-tid').value; // Added Teacher ID for exact matching
+    const teacherId = document.getElementById('bm-tid').value;
 
-    if (!roll || !studentName) return alert("Please Auto-Fill the student details first.");
+    if (!roll || !batchName || !teacherId) return alert("Please fill all details (Roll No, Teacher, and Batch).");
 
-    // --- 1. PREVENT DUPLICATE ENTRY ---
+    // --- 1. MODIFIED DUPLICATE CHECK: Check Roll + Batch Name ---
     const { data: existingEntry } = await db.from('list')
         .select('id')
         .eq('roll_number', roll)
+        .eq('batch_name', batchName) // Only block if same student is added to same batch
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
     if (existingEntry) {
-        return alert(`Error: ${studentName} (${roll}) is already added to the Batch Master!`);
+        return alert(`Error: ${studentName} is already enrolled in the batch "${batchName}".`);
     }
 
-    // --- 2. STRICT BATCH CAPACITY CHECK ---
-    if (batchName && batchName !== "No Batch Assigned" && batchName !== "N/A") {
-        
-        // Step A: Fetch the capacity limit from Section 5 (matches Teacher AND Batch Name exactly)
-        const { data: batchData, error: bErr } = await db.from('batches')
-            .select('students_allotted')
-            .eq('teacher_id', teacherId)
-            .eq('batch_name', batchName)
-            .eq('institute_id', sessionInstID)
-            .maybeSingle();
+    // --- 2. CAPACITY CHECK (Remains same) ---
+    const { data: batchData } = await db.from('batches')
+        .select('students_allotted')
+        .eq('teacher_id', teacherId)
+        .eq('batch_name', batchName)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
 
-        if (batchData) {
-            const maxCapacity = parseInt(batchData.students_allotted) || 0;
-            
-            // Only enforce if you set a limit greater than 0
-            if (maxCapacity > 0) {
-                
-                // Step B: Manually fetch and count students (Bypasses Supabase count bug)
-                const { data: currentStudents, error: countErr } = await db.from('list')
-                    .select('id')
-                    .eq('batch_name', batchName)
-                    .eq('institute_id', sessionInstID);
-                
-                const currentCount = currentStudents ? currentStudents.length : 0;
-                
-                // Step C: Block if full
-                if (currentCount >= maxCapacity) {
-                    return alert(`🛑 ERROR: BATCH FULL!\n\nThe batch "${batchName}" has a maximum limit of ${maxCapacity} students.\nCurrently enrolled: ${currentCount} students.\n\nYou CANNOT add ${studentName} to this batch.`);
-                }
-            }
-        } else {
-            console.log("System note: Could not find a specific capacity limit for this batch.");
+    if (batchData && batchData.students_allotted > 0) {
+        const { data: currentStudents } = await db.from('list')
+            .select('id')
+            .eq('batch_name', batchName)
+            .eq('institute_id', sessionInstID);
+        
+        if (currentStudents && currentStudents.length >= batchData.students_allotted) {
+            return alert(`🛑 BATCH FULL! Cannot add student to "${batchName}".`);
         }
     }
-    // --- END CAPACITY CHECK ---
 
     // --- 3. SAVE THE RECORD ---
     const data = {
@@ -7641,10 +7607,10 @@ async function addBatchMasterRecord() {
         alert("Error saving record: " + error.message);
     } else {
         alert(`Success! ${studentName} added to ${batchName}.`);
-        clearBatchMaster();
+        // Refresh the list view if visible
+        listAllByBatch(); 
     }
 }
-
 
 // 5. FETCH RECORD (By Roll Number)
 async function fetchBatchMasterRecord() {
