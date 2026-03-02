@@ -1069,22 +1069,23 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                     <option>Computer Science</option>
                 </select>
             </div>
-            <div class="input-group" style="grid-column: 1 / -1; background: #fff8e1; padding: 15px; border: 1px solid #000; border-radius: 8px;">
-    <label style="font-weight:bold; display:block; margin-bottom:10px;">Teacher's Available Slots (from Portal):</label>
-    <div id="batch-checkbox-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-        <!-- Checkboxes will be auto-checked based on Section 11 -->
-        <label><input type="checkbox" class="batch-time-slot" value="09:00 AM to 10:00 AM"> 09:00 AM - 10:00 AM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="10:00 AM to 11:00 AM"> 10:00 AM - 11:00 AM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="11:00 AM to 12:00 PM"> 11:00 AM - 12:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="12:00 PM to 01:00 PM"> 12:00 PM - 01:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="01:00 PM to 02:00 PM"> 01:00 PM - 02:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="02:00 PM to 03:00 PM"> 02:00 PM - 03:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="03:00 PM to 04:00 PM"> 03:00 PM - 04:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="04:00 PM to 05:00 PM"> 04:00 PM - 05:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="05:00 PM to 06:00 PM"> 05:00 PM - 06:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="06:00 PM to 07:00 PM"> 06:00 PM - 07:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="07:00 PM to 08:00 PM"> 07:00 PM - 08:00 PM</label>
-        <label><input type="checkbox" class="batch-time-slot" value="08:00 PM to 09:00 PM"> 08:00 PM - 09:00 PM</label>
+            <div class="input-group" style="grid-column: 1 / -1; margin-top: 10px;">
+    <label style="font-weight:bold; color: #00796b;">Confirmed Timings (Fetched from Teacher Portal):</label>
+    <div id="batch-slots-display" style="
+        padding: 20px; 
+        background: #e0f2f1; 
+        border: 2px dashed #00796b; 
+        border-radius: 12px; 
+        text-align: center; 
+        font-size: 1.2rem; 
+        font-weight: 900; 
+        color: #004d40;
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    ">
+        Select Teacher & Subject to view timings...
     </div>
 </div>
             <div class="input-group">
@@ -3463,28 +3464,39 @@ async function generateUPIQR() {
 /* ==========================================
    5. BATCH MANAGEMENT
    ========================================== */
-// Update the Save function for Section 5 to handle multiple checkboxes
 async function addBatch() {
-// Paste inside addBatch() at the very start
-const { data: tch } = await db.from('teacher_details').select('subject_taught').eq('id', document.getElementById('batch-teacher-id').value).single();
-if (!tch || !tch.subject_taught.toUpperCase().includes(document.getElementById('batch-subject').value.toUpperCase())) 
-    return alert("🛑 ERROR: This teacher is not registered to teach this subject!");
-    const selectedSlots = Array.from(document.querySelectorAll('.batch-time-slot:checked')).map(cb => cb.value).join(', ');
-    
+    const batchName = document.getElementById('batch-name').value;
+    const displaySlots = document.getElementById('batch-slots-display').innerText;
+    const subject = document.getElementById('batch-subject').value;
+
+    // Validation
+    if (!batchName || !subject) return alert("Please enter Batch Name and Subject.");
+    if (displaySlots.includes("Select") || displaySlots.includes("No slots") || displaySlots.includes("UNAVAILABLE")) {
+        return alert("Error: Cannot create batch. No valid timings found for this teacher/subject.");
+    }
+
     const batchData = {
         institute_id: sessionInstID,
-        batch_name: document.getElementById('batch-name').value,
+        batch_name: batchName,
         teacher_id: document.getElementById('batch-teacher-id').value,
         teacher_name: document.getElementById('batch-teacher-name').value,
-        batch_time: selectedSlots, // Saves all checked slots
-        subject_name: document.getElementById('batch-subject').value,
-        students_allotted: parseInt(document.getElementById('batch-students').value) || 0
+        batch_time: displaySlots, // Automatically takes the string we just displayed
+        subject_name: subject,
+        students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
+        remarks: document.getElementById('batch-remarks').value
     };
 
     const { error } = await db.from('batches').insert([batchData]);
-    if (error) alert(error.message); else alert("Batch Created with selected timings!");
+    
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("SUCCESS: Batch '" + batchName + "' created for " + subject + " at " + displaySlots);
+        // Clear form
+        document.getElementById('batch-name').value = "";
+        handleBatchTeacherChange(); // Reset display
+    }
 }
-
 // 4. THE MISSING FETCH FUNCTION
 // 4. THE MISSING FETCH FUNCTION (BULLETPROOF VERSION)
 async function fetchBatch() {
@@ -3649,65 +3661,52 @@ async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
     const selectedSubject = document.getElementById('batch-subject').value;
     const nameInput = document.getElementById('batch-teacher-name');
-    const checkboxes = document.querySelectorAll('.batch-time-slot');
-
-    // 1. Reset all checkboxes before fetching new data
-    checkboxes.forEach(cb => {
-        cb.checked = false;
-        cb.parentElement.style.color = "#ccc"; // Grey out by default
-        cb.parentElement.style.fontWeight = "normal";
-    });
+    const displayArea = document.getElementById('batch-slots-display');
 
     if (!tid) {
         nameInput.value = "";
+        displayArea.innerText = "Select Teacher & Subject to view timings...";
+        displayArea.style.background = "#e0f2f1";
         return;
     }
 
-    // 2. THE CONNECTION: Query teacher_details table using the tid from Batch section
+    // 1. Fetch Teacher Timings from teacher_details table
     const { data: teacher, error } = await db.from('teacher_details')
         .select('teacher_name, time_of_slot, availability')
         .eq('id', tid)
-        .eq('institute_id', sessionInstID) // Ensures data belongs to your institute
+        .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (error) {
-        console.error("Link Error:", error.message);
+    if (error || !teacher) {
+        displayArea.innerText = "Error: Teacher not found in database.";
         return;
     }
 
-    if (teacher) {
-        // 3. Auto-fill the Teacher Name field in Section 5
-        nameInput.value = teacher.teacher_name;
+    nameInput.value = teacher.teacher_name;
 
-        // 4. Check if teacher is available tomorrow
-        if (teacher.availability !== "Yes") {
-            console.log("Teacher is marked unavailable in Portal.");
-            return;
-        }
+    // 2. Parse the timing map
+    let slotMap = {};
+    try {
+        slotMap = (typeof teacher.time_of_slot === 'string') ? JSON.parse(teacher.time_of_slot) : teacher.time_of_slot;
+    } catch (e) {
+        slotMap = {};
+    }
 
-        // 5. Parse the availability map saved in Section 11
-        let slotMap = {};
-        try {
-            // If it's already an object, use it; if it's a string, parse it.
-            slotMap = (typeof teacher.time_of_slot === 'string') ? JSON.parse(teacher.time_of_slot) : teacher.time_of_slot;
-        } catch (e) {
-            console.warn("No valid slot map found for this teacher.");
-            return;
-        }
-
-        // 6. Match the specific subject selected in Batch Section to the Teacher's Slots
-        if (selectedSubject && slotMap[selectedSubject]) {
-            const savedSlots = slotMap[selectedSubject]; // e.g. "09:00 AM to 10:00 AM, 11:00 AM to 12:00 PM"
-            
-            checkboxes.forEach(cb => {
-                // If the checkbox value exists in the teacher's saved subject slots
-                if (savedSlots.includes(cb.value)) {
-                    cb.checked = true;
-                    cb.parentElement.style.color = "#000"; // Highlight available
-                    cb.parentElement.style.fontWeight = "bold";
-                }
-            });
-        }
+    // 3. Logic to show only relevant timings
+    if (teacher.availability === "No") {
+        displayArea.innerText = "TEACHER UNAVAILABLE (Marked 'No' in Portal)";
+        displayArea.style.background = "#ffebee";
+        displayArea.style.color = "#c62828";
+    } else if (selectedSubject && slotMap[selectedSubject]) {
+        // SUCCESS: Show only the timings for this specific subject
+        displayArea.innerText = slotMap[selectedSubject];
+        displayArea.style.background = "#7FFFD4"; // Aquamarine highlight
+        displayArea.style.color = "#000";
+        displayArea.style.border = "2px solid #000";
+    } else {
+        displayArea.innerText = "No slots assigned for [" + selectedSubject + "] in Teacher Portal.";
+        displayArea.style.background = "#fff3e0";
+        displayArea.style.color = "#e65100";
     }
 }
 /* ==========================================
