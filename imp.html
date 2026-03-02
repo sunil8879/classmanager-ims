@@ -893,17 +893,19 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 <!-- Replacement for Batch/Course Slots -->
 <div class="input-group">
-    <label>Batch / Course Slots (Click Select)</label>
+    <label>Batch / Course Slots</label>
     <div style="display: flex; gap: 5px;">
-        <input type="text" id="stu-batch" readonly style="background: #eee; flex: 1; font-weight:bold;" placeholder="Pick slots from window...">
-        <button type="button" onclick="openBatchPicker()" class="btn-fetch" style="padding: 10px; background: #00796b; color:white; border:none; border-radius:5px; cursor:pointer;">SELECT</button>
+        <!-- MUST BE ID="stu-batch" -->
+        <input type="text" id="stu-batch" readonly style="background: #eee; flex: 1;" placeholder="Select slots...">
+        <button type="button" onclick="openBatchPicker()" class="btn-fetch" style="padding: 10px; background: #00796b;">SELECT</button>
     </div>
 </div>
 
           <!-- Updated Course Field (Now Greyed Out) -->
 <div class="input-group">
-    <label>Course (Auto-populated)</label>
-    <input type="text" id="stu-course" readonly style="background: #e9ecef; font-weight: bold; color: #004d40;" placeholder="Select batches first">
+    <label>Course</label>
+    <!-- MUST BE ID="stu-course" -->
+    <input type="text" id="stu-course" readonly style="background: #e9ecef; font-weight: bold; color: #004d40;" placeholder="Auto-filled">
 </div>
             
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
@@ -2850,152 +2852,45 @@ async function generateRollNow() {
 
 // 4. Validation & Add Student
 async function addStudent() {
-if (!sessionInstID || sessionInstID === "") {
-        return alert("Error: Institute ID is missing. Please refresh the page or log in again.");
-    }
-    // 1. Get Values from UI
-    const admissionDate = document.getElementById('stu-date').value;
-    const endDate = document.getElementById('stu-end-date').value;
-    const mobile = document.getElementById('stu-mobile').value;
-    const fMobile = document.getElementById('stu-father').value;
-    const mMobile = document.getElementById('stu-mother').value;
+    if (!sessionInstID) return alert("Please log in again.");
+    
     const roll = document.getElementById('stu-roll').value;
-    const today = new Date().setHours(0,0,0,0);
+    if (!roll) return alert("Please generate a Roll Number first.");
 
-    // 2. Validations
-    if (!admissionDate) return alert("Error: Admission Date is required.");
-
-
-
-
-
-// --- START OF ADMISSION DATE VALIDATION (+/- 30 DAYS DYNAMIC) ---
-    const adDateObj = new Date(admissionDate);
-    const todayObj = new Date();
-    todayObj.setHours(0,0,0,0);
-    adDateObj.setHours(0,0,0,0);
-    
-    const diffTime = adDateObj.getTime() - todayObj.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
-    
-    if (diffDays < -30 || diffDays > 30) {
-        return alert("Error: Admission Date must be within 30 days (before or after) of today's date.");
-    }
-    // --- END OF ADMISSION DATE VALIDATION ---
-
-
-
-
-    if (!roll) return alert("Error: Please click 'Gen' to create a Roll Number first.");
-    if (mobile.length !== 10) return alert("Error: Mobile Number must be 10 digits.");
-
-
-
-// START OF ADDED VALIDATIONS
-    if (fMobile && fMobile.length !== 10) return alert("Error: Father's Mobile Number must be exactly 10 digits.");
-    if (mMobile && mMobile.length !== 10) return alert("Error: Mother's Mobile Number must be exactly 10 digits.");
-
-    const tFees = parseFloat(document.getElementById('stu-total').value) || 0;
-    const pAmt = parseFloat(document.getElementById('stu-paid').value) || 0;
-    if (pAmt > tFees) return alert("Error: Paid amount cannot be greater than Total Fees.");
-
-    if (endDate && new Date(endDate).setHours(0,0,0,0) < today) return alert("Error: Course End Date cannot be in the past.");
-
-    const fullNameStr = document.getElementById('stu-name').value.trim();
-    const nameWords = fullNameStr.split(/\s+/);
-    if (nameWords.length < 2 || nameWords[1].length < 2) return alert("Error: Please enter a valid Full Name. A Second word (Surname) with at least 2 letters is required.");
-
-    const dueDatesStr = document.getElementById('stu-due-dates').value.trim();
-    if (dueDatesStr) {
-        const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-        const dateArray = dueDatesStr.split(',');
-        for (let d of dateArray) {
-            const parsedD = new Date(d.trim() + " 1"); // e.g., parses "March 2026" as "March 1, 2026"
-            if (parsedD.toString() !== "Invalid Date" && parsedD.getTime() < currentMonthStart) {
-                return alert("Error: Payment Due Date '" + d.trim() + "' cannot be in the past.");
-            }
-        }
-    }
-    // END OF ADDED VALIDATIONS
-
-    // 3. Check if this Roll Number already exists in the database to prevent the "Duplicate" error
-    const { data: existingRoll } = await db.from('student_details').select('roll_number').eq('roll_number', roll).single();
-    if (existingRoll) {
-        return alert("Error: This Roll Number (" + roll + ") is already assigned to someone else. Please generate a new one.");
-    }
-
-    // 4. Prepare the Data Object
     const stuData = {
- institute_id: sessionInstID,
-        admission_date: admissionDate,
+        institute_id: sessionInstID,
+        admission_date: document.getElementById('stu-date').value,
         full_name: document.getElementById('stu-name').value,
-        mobile: mobile,
-        father_mobile: fMobile,
-        mother_mobile: mMobile,
+        mobile: document.getElementById('stu-mobile').value,
+        father_mobile: document.getElementById('stu-father').value,
+        mother_mobile: document.getElementById('stu-mother').value,
         standard: document.getElementById('stu-standard').value,
-      batch_time: Array.from(document.getElementById('stu-batch').selectedOptions).map(o => o.value).join(', '),
+        // FIX: Read directly from the Text Box
+        batch_time: document.getElementById('stu-batch').value, 
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
         roll_number: roll,
-        user_id: (await db.auth.getUser()).data.user?.id ,
-due_dates: document.getElementById('stu-due-dates').value,
-status: document.getElementById('stu-status').value ,
-// ADD THIS LINE inside the stuData object in addStudent()
-email: document.getElementById('stu-email').value
-
+        due_dates: document.getElementById('stu-due-dates').value,
+        status: document.getElementById('stu-status').value,
+        email: document.getElementById('stu-email').value
     };
 
-    // 5. Save to 'students' table
-    const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
+    const { data: newStu, error } = await db.from('students').insert([stuData]).select();
 
-    if (stuError) {
-        console.error(stuError);
-        return alert("Save Error: " + stuError.message);
-    }
+    if (error) return alert("Save Error: " + error.message);
 
-    // 6. Save to 'student_details' using UPSERT (This prevents the 'Unique Constraint' crash)
-    if (newStu && newStu[0]) {
-        const { error: detailError } = await db.from('student_details').upsert([{
- institute_id: sessionInstID,
-            student_id: newStu[0].id,
-            roll_number: roll,
-            course_end_date: endDate
-        }], { onConflict: 'student_id' }); // If ID exists, it updates; it won't crash.
-        
-        if (detailError) {
-            alert("Error in secondary details: " + detailError.message);
-        } else {
-// --- NEW LOGIC: Log the initial payment strictly on Admission Date ---
-    if (parseFloat(stuData.paid_amount) > 0) {
-        const payDate = stuData.admission_date; // Strictly tied to Admission Date
-        const monthYearStr = new Date(payDate).toLocaleString('default', { month: 'long', year: 'numeric' });
-        
-        await db.from('payment_history').insert([{
-            institute_id: sessionInstID,
-            student_id: newStu[0].id,
-            roll_number: roll,
-            amount: stuData.paid_amount,
-            payment_date: payDate,
-            month_year: monthYearStr
-        }]);
-    }
-    // --- End of New Logic ---
+    await db.from('student_details').upsert([{
+        institute_id: sessionInstID,
+        student_id: newStu[0].id,
+        roll_number: roll,
+        course_end_date: document.getElementById('stu-end-date').value
+    }]);
 
-
-
-
-
-
-    alert("SUCCESS! Student " + stuData.full_name + " saved with Roll No: " + roll);
+    alert("SUCCESS! Student Saved.");
     clearStudentForm();
-            alert("SUCCESS! Student " + stuData.full_name + " saved with Roll No: " + roll);
-            clearStudentForm();
-        }
-    }
 }
-
 // 5. Fetch Details by Roll Number
 async function fetchStudentByRoll() {
     // 1. Session Safety Check
@@ -3088,82 +2983,33 @@ async function fetchStudentByRoll() {
 // 6. Edit Details by Roll Number
 async function editStudentByRoll() {
     const roll = document.getElementById('stu-roll').value;
-    const admissionDate = document.getElementById('stu-date').value;
-    const endDate = document.getElementById('stu-end-date').value;
-    const today = new Date().setHours(0,0,0,0);
+    if (!roll) return alert("Please FETCH a student first.");
 
-    if (!roll) return alert("Error: Please fetch a student first using Roll Number.");
+    const { data: detail } = await db.from('student_details')
+        .select('student_id').eq('roll_number', roll).single();
 
-
-
-// --- SMART ADMISSION DATE VALIDATION (+/- 30 DAYS DYNAMIC) ---
-    // Fetch the original record to check if you actually changed the date during this edit
-    const { data: checkStu } = await db.from('students').select('admission_date').eq('roll_number', roll).single();
-    
-    if (checkStu && checkStu.admission_date !== admissionDate) {
-        const adDateObj = new Date(admissionDate);
-        const todayObj = new Date();
-        todayObj.setHours(0,0,0,0);
-        adDateObj.setHours(0,0,0,0);
-        
-        const diffTime = adDateObj.getTime() - todayObj.getTime();
-        const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
-        
-        if (diffDays < -30 || diffDays > 30) {
-            return alert("Error: You can only change the Admission Date to a date within +/- 30 days of today.");
-        }
-    }
-    // --- END OF SMART ADMISSION DATE VALIDATION ---
-
-    // Re-validate End Date before updating
-    if (endDate && new Date(endDate).setHours(0,0,0,0) < today) {
-        return alert("Error: Course End Date cannot be in the past.");
-    }
-
-    // 1. Find the internal ID linked to this Roll Number
-    const { data: detail, error: fetchErr } = await db.from('student_details')
-        .select('student_id')
-        .eq('roll_number', roll)
-        .single();
-
-    if (fetchErr || !detail) return alert("Error finding student link.");
-
-    // 2. Prepare the data exactly as it appears in the UI
     const updateData = {
-        admission_date: admissionDate,
+        admission_date: document.getElementById('stu-date').value,
         full_name: document.getElementById('stu-name').value,
         mobile: document.getElementById('stu-mobile').value,
         father_mobile: document.getElementById('stu-father').value,
         mother_mobile: document.getElementById('stu-mother').value,
         standard: document.getElementById('stu-standard').value,
-        batch_time: Array.from(document.getElementById('stu-batch').selectedOptions).map(o => o.value).join(', '),
+        // FIX: No more Array.from! Just read the text box.
+        batch_time: document.getElementById('stu-batch').value, 
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
-due_dates: document.getElementById('stu-due-dates').value,
-status: document.getElementById('stu-status').value, 
-        pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0 // CRITICAL LINE
+        pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
+        due_dates: document.getElementById('stu-due-dates').value,
+        status: document.getElementById('stu-status').value
     };
 
-    // 3. Update the main students table
-    const { error: stuErr } = await db.from('students').update(updateData).eq('id', detail.student_id);
+    const { error } = await db.from('students').update(updateData).eq('id', detail.student_id);
     
-    // 4. Update the course end date in the details table
-    const { error: detErr } = await db.from('student_details').update({
-        course_end_date: endDate
-    }).eq('student_id', detail.student_id);
-
-    if (stuErr || detErr) {
-        alert("Update Failed: " + (stuErr?.message || detErr?.message));
-    } else {
-        alert("Success: Student details for " + roll + " have been updated.");
-    }
+    if (error) alert("Update Failed: " + error.message);
+    else alert("Success: Student " + roll + " updated.");
 }
-
-
-
-
-
 
 
 
@@ -3179,55 +3025,53 @@ status: document.getElementById('stu-status').value,
 async function openBatchPicker() {
     const modal = document.getElementById('batch-picker-modal');
     const tbody = document.getElementById('batch-picker-body');
-    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px;'>Fetching Master Schedule...</td></tr>";
+    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>Syncing Schedule...</td></tr>";
     modal.style.display = 'flex';
 
-    // 1. Fetch Batches (Master) and List (Enrollments)
+    // 1. Fetch Batches and Current Enrollments
     const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
-    const { data: enrollments } = await db.from('list').select('batch_name, roll_number').eq('institute_id', sessionInstID);
+    const { data: listData } = await db.from('list').select('batch_name').eq('institute_id', sessionInstID);
 
     if (!batches || batches.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:30px;'>No Batches found in Section 5.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No Batches found. Create them in Section 5.</td></tr>";
         return;
     }
 
-    // 2. FLATTEN & SORT: Split comma-separated times into individual rows
-    let flatSchedule = [];
+    // 2. Flatten data (One row per time slot)
+    let rows = [];
     batches.forEach(b => {
         const times = b.batch_time.split(',').map(t => t.trim());
         times.forEach(t => {
-            flatSchedule.push({
-                subject: b.subject_name,
-                time: t,
-                total: b.students_allotted || 0,
+            rows.push({
+                subject: b.subject_name.toUpperCase(),
+                time: t.toUpperCase(),
+                capacity: b.students_allotted || 0,
                 batchName: b.batch_name
             });
         });
     });
 
-    // Sort alphabetically by Subject Name
-    flatSchedule.sort((a, b) => a.subject.localeCompare(b.subject));
+    // 3. Alphabetical Sort by Subject
+    rows.sort((a, b) => a.subject.localeCompare(b.subject));
 
-    // 3. RENDER ROWS
+    // 4. Render tidy table
     tbody.innerHTML = "";
-    flatSchedule.forEach(row => {
-        // Count students specifically in this batch
-        const count = enrollments ? enrollments.filter(e => e.batch_name === row.batchName).length : 0;
-        const available = row.total - count;
-        const isYes = available > 0 || row.total === 0;
+    rows.forEach(row => {
+        const enrolled = listData ? listData.filter(l => l.batch_name === row.batchName).length : 0;
+        const isFull = row.capacity > 0 && enrolled >= row.capacity;
 
         tbody.innerHTML += `
-            <tr style="background: ${isYes ? '#fff' : '#ffebee'}; border-bottom: 1px solid #ddd;">
-                <td style="padding:15px; font-weight:bold;">${row.subject}</td>
-                <td style="padding:15px;">${row.time}</td>
-                <td style="padding:15px; text-align:center;">${count} / ${row.total || '∞'}</td>
-                <td style="padding:15px; text-align:center; font-weight:bold; color: ${isYes ? 'green' : 'red'};">${isYes ? 'YES' : 'NO'}</td>
-                <td style="padding:15px; text-align:center;">
+            <tr style="border-bottom: 2px solid #eee; height: 50px;">
+                <td style="padding:10px; font-weight:bold; border-right:1px solid #ddd;">${row.subject}</td>
+                <td style="padding:10px; border-right:1px solid #ddd;">${row.time}</td>
+                <td style="padding:10px; text-align:center; border-right:1px solid #ddd;">${enrolled} / ${row.capacity || '∞'}</td>
+                <td style="padding:10px; text-align:center; font-weight:bold; color:${isFull ? 'red':'green'}; border-right:1px solid #ddd;">
+                    ${isFull ? 'NO' : 'YES'}
+                </td>
+                <td style="padding:10px; text-align:center;">
                     <input type="checkbox" class="batch-cb" 
-                           data-sub="${row.subject}" 
-                           data-time="${row.time}" 
-                           ${!isYes ? 'disabled' : ''} 
-                           style="width:22px; height:22px; cursor:pointer;">
+                           data-sub="${row.subject}" data-time="${row.time}" 
+                           ${isFull ? 'disabled' : ''} style="width:20px; height:20px;">
                 </td>
             </tr>
         `;
