@@ -3103,7 +3103,7 @@ async function editStudentByRoll() {
         father_mobile: document.getElementById('stu-father').value,
         mother_mobile: document.getElementById('stu-mother').value,
         standard: document.getElementById('stu-standard').value,
-        batch_time: document.getElementById('stu-batch').value,
+        batch_time: Array.from(document.getElementById('stu-batch').selectedOptions).map(o => o.value).join(', '),
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
