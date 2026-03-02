@@ -6240,57 +6240,49 @@ window.showHomeChartPage = function(page) {
    ========================================== */
 
 async function generateFinancialForecast(students) {
-    const monthsToShow = 6;
     const forecastData = {};
-    const chartRows =[];
-    
-    // Bulletproof Month Naming Array
-    const monthNames =["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const chartRows = [];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    // 1. Initialize the next 6 months safely
-    let today = new Date();
-    for (let i = 0; i < monthsToShow; i++) {
-        let futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        let standardMonth = monthNames[futureDate.getMonth()] + " " + futureDate.getFullYear();
-        forecastData[standardMonth] = 0;
+    // 1. GENERATE THE FIXED 6-MONTH WINDOW (1 Past + 1 Current + 4 Future)
+    const displayMonths = [];
+    let tempDate = new Date();
+    tempDate.setDate(1); 
+    tempDate.setMonth(tempDate.getMonth() - 1); // Go back 1 month (e.g., February if today is March)
+
+    for (let i = 0; i < 6; i++) {
+        let mKey = monthNames[tempDate.getMonth()] + " " + tempDate.getFullYear();
+        displayMonths.push(mKey);
+        forecastData[mKey] = 0; // Initialize with 0
+        tempDate.setMonth(tempDate.getMonth() + 1);
     }
 
-    // 2. Parse Student Due Dates and distribute Pending Amounts (ACTIVE STUDENTS ONLY)
+    // 2. PARSE STUDENT DUE DATES (ACTIVE STUDENTS ONLY)
     students.forEach(s => {
-        if (s.pending_amount > 0 && s.due_dates) {
-            const dates = s.due_dates.split(',').map(d => d.trim());
-            let validFutureKeys =[];
-
-            const todayForFilter = new Date();
-            todayForFilter.setHours(0, 0, 0, 0);
-
-            for (let k = 0; k < dates.length; k++) {
-                let cleanDateStr = dates[k].replace(/(st|nd|rd|th)/i, ''); 
-                let parsedDate = new Date(cleanDateStr);
-                
-                if (!isNaN(parsedDate) && parsedDate >= todayForFilter) {
-                    let key = monthNames[parsedDate.getMonth()] + " " + parsedDate.getFullYear();
-                    validFutureKeys.push(key);
-                }
+        if (s.pending_amount > 0) {
+            let rawDates = [];
+            if (s.due_dates && s.due_dates.trim() !== "") {
+                rawDates = s.due_dates.split(',').map(d => d.trim()).filter(d => d !== "");
+            } else {
+                // Fallback: If no installments listed, use admission month
+                const adm = new Date(s.admission_date);
+                rawDates = [monthNames[adm.getMonth()] + " " + adm.getFullYear()];
             }
 
-            if (validFutureKeys.length === 0) return; 
+            const perInstallment = s.pending_amount / rawDates.length;
 
-            const perInstallment = s.pending_amount / validFutureKeys.length;
-
-            validFutureKeys.forEach(key => {
-                if (forecastData.hasOwnProperty(key)) {
-                    forecastData[key] += perInstallment;
-                }
+            rawDates.forEach(dateStr => {
+                // Find which of our 6 display months this belongs to
+                displayMonths.forEach(mKey => {
+                    if (dateStr.toLowerCase().includes(mKey.toLowerCase())) {
+                        forecastData[mKey] += perInstallment;
+                    }
+                });
             });
         }
     });
 
-    // 3. Update the UI Cards
-    const cardContainer = document.getElementById('forecast-cards');
-    cardContainer.innerHTML = "";
-    
-    // --- REAL YEARLY REVENUE (Active + Inactive) FOR GRAPHS ---
+    // 3. FETCH DATA FOR GRAPHS (USING INSTITUTE ID)
     const currentYear = new Date().getFullYear();
     const { data: yearlyPayments } = await db.from('payment_history')
         .select('amount')
@@ -6299,43 +6291,50 @@ async function generateFinancialForecast(students) {
         .lte('payment_date', `${currentYear}-12-31`);
         
     const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
-    // --- END ---
-
-    // Stats strictly for Active students
     const totalAdmissions = students.length;
     const totalPending = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
 
-    Object.keys(forecastData).forEach(month => {
+    // 4. RENDER UI CARDS
+    const cardContainer = document.getElementById('forecast-cards');
+    cardContainer.innerHTML = "";
+    
+    const todayMonthStart = new Date();
+    todayMonthStart.setDate(1);
+    todayMonthStart.setHours(0,0,0,0);
+
+    displayMonths.forEach(month => {
+        const amt = Math.round(forecastData[month]);
+        const mDate = new Date(month);
+        const isPast = mDate < todayMonthStart;
+
         cardContainer.innerHTML += `
-            <div class="stat-card" style="padding: 15px; min-width: 130px; border-bottom: 4px solid #f39c12;">
-                <p style="font-size: 0.7rem; margin-bottom: 5px;">${month.toUpperCase()}</p>
-                <h4 style="font-size: 1.2rem !important; color: #000;">₹${Math.round(forecastData[month]).toLocaleString()}</h4>
+            <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid ${isPast ? '#ff0000' : '#f39c12'}; background: ${isPast ? '#fff5f5' : 'white'};">
+                <p style="font-size: 0.7rem; margin-bottom: 5px; color: ${isPast ? '#ff0000' : '#666'};">
+                    ${month.toUpperCase()} ${isPast ? '(PAST DUE)' : ''}
+                </p>
+                <h4 style="font-size: 1.2rem !important; color: #000;">₹${amt.toLocaleString('en-IN')}</h4>
             </div>
         `;
-        chartRows.push([month, totalAdmissions, totalReceived, totalPending, Math.round(forecastData[month])]);
+        // Initial data for chartRows
+        chartRows.push([month, totalAdmissions, totalReceived, totalPending, amt]);
     });
 
-/* --- DYNAMIC FORECAST & CHART DATA SYNC --- */
+    // 5. CUMULATIVE CHART DATA SYNC
     let runningCollection = totalReceived;
     let runningPending = totalPending;
 
     for (let i = 0; i < chartRows.length; i++) {
-        let monthlyIncoming = chartRows[i][4]; // This is the forecast for this specific month
-
-        // Update the Line/Bar chart values (Running cumulative totals)
+        let monthlyIncoming = chartRows[i][4];
         runningCollection += monthlyIncoming;
         runningPending -= monthlyIncoming;
         if (runningPending < 0) runningPending = 0; 
 
-        // Update the columns for the Line/Bar Chart
-        chartRows[i][2] = runningCollection; // Cumulative Collection
-        chartRows[i][3] = runningPending;    // Remaining Pending
-        
-        // Push a 6th value so the DataTable schema (6 columns) matches your data
-        chartRows[i].push(monthlyIncoming); 
+        chartRows[i][2] = runningCollection; // Total Collection Line
+        chartRows[i][3] = runningPending;    // Total Pending Line
+        chartRows[i].push(monthlyIncoming);  // Value for Bar Chart
     }
 
-    /* --- DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
+    // 6. DYNAMIC ADMISSIONS (END DATE) LOGIC (USING INSTITUTE ID)
     const { data: dynStudents } = await db.from('students')
         .select('student_details(course_end_date)')
         .eq('institute_id', sessionInstID)
@@ -6361,12 +6360,11 @@ async function generateFinancialForecast(students) {
                     }
                 }
             });
-            
-            chartRows[i][1] = activeCount;
+            chartRows[i][1] = activeCount; // Update Admission count per month
         }
     }
 
-    // 4. Draw the Google Chart
+    // 7. FINAL DRAW
     drawHomeForecastingChart(chartRows);
 }
 
