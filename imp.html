@@ -6240,57 +6240,55 @@ window.showHomeChartPage = function(page) {
    ========================================== */
 
 async function generateFinancialForecast(students) {
-    const monthsToShow = 6;
     const forecastData = {};
-    const chartRows =[];
-    
-    // Bulletproof Month Naming Array
-    const monthNames =["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    // 1. Initialize the next 6 months safely
-    let today = new Date();
-    for (let i = 0; i < monthsToShow; i++) {
-        let futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        let standardMonth = monthNames[futureDate.getMonth()] + " " + futureDate.getFullYear();
-        forecastData[standardMonth] = 0;
-    }
-
-    // 2. Parse Student Due Dates and distribute Pending Amounts (ACTIVE STUDENTS ONLY)
+    // 1. SCAN ALL STUDENTS TO FIND EVERY "MONTH YEAR" WHERE MONEY IS DUE
     students.forEach(s => {
         if (s.pending_amount > 0 && s.due_dates) {
-            const dates = s.due_dates.split(',').map(d => d.trim());
-            let validFutureKeys =[];
+            const dates = s.due_dates.split(',').map(d => d.trim()).filter(d => d !== "");
+            
+            // Calculate how much is due per installment
+            const perInstallment = s.pending_amount / dates.length;
 
-            const todayForFilter = new Date();
-            todayForFilter.setHours(0, 0, 0, 0);
-
-            for (let k = 0; k < dates.length; k++) {
-                let cleanDateStr = dates[k].replace(/(st|nd|rd|th)/i, ''); 
-                let parsedDate = new Date(cleanDateStr);
+            dates.forEach(dateStr => {
+                // Standardize the format (e.g., "February 2026")
+                // We handle potential "st, nd, rd, th" just in case
+                let cleanDate = dateStr.replace(/(st|nd|rd|th)/i, '');
+                let dObj = new Date(cleanDate);
                 
-                if (!isNaN(parsedDate) && parsedDate >= todayForFilter) {
-                    let key = monthNames[parsedDate.getMonth()] + " " + parsedDate.getFullYear();
-                    validFutureKeys.push(key);
-                }
-            }
-
-            if (validFutureKeys.length === 0) return; 
-
-            const perInstallment = s.pending_amount / validFutureKeys.length;
-
-            validFutureKeys.forEach(key => {
-                if (forecastData.hasOwnProperty(key)) {
+                if (!isNaN(dObj)) {
+                    let key = monthNames[dObj.getMonth()] + " " + dObj.getFullYear();
+                    
+                    // Add to the forecast object
+                    if (!forecastData[key]) {
+                        forecastData[key] = 0;
+                    }
                     forecastData[key] += perInstallment;
                 }
             });
         }
     });
 
-    // 3. Update the UI Cards
+    // 2. SORT THE MONTHS CHRONOLOGICALLY
+    // We convert the keys back to Date objects to sort them properly
+    const sortedMonths = Object.keys(forecastData).sort((a, b) => {
+        return new Date(a) - new Date(b);
+    });
+
+    // 3. UPDATE THE UI CARDS
     const cardContainer = document.getElementById('forecast-cards');
     cardContainer.innerHTML = "";
+
+    // If no money is expected anywhere, show a message
+    if (sortedMonths.length === 0) {
+        cardContainer.innerHTML = "<p style='color:#666;'>No upcoming or overdue fee installments found.</p>";
+    }
+
+    // 4. PREPARE DATA FOR GRAPHS (No changes needed to graph code structure)
+    const chartRows = [];
     
-    // --- REAL YEARLY REVENUE (Active + Inactive) FOR GRAPHS ---
+    // Get yearly collection for the graph logic
     const currentYear = new Date().getFullYear();
     const { data: yearlyPayments } = await db.from('payment_history')
         .select('amount')
@@ -6299,77 +6297,36 @@ async function generateFinancialForecast(students) {
         .lte('payment_date', `${currentYear}-12-31`);
         
     const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
-    // --- END ---
-
-    // Stats strictly for Active students
     const totalAdmissions = students.length;
     const totalPending = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
 
-    Object.keys(forecastData).forEach(month => {
-        cardContainer.innerHTML += `
-            <div class="stat-card" style="padding: 15px; min-width: 130px; border-bottom: 4px solid #f39c12;">
-                <p style="font-size: 0.7rem; margin-bottom: 5px;">${month.toUpperCase()}</p>
-                <h4 style="font-size: 1.2rem !important; color: #000;">₹${Math.round(forecastData[month]).toLocaleString()}</h4>
-            </div>
-        `;
-        chartRows.push([month, totalAdmissions, totalReceived, totalPending, Math.round(forecastData[month])]);
-    });
-
-/* --- DYNAMIC FORECAST & CHART DATA SYNC --- */
     let runningCollection = totalReceived;
     let runningPending = totalPending;
 
-    for (let i = 0; i < chartRows.length; i++) {
-        let monthlyIncoming = chartRows[i][4]; // This is the forecast for this specific month
+    sortedMonths.forEach(month => {
+        const monthlyIncoming = Math.round(forecastData[month]);
+        
+        // Add to UI
+        cardContainer.innerHTML += `
+            <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid #f39c12; background: ${new Date(month) < new Date().setHours(0,0,0,0) ? '#fff0f0' : 'white'};">
+                <p style="font-size: 0.7rem; margin-bottom: 5px; color: ${new Date(month) < new Date().setHours(0,0,0,0) ? 'red' : '#666'};">
+                    ${month.toUpperCase()} ${new Date(month) < new Date().setHours(0,0,0,0) ? '(OVERDUE)' : ''}
+                </p>
+                <h4 style="font-size: 1.2rem !important; color: #000;">₹${monthlyIncoming.toLocaleString()}</h4>
+            </div>
+        `;
 
-        // Update the Line/Bar chart values (Running cumulative totals)
+        // Logic for cumulative graph lines
         runningCollection += monthlyIncoming;
         runningPending -= monthlyIncoming;
-        if (runningPending < 0) runningPending = 0; 
+        if (runningPending < 0) runningPending = 0;
 
-        // Update the columns for the Line/Bar Chart
-        chartRows[i][2] = runningCollection; // Cumulative Collection
-        chartRows[i][3] = runningPending;    // Remaining Pending
-        
-        // Push a 6th value so the DataTable schema (6 columns) matches your data
-        chartRows[i].push(monthlyIncoming); 
-    }
+        chartRows.push([month, totalAdmissions, runningCollection, runningPending, monthlyIncoming, monthlyIncoming]);
+    });
 
-    /* --- DYNAMIC ADMISSIONS (END DATE) LOGIC --- */
-    const { data: dynStudents } = await db.from('students')
-        .select('student_details(course_end_date)')
-        .eq('institute_id', sessionInstID)
-        .eq('status', 'Active');
-
-    if (dynStudents) {
-        for (let i = 0; i < chartRows.length; i++) {
-            let monthName = chartRows[i][0]; 
-            let chartMonthDate = new Date(monthName + " 1"); 
-            let activeCount = 0;
-
-            dynStudents.forEach(s => {
-                let details = Array.isArray(s.student_details) ? s.student_details[0] : s.student_details;
-                let endStr = details ? details.course_end_date : null;
-
-                if (!endStr) {
-                    activeCount++; 
-                } else {
-                    let endDate = new Date(endStr);
-                    if (endDate.getFullYear() > chartMonthDate.getFullYear() || 
-                       (endDate.getFullYear() === chartMonthDate.getFullYear() && endDate.getMonth() >= chartMonthDate.getMonth())) {
-                        activeCount++;
-                    }
-                }
-            });
-            
-            chartRows[i][1] = activeCount;
-        }
-    }
-
-    // 4. Draw the Google Chart
+    // 5. DRAW THE GRAPH
     drawHomeForecastingChart(chartRows);
 }
-
 function drawHomeForecastingChart(chartRows) {
     var data = new google.visualization.DataTable();
     data.addColumn('string', 'Month');
