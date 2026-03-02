@@ -3453,6 +3453,13 @@ async function generateUPIQR() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
+// Inside addBatch()
+const teacherExpertise = document.getElementById('batch-teacher-id').dataset.subjects || "";
+const selectedSubject = document.getElementById('batch-subject').value.toUpperCase();
+
+if (!teacherExpertise.includes(selectedSubject)) {
+    return alert(`🛑 SUBJECT MISMATCH: This teacher is registered for [${teacherExpertise}]. They cannot be assigned to a [${selectedSubject}] batch.`);
+}
     const bName = document.getElementById('batch-name').value.trim();
     const tId = document.getElementById('batch-teacher-id').value.toUpperCase().trim();
     const bTime = document.getElementById('batch-time').value;
@@ -3649,15 +3656,20 @@ async function loadBatchTeacherDropdown() {
 }
 
 // 2. Auto-fill the Teacher Name box when ID is selected
-function handleBatchTeacherChange() {
+async function handleBatchTeacherChange() {
     const select = document.getElementById('batch-teacher-id');
     const nameInput = document.getElementById('batch-teacher-name');
-    const selectedOpt = select.options[select.selectedIndex];
+    const tid = select.value;
     
-    if (selectedOpt && selectedOpt.dataset.name) {
-        nameInput.value = selectedOpt.dataset.name;
-    } else {
-        nameInput.value = "";
+    if (!tid) return;
+
+    // Fetch teacher details to get their expertise
+    const { data } = await db.from('teacher_details').select('teacher_name, subject_taught').eq('id', tid).single();
+    
+    if (data) {
+        nameInput.value = data.teacher_name;
+        // Store subjects in a temporary attribute for validation
+        select.dataset.subjects = data.subject_taught.toUpperCase(); 
     }
 }
 /* ==========================================
@@ -5765,6 +5777,19 @@ async function saveAllocation() {
         batch_name: tBatch // NEW: Saving the link to the specific batch from Section 5
     };
 
+
+
+// Inside saveAllocation()
+const teacherExpertise = document.getElementById('alloc-tbatch').options[document.getElementById('alloc-tbatch').selectedIndex].text.toUpperCase();
+const studentCourse = document.getElementById('alloc-subject').value.toUpperCase();
+
+if (!teacherExpertise.includes(studentCourse)) {
+    return alert(`🛑 ALLOCATION DENIED: You are linking a [${studentCourse}] student to a batch focused on [${teacherExpertise}]. Please select the correct teacher.`);
+}
+
+
+
+
     const { error } = await db.from('student_allocations').insert([data]);
 
     if (error) {
@@ -7697,6 +7722,19 @@ async function addBatchMasterRecord() {
     const batchName = document.getElementById('bm-bname').value.trim();
     const studentName = document.getElementById('bm-sname').value;
     const teacherId = document.getElementById('bm-tid').value;
+
+
+// Inside addBatchMasterRecord()
+const studentCourses = document.getElementById('bm-course').value.toUpperCase();
+const batchInfo = document.getElementById('bm-bname').value.toUpperCase(); // This usually contains the subject name
+
+// Check if the student actually takes the subject that this batch is for
+// Example: If batch is "Evening Physics" and student takes "Maths, Physics", it passes.
+const batchSubjectFound = studentCourses.split(',').some(course => batchInfo.includes(course.trim()));
+
+if (!batchSubjectFound) {
+    return alert(`🛑 INVALID ENROLLMENT: Student is enrolled for [${studentCourses}], but you are trying to add them to the [${batchInfo}] batch. These do not match.`);
+}
 
     if (!roll || !batchName || !teacherId) return alert("Please fill all details (Roll No, Teacher, and Batch).");
 
