@@ -1790,6 +1790,13 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                 </div>
             </div>
             <div class="input-group"><label>Teacher Name</label><input type="text" id="alloc-tname" readonly style="background:#eee;"></div>
+
+<!-- INSERT THIS NEW BLOCK BELOW -->
+<div class="input-group">
+    <label>Subjects Taught by Teacher</label>
+    <input type="text" id="alloc-tsubject" readonly style="background:#eee;" placeholder="Auto-populated">
+</div>
+<!-- END OF INSERTION -->
             
             <div class="input-group">
                 <label>Student Roll Number</label>
@@ -5432,9 +5439,25 @@ async function fetchTeacherHistory() {
 // 1. Fetch Teacher Info
 async function fetchTeacherForAlloc() {
     const tid = document.getElementById('alloc-tid').value.toUpperCase();
-    const { data } = await db.from('teacher_details').select('teacher_name').eq('id', tid).eq('institute_id', sessionInstID).maybeSingle();
-    if(data) document.getElementById('alloc-tname').value = data.teacher_name;
-    else alert("Teacher not found.");
+    
+    // Updated query to include subject_taught
+    const { data, error } = await db.from('teacher_details')
+        .select('teacher_name, subject_taught') 
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (error) return alert("Database Error: " + error.message);
+
+    if (data) {
+        document.getElementById('alloc-tname').value = data.teacher_name;
+        // Populate the new field
+        document.getElementById('alloc-tsubject').value = data.subject_taught || "Not Specified";
+    } else {
+        alert("Teacher not found. Check the ID.");
+        document.getElementById('alloc-tname').value = "";
+        document.getElementById('alloc-tsubject').value = "";
+    }
 }
 
 // 2. Fetch Student Info
@@ -5463,14 +5486,27 @@ async function saveAllocation() {
         institute_id: sessionInstID,
         teacher_id: document.getElementById('alloc-tid').value.toUpperCase(),
         teacher_name: document.getElementById('alloc-tname').value,
+        teacher_subjects: document.getElementById('alloc-tsubject').value, // Added this field
         roll_number: document.getElementById('alloc-roll').value.toUpperCase(),
         student_name: document.getElementById('alloc-sname').value,
         subject: document.getElementById('alloc-subject').value
     };
-    if(!data.teacher_id || !data.roll_number) return alert("Please select both Teacher and Student.");
+    
+    if (!data.teacher_id || !data.roll_number) {
+        return alert("Please select both Teacher and Student.");
+    }
     
     const { error } = await db.from('student_allocations').insert([data]);
-    if(error) alert(error.message); else alert("Link Created Successfully!");
+    
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("Link Created Successfully!");
+        // Optional: Clear fields
+        document.getElementById('alloc-roll').value = "";
+        document.getElementById('alloc-sname').value = "";
+        document.getElementById('alloc-subject').value = "";
+    }
 }
 
 // 4. View all students assigned to a specific teacher
