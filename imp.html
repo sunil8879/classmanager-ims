@@ -3640,34 +3640,46 @@ async function handleBatchTeacherChange() {
     const selectedSub = document.getElementById('batch-subject').value; 
     const checkboxes = document.querySelectorAll('.batch-time-slot');
 
-    // Reset UI
-    checkboxes.forEach(cb => { cb.checked = false; cb.parentElement.style.color = "#ccc"; });
-    if (!tid || !selectedSub) return;
+    // 1. Reset everything to unchecked and grey
+    checkboxes.forEach(cb => { 
+        cb.checked = false; 
+        cb.parentElement.style.color = "#ccc"; 
+    });
 
-    const { data: teacher } = await db.from('teacher_details').select('teacher_name, time_of_slot').eq('id', tid).single();
+    if (!tid) return;
+
+    // 2. Fetch teacher from database
+    const { data: teacher } = await db.from('teacher_details')
+        .select('teacher_name, time_of_slot')
+        .eq('id', tid)
+        .single();
 
     if (teacher) {
         document.getElementById('batch-teacher-name').value = teacher.teacher_name;
+        
+        // 3. If no subject is picked yet, stop here
+        if (!selectedSub) return;
+
         try {
-            // THE FIX: Parse the JSON availability map
-            const availabilityData = JSON.parse(teacher.time_of_slot);
+            // 4. Parse the JSON map and find the slots for the chosen subject
+            const availabilityData = JSON.parse(teacher.time_of_slot || "{}");
             const savedSlots = availabilityData[selectedSub] || "";
             
+            // 5. Check the boxes if the teacher is available
             if (savedSlots) {
                 const slotsArray = savedSlots.split(', ');
                 checkboxes.forEach(cb => {
                     if (slotsArray.includes(cb.value)) {
                         cb.checked = true;
-                        cb.parentElement.style.color = "#000"; // Highlight available ones
+                        cb.parentElement.style.color = "#000"; // Turn text black for active slots
                     }
                 });
-            } else {
-                console.log("No slots found for this specific subject.");
             }
-        } catch (e) { console.error("Error loading slots:", e); }
+        } catch (e) { 
+            console.error("Slot format error:", e); 
+        }
     }
 }
-
 /* ==========================================
    6. ATTENDANCE (Mark & Fetch)
    ========================================== */
@@ -5051,37 +5063,25 @@ function updateSubjectPages() {
 }
 
 function changeSubjectPage(dir) {
-
-
-if (getSelectedTeacherTimeSlots().split(', ').some(slot => slot && Object.entries(availabilityMap).some(([sub, val]) => sub !== subjectPages[currentSubjectIndex] && val.includes(slot)))) return alert("🛑 Conflict: This slot is already taken by another subject!");
     if (subjectPages.length === 0) return alert("Please type subjects in 'Subject Taught' box first.");
-    
-    // 1. Get currently selected slots for the current subject
-    const currentSub = subjectPages[currentSubjectIndex];
-    const selectedSlots = getSelectedTeacherTimeSlots();
 
-    // 2. VALIDATION: Check if any of these slots are already taken by OTHER subjects
-    for (let sub in availabilityMap) {
-        if (sub !== currentSub && selectedSlots !== "") {
-            const otherSlots = availabilityMap[sub].split(', ');
-            const currentSlotsArr = selectedSlots.split(', ');
-            const overlap = currentSlotsArr.filter(slot => otherSlots.includes(slot));
-            
-            if (overlap.length > 0) {
-                return alert(`🛑 SLOT CONFLICT: The slot [${overlap[0]}] is already assigned to ${sub}. A teacher cannot teach two subjects at the same time!`);
-            }
-        }
-    }
+    // 1. Save the checkboxes you just picked for the current subject
+    availabilityMap[subjectPages[currentSubjectIndex]] = getSelectedTeacherTimeSlots();
 
-    // 3. Save to memory if no conflict
-    availabilityMap[currentSub] = selectedSlots;
-
-    // 4. Move Index
+    // 2. Calculate the next subject index
     let newIndex = currentSubjectIndex + dir;
+
+    // 3. If the next subject exists, move to it
     if (newIndex >= 0 && newIndex < subjectPages.length) {
         currentSubjectIndex = newIndex;
+        
+        // 4. Update the visual Red/Yellow display box
         document.getElementById('tch-current-subject-display').innerText = subjectPages[currentSubjectIndex];
+        
+        // 5. Load the checkboxes that were previously saved for THIS subject
         setTeacherTimeSlots(availabilityMap[subjectPages[currentSubjectIndex]] || "");
+    } else {
+        alert("End of subject list.");
     }
 }
 
@@ -5775,6 +5775,11 @@ async function fetchStudentForAlloc() {
 
 // 3. Save the Relationship
 async function saveAllocation() {
+
+// Paste inside saveAllocation() at the start
+if (!document.getElementById('alloc-tbatch').selectedOptions[0].text.toUpperCase().includes(document.getElementById('alloc-subject').value.toUpperCase())) return alert("🛑 ERROR: Subject Mismatch! Link to correct teacher.");
+
+
     const tExpertise = document.getElementById('alloc-tbatch').options[document.getElementById('alloc-tbatch').selectedIndex].text.toUpperCase();
     const selectedCourse = document.getElementById('alloc-subject').value.toUpperCase();
     
@@ -8927,7 +8932,19 @@ async function refreshStudentBatchDropdown() {
 
 
 
-
+// Paste at the bottom of <script>
+document.getElementById('tch-time-checkboxes').addEventListener('change', function(e) {
+    if (e.target.checked) {
+        const val = e.target.value;
+        const conflict = Object.entries(availabilityMap).find(([sub, slots]) => 
+            sub !== subjectPages[currentSubjectIndex] && slots.includes(val)
+        );
+        if (conflict) {
+            e.target.checked = false;
+            alert("🛑 Slot Conflict: [" + val + "] is already taken for " + conflict[0]);
+        }
+    }
+});
 
 
 
