@@ -8879,17 +8879,17 @@ async function autopopulateBatchMaster() {
 
     // --- THE LOGIC FIX ---
 if (allocs && allocs.length > 0) {
-        currentRollAllocations = allocs; // Save to global memory for the listener
+        // Filter out any records where batch_name is null or empty
+        currentRollAllocations = allocs.filter(a => a.batch_name && a.batch_name !== "null"); 
+        
         const tidSelect = document.getElementById('bm-tid');
         tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
 
-        // 1. Create a Unique list of Teachers
-        const uniqueAllocs = [];
-        const seenIds = new Set();
-        allocs.forEach(a => {
-            if (!seenIds.has(a.teacher_id)) {
-                seenIds.add(a.teacher_id);
-                uniqueAllocs.push(a); // Define uniqueAllocs here!
+        // Get UNIQUE Teacher IDs
+        const seenTids = new Set();
+        currentRollAllocations.forEach(a => {
+            if (!seenTids.has(a.teacher_id)) {
+                seenTids.add(a.teacher_id);
                 let opt = document.createElement('option');
                 opt.value = a.teacher_id;
                 opt.text = `${a.teacher_id} - ${a.teacher_name}`;
@@ -8898,36 +8898,17 @@ if (allocs && allocs.length > 0) {
             }
         });
 
-        // 2. Handle Auto-Selection logic
-        if (uniqueAllocs.length === 1) {
-            // Automatically pick the only teacher
-            tidSelect.selectedIndex = 1; 
-            document.getElementById('bm-tname').value = uniqueAllocs[0].teacher_name;
-
-            // Immediately fill the batch dropdown for this teacher
-            const relevantBatches = allocs.filter(a => a.teacher_id === uniqueAllocs[0].teacher_id);
-            const bnameSelect = document.getElementById('bm-bname');
-            bnameSelect.innerHTML = '<option value="">-- Select Linked Batch --</option>';
-            
-            relevantBatches.forEach(b => {
-                let opt = document.createElement('option');
-                opt.value = b.batch_name;
-                opt.text = b.batch_name;
-                bnameSelect.appendChild(opt);
-            });
-
-            // If there is only one batch, pick that too
-            if (relevantBatches.length === 1) {
-                bnameSelect.selectedIndex = 1;
-            }
+        if (seenTids.size === 1) {
+            tidSelect.selectedIndex = 1;
+            // Manually trigger the fill logic for the single teacher
+            const event = new Event('change');
+            tidSelect.dispatchEvent(event);
         } else {
-            // More than 1 teacher: make user pick
             document.getElementById('bm-bname').innerHTML = '<option value="">-- Pick Teacher First --</option>';
         }
     } else {
-        // NO data found in Module 18
-        alert("Notice: No specific Teacher Allocation (Module 18) found for this student.");
-        await loadBMTeacherDropdown(); // Fallback to full list
+        alert("No specific Teacher Allocation found.");
+        await loadBMTeacherDropdown();
     }
 }
 
@@ -8978,31 +8959,36 @@ document.getElementById('stu-batch').addEventListener('change', function() {
 
 document.getElementById('bm-tid').addEventListener('change', function() {
     const tid = this.value;
-    const nameInput = document.getElementById('bm-tname');
     const bnameSelect = document.getElementById('bm-bname');
+    const nameInput = document.getElementById('bm-tname');
     
-    // 1. Fill Teacher Name
     const selectedOpt = this.options[this.selectedIndex];
-    nameInput.value = selectedOpt.dataset.name || "";
+    nameInput.value = selectedOpt ? (selectedOpt.dataset.name || "") : "";
 
-    // 2. Filter batches for THIS teacher from the saved student allocations
-    const relevantBatches = currentRollAllocations.filter(a => a.teacher_id === tid);
-
-    // 3. Populate the Batch dropdown with only the batches this student is linked to
     bnameSelect.innerHTML = '<option value="">-- Select Linked Batch --</option>';
-    relevantBatches.forEach(b => {
-        let opt = document.createElement('option');
-        opt.value = b.batch_name;
-        opt.text = b.batch_name; // This will now show the correct batch/subject link
-        bnameSelect.appendChild(opt);
+
+    if (!tid) return;
+
+    // --- LOGIC TO REMOVE DUPLICATES AND NULLS ---
+    const seenBatches = new Set();
+    
+    currentRollAllocations.forEach(a => {
+        // 1. Check if record belongs to this teacher
+        // 2. Check if batch name is NOT empty/null
+        // 3. Check if we haven't already added this batch name to the list
+        if (a.teacher_id === tid && a.batch_name && !seenBatches.has(a.batch_name)) {
+            seenBatches.add(a.batch_name);
+            let opt = document.createElement('option');
+            opt.value = a.batch_name;
+            opt.text = a.batch_name;
+            bnameSelect.appendChild(opt);
+        }
     });
 
-    // Auto-select if only one batch exists for this teacher
-    if (relevantBatches.length === 1) {
+    if (seenBatches.size === 1) {
         bnameSelect.selectedIndex = 1;
     }
 });
-
     </script>
 <script>
 if ('serviceWorker' in navigator) {
