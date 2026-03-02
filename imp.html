@@ -1791,12 +1791,13 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             </div>
             <div class="input-group"><label>Teacher Name</label><input type="text" id="alloc-tname" readonly style="background:#eee;"></div>
 
-<!-- INSERT THIS NEW BLOCK BELOW -->
+<!-- Replace the old alloc-subject input with this select box -->
 <div class="input-group">
-    <label>Subjects Taught by Teacher</label>
-    <input type="text" id="alloc-tsubject" readonly style="background:#eee;" placeholder="Auto-populated">
+    <label>Select Student Course to Link</label>
+    <select id="alloc-subject">
+        <option value="">-- Fetch Student First --</option>
+    </select>
 </div>
-<!-- END OF INSERTION -->
             
             <div class="input-group">
                 <label>Student Roll Number</label>
@@ -5462,10 +5463,10 @@ async function fetchTeacherForAlloc() {
 
 // 2. Fetch Student Info
 async function fetchStudentForAlloc() {
-    const roll = document.getElementById('alloc-roll').value.toUpperCase();
+    const roll = document.getElementById('alloc-roll').value.toUpperCase().trim();
+    if(!roll) return alert("Enter Student Roll Number");
     
-    // We now select both 'full_name' AND 'course'
-    const { data } = await db.from('students')
+    const { data, error } = await db.from('students')
         .select('full_name, course')
         .eq('roll_number', roll)
         .eq('institute_id', sessionInstID)
@@ -5473,8 +5474,21 @@ async function fetchStudentForAlloc() {
 
     if(data) {
         document.getElementById('alloc-sname').value = data.full_name;
-        // Autopopulate Subject with the Course name
-        document.getElementById('alloc-subject').value = data.course || "N/A";
+        
+        // --- DYNAMIC DROPDOWN LOGIC ---
+        const subjectDropdown = document.getElementById('alloc-subject');
+        subjectDropdown.innerHTML = '<option value="">-- Select a Course --</option>';
+        
+        if (data.course) {
+            // Split by comma in case student has "Physics, Spoken English"
+            const courses = data.course.split(',').map(c => c.trim());
+            courses.forEach(c => {
+                let opt = document.createElement('option');
+                opt.value = c;
+                opt.text = c;
+                subjectDropdown.appendChild(opt);
+            });
+        }
     } else {
         alert("Student not found.");
     }
@@ -5482,30 +5496,41 @@ async function fetchStudentForAlloc() {
 
 // 3. Save the Relationship
 async function saveAllocation() {
+    const teacherId = document.getElementById('alloc-tid').value.toUpperCase();
+    const teacherName = document.getElementById('alloc-tname').value;
+    const teacherExpertise = document.getElementById('alloc-tsubject').value.toUpperCase(); // e.g., "PHYSICS"
+    const selectedCourse = document.getElementById('alloc-subject').value.toUpperCase(); // e.g., "SPOKEN ENGLISH"
+    const roll = document.getElementById('alloc-roll').value.toUpperCase();
+    const studentName = document.getElementById('alloc-sname').value;
+
+    // 1. Basic Validation
+    if (!teacherId || !roll || !selectedCourse) {
+        return alert("Error: Please select Teacher, Student, and the Course to link.");
+    }
+
+    // 2. THE SUBJECT GUARD (Validation Logic)
+    // We check if the teacher's subject string contains the selected course
+    // This handles cases like Teacher Subject: "Physics, Maths" and Student Course: "Physics"
+    if (!teacherExpertise.includes(selectedCourse)) {
+        return alert(`🛑 ALLOCATION DENIED!\n\n${teacherName} is registered to teach: [${teacherExpertise}].\n\nYou are trying to link them to: [${selectedCourse}].\n\nFor ${selectedCourse}, please choose the concerned teacher.`);
+    }
+
+    // 3. Save to Database if validation passes
     const data = {
         institute_id: sessionInstID,
-        teacher_id: document.getElementById('alloc-tid').value.toUpperCase(),
-        teacher_name: document.getElementById('alloc-tname').value,
-        teacher_subjects: document.getElementById('alloc-tsubject').value, // Added this field
-        roll_number: document.getElementById('alloc-roll').value.toUpperCase(),
-        student_name: document.getElementById('alloc-sname').value,
-        subject: document.getElementById('alloc-subject').value
+        teacher_id: teacherId,
+        teacher_name: teacherName,
+        roll_number: roll,
+        student_name: studentName,
+        subject: document.getElementById('alloc-subject').value // Original casing for DB
     };
-    
-    if (!data.teacher_id || !data.roll_number) {
-        return alert("Please select both Teacher and Student.");
-    }
-    
+
     const { error } = await db.from('student_allocations').insert([data]);
-    
+
     if (error) {
         alert("Error: " + error.message);
     } else {
-        alert("Link Created Successfully!");
-        // Optional: Clear fields
-        document.getElementById('alloc-roll').value = "";
-        document.getElementById('alloc-sname').value = "";
-        document.getElementById('alloc-subject').value = "";
+        alert(`Success! ${studentName} linked to ${teacherName} for ${document.getElementById('alloc-subject').value}.`);
     }
 }
 
