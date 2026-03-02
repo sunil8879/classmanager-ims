@@ -1843,11 +1843,13 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             </div>
             <div class="input-group"><label>Teacher Name</label><input type="text" id="alloc-tname" readonly style="background:#eee;"></div>
             
-            <!-- NEW FIELD: SUBJECTS TAUGHT BY TEACHER -->
-            <div class="input-group">
-                <label>Subjects Taught by Teacher</label>
-                <input type="text" id="alloc-tsubject" readonly style="background:#eee;" placeholder="Auto-populated">
-            </div>
+          <!-- REPLACE the old Subjects Taught by Teacher input with this -->
+<div class="input-group">
+    <label>Teacher's Active Batches (from Sec 5)</label>
+    <select id="alloc-tbatch" onchange="syncAllocationSubject()" style="padding: 12px; border: 1px solid #000; border-radius: 8px; background: #fff8e1; border: 2px solid #f39c12;">
+        <option value="">-- Fetch Teacher First --</option>
+    </select>
+</div>
             
             <!-- STUDENT INFO -->
             <div class="input-group">
@@ -5574,31 +5576,59 @@ async function fetchTeacherHistory() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-// 1. Fetch Teacher Info
 async function fetchTeacherForAlloc() {
-    const tidInput = document.getElementById('alloc-tid');
-    const tNameInput = document.getElementById('alloc-tname');
-    const tSubInput = document.getElementById('alloc-tsubject');
+    const tid = document.getElementById('alloc-tid').value.toUpperCase().trim();
+    if (!tid) return alert("Please enter a Teacher ID.");
 
-    if (!tidInput || !tNameInput || !tSubInput) return console.error("Missing Teacher Allocation HTML IDs");
-
-    const tid = tidInput.value.toUpperCase().trim();
-    if(!tid) return alert("Enter Teacher ID");
-
-    const { data, error } = await db.from('teacher_details')
-        .select('teacher_name, subject_taught')
+    // 1. Fetch Teacher Name
+    const { data: teacher } = await db.from('teacher_details')
+        .select('teacher_name')
         .eq('id', tid)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (data) {
-        tNameInput.value = data.teacher_name;
-        tSubInput.value = data.subject_taught || "Not Specified";
+    if (teacher) {
+        document.getElementById('alloc-tname').value = teacher.teacher_name;
+        
+        // 2. Fetch all Batches created by this teacher in Section 5
+        const { data: batches } = await db.from('batches')
+            .select('batch_name, subject_name')
+            .eq('teacher_id', tid)
+            .eq('institute_id', sessionInstID);
+
+        const batchSelect = document.getElementById('alloc-tbatch');
+        batchSelect.innerHTML = '<option value="">-- Select Teacher Batch --</option>';
+
+        if (batches && batches.length > 0) {
+            batches.forEach(b => {
+                let opt = document.createElement('option');
+                opt.value = b.batch_name;
+                opt.text = `${b.batch_name} (${b.subject_name})`;
+                // We store the subject name in a dataset to compare later
+                opt.dataset.subject = b.subject_name; 
+                batchSelect.appendChild(opt);
+            });
+        } else {
+            alert("This teacher has no batches created in Section 5. Please create a batch first.");
+        }
     } else {
         alert("Teacher not found.");
     }
 }
 
+// Helper function to show alerts if subjects don't match
+function syncAllocationSubject() {
+    const batchSelect = document.getElementById('alloc-tbatch');
+    const selectedBatch = batchSelect.options[batchSelect.selectedIndex];
+    const teacherSubject = selectedBatch.dataset.subject ? selectedBatch.dataset.subject.toUpperCase() : "";
+    
+    const studentSubSelect = document.getElementById('alloc-subject');
+    const studentSubject = studentSubSelect.value.toUpperCase();
+
+    if (studentSubject && teacherSubject && !teacherSubject.includes(studentSubject)) {
+        alert(`⚠️ Warning: You selected a ${teacherSubject} batch, but the student's selected course is ${studentSubject}. Please ensure they match.`);
+    }
+}
 // 2. Fetch Student Info
 async function fetchStudentForAlloc() {
     const rollInput = document.getElementById('alloc-roll');
@@ -5637,29 +5667,33 @@ async function fetchStudentForAlloc() {
 async function saveAllocation() {
     const tid = document.getElementById('alloc-tid').value.toUpperCase();
     const tName = document.getElementById('alloc-tname').value;
-    const tExpertise = document.getElementById('alloc-tsubject').value.toUpperCase();
-    const selectedSub = document.getElementById('alloc-subject').value;
+    const tBatch = document.getElementById('alloc-tbatch').value; // Get the specific Batch Name
+    const sCourse = document.getElementById('alloc-subject').value; // Student's course
     const roll = document.getElementById('alloc-roll').value.toUpperCase();
     const sName = document.getElementById('alloc-sname').value;
 
-    if (!tid || !roll || !selectedSub) return alert("Please fill all fields.");
-
-    // Validation Guard
-    if (!tExpertise.includes(selectedSub.toUpperCase())) {
-        return alert(`🛑 ERROR: ${tName} teaches [${tExpertise}].\nThey cannot be linked to [${selectedSub}].`);
+    if (!tid || !tBatch || !sCourse || !roll) {
+        return alert("Please select Teacher, Teacher's Batch, and Student Course.");
     }
 
-    const { error } = await db.from('student_allocations').insert([{
+    // Prepare data for Supabase
+    const data = {
         institute_id: sessionInstID,
         teacher_id: tid,
         teacher_name: tName,
         roll_number: roll,
         student_name: sName,
-        subject: selectedSub
-    }]);
+        subject: sCourse, // This is the student's specific course
+        batch_name: tBatch // NEW: Saving the link to the specific batch from Section 5
+    };
 
-    if (error) alert(error.message);
-    else alert("Link Created Successfully!");
+    const { error } = await db.from('student_allocations').insert([data]);
+
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert(`Success! ${sName} linked to ${tName} for Batch: ${tBatch}.`);
+    }
 }
 
 // 4. View all students assigned to a specific teacher
@@ -7543,6 +7577,10 @@ async function autopopulateBatchMaster() {
             opt.value = a.teacher_id;
             opt.text = `${a.teacher_id} - ${a.teacher_name}`;
             opt.dataset.name = a.teacher_name;
+
+
+// ADD THIS: Store the batch name in the option
+        opt.dataset.batch = a.batch_name || ""; 
             tidSelect.appendChild(opt);
         });
         alert(`Found ${allocs.length} teacher allocation(s) for ${stu.full_name}. Please select one.`);
