@@ -1837,14 +1837,16 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     <div class="card">
         <h3><i class="fas fa-link"></i> Student Allocation</h3>
         <div class="form-grid">
+
+
             <!-- TEACHER INFO -->
-            <div class="input-group">
-                <label>Teacher ID</label>
-                <div style="display: flex; gap: 5px;">
-                    <input type="text" id="alloc-tid" placeholder="TCH-XXXX">
-                    <button class="btn-fetch" onclick="fetchTeacherForAlloc()" style="padding:5px;"><i class="fas fa-search"></i></button>
-                </div>
-            </div>
+           <div class="input-group">
+    <label>Teacher ID</label>
+    <select id="alloc-tid" onchange="fetchTeacherForAlloc()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+        <option value="">-- Select Teacher --</option>
+    </select>
+</div>
+
             <div class="input-group"><label>Teacher Name</label><input type="text" id="alloc-tname" readonly style="background:#eee;"></div>
             
           <!-- REPLACE the old Subjects Taught by Teacher input with this -->
@@ -5628,6 +5630,30 @@ async function fetchTeacherHistory() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
+
+
+// Fetch all teachers and fill the dropdown for Student Allocation
+async function loadAllocTeacherDropdown() {
+    const select = document.getElementById('alloc-tid');
+    const { data } = await db.from('teacher_details')
+        .select('id, teacher_name')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    select.innerHTML = '<option value="">-- Select Teacher --</option>';
+    if (data) {
+        data.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.id + " (" + t.teacher_name + ")";
+            select.appendChild(opt);
+        });
+    }
+}
+
+
+
+
 async function fetchTeacherForAlloc() {
     const tid = document.getElementById('alloc-tid').value.toUpperCase().trim();
     if (!tid) return alert("Please enter a Teacher ID.");
@@ -5885,6 +5911,9 @@ case 'batch-master':
     break;
 case 'batch':
     loadBatchTeacherDropdown();
+    break;
+case 'allocation-mod':
+    loadAllocTeacherDropdown();
     break;
 
 // Locate the switch(id) inside showSection(id) and add this:
