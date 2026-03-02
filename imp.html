@@ -897,7 +897,10 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     </select>
     <small style="color: #666;">* Hold Ctrl (Win) or Cmd (Mac) to select multiple</small>
 </div>
-            <div class="input-group"><label>Course</label><input type="text" id="stu-course" placeholder="Course"></div>
+           <div class="input-group">
+    <label>Enrolled Course(s)</label>
+    <input type="text" id="stu-course" readonly style="background:#eee;" placeholder="Select slots above to populate">
+</div>
             
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
             <div class="input-group"><label>Paid Amount</label><input type="number" id="stu-paid" oninput="calcStuPending()"></div>
@@ -8910,12 +8913,31 @@ async function refreshStudentBatchDropdown() {
             // Value is the time, Text is Subject + Time
             opt.value = b.batch_time;
             opt.text = `${b.subject_name} (${b.batch_time})`;
+// ADD THIS LINE: It stores the pure subject name hidden inside the option
+            opt.dataset.subject = b.subject_name; 
             batchSelect.appendChild(opt);
         });
     }
 }
 
-
+// Add this logic to your script
+document.getElementById('stu-batch').addEventListener('change', function() {
+    const courseInput = document.getElementById('stu-course');
+    
+    // 1. Get all selected options
+    const selectedOptions = Array.from(this.selectedOptions);
+    
+    // 2. Extract the subject names we stored in dataset.subject
+    const subjects = selectedOptions
+        .map(opt => opt.dataset.subject)
+        .filter(s => s); // Remove empty values
+    
+    // 3. Remove duplicates (e.g., if user picks two different times for same subject)
+    const uniqueSubjects = [...new Set(subjects)];
+    
+    // 4. Join with commas and update the greyed-out box
+    courseInput.value = uniqueSubjects.join(', ');
+});
 
 
     </script>
