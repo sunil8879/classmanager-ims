@@ -1026,26 +1026,70 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
         </div>
     </div>
 </section>
-<!-- 4. BATCH MANAGEMENT -->
+
+
+<!-- 4. BATCH MANAGEMENT (Updated) -->
 <section id="batch" class="content-section">
     <div class="card">
         <h3><i class="fas fa-layer-group"></i> Batch Management</h3>
         <div class="form-grid">
-            <input type="text" id="batch-name" placeholder="Batch Name">
-            <input type="text" id="batch-teacher-id" placeholder="Teacher ID (e.g. TCH-1234)">
-            <input type="text" id="batch-teacher-name" placeholder="Teacher Name">
-            <input type="time" id="batch-time">
-            <input type="text" id="batch-subject" placeholder="Subject Name">
-            <input type="number" id="batch-students" placeholder="Students Allotted">
-            <input type="text" id="batch-remarks" placeholder="Remarks">
+            <div class="input-group">
+                <label>Batch Name (Unique)</label>
+                <input type="text" id="batch-name" placeholder="e.g. Morning-Pro-A">
+            </div>
+            <div class="input-group">
+                <label>Teacher ID</label>
+                <input type="text" id="batch-teacher-id" placeholder="TCH-XXXX" onblur="fetchTeacherNameForBatch()">
+            </div>
+            <div class="input-group">
+                <label>Teacher Name</label>
+                <input type="text" id="batch-teacher-name" readonly style="background:#eee;">
+            </div>
+            <div class="input-group">
+                <label>Subject</label>
+                <select id="batch-subject">
+                    <option value="">-- Select Subject --</option>
+                    <option>Mathematics</option>
+                    <option>Physics</option>
+                    <option>Chemistry</option>
+                    <option>Biology</option>
+                    <option>History</option>
+                    <option>Geography</option>
+                    <option>Spoken English</option>
+                    <option>Computer Science</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Batch Time Slot</label>
+                <select id="batch-time">
+                    <option value="">-- Select Time --</option>
+                    <option value="06:00">06:00 AM</option><option value="07:00">07:00 AM</option>
+                    <option value="08:00">08:00 AM</option><option value="09:00">09:00 AM</option>
+                    <option value="10:00">10:00 AM</option><option value="11:00">11:00 AM</option>
+                    <option value="12:00">12:00 PM</option><option value="13:00">01:00 PM</option>
+                    <option value="14:00">02:00 PM</option><option value="15:00">03:00 PM</option>
+                    <option value="16:00">04:00 PM</option><option value="17:00">05:00 PM</option>
+                    <option value="18:00">06:00 PM</option><option value="19:00">07:00 PM</option>
+                    <option value="20:00">08:00 PM</option><option value="21:00">09:00 PM</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Max Students Allotted</label>
+                <input type="number" id="batch-students" placeholder="Capacity">
+            </div>
+            <div class="input-group" style="grid-column: 1 / -1;">
+                <label>Batch Remarks</label>
+                <input type="text" id="batch-remarks" placeholder="Optional notes">
+            </div>
         </div>
       <div class="button-row">
             <button class="btn-add" onclick="addBatch()">ADD Batch</button>
-            <button class="btn-fetch" onclick="fetchBatch()">FETCH (by Name)</button>
+            <button class="btn-fetch" onclick="fetchBatchByTeacher()">FETCH (by Teacher ID)</button>
             <button class="btn-edit" onclick="updateBatch()">UPDATE (by Name)</button>
         </div>
     </div>
 </section>
+
 
 <!-- 5. ATTENDANCE -->
 <!-- 5. ATTENDANCE -->
@@ -3386,20 +3430,45 @@ async function generateUPIQR() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
+    const bName = document.getElementById('batch-name').value.trim();
+    const tId = document.getElementById('batch-teacher-id').value.toUpperCase().trim();
+    const bTime = document.getElementById('batch-time').value;
+    const subject = document.getElementById('batch-subject').value;
+
+    if (!bName || !tId || !bTime || !subject) {
+        return alert("Please fill Batch Name, Teacher ID, Subject and Time Slot.");
+    }
+
+    // --- CONFLICT CHECK: Same Teacher + Same Time ---
+    const { data: conflict } = await db.from('batches')
+        .select('subject_name, batch_name')
+        .eq('teacher_id', tId)
+        .eq('batch_time', bTime)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (conflict) {
+        return alert(`🛑 SCHEDULING CONFLICT!\n\nThis teacher is already assigned to the batch "${conflict.batch_name}" for subject "${conflict.subject_name}" at ${bTime}.\n\nA teacher cannot have two different subjects at the same time.`);
+    }
+
     const batchData = {
- institute_id: sessionInstID,
-        batch_name: document.getElementById('batch-name').value,
-        teacher_id: document.getElementById('batch-teacher-id').value,
+        institute_id: sessionInstID,
+        batch_name: bName,
+        teacher_id: tId,
         teacher_name: document.getElementById('batch-teacher-name').value,
-        batch_time: document.getElementById('batch-time').value,
-        subject_name: document.getElementById('batch-subject').value,
+        batch_time: bTime,
+        subject_name: subject,
         students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
         remarks: document.getElementById('batch-remarks').value
     };
 
     const { error } = await db.from('batches').insert([batchData]);
-    if (error) alert("Save Error: " + error.message);
-    else alert("Batch Saved Successfully!");
+    if (error) {
+        if (error.code === '23505') alert("Error: A batch with this name already exists.");
+        else alert("Save Error: " + error.message);
+    } else {
+        alert("Batch Saved Successfully!");
+    }
 }
 
 // 4. THE MISSING FETCH FUNCTION
@@ -3463,6 +3532,42 @@ async function updateBatch() {
 }
 
 
+async function fetchBatchByTeacher() {
+    const tid = prompt("Enter Teacher ID (TCH-XXXX) to view their batches:");
+    if (!tid) return;
+
+    const { data, error } = await db.from('batches')
+        .select('*')
+        .eq('teacher_id', tid.toUpperCase())
+        .eq('institute_id', sessionInstID);
+
+    if (error || !data || data.length === 0) {
+        return alert("No batches found for this teacher.");
+    }
+
+    // If teacher has multiple batches, let user pick which one to load into the form
+    let selection = data[0];
+    if (data.length > 1) {
+        let msg = "This teacher has multiple batches. Enter the Number to load:\n";
+        data.forEach((b, i) => msg += `${i+1}. ${b.batch_name} (${b.subject_name} at ${b.batch_time})\n`);
+        let choice = prompt(msg);
+        if (choice && data[parseInt(choice)-1]) {
+            selection = data[parseInt(choice)-1];
+        }
+    }
+
+    // Populate UI
+    document.getElementById('batch-name').value = selection.batch_name;
+    document.getElementById('batch-teacher-id').value = selection.teacher_id;
+    document.getElementById('batch-teacher-name').value = selection.teacher_name;
+    document.getElementById('batch-time').value = selection.batch_time;
+    document.getElementById('batch-subject').value = selection.subject_name;
+    document.getElementById('batch-students').value = selection.students_allotted;
+    document.getElementById('batch-remarks').value = selection.remarks || "";
+    
+    alert("Batch details loaded!");
+}
+
 
 async function editBatch() {
     const tID = val('#batch', 'input[placeholder="Teacher ID"]');
@@ -3473,6 +3578,25 @@ async function editBatch() {
     };
     const { error } = await db.from('batches').update(updateData).eq('teacher_id', tID);
     if (error) alert(error.message); else alert("Batch Updated Successfully!");
+}
+
+
+async function fetchTeacherNameForBatch() {
+    const tid = document.getElementById('batch-teacher-id').value.toUpperCase().trim();
+    if (!tid) return;
+
+    const { data } = await db.from('teacher_details')
+        .select('teacher_name')
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (data) {
+        document.getElementById('batch-teacher-name').value = data.teacher_name;
+    } else {
+        alert("Teacher ID not found.");
+        document.getElementById('batch-teacher-name').value = "";
+    }
 }
 /* ==========================================
    6. ATTENDANCE (Mark & Fetch)
