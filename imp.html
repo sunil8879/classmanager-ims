@@ -2851,25 +2851,31 @@ async function generateRollNow() {
 }
 
 // 4. Validation & Add Student
+/* ==========================================
+   FIXED: ADD STUDENT (WITH AUTO-PAYMENT LOG)
+   ========================================== */
 async function addStudent() {
-    if (!sessionInstID) return alert("Please log in again.");
+    if (!sessionInstID) return alert("Error: Institute ID missing. Please log in again.");
     
     const roll = document.getElementById('stu-roll').value;
-    if (!roll) return alert("Please generate a Roll Number first.");
+    if (!roll) return alert("Error: Please generate a Roll Number first.");
 
+    const admissionDate = document.getElementById('stu-date').value;
+    const paidAmt = parseFloat(document.getElementById('stu-paid').value) || 0;
+
+    // 1. Prepare Main Student Data
     const stuData = {
         institute_id: sessionInstID,
-        admission_date: document.getElementById('stu-date').value,
+        admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
         mobile: document.getElementById('stu-mobile').value,
         father_mobile: document.getElementById('stu-father').value,
         mother_mobile: document.getElementById('stu-mother').value,
         standard: document.getElementById('stu-standard').value,
-        // FIX: Read directly from the Text Box
         batch_time: document.getElementById('stu-batch').value, 
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
-        paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
+        paid_amount: paidAmt,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
         roll_number: roll,
         due_dates: document.getElementById('stu-due-dates').value,
@@ -2877,19 +2883,48 @@ async function addStudent() {
         email: document.getElementById('stu-email').value
     };
 
-    const { data: newStu, error } = await db.from('students').insert([stuData]).select();
+    // 2. Save to 'students' table
+    const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
 
-    if (error) return alert("Save Error: " + error.message);
+    if (stuError) return alert("Save Error: " + stuError.message);
 
-    await db.from('student_details').upsert([{
-        institute_id: sessionInstID,
-        student_id: newStu[0].id,
-        roll_number: roll,
-        course_end_date: document.getElementById('stu-end-date').value
-    }]);
+    if (newStu && newStu[0]) {
+        const studentId = newStu[0].id;
 
-    alert("SUCCESS! Student Saved.");
-    clearStudentForm();
+        // 3. Save to 'student_details' table
+        await db.from('student_details').upsert([{
+            institute_id: sessionInstID,
+            student_id: studentId,
+            roll_number: roll,
+            course_end_date: document.getElementById('stu-end-date').value
+        }]);
+
+        // --- THE CRITICAL FIX: LOG FIRST PAYMENT INTO HISTORY ---
+        if (paidAmt > 0) {
+            const dateObj = new Date(admissionDate);
+            const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            const { error: payError } = await db.from('payment_history').insert([{
+                institute_id: sessionInstID,
+                student_id: studentId,
+                roll_number: roll,
+                amount: paidAmt,
+                payment_date: admissionDate,
+                month_year: monthYearStr,
+                course_name: stuData.course,
+                total_fees: stuData.total_fees,
+                pending_fees: stuData.pending_amount
+            }]);
+
+            if (payError) console.error("Initial payment log failed:", payError.message);
+        }
+
+        alert("SUCCESS! Student Registered & Initial Payment Logged in History.");
+        clearStudentForm();
+        
+        // Refresh Dashboard automatically
+        loadHomeDashboardStats(); 
+    }
 }
 // 5. Fetch Details by Roll Number
 async function fetchStudentByRoll() {
