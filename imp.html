@@ -2740,54 +2740,31 @@ async function handleLogout() {
 async function loadHomeDashboardStats() {
     if (!sessionInstID) return;
     
-    // ADDED 'due_dates' to the select statement below
+    // 1. Fetch Students for Admissions and Pending counts
     const { data: students } = await db.from('students')
         .select('paid_amount, pending_amount, due_dates') 
         .eq('institute_id', sessionInstID)
         .eq('status', 'Active');
 
+    // 2. Fetch ALL Payments from History for the current year
+    const currentYear = new Date().getFullYear();
+    const { data: yearlyPayments } = await db.from('payment_history')
+        .select('amount')
+        .eq('institute_id', sessionInstID)
+        .gte('payment_date', `${currentYear}-01-01`)
+        .lte('payment_date', `${currentYear}-12-31`);
+
     if (students) {
         const totalStu = students.length;
-        const totalColl = students.reduce((sum, s) => sum + (Number(s.paid_amount) || 0), 0);
         const totalPend = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
+        const totalColl = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
 
         document.getElementById('home-total-stu').innerText = totalStu;
         document.getElementById('home-total-coll').innerText = "₹ " + totalColl.toLocaleString('en-IN');
         document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
-loadHomeInventoryStats();
-
-
-
-
-
-
-
-// --- START OF ADDED YEARLY COLLECTION LOGIC ---
-        const currentYear = new Date().getFullYear();
-        const { data: yearlyPayments } = await db.from('payment_history')
-            .select('amount')
-            .eq('institute_id', sessionInstID)
-            .gte('payment_date', `${currentYear}-01-01`)
-            .lte('payment_date', `${currentYear}-12-31`);
-            
-        const actualYearlyCollection = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
         
-        // This overwrites the flawed "Active only" calculation with the true Year-to-Date revenue
-        document.getElementById('home-total-coll').innerText = "₹ " + actualYearlyCollection.toLocaleString('en-IN');
-        
-        // Updates the tiny text below the number so the owner knows it is Year-to-Date
-        const collSubtext = document.getElementById('home-total-coll').nextElementSibling;
-        if(collSubtext) collSubtext.innerText = "Collected in " + currentYear;
-        // --- END OF ADDED YEARLY COLLECTION LOGIC ---
-
-
-
-
-
-
-
-
-        // --- ADDED FOR FORECASTING ---
+        loadHomeInventoryStats();
+        // Trigger the forecast calculation
         generateFinancialForecast(students);
     }
 }
@@ -6356,12 +6333,15 @@ window.showHomeChartPage = function(page) {
    FINANCIAL INTELLIGENCE: FORECASTING ENGINE
    ========================================== */
 
+/* ==========================================
+   FIXED: FINANCIAL FORECASTING & CHART LOGIC
+   ========================================== */
 async function generateFinancialForecast(students) {
     const forecastData = {};
     const chartRows = [];
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
-    // 1. GENERATE THE FIXED 6-MONTH WINDOW (1 Past + 1 Current + 4 Future)
+    // 1. Setup 6-month window (1 Past Month + 1 Current + 4 Future)
     const displayMonths = [];
     let tempDate = new Date();
     tempDate.setDate(1); 
@@ -6374,134 +6354,90 @@ async function generateFinancialForecast(students) {
         tempDate.setMonth(tempDate.getMonth() + 1);
     }
 
-    const firstMonthKey = displayMonths[0]; // The "Past Month" anchor (February 2026)
+    const pastDueKey = displayMonths[0]; // Anchor for any unallocated money
 
-    // 2. ALLOCATE PENDING FEES (DYNAMIC CATCH-ALL LOGIC)
+    // 2. Distribute Pending Money into Month Buckets
     students.forEach(s => {
-        const totalPendingForStudent = parseFloat(s.pending_amount) || 0;
-        if (totalPendingForStudent <= 0) return;
+        const totalPending = parseFloat(s.pending_amount) || 0;
+        if (totalPending <= 0) return;
 
-        let rawDates = [];
-        if (s.due_dates && s.due_dates.trim() !== "") {
-            rawDates = s.due_dates.split(',').map(d => d.trim()).filter(d => d !== "");
-        }
+        let rawDates = s.due_dates ? s.due_dates.toUpperCase().split(',').map(d => d.trim()) : [];
 
         if (rawDates.length > 0) {
-            const perInstallment = totalPendingForStudent / rawDates.length;
-            let allocatedToWindow = 0;
+            const perInstallment = totalPending / rawDates.length;
+            let allocated = 0;
 
             rawDates.forEach(dateStr => {
-                let matched = false;
+                let found = false;
                 displayMonths.forEach(mKey => {
-                    if (dateStr.toLowerCase().includes(mKey.toLowerCase())) {
+                    if (dateStr.includes(mKey)) {
                         forecastData[mKey] += perInstallment;
-                        allocatedToWindow += perInstallment;
-                        matched = true;
+                        allocated += perInstallment;
+                        found = true;
                     }
                 });
-
-                // If installment date is in the deep past (before our window), add to first card
-                if (!matched) {
-                    let dObj = new Date(dateStr.replace(/(st|nd|rd|th)/i, ''));
-                    if (!isNaN(dObj) && dObj < new Date(displayMonths[0])) {
-                        forecastData[firstMonthKey] += perInstallment;
-                        allocatedToWindow += perInstallment;
-                    }
+                if (!found) { // If date is older than our window
+                    forecastData[pastDueKey] += perInstallment;
+                    allocated += perInstallment;
                 }
             });
-
-            // RESIDUAL LOGIC: If some money isn't accounted for by the string matching,
-            // or if the student joined in the past, dump the remainder into the Past Month card.
-            const remainder = totalPendingForStudent - allocatedToWindow;
-            if (remainder > 1) { // 1 rupee buffer for rounding
-                forecastData[firstMonthKey] += remainder;
-            }
-
+            // Handle rounding
+            if (totalPending - allocated > 1) forecastData[pastDueKey] += (totalPending - allocated);
         } else {
-            // FALLBACK: If NO due dates are mentioned, dump the whole pending amount 
-            // into the First Card (Past Month) because it is technically "Already Due"
-            forecastData[firstMonthKey] += totalPendingForStudent;
+            // No due dates? Move all to Past Due card
+            forecastData[pastDueKey] += totalPending;
         }
     });
 
-    // 3. FETCH DATA FOR GRAPHS (INSTITUTE SPECIFIC)
+    // 3. Update the UI Cards
+    const cardContainer = document.getElementById('forecast-cards');
+    if (cardContainer) {
+        cardContainer.innerHTML = "";
+        const todayLabel = monthNames[new Date().getMonth()] + " " + new Date().getFullYear();
+        
+        displayMonths.forEach(month => {
+            const amt = Math.round(forecastData[month]);
+            const isPast = month !== todayLabel && displayMonths.indexOf(month) < displayMonths.indexOf(todayLabel);
+            cardContainer.innerHTML += `
+                <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid ${isPast ? '#ff0000' : '#f39c12'};">
+                    <p style="font-size: 0.7rem; color: ${isPast ? '#ff0000' : '#666'}; font-weight: bold; margin-bottom:5px;">
+                        ${month} ${isPast ? '(PAST DUE)' : ''}
+                    </p>
+                    <h4 style="font-size: 1.2rem !important; color:#000; margin:0;">₹${amt.toLocaleString('en-IN')}</h4>
+                </div>`;
+        });
+    }
+
+    // 4. FETCH DATA FOR GRAPHS (Actuals vs Trends)
     const currentYear = new Date().getFullYear();
     const { data: yearlyPayments } = await db.from('payment_history')
-        .select('amount')
-        .eq('institute_id', sessionInstID)
+        .select('amount').eq('institute_id', sessionInstID)
         .gte('payment_date', `${currentYear}-01-01`)
         .lte('payment_date', `${currentYear}-12-31`);
         
     const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
-    const totalAdmissions = students.length;
     const totalPendingGlobal = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
 
-    // 4. RENDER UI CARDS
-    const cardContainer = document.getElementById('forecast-cards');
-    cardContainer.innerHTML = "";
-    
-    const todayMonthStart = new Date();
-    todayMonthStart.setDate(1);
-    todayMonthStart.setHours(0,0,0,0);
-
-    displayMonths.forEach(month => {
-        const amt = Math.round(forecastData[month]);
-        const mDate = new Date(month);
-        const isPast = mDate < todayMonthStart;
-
-        cardContainer.innerHTML += `
-            <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid ${isPast ? '#ff0000' : '#f39c12'}; background: ${isPast ? '#fff5f5' : 'white'};">
-                <p style="font-size: 0.7rem; margin-bottom: 5px; color: ${isPast ? '#ff0000' : '#666'}; font-weight: bold;">
-                    ${month.toUpperCase()} ${isPast ? '(PAST DUE)' : ''}
-                </p>
-                <h4 style="font-size: 1.2rem !important; color: #000;">₹${amt.toLocaleString('en-IN')}</h4>
-            </div>
-        `;
-        chartRows.push([month, totalAdmissions, totalReceived, totalPendingGlobal, amt]);
-    });
-
-    // 5. CUMULATIVE CHART DATA SYNC
+    // 5. CUMULATIVE CHART DATA GENERATION
     let runningCollection = totalReceived;
     let runningPending = totalPendingGlobal;
 
-    for (let i = 0; i < chartRows.length; i++) {
-        let monthlyIncoming = chartRows[i][4];
+    displayMonths.forEach(month => {
+        let monthlyIncoming = forecastData[month];
         runningCollection += monthlyIncoming;
         runningPending -= monthlyIncoming;
-        if (runningPending < 0) runningPending = 0; 
+        if (runningPending < 0) runningPending = 0;
 
-        chartRows[i][2] = runningCollection; 
-        chartRows[i][3] = runningPending;    
-        chartRows[i].push(monthlyIncoming);  
+        chartRows.push([month, students.length, runningCollection, runningPending, monthlyIncoming]);
+    });
+
+    // 6. Draw the Google Chart
+    if (typeof drawHomeForecastingChart === 'function') {
+        drawHomeForecastingChart(chartRows);
     }
-
-    // 6. DYNAMIC ADMISSIONS (END DATE) LOGIC
-    const { data: dynStudents } = await db.from('students')
-        .select('student_details(course_end_date)')
-        .eq('institute_id', sessionInstID)
-        .eq('status', 'Active');
-
-    if (dynStudents) {
-        for (let i = 0; i < chartRows.length; i++) {
-            let monthName = chartRows[i][0]; 
-            let chartMonthDate = new Date(monthName + " 1"); 
-            let activeCount = 0;
-
-            dynStudents.forEach(s => {
-                let details = Array.isArray(s.student_details) ? s.student_details[0] : s.student_details;
-                let endStr = details ? details.course_end_date : null;
-                if (!endStr) { activeCount++; } 
-                else {
-                    let endDate = new Date(endStr);
-                    if (endDate >= chartMonthDate) activeCount++;
-                }
-            });
-            chartRows[i][1] = activeCount;
-        }
-    }
-
-    drawHomeForecastingChart(chartRows);
 }
+
+
 function drawHomeForecastingChart(chartRows) {
     var data = new google.visualization.DataTable();
     data.addColumn('string', 'Month');
