@@ -889,7 +889,14 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <div class="input-group"><label>Father's Mobile</label><input type="text" id="stu-father" maxlength="10"></div>
             <div class="input-group"><label>Mother's Mobile</label><input type="text" id="stu-mother" maxlength="10"></div>
             <div class="input-group"><label>Class / Standard</label><input type="text" id="stu-standard"></div>
-          <div class="input-group"><label>Batch Time</label><input type="time" id="stu-batch" readonly style="background:#eee;" title="Auto-populated from Batch Management"></div>
+         <!-- Replace the old Batch Time input with this -->
+<div class="input-group">
+    <label>Batch / Course Slots</label>
+    <select id="stu-batch" multiple style="height: 100px; padding: 5px; border: 1px solid #000; border-radius: 8px;">
+        <option value="">-- Select Batches --</option>
+    </select>
+    <small style="color: #666;">* Hold Ctrl (Win) or Cmd (Mac) to select multiple</small>
+</div>
             <div class="input-group"><label>Course</label><input type="text" id="stu-course" placeholder="Course"></div>
             
             <div class="input-group"><label>Total Fees</label><input type="number" id="stu-total" oninput="calcStuPending()"></div>
@@ -2834,7 +2841,7 @@ if (!sessionInstID || sessionInstID === "") {
         father_mobile: fMobile,
         mother_mobile: mMobile,
         standard: document.getElementById('stu-standard').value,
-        batch_time: document.getElementById('stu-batch').value,
+      batch_time: Array.from(document.getElementById('stu-batch').selectedOptions).map(o => o.value).join(', '),
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
         paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
@@ -2950,7 +2957,11 @@ status
     document.getElementById('stu-father').value = s.father_mobile || "";
     document.getElementById('stu-mother').value = s.mother_mobile || "";
     document.getElementById('stu-standard').value = s.standard || "";
-    document.getElementById('stu-batch').value = s.batch_time || "";
+  const savedBatches = s.batch_time ? s.batch_time.split(', ') : [];
+const batchSelect = document.getElementById('stu-batch');
+Array.from(batchSelect.options).forEach(opt => {
+    opt.selected = savedBatches.includes(opt.value);
+});
     document.getElementById('stu-course').value = s.course || "";
     document.getElementById('stu-total').value = s.total_fees || 0;
     document.getElementById('stu-paid').value = s.paid_amount || 0;
@@ -5596,6 +5607,11 @@ function showSection(id) {
 
 case 'batch-master':
     loadBMTeacherDropdown(); // New function
+    break;
+
+// Locate the switch(id) inside showSection(id) and add this:
+case 'students':
+    refreshStudentBatchDropdown();
     break;
 				
 				// Inside your switch (id) statement in showSection(id)
@@ -8546,7 +8562,28 @@ async function autopopulateBatchMaster() {
 
 
 
+async function refreshStudentBatchDropdown() {
+    const batchSelect = document.getElementById('stu-batch');
+    if (!batchSelect) return;
 
+    // Clear existing
+    batchSelect.innerHTML = '<option value="">-- Select Batches --</option>';
+
+    // Fetch all batches for this institute
+    const { data: batches, error } = await db.from('batches')
+        .select('batch_name, batch_time, subject_name')
+        .eq('institute_id', sessionInstID);
+
+    if (batches) {
+        batches.forEach(b => {
+            let opt = document.createElement('option');
+            // Value is the time, Text is Subject + Time
+            opt.value = b.batch_time;
+            opt.text = `${b.subject_name} (${b.batch_time})`;
+            batchSelect.appendChild(opt);
+        });
+    }
+}
 
 
 
