@@ -3465,6 +3465,10 @@ async function generateUPIQR() {
    ========================================== */
 // Update the Save function for Section 5 to handle multiple checkboxes
 async function addBatch() {
+// Paste inside addBatch() at the very start
+const { data: tch } = await db.from('teacher_details').select('subject_taught').eq('id', document.getElementById('batch-teacher-id').value).single();
+if (!tch || !tch.subject_taught.toUpperCase().includes(document.getElementById('batch-subject').value.toUpperCase())) 
+    return alert("🛑 ERROR: This teacher is not registered to teach this subject!");
     const selectedSlots = Array.from(document.querySelectorAll('.batch-time-slot:checked')).map(cb => cb.value).join(', ');
     
     const batchData = {
@@ -3637,47 +3641,23 @@ async function loadBatchTeacherDropdown() {
 
 async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
-    const selectedSub = document.getElementById('batch-subject').value; 
+    const subject = document.getElementById('batch-subject').value;
     const checkboxes = document.querySelectorAll('.batch-time-slot');
 
-    // 1. Reset everything to unchecked and grey
-    checkboxes.forEach(cb => { 
-        cb.checked = false; 
-        cb.parentElement.style.color = "#ccc"; 
-    });
+    if (!tid || !subject) return;
 
-    if (!tid) return;
+    const { data: t } = await db.from('teacher_details').select('teacher_name, time_of_slot').eq('id', tid).single();
 
-    // 2. Fetch teacher from database
-    const { data: teacher } = await db.from('teacher_details')
-        .select('teacher_name, time_of_slot')
-        .eq('id', tid)
-        .single();
-
-    if (teacher) {
-        document.getElementById('batch-teacher-name').value = teacher.teacher_name;
+    if (t) {
+        document.getElementById('batch-teacher-name').value = t.teacher_name;
+        // Parse the JSON map and find slots for the picked subject
+        const slotMap = JSON.parse(t.time_of_slot || "{}");
+        const availableSlots = slotMap[subject] || "";
         
-        // 3. If no subject is picked yet, stop here
-        if (!selectedSub) return;
-
-        try {
-            // 4. Parse the JSON map and find the slots for the chosen subject
-            const availabilityData = JSON.parse(teacher.time_of_slot || "{}");
-            const savedSlots = availabilityData[selectedSub] || "";
-            
-            // 5. Check the boxes if the teacher is available
-            if (savedSlots) {
-                const slotsArray = savedSlots.split(', ');
-                checkboxes.forEach(cb => {
-                    if (slotsArray.includes(cb.value)) {
-                        cb.checked = true;
-                        cb.parentElement.style.color = "#000"; // Turn text black for active slots
-                    }
-                });
-            }
-        } catch (e) { 
-            console.error("Slot format error:", e); 
-        }
+        checkboxes.forEach(cb => {
+            cb.checked = availableSlots.includes(cb.value);
+            cb.parentElement.style.color = cb.checked ? "#000" : "#ccc";
+        });
     }
 }
 /* ==========================================
