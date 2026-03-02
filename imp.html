@@ -2178,9 +2178,25 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             
             <div class="input-group"><label>Student Full Name</label><input type="text" id="bm-sname" readonly style="background:#eee;"></div>
             <div class="input-group"><label>Course Name</label><input type="text" id="bm-course" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Teacher ID</label><input type="text" id="bm-tid" readonly style="background:#eee;"></div>
+            
+            <!-- DYNAMIC TEACHER ID DROPDOWN -->
+            <div class="input-group">
+                <label>Teacher ID</label>
+                <select id="bm-tid" onchange="handleBMTeacherChange()">
+                    <option value="">-- Select Teacher --</option>
+                </select>
+            </div>
+
             <div class="input-group"><label>Teacher Name</label><input type="text" id="bm-tname" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>Batch Name</label><input type="text" id="bm-bname" readonly style="background:#eee;"></div>
+            
+            <!-- DYNAMIC BATCH NAME DROPDOWN -->
+            <div class="input-group">
+                <label>Batch Name (Subject)</label>
+                <select id="bm-bname">
+                    <option value="">-- Select Batch --</option>
+                </select>
+            </div>
+
             <div class="input-group" style="grid-column: 1/-1;"><label>Remarks</label><input type="text" id="bm-remarks" placeholder="Add remarks..."></div>
         </div>
 
@@ -2190,7 +2206,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <button class="btn-fetch" style="background:#8e44ad;" onclick="listAllByBatch()">LIST STUDENTS (By Batch)</button>
             <button class="btn-edit" style="background:#666;" onclick="clearBatchMaster()">CLEAR</button>
         </div>
-
+        <!-- ... rest of the table code remains same ... -->
         <!-- Table Display Area -->
         <div id="bm-list-area" style="display:none; margin-top: 30px; overflow-x: auto; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #ddd;">
             <h4 style="margin-bottom: 15px; color: #000; text-align: left;" id="bm-list-title">Student List</h4>
@@ -5577,6 +5593,10 @@ function showSection(id) {
                 // Auto-load Personal Student Portal
                 if (typeof loadStudentPortal === 'function') loadStudentPortal();
                 break;
+
+case 'batch-master':
+    loadBMTeacherDropdown(); // New function
+    break;
 				
 				// Inside your switch (id) statement in showSection(id)
 case 'calendar-mod':
@@ -8412,6 +8432,120 @@ async function listTeachersOnLeave() {
     if (existing) existing.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
+
+
+
+
+
+// 1. Load all teachers from the database into the dropdown
+async function loadBMTeacherDropdown() {
+    const tidSelect = document.getElementById('bm-tid');
+    // Clear existing options except the first one
+    tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+
+    const { data: teachers, error } = await db.from('teacher_details')
+        .select('id, teacher_name')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active')
+        .order('teacher_name', { ascending: true });
+
+    if (teachers) {
+        teachers.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = `${t.id} - ${t.teacher_name}`;
+            opt.dataset.name = t.teacher_name; // Store name for easy access
+            tidSelect.appendChild(opt);
+        });
+    }
+}
+
+// 2. When a teacher is selected, update name and load their specific batches
+async function handleBMTeacherChange() {
+    const tidSelect = document.getElementById('bm-tid');
+    const tnameInput = document.getElementById('bm-tname');
+    const bnameSelect = document.getElementById('bm-bname');
+    
+    const selectedOption = tidSelect.options[tidSelect.selectedIndex];
+    const tid = tidSelect.value;
+
+    // Clear batch dropdown
+    bnameSelect.innerHTML = '<option value="">-- Select Batch --</option>';
+
+    if (!tid) {
+        tnameInput.value = "";
+        return;
+    }
+
+    // Auto-set the name
+    tnameInput.value = selectedOption.dataset.name;
+
+    // Fetch all batches/subjects this specific teacher is assigned to
+    const { data: batches, error } = await db.from('batches')
+        .select('batch_name, subject_name')
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID);
+
+    if (batches && batches.length > 0) {
+        batches.forEach(b => {
+            let opt = document.createElement('option');
+            opt.value = b.batch_name;
+            opt.text = `${b.batch_name} (${b.subject_name})`;
+            bnameSelect.appendChild(opt);
+        });
+    } else {
+        let opt = document.createElement('option');
+        opt.value = "General";
+        opt.text = "No Specific Batch Found";
+        bnameSelect.appendChild(opt);
+    }
+}
+
+// 3. Update the Auto-populate (Student Roll Search) to work with dropdowns
+async function autopopulateBatchMaster() {
+    const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Please enter a Roll Number first.");
+
+    // Load Teacher List first if not already loaded
+    if(document.getElementById('bm-tid').options.length <= 1) await loadBMTeacherDropdown();
+
+    // A. Fetch from STUDENTS table
+    const { data: stu } = await db.from('students')
+        .select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+
+    if (!stu) return alert("Student not found.");
+    
+    document.getElementById('bm-sname').value = stu.full_name;
+    document.getElementById('bm-course').value = stu.course || "N/A";
+
+    // B. Fetch Allocation (Which teacher is this student linked to?)
+    const { data: alloc } = await db.from('student_allocations')
+        .select('teacher_id')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (alloc) {
+        // Select the teacher in dropdown
+        document.getElementById('bm-tid').value = alloc.teacher_id;
+        // Trigger the change to load that teacher's batches
+        await handleBMTeacherChange();
+        
+        // C. Try to auto-select the batch if it matches the student's course
+        const bSelect = document.getElementById('bm-bname');
+        for (let i = 0; i < bSelect.options.length; i++) {
+            if (bSelect.options[i].text.includes(stu.course)) {
+                bSelect.selectedIndex = i;
+                break;
+            }
+        }
+    } else {
+        alert("Student found, but no Teacher Allocation (Module 18) found. Please select teacher manually.");
+    }
+}
+
+
+
 
 
 
