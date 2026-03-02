@@ -3635,36 +3635,36 @@ async function loadBatchTeacherDropdown() {
     }
 }
 
-// 2. Auto-fill the Teacher Name box when ID is selected
 async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
-    const nameInput = document.getElementById('batch-teacher-name');
-    const selectedSub = document.getElementById('batch-subject').value; // Get subject selected in Sec 5
+    const selectedSub = document.getElementById('batch-subject').value; 
     const checkboxes = document.querySelectorAll('.batch-time-slot');
 
-    // Reset checkboxes
+    // Reset UI
     checkboxes.forEach(cb => { cb.checked = false; cb.parentElement.style.color = "#ccc"; });
-    if (!tid) return;
+    if (!tid || !selectedSub) return;
 
-    const { data: teacher } = await db.from('teacher_details').select('*').eq('id', tid).single();
+    const { data: teacher } = await db.from('teacher_details').select('teacher_name, time_of_slot').eq('id', tid).single();
 
     if (teacher) {
-        nameInput.value = teacher.teacher_name;
-        if (!selectedSub) return;
-
+        document.getElementById('batch-teacher-name').value = teacher.teacher_name;
         try {
-            const slotData = JSON.parse(teacher.time_of_slot);
-            const specificSlots = slotData[selectedSub] || "";
-            if (specificSlots) {
-                const slots = specificSlots.split(',').map(s => s.trim());
+            // THE FIX: Parse the JSON availability map
+            const availabilityData = JSON.parse(teacher.time_of_slot);
+            const savedSlots = availabilityData[selectedSub] || "";
+            
+            if (savedSlots) {
+                const slotsArray = savedSlots.split(', ');
                 checkboxes.forEach(cb => {
-                    if (slots.includes(cb.value)) {
+                    if (slotsArray.includes(cb.value)) {
                         cb.checked = true;
-                        cb.parentElement.style.color = "#000";
+                        cb.parentElement.style.color = "#000"; // Highlight available ones
                     }
                 });
+            } else {
+                console.log("No slots found for this specific subject.");
             }
-        } catch (e) { console.log("Old data format"); }
+        } catch (e) { console.error("Error loading slots:", e); }
     }
 }
 
@@ -5051,22 +5051,36 @@ function updateSubjectPages() {
 }
 
 function changeSubjectPage(dir) {
-    if (subjectPages.length === 0) return alert("Please type subjects in 'Subject Taught' box first (comma separated).");
+    if (subjectPages.length === 0) return alert("Please type subjects in 'Subject Taught' box first.");
     
-    // Save current checkboxes to memory
+    // 1. Get currently selected slots for the current subject
     const currentSub = subjectPages[currentSubjectIndex];
-    availabilityMap[currentSub] = getSelectedTeacherTimeSlots();
+    const selectedSlots = getSelectedTeacherTimeSlots();
 
-    // Move to next/prev
-    currentSubjectIndex += dir;
-    if (currentSubjectIndex < 0) currentSubjectIndex = 0;
-    if (currentSubjectIndex >= subjectPages.length) currentSubjectIndex = subjectPages.length - 1;
+    // 2. VALIDATION: Check if any of these slots are already taken by OTHER subjects
+    for (let sub in availabilityMap) {
+        if (sub !== currentSub && selectedSlots !== "") {
+            const otherSlots = availabilityMap[sub].split(', ');
+            const currentSlotsArr = selectedSlots.split(', ');
+            const overlap = currentSlotsArr.filter(slot => otherSlots.includes(slot));
+            
+            if (overlap.length > 0) {
+                return alert(`🛑 SLOT CONFLICT: The slot [${overlap[0]}] is already assigned to ${sub}. A teacher cannot teach two subjects at the same time!`);
+            }
+        }
+    }
 
-    // Update UI
-    document.getElementById('tch-current-subject-display').innerText = subjectPages[currentSubjectIndex];
-    setTeacherTimeSlots(availabilityMap[subjectPages[currentSubjectIndex]] || "");
+    // 3. Save to memory if no conflict
+    availabilityMap[currentSub] = selectedSlots;
+
+    // 4. Move Index
+    let newIndex = currentSubjectIndex + dir;
+    if (newIndex >= 0 && newIndex < subjectPages.length) {
+        currentSubjectIndex = newIndex;
+        document.getElementById('tch-current-subject-display').innerText = subjectPages[currentSubjectIndex];
+        setTeacherTimeSlots(availabilityMap[subjectPages[currentSubjectIndex]] || "");
+    }
 }
-
 
 function toggleTeacherTimeSlots() {
     const avail = document.getElementById('tch-availability').value;
@@ -5758,36 +5772,30 @@ async function fetchStudentForAlloc() {
 
 // 3. Save the Relationship
 async function saveAllocation() {
-    const tid = document.getElementById('alloc-tid').value.toUpperCase();
-    const tName = document.getElementById('alloc-tname').value;
-    const tBatch = document.getElementById('alloc-tbatch').value; // Get the specific Batch Name
-    const sCourse = document.getElementById('alloc-subject').value; // Student's course
-    const roll = document.getElementById('alloc-roll').value.toUpperCase();
-    const sName = document.getElementById('alloc-sname').value;
-
-    if (!tid || !tBatch || !sCourse || !roll) {
-        return alert("Please select Teacher, Teacher's Batch, and Student Course.");
+    const tExpertise = document.getElementById('alloc-tbatch').options[document.getElementById('alloc-tbatch').selectedIndex].text.toUpperCase();
+    const selectedCourse = document.getElementById('alloc-subject').value.toUpperCase();
+    
+    // VALIDATION: Check if the teacher's batch matches the student's selected course
+    if (!tExpertise.includes(selectedCourse)) {
+        return alert(`🛑 CROSS-SUBJECT ERROR: You cannot link a [${selectedCourse}] course to this teacher's batch [${tExpertise}]. Please choose the correct teacher.`);
     }
 
     // Prepare data for Supabase
     const data = {
         institute_id: sessionInstID,
-        teacher_id: tid,
-        teacher_name: tName,
-        roll_number: roll,
-        student_name: sName,
-        subject: sCourse, // This is the student's specific course
-        batch_name: tBatch // NEW: Saving the link to the specific batch from Section 5
+        teacher_id: document.getElementById('alloc-tid').value.toUpperCase(),
+        teacher_name: document.getElementById('alloc-tname').value,
+        roll_number: document.getElementById('alloc-roll').value.toUpperCase(),
+        student_name: document.getElementById('alloc-sname').value,
+        subject: document.getElementById('alloc-subject').value, 
+        batch_name: document.getElementById('alloc-tbatch').value 
     };
 
     const { error } = await db.from('student_allocations').insert([data]);
-
-    if (error) {
-        alert("Error: " + error.message);
-    } else {
-        alert(`Success! ${sName} linked to ${tName} for Batch: ${tBatch}.`);
-    }
+    if (error) alert(error.message); else alert("Linked Successfully!");
 }
+
+
 
 // 4. View all students assigned to a specific teacher
 async function viewTeacherStudents() {
