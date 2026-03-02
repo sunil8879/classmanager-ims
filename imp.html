@@ -1069,20 +1069,24 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                     <option>Computer Science</option>
                 </select>
             </div>
-            <div class="input-group">
-                <label>Batch Time Slot</label>
-                <select id="batch-time">
-                    <option value="">-- Select Time --</option>
-                    <option value="06:00">06:00 AM</option><option value="07:00">07:00 AM</option>
-                    <option value="08:00">08:00 AM</option><option value="09:00">09:00 AM</option>
-                    <option value="10:00">10:00 AM</option><option value="11:00">11:00 AM</option>
-                    <option value="12:00">12:00 PM</option><option value="13:00">01:00 PM</option>
-                    <option value="14:00">02:00 PM</option><option value="15:00">03:00 PM</option>
-                    <option value="16:00">04:00 PM</option><option value="17:00">05:00 PM</option>
-                    <option value="18:00">06:00 PM</option><option value="19:00">07:00 PM</option>
-                    <option value="20:00">08:00 PM</option><option value="21:00">09:00 PM</option>
-                </select>
-            </div>
+            <div class="input-group" style="grid-column: 1 / -1; background: #fff8e1; padding: 15px; border: 1px solid #000; border-radius: 8px;">
+    <label style="font-weight:bold; display:block; margin-bottom:10px;">Teacher's Available Slots (from Portal):</label>
+    <div id="batch-checkbox-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+        <!-- Checkboxes will be auto-checked based on Section 11 -->
+        <label><input type="checkbox" class="batch-time-slot" value="09:00 AM to 10:00 AM"> 09:00 AM - 10:00 AM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="10:00 AM to 11:00 AM"> 10:00 AM - 11:00 AM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="11:00 AM to 12:00 PM"> 11:00 AM - 12:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="12:00 PM to 01:00 PM"> 12:00 PM - 01:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="01:00 PM to 02:00 PM"> 01:00 PM - 02:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="02:00 PM to 03:00 PM"> 02:00 PM - 03:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="03:00 PM to 04:00 PM"> 03:00 PM - 04:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="04:00 PM to 05:00 PM"> 04:00 PM - 05:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="05:00 PM to 06:00 PM"> 05:00 PM - 06:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="06:00 PM to 07:00 PM"> 06:00 PM - 07:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="07:00 PM to 08:00 PM"> 07:00 PM - 08:00 PM</label>
+        <label><input type="checkbox" class="batch-time-slot" value="08:00 PM to 09:00 PM"> 08:00 PM - 09:00 PM</label>
+    </div>
+</div>
             <div class="input-group">
                 <label>Max Students Allotted</label>
                 <input type="number" id="batch-students" placeholder="Capacity">
@@ -3450,46 +3454,22 @@ async function generateUPIQR() {
 /* ==========================================
    5. BATCH MANAGEMENT
    ========================================== */
+// Update the Save function for Section 5 to handle multiple checkboxes
 async function addBatch() {
-    const bName = document.getElementById('batch-name').value.trim();
-    const tId = document.getElementById('batch-teacher-id').value.toUpperCase().trim();
-    const bTime = document.getElementById('batch-time').value;
-    const subject = document.getElementById('batch-subject').value;
-
-    if (!bName || !tId || !bTime || !subject) {
-        return alert("Please fill Batch Name, Teacher ID, Subject and Time Slot.");
-    }
-
-    // --- CONFLICT CHECK: Same Teacher + Same Time ---
-    const { data: conflict } = await db.from('batches')
-        .select('subject_name, batch_name')
-        .eq('teacher_id', tId)
-        .eq('batch_time', bTime)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    if (conflict) {
-        return alert(`🛑 SCHEDULING CONFLICT!\n\nThis teacher is already assigned to the batch "${conflict.batch_name}" for subject "${conflict.subject_name}" at ${bTime}.\n\nA teacher cannot have two different subjects at the same time.`);
-    }
-
+    const selectedSlots = Array.from(document.querySelectorAll('.batch-time-slot:checked')).map(cb => cb.value).join(', ');
+    
     const batchData = {
         institute_id: sessionInstID,
-        batch_name: bName,
-        teacher_id: tId,
+        batch_name: document.getElementById('batch-name').value,
+        teacher_id: document.getElementById('batch-teacher-id').value,
         teacher_name: document.getElementById('batch-teacher-name').value,
-        batch_time: bTime,
-        subject_name: subject,
-        students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
-        remarks: document.getElementById('batch-remarks').value
+        batch_time: selectedSlots, // Saves all checked slots
+        subject_name: document.getElementById('batch-subject').value,
+        students_allotted: parseInt(document.getElementById('batch-students').value) || 0
     };
 
     const { error } = await db.from('batches').insert([batchData]);
-    if (error) {
-        if (error.code === '23505') alert("Error: A batch with this name already exists.");
-        else alert("Save Error: " + error.message);
-    } else {
-        alert("Batch Saved Successfully!");
-    }
+    if (error) alert(error.message); else alert("Batch Created with selected timings!");
 }
 
 // 4. THE MISSING FETCH FUNCTION
@@ -3647,17 +3627,39 @@ async function loadBatchTeacherDropdown() {
 }
 
 // 2. Auto-fill the Teacher Name box when ID is selected
-function handleBatchTeacherChange() {
-    const select = document.getElementById('batch-teacher-id');
+async function handleBatchTeacherChange() {
+    const tid = document.getElementById('batch-teacher-id').value;
     const nameInput = document.getElementById('batch-teacher-name');
-    const selectedOpt = select.options[select.selectedIndex];
-    
-    if (selectedOpt && selectedOpt.dataset.name) {
-        nameInput.value = selectedOpt.dataset.name;
-    } else {
-        nameInput.value = "";
+    const checkboxes = document.querySelectorAll('.batch-time-slot');
+
+    // Reset UI
+    checkboxes.forEach(cb => { cb.checked = false; cb.parentElement.style.color = "#ccc"; });
+    if (!tid) return;
+
+    // Fetch Teacher Info + Availability from Section 11's table
+    const { data: teacher } = await db.from('teacher_details')
+        .select('teacher_name, time_of_slot, availability')
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .single();
+
+    if (teacher) {
+        nameInput.value = teacher.teacher_name;
+        
+        if (teacher.availability === "Yes" && teacher.time_of_slot) {
+            const slots = teacher.time_of_slot.split(',').map(s => s.trim());
+            checkboxes.forEach(cb => {
+                if (slots.includes(cb.value)) {
+                    cb.checked = true;
+                    cb.parentElement.style.color = "#000"; // Highlight available slots
+                }
+            });
+        } else {
+            alert("This teacher is marked as Unavailable in the Teacher Portal.");
+        }
     }
 }
+
 /* ==========================================
    6. ATTENDANCE (Mark & Fetch)
    ========================================== */
@@ -7618,49 +7620,84 @@ function clearBatchMaster() {
 
 // 3. Auto-populate from multiple tables
 // REPLACE existing autopopulateBatchMaster function completely
+let currentRollAllocations = []; 
+
 async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
-    if(!roll) return alert("Please enter a Roll Number first.");
+    if(!roll) return alert("Please enter a Roll Number.");
 
     // 1. Fetch Student Base Info
-    const { data: stu } = await db.from('students')
-        .select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-
+    const { data: stu } = await db.from('students').select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
     if (!stu) return alert("Student not found in admission records.");
     
     document.getElementById('bm-sname').value = stu.full_name;
     document.getElementById('bm-course').value = stu.course || "N/A";
 
-    // 2. Fetch ALL Allocations for this student (Support for multiple teachers)
-    const { data: allocs, error: allocErr } = await db.from('student_allocations')
-        .select('teacher_id, teacher_name')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID);
+    // 2. Fetch ALL Unique Allocations (Section 18 link)
+    const { data: allocs } = await db.from('student_allocations').select('*').eq('roll_number', roll).eq('institute_id', sessionInstID);
 
     const tidSelect = document.getElementById('bm-tid');
     tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
 
     if (allocs && allocs.length > 0) {
-        // Populate dropdown with ONLY the teachers allocated to this specific student
+        currentRollAllocations = allocs;
+        
+        // --- ELIMINATE DUPLICATE TEACHER IDS ---
+        const uniqueTids = [];
+        const seen = new Set();
         allocs.forEach(a => {
+            if (!seen.has(a.teacher_id)) {
+                seen.add(a.teacher_id);
+                uniqueTids.push(a);
+            }
+        });
+
+        uniqueTids.forEach(a => {
             let opt = document.createElement('option');
             opt.value = a.teacher_id;
             opt.text = `${a.teacher_id} - ${a.teacher_name}`;
             opt.dataset.name = a.teacher_name;
-
-
-// ADD THIS: Store the batch name in the option
-        opt.dataset.batch = a.batch_name || ""; 
             tidSelect.appendChild(opt);
         });
-        alert(`Found ${allocs.length} teacher allocation(s) for ${stu.full_name}. Please select one.`);
+
+        // Auto-select if only 1 teacher
+        if (uniqueTids.length === 1) {
+            tidSelect.selectedIndex = 1;
+            tidSelect.dispatchEvent(new Event('change'));
+        }
     } else {
-        // Fallback: If no allocation found, load all teachers for manual selection
-        alert("No specific Teacher Allocation (Module 18) found. Loading full teacher list...");
-        await loadBMTeacherDropdown(); 
+        // This only shows if student_allocations table is actually empty for this roll
+        alert("No Teacher Allocation found for this student. Please go to Section 18 first.");
+        loadBMTeacherDropdown(); // Fallback to all teachers
     }
 }
 
+// Listener to filter batches per teacher and ELIMINATE DUPLICATE BATCH NAMES
+document.getElementById('bm-tid').addEventListener('change', function() {
+    const tid = this.value;
+    const bnameSelect = document.getElementById('bm-bname');
+    const nameInput = document.getElementById('bm-tname');
+    
+    const selectedOpt = this.options[this.selectedIndex];
+    nameInput.value = selectedOpt ? (selectedOpt.dataset.name || "") : "";
+
+    bnameSelect.innerHTML = '<option value="">-- Select Linked Batch --</option>';
+    if (!tid) return;
+
+    // --- ELIMINATE DUPLICATE BATCH NAMES ---
+    const seenBatches = new Set();
+    currentRollAllocations.forEach(a => {
+        if (a.teacher_id === tid && a.batch_name && !seenBatches.has(a.batch_name)) {
+            seenBatches.add(a.batch_name);
+            let opt = document.createElement('option');
+            opt.value = a.batch_name;
+            opt.text = a.batch_name;
+            bnameSelect.appendChild(opt);
+        }
+    });
+
+    if (seenBatches.size === 1) bnameSelect.selectedIndex = 1;
+});
 // 4. ADD RECORD to "list" table
 // 4. ADD RECORD to "list" table (BUG-FREE CAPACITY CHECK)
 async function addBatchMasterRecord() {
