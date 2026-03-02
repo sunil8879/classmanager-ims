@@ -8855,45 +8855,53 @@ async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter a Roll Number first.");
 
-    // Load Teacher List first if not already loaded
-    if(document.getElementById('bm-tid').options.length <= 1) await loadBMTeacherDropdown();
-
-    // A. Fetch from STUDENTS table
-    const { data: stu } = await db.from('students')
-        .select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-
-    if (!stu) return alert("Student not found.");
-    
-    document.getElementById('bm-sname').value = stu.full_name;
-    document.getElementById('bm-course').value = stu.course || "N/A";
-
-    // B. Fetch Allocation (Which teacher is this student linked to?)
-    const { data: alloc } = await db.from('student_allocations')
-        .select('teacher_id')
+    // 1. Fetch Student Base Info from Students Table
+    const { data: stu, error: stuErr } = await db.from('students')
+        .select('full_name, course')
         .eq('roll_number', roll)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (alloc) {
-        // Select the teacher in dropdown
-        document.getElementById('bm-tid').value = alloc.teacher_id;
-        // Trigger the change to load that teacher's batches
-        await handleBMTeacherChange();
+    if (stuErr || !stu) return alert("Student not found in admission records.");
+    
+    document.getElementById('bm-sname').value = stu.full_name;
+    document.getElementById('bm-course').value = stu.course || "N/A";
+
+    // 2. Fetch ALL Allocations from Student_Allocations (Module 18)
+    const { data: allocs, error: allocErr } = await db.from('student_allocations')
+        .select('teacher_id, teacher_name, batch_name')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
+
+    const tidSelect = document.getElementById('bm-tid');
+    tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
+
+    // --- THE LOGIC FIX ---
+    if (allocs && allocs.length > 0) {
+        // DATA FOUND: Populate the dropdown silently
+        allocs.forEach(a => {
+            let opt = document.createElement('option');
+            opt.value = a.teacher_id;
+            opt.text = `${a.teacher_id} - ${a.teacher_name}`;
+            opt.dataset.name = a.teacher_name;      // Stores name for auto-fill
+            opt.dataset.batch = a.batch_name || ""; // Stores batch link for auto-fill
+            tidSelect.appendChild(opt);
+        });
         
-        // C. Try to auto-select the batch if it matches the student's course
-        const bSelect = document.getElementById('bm-bname');
-        for (let i = 0; i < bSelect.options.length; i++) {
-            if (bSelect.options[i].text.includes(stu.course)) {
-                bSelect.selectedIndex = i;
-                break;
-            }
+        // If there is exactly one allocation, you can auto-select it
+        if (allocs.length === 1) {
+            tidSelect.selectedIndex = 1;
+            // Manually trigger the fill logic
+            document.getElementById('bm-tname').value = allocs[0].teacher_name;
+            document.getElementById('bm-bname').value = allocs[0].batch_name || "";
         }
+        
     } else {
-        alert("Student found, but no Teacher Allocation (Module 18) found. Please select teacher manually.");
+        // NO DATA FOUND: Only now show the alert
+        alert("Notice: No specific Teacher Allocation (Module 18) found for this student. You can select a teacher manually from the full list.");
+        await loadBMTeacherDropdown(); // This loads all teachers as a fallback
     }
 }
-
-
 
 async function refreshStudentBatchDropdown() {
     const batchSelect = document.getElementById('stu-batch');
@@ -8937,6 +8945,28 @@ document.getElementById('stu-batch').addEventListener('change', function() {
     
     // 4. Join with commas and update the greyed-out box
     courseInput.value = uniqueSubjects.join(', ');
+});
+
+
+// Add this inside your script or DOMContentLoaded block
+document.getElementById('bm-tid').addEventListener('change', function() {
+    const selectedOpt = this.options[this.selectedIndex];
+    const nameInput = document.getElementById('bm-tname');
+    const batchSelect = document.getElementById('bm-bname');
+    
+    if (selectedOpt && selectedOpt.value !== "") {
+        // Fill Teacher Name box
+        nameInput.value = selectedOpt.dataset.name || "";
+        
+        // Auto-select the Batch from the dropdown
+        const linkedBatch = selectedOpt.dataset.batch;
+        if (linkedBatch) {
+            batchSelect.value = linkedBatch;
+        }
+    } else {
+        nameInput.value = "";
+        batchSelect.value = "";
+    }
 });
 
 
