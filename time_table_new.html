@@ -626,7 +626,10 @@ function renderTimetableGrid(bookings, dateVal) {
     
     const jsDay = new Date(dateVal).getDay();
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
-    const tName = document.getElementById('f-teacher-name').value;
+    
+    // Get Teacher info from the form
+    const tName = document.getElementById('f-teacher-name').value || "Assigned Teacher";
+    const tID = document.getElementById('f-teacher-id').value;
 
     const tbody = document.getElementById('timetable-body');
     tbody.innerHTML = '';
@@ -634,41 +637,49 @@ function renderTimetableGrid(bookings, dateVal) {
     SLOTS.forEach(time => {
         const tr = document.createElement('tr');
         
-        // --- LEFT COLUMN: TIME ---
+        // --- EXTREME LEFT COLUMN: TIME ---
         const tdTime = document.createElement('td'); 
         tdTime.className = 'time-slot'; 
         tdTime.innerText = time;
 
-        // Check if this slot is booked (Matching only by time_slot)
+        // Check if a booking exists for this specific time string
         const bData = bookings?.find(b => b.time_slot.trim() === time.trim());
 
         if (bData) {
-            tdTime.classList.add('is-taken');
-            // THE HOVER POPUP INFO
-            tdTime.title = `BOOKING DETAILS:\nStudent: ${bData.student_name}\nRoll: ${bData.student_roll}\nTeacher ID: ${bData.teacher_id}\nTeacher: ${tName}\nSubject: ${bData.course}`;
+            // APPLY YELLOW COLOR
+            tdTime.style.backgroundColor = "#FFD700"; 
+            tdTime.style.color = "#000";
+            tdTime.style.fontWeight = "900";
+            tdTime.style.border = "2px solid #000";
+            tdTime.style.cursor = "help";
+
+            // HOVER POPUP INFO (Using Roll No since Name is missing from DB)
+            tdTime.title = `⚠️ SLOT BOOKED\n----------------\nSTUDENT ROLL: ${bData.student_roll}\nTEACHER ID: ${bData.teacher_id}\nTEACHER NAME: ${tName}\nCOURSE: ${bData.course}`;
         }
+        
         tr.appendChild(tdTime);
 
-        // --- OTHER COLUMNS: DAYS ---
+        // --- THE DAY COLUMNS ---
         DAYS.forEach(day => {
             const td = document.createElement('td');
             
-            // Highlight only the active day (Tomorrow)
             if (day === activeDayName) {
                 if (bData) {
-                    td.innerHTML = `<b style="color:red;">BOOKED</b>`;
+                    td.innerHTML = `<span style="color:red; font-weight:bold;">OCCUPIED</span>`;
                 } else if (currentUserProfile.role === 'Student') {
                     td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
                 } else {
-                    td.innerHTML = `OPEN`;
+                    td.innerHTML = `<small>AVAILABLE</small>`;
                 }
             } else {
                 td.style.opacity = "0.2";
             }
             tr.appendChild(td);
         });
+        
         tbody.appendChild(tr);
     });
+    
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
     /**
@@ -683,12 +694,11 @@ async function bookThisSlot(day, time) {
 
     if (!officialTime.includes(time)) return alert("DENIED: Outside Batch hours.");
 
-    // Insert Record (REMOVED 'day' TO FIX YOUR ERROR)
+    // This insert uses only the core columns to avoid schema errors
     const { error } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
         student_roll: roll,
-        student_name: currentUserProfile.full_name.toUpperCase(),
         booking_date: dateVal,
         time_slot: time,
         course: course
@@ -697,8 +707,8 @@ async function bookThisSlot(day, time) {
     if (error) {
         alert("Database Error: " + error.message);
     } else {
-        alert("Success!");
-        generateTimeTable();
+        alert("Booking Successful!");
+        generateTimeTable(); // Refresh the grid
     }
 }
     /**
