@@ -590,7 +590,7 @@ const DAYS = [
 ];
 
         // --- 2. DATABASE FETCH LOGIC ---
-       async function fetchStudent() {
+    async function fetchStudent() {
     const roll = document.getElementById('f-roll').value.trim().toUpperCase();
 
     if (!roll) {
@@ -598,31 +598,33 @@ const DAYS = [
         return;
     }
 
-    let query = db.from('students').select('full_name, course').eq('roll_number', roll);
-    if (sessionInstID) query = query.eq('institute_id', sessionInstID);
+    // Ensure we are only searching within the logged-in institute
+    if (!sessionInstID) await checkCurrentSession();
 
-    const { data, error } = await query.limit(1).maybeSingle();
+    const { data, error } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
 
     if (error) {
-        console.error("Fetch Error:", error.message);
-        alert("Database Error: " + error.message);
+        alert("Error: " + error.message);
         return;
     }
 
     if (!data) {
-        alert("Student not found. Please verify the Roll Number.");
-        document.getElementById('f-student-name').value = '';
-        document.getElementById('f-course').value = '';
-        document.getElementById('f-teacher').innerHTML = '<option value="">Select Teacher</option>';
+        alert("Student Roll Number not found in this institute.");
         return;
     }
 
-    document.getElementById('f-student-name').value = data.full_name || '';
-    document.getElementById('f-course').value = data.course || '';
+    // Populate Fields
+    document.getElementById('f-student-name').value = data.full_name;
+    document.getElementById('f-course').value = data.course;
 
-    // ✅ Populate teacher dropdown for this course
+    // Automatically trigger teacher search based on student's course
     populateTeachersBySubject(data.course);
 }
+
 
         async function fetchTeacher() {
             const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
@@ -942,50 +944,42 @@ async function authenticateForBooking() {
 }
 
 
-async function populateTeachersBySubject(selectedCourse) {
+// --- 2. SYNC TEACHER DATA (Find Teachers linked to the Student's Course) ---
+async function populateTeachersBySubject(studentCourse) {
     const teacherSelect = document.getElementById("f-teacher");
-    teacherSelect.innerHTML = '<option value="">Loading...</option>';
+    teacherSelect.innerHTML = '<option value="">Searching for teachers...</option>';
 
-    if (!sessionInstID) {
-        const isAuth = await authenticateForBooking();
-        if (!isAuth) return;
-    }
+    if (!sessionInstID) await checkCurrentSession();
 
-    // UPDATED: Added availability and time_of_slot to the select query
-    const { data, error } = await db
-        .from("teacher_details")
-        .select("id, teacher_name, mobile, email, experience, rating, availability, time_of_slot") 
-        .eq("institute_id", sessionInstID)
-        .eq("subject_taught", selectedCourse);
+    // Fetch teachers who teach this subject
+    // We use ilike to match even if the student is enrolled in multiple courses
+    const { data, error } = await db.from('teacher_details')
+        .select('id, teacher_name, mobile, availability, time_of_slot, rating, experience')
+        .eq('institute_id', sessionInstID)
+        .ilike('subject_taught', `%${studentCourse}%`)
+        .eq('status', 'Active');
 
-    if (error) {
-        console.error(error);
-        teacherSelect.innerHTML = '<option value="">Error loading teachers</option>';
+    if (error || !data || data.length === 0) {
+        teacherSelect.innerHTML = '<option value="">No Active Teachers for this course</option>';
         return;
     }
 
-    teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
-
-    if (!data || data.length === 0) {
-        teacherSelect.innerHTML = '<option value="">No teachers available</option>';
-        return;
-    }
-
+    // Sort by rating (highest first)
     data.sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
-    data.forEach(teacher => {
-        const option = document.createElement("option");
-        option.value = teacher.id;
-        option.textContent = `${teacher.teacher_name} (${teacher.experience || 0} yrs exp) ⭐ ${teacher.rating || 'N/A'}`;
-
-        // Store data in the HTML option element so we can grab it instantly when clicked
-        option.dataset.name = teacher.teacher_name;
-        option.dataset.mobile = teacher.mobile || "";
-        option.dataset.email = teacher.email || "";
-        option.dataset.availability = teacher.availability || "No";
-        option.dataset.timeslots = teacher.time_of_slot || "";
-
-        teacherSelect.appendChild(option);
+    teacherSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+    data.forEach(t => {
+        let opt = document.createElement('option');
+        opt.value = t.id;
+        opt.text = `${t.teacher_name} (⭐ ${t.rating || 0})`;
+        
+        // Store crucial metadata in the dropdown option
+        opt.dataset.name = t.teacher_name;
+        opt.dataset.mobile = t.mobile;
+        opt.dataset.availability = t.availability;
+        opt.dataset.slotMap = t.time_of_slot; // This is the JSON string
+        
+        teacherSelect.appendChild(opt);
     });
 }
 
@@ -995,35 +989,56 @@ async function populateTeachersBySubject(selectedCourse) {
 
 
 
+// --- 3. SYNC BATCH TIMINGS (Capture the exact subject timings for the teacher) ---
 document.getElementById("f-teacher").addEventListener("change", function () {
     const selectedOption = this.options[this.selectedIndex];
-    const slotsInput = document.getElementById("f-teacher-available-slots");
+    const studentCourse = document.getElementById('f-course').value.trim().toUpperCase();
+    const slotsDisplay = document.getElementById("f-teacher-available-slots");
+    const nameDisplay = document.getElementById("f-teacher-name");
 
-    // If the user selects the default "Select Teacher" placeholder
     if (!this.value) {
-        document.getElementById("f-teacher-name").value = "";
-        if (slotsInput) slotsInput.value = "";
+        nameDisplay.value = "";
+        slotsDisplay.value = "";
         return;
     }
 
-    // 1. Auto-populate teacher name
-    document.getElementById("f-teacher-name").value = selectedOption.dataset.name || "";
+    nameDisplay.value = selectedOption.dataset.name;
 
-    // 2. Auto-populate available slots instantly
-    if (slotsInput) {
+    // Logic to extract subject-specific timing from the Teacher's Profile
+    try {
+        const rawMap = selectedOption.dataset.slotMap;
         const avail = selectedOption.dataset.availability;
-        const slotsStr = selectedOption.dataset.timeslots;
         
-        if (avail === "Yes" && slotsStr && slotsStr.trim() !== "") {
-            slotsInput.value = slotsStr;
-        } else {
-            slotsInput.value = "Teacher Not Available / No Slots Set";
+        // If teacher marked as unavailable
+        if (avail === "No") {
+            slotsDisplay.value = "TEACHER IS NOT AVAILABLE TOMORROW";
+            return;
         }
+
+        // Parse the Slot Map (JSON set in Teacher Portal)
+        const slotMap = JSON.parse(rawMap);
+        let foundSlots = "";
+
+        // Look for the specific timing for the student's course
+        Object.keys(slotMap).forEach(subject => {
+            if (subject.toUpperCase() === studentCourse) {
+                foundSlots = slotMap[subject];
+            }
+        });
+
+        if (foundSlots) {
+            slotsDisplay.value = foundSlots;
+            // Update the Time Selection dropdown to only show the relevant slot if needed
+            // Or just inform the student
+        } else {
+            slotsDisplay.value = "No specific slots found for this subject.";
+        }
+        
+    } catch (e) {
+        console.error("Slot Parsing Error:", e);
+        slotsDisplay.value = "Error reading teacher timings.";
     }
 });
-
-
-
 
 
 
