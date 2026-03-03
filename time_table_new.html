@@ -607,11 +607,10 @@ function renderTimetableGrid(bookings, dateVal) {
     const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
     
-    // Determine the day name based on selected date
+    // 1. Setup Variables
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(dateVal).getDay()];
-    
-    // Get logged-in info for "JOIN" logic
     const loggedInRoll = document.getElementById('f-roll').value;
+    const currentCourse = document.getElementById('f-course').value;
     const currentTeacherName = document.getElementById('f-teacher-name').value;
 
     const tbody = document.getElementById('timetable-body');
@@ -621,26 +620,25 @@ function renderTimetableGrid(bookings, dateVal) {
         const tr = document.createElement('tr');
         const tdTime = document.createElement('td'); 
         
-        // --- MULTI-STUDENT LOGIC ---
-        // Filter finds ALL students booked for this specific teacher and time
+        // --- BATCH DATA ---
+        // Find ALL students currently booked in this teacher's time slot
         const batchMembers = bookings?.filter(b => b.time_slot === time) || [];
-        // Check if the current logged-in student is already in this batch
         const myBooking = batchMembers.find(b => b.student_roll === loggedInRoll);
+        const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
 
         if (batchMembers.length > 0) {
-            // --- YELLOW BOOKING BOX (BATCH VIEW) ---
+            // --- YELLOW BOX (MOBILE COMPLIANT) ---
             tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)";
             tdTime.style.color = "#000";
             tdTime.style.border = "2px solid #000";
             tdTime.style.position = "relative";
             tdTime.style.textAlign = "left";
             tdTime.style.padding = "10px";
-            // Mobile compliance: Dynamic width
-            tdTime.style.minWidth = window.innerWidth < 768 ? "160px" : "220px";
+            // Responsive width for mobile visibility
+            tdTime.style.minWidth = window.innerWidth < 768 ? "150px" : "220px";
 
-            // Delete Icon Logic
+            // Delete Button (Staff or Self)
             let deleteBtn = "";
-            // Show if Staff OR if current user has a booking here to cancel
             if (currentUserProfile.role !== 'Student' || myBooking) {
                 const targetId = myBooking ? myBooking.id : batchMembers[0].id;
                 const targetRoll = myBooking ? myBooking.student_roll : batchMembers[0].student_roll;
@@ -649,33 +647,32 @@ function renderTimetableGrid(bookings, dateVal) {
                              <i class="fas fa-trash-alt"></i></button>`;
             }
 
-            // Generate list of all student roll numbers in this batch
-            const rollListHtml = batchMembers.map(m => `• Roll: ${m.student_roll}`).join('<br>');
+            // List of Roll Numbers in the batch
+            const rollList = batchMembers.map(m => `• Roll: ${m.student_roll}`).join('<br>');
 
             tdTime.innerHTML = `
                 ${deleteBtn}
                 <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
                 <div style="font-size:0.7rem; line-height:1.4;">
                     <b style="color:red;">BATCH SIZE: ${batchMembers.length}</b><br>
-                    <b>TCH:</b> ${currentTeacherName}<br>
+                    <b style="color:blue;">SUB: ${batchSubject}</b><br>
                     <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
-                        ${rollListHtml}
+                        ${rollList}
                     </div>
                 </div>`;
             
-            tdTime.title = `Total Students: ${batchMembers.length}\nTeacher: ${currentTeacherName}`;
+            tdTime.title = `Subject: ${batchSubject}\nStudents: ${batchMembers.length}`;
         } else {
-            // --- EMPTY TIME SLOT (BLUE THEME) ---
+            // --- BLUE BOX (EMPTY SLOT) ---
             tdTime.className = 'time-slot'; 
             tdTime.innerText = time;
-            tdTime.style.minWidth = window.innerWidth < 768 ? "160px" : "220px";
+            tdTime.style.minWidth = window.innerWidth < 768 ? "150px" : "220px";
         }
         tr.appendChild(tdTime);
 
         // --- DAY COLUMNS ---
         DAYS.forEach(day => {
             const td = document.createElement('td');
-            // Dim days that are not the selected date
             if (day !== activeDayName) {
                 td.style.opacity = "0.2";
                 td.style.pointerEvents = "none";
@@ -683,16 +680,21 @@ function renderTimetableGrid(bookings, dateVal) {
 
             if (day === activeDayName) {
                 if (myBooking) {
-                    // Current User is already in this batch
+                    // I am already in this class
                     td.className = 'booked-cell';
-                    td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>Roll: ${myBooking.student_roll}</small><br><small>Batch Active</small>`;
+                    td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
+                } else if (batchSubject && batchSubject !== currentCourse) {
+                    // SUBJECT MISMATCH (Biology vs Chemistry)
+                    td.style.background = "#ffeae6";
+                    td.style.border = "1px dashed red";
+                    td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject} ONLY</span>`;
                 } else {
-                    // User is NOT in this batch. Allow them to JOIN.
+                    // AVAILABLE TO JOIN OR BOOK
                     const count = batchMembers.length;
-                    const btnLabel = count > 0 ? `JOIN BATCH (${count})` : "BOOK SLOT";
+                    const label = count > 0 ? `JOIN ${batchSubject}` : "BOOK SLOT";
                     
                     if (currentUserProfile.role === 'Student') {
-                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">${btnLabel}</button>`;
+                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">${label}</button>`;
                     } else {
                         td.innerHTML = `<span style="font-size:0.7rem; color:#999;">${count > 0 ? count + ' Students' : 'EMPTY'}</span>`;
                     }
@@ -702,60 +704,63 @@ function renderTimetableGrid(bookings, dateVal) {
         });
         tbody.appendChild(tr);
     });
-    // Display the grid
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
     /**
      * 6. BOOKING VALIDATIONS
      */
 async function bookThisSlot(day, time) {
-    // --- 1. GET DATA FIRST (CRITICAL: THIS MUST BE AT THE TOP) ---
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
     const officialTime = document.getElementById('f-official-slots').value;
-    const course = document.getElementById('f-course').value;
+    const currentCourse = document.getElementById('f-course').value; // e.g., Biology
     const tid = document.getElementById('f-teacher-id').value;
     const tname = document.getElementById('f-teacher-name').value;
 
     if (!roll) return alert("Please select an assignment from the table first.");
 
-    // --- 2. STRICT VALIDATIONS (3 CLASS LIMIT & 2 CANCELLATION BLOCK) ---
+    // --- 1. VALIDATION: MAX 3 CLASSES PER DAY ---
     const { count: bCount } = await db.from('class_bookings').select('*', { count: 'exact', head: true }).eq('student_roll', roll).eq('booking_date', dateVal);
-    if (bCount >= 3) return alert("🛑 ACCESS DENIED: Daily limit of 3 classes reached!");
+    if (bCount >= 3) return alert("🛑 ERROR: Daily limit of 3 classes reached!");
 
+    // --- 2. VALIDATION: HISTORY/MISCHIEF ---
     const { count: cCount } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
-    if (cCount >= 2) return alert("🛑 ACCESS DENIED: History of too many cancellations. Booking blocked!");
+    if (cCount >= 2) return alert("🛑 ACCESS DENIED: Too many cancellations on your record!");
 
-    // --- 3. BATCH TIME VALIDATION ---
-    if (!officialTime.includes(time)) {
-        return alert("❌ DENIED: Selected time is not within the Teacher's Batch schedule.");
+    // --- 3. NEW VALIDATION: SUBJECT MATCHING (Biology vs Chemistry) ---
+    // Check if anyone is already in this slot for this teacher
+    const { data: existingBatch } = await db.from('class_bookings')
+        .select('course')
+        .eq('teacher_id', tid)
+        .eq('booking_date', dateVal)
+        .eq('time_slot', time)
+        .limit(1);
+
+    if (existingBatch && existingBatch.length > 0) {
+        const batchSubject = existingBatch[0].course;
+        if (batchSubject !== currentCourse) {
+            return alert(`❌ SUBJECT CONFLICT: This ${time} slot is a "${batchSubject}" batch. You are assigned to "${currentCourse}" and cannot join.`);
+        }
     }
 
-    // --- 4. WHATSAPP FLOW (MANDATORY) ---
+    // --- 4. BATCH TIME VALIDATION ---
+    if (!officialTime.includes(time)) return alert("❌ DENIED: Not within Teacher's Batch schedule.");
+
+    // --- 5. WHATSAPP FLOW ---
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     if (tData?.mobile) {
-        const msg = `📚 Booking Request: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
-        window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
-        
-        const confirmSave = confirm("WhatsApp page opened. Did you send the message? Click OK to finalize the booking in the database.");
-        if (!confirmSave) return;
+        window.open(`https://wa.me/91${tData.mobile}?text=Booking: ${currentCourse} at ${time}`, "_blank");
+        if (!confirm("WhatsApp opened. Confirm sent?")) return;
     }
 
-    // --- 5. INSERT RECORD ---
+    // --- 6. SAVE ---
     const { error } = await db.from("class_bookings").insert({
-        institute_id: sessionInstID,
-        teacher_id: tid,
-        student_roll: roll,
-        booking_date: dateVal,
-        time_slot: time,
-        course: course
+        institute_id: sessionInstID, teacher_id: tid, student_roll: roll, 
+        booking_date: dateVal, time_slot: time, course: currentCourse
     });
 
-    if (error) {
-        alert("Database Error: " + error.message);
-    } else {
-        document.getElementById('confirmation-text').innerText = `Success! Class booked for ${course} on ${dateVal} at ${time}.`;
-        document.getElementById('confirm-modal').style.display = 'flex';
+    if (!error) {
+        alert("Booking Successful!");
         generateTimeTable(); 
     }
 }
