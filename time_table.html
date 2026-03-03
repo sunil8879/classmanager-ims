@@ -693,6 +693,9 @@ document.getElementById("f-teacher").addEventListener("change", function () {
     const selectedOption = this.options[this.selectedIndex];
     const slotsInput = document.getElementById("f-teacher-available-slots");
     const nameInput = document.getElementById("f-teacher-name");
+    
+    // We must get the subject the user picked from the dropdown
+    const chosenSubject = document.getElementById('f-subject-choice').value;
 
     if (!this.value) {
         nameInput.value = "";
@@ -700,24 +703,36 @@ document.getElementById("f-teacher").addEventListener("change", function () {
         return;
     }
 
-    nameInput.value = selectedOption.dataset.name;
-    // Show the time assigned in Section 5 (Batch Management)
-    slotsInput.value = selectedOption.dataset.batchTime || "No time assigned to this batch.";
-});
-        // Find the slot for the CHOSEN subject specifically
-        let specificSlots = "";
-        Object.keys(slotMap).forEach(key => {
-            if (key.trim().toUpperCase() === chosenSubject.toUpperCase()) {
-                specificSlots = slotMap[key];
-            }
-        });
+    // Populate Teacher Name
+    nameInput.value = selectedOption.dataset.name || "";
 
-        slotsInput.value = specificSlots || "No slots assigned for this subject.";
+    try {
+        // First check: Did we get a simple Batch Time (from Section 5 batches)?
+        if (selectedOption.dataset.batchTime) {
+            slotsInput.value = selectedOption.dataset.batchTime;
+        } 
+        // Second check: Do we have a JSON Map (from Section 11 teacher portal)?
+        else if (selectedOption.dataset.slotMap) {
+            // Safely parse the JSON map
+            const slotMap = JSON.parse(selectedOption.dataset.slotMap);
+            let specificSlots = "";
+
+            // Loop through the map to find the slot for the chosen subject
+            Object.keys(slotMap).forEach(key => {
+                if (key.trim().toUpperCase() === chosenSubject.toUpperCase()) {
+                    specificSlots = slotMap[key];
+                }
+            });
+
+            slotsInput.value = specificSlots || "No slots assigned for this subject.";
+        } else {
+            slotsInput.value = "No timing data found.";
+        }
     } catch (e) {
+        console.error("Timetable Error:", e);
         slotsInput.value = "Error loading timings.";
     }
-});
-
+}); // End of Listener
         async function fetchTeacher() {
             const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
 
