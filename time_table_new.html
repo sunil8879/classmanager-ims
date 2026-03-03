@@ -591,7 +591,6 @@ function renderTimetableGrid(bookings, dateVal) {
         
         // --- LEFT COLUMN (TIME SLOT) ---
         const tdTime = document.createElement('td'); 
-        // We find the booking just by time because the list is already filtered by Date and Teacher
         const bDataRow = bookings?.find(b => b.time_slot === time);
 
         if (bDataRow) {
@@ -604,16 +603,16 @@ function renderTimetableGrid(bookings, dateVal) {
 
             let deleteIconHtml = "";
             if (currentUserProfile.role !== 'Student') {
-                deleteIconHtml = `<button style="background:#2d3436; color:#fff; border:none; padding:4px 8px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" onclick="cancelBooking('${bDataRow.id}','${bDataRow.student_roll}','${bDataRow.student_name}')"><i class="fas fa-trash-alt"></i></button>`;
+                deleteIconHtml = `<button style="background:#2d3436; color:#fff; border:none; padding:4px 8px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" onclick="cancelBooking('${bDataRow.id}','${bDataRow.student_roll}','Unknown')"><i class="fas fa-trash-alt"></i></button>`;
             }
 
             tdTime.innerHTML = `
                 ${deleteIconHtml}
                 <div style="font-weight:900; text-decoration:underline; font-size:0.85rem;">${time}</div>
                 <div style="font-size:0.7rem; margin-top:5px;">
-                    <b>STU:</b> ${bDataRow.student_name}<br>
                     <b>ROLL:</b> ${bDataRow.student_roll}<br>
                     <b>TID:</b> ${bDataRow.teacher_id}<br>
+                    <b>TCH:</b> ${currentTeacherName}<br>
                     <b>SUB:</b> ${bDataRow.course}
                 </div>`;
         } else {
@@ -630,12 +629,11 @@ function renderTimetableGrid(bookings, dateVal) {
                 td.style.pointerEvents = "none";
             }
 
-            // Match booking for this specific row/time
             const bData = bookings?.find(b => b.time_slot === time);
             
             if (bData && day === activeDayName) {
                 td.className = 'booked-cell';
-                td.innerHTML = `<b>${bData.student_name}</b><br><small>Roll: ${bData.student_roll}</small><br><small>${bData.course}</small>`;
+                td.innerHTML = `<b>ROLL: ${bData.student_roll}</b><br><small>${bData.course}</small>`;
             } else {
                 if (currentUserProfile.role === 'Student') {
                     td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
@@ -692,7 +690,7 @@ function renderTimetableGrid(bookings, dateVal) {
         institute_id: sessionInstID,
         teacher_id: tid,
         student_roll: roll,
-        student_name: currentUserProfile.full_name.toUpperCase(),
+        //student_name: currentUserProfile.full_name.toUpperCase(),
         booking_date: dateVal,
         time_slot: time,
         //day: day,
