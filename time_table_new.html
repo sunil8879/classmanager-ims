@@ -601,7 +601,6 @@ function renderTimetableGrid(bookings, dateVal) {
     const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
     
-    // 1. Setup Variables
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(dateVal).getDay()];
     const loggedInRoll = document.getElementById('f-roll').value;
     const currentCourse = document.getElementById('f-course').value;
@@ -614,62 +613,44 @@ function renderTimetableGrid(bookings, dateVal) {
         const tr = document.createElement('tr');
         const tdTime = document.createElement('td'); 
         
-        // --- BATCH DATA ---
-        // Find ALL students currently booked in this teacher's time slot
         const batchMembers = bookings?.filter(b => b.time_slot === time) || [];
         const myBooking = batchMembers.find(b => b.student_roll === loggedInRoll);
         const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
 
-     // --- REPLACE THIS SECTION INSIDE renderTimetableGrid ---
-if (batchMembers.length > 0) {
-    tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)"; // Yellow Indicator
-    tdTime.style.border = "2px solid #000";
-    tdTime.style.padding = "10px";
-    tdTime.style.minWidth = window.innerWidth < 768 ? "150px" : "220px";
+        if (batchMembers.length > 0) {
+            // --- YELLOW BOOKED STATE ---
+            tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)";
+            tdTime.style.border = "2px solid #000";
+            tdTime.style.padding = "10px";
+            tdTime.style.position = "relative";
+            tdTime.style.minWidth = window.innerWidth < 768 ? "150px" : "220px";
 
-    // Create the list of Names and Rolls safely
-    const rollList = batchMembers.map(m => {
-        const displayName = m.student_name ? m.student_name : "N/A";
-        return `• ${displayName} (${m.student_roll})`;
-    }).join('<br>');
-
-    tdTime.innerHTML = `
-        <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
-        <div style="font-size:0.7rem; line-height:1.4;">
-            <b style="color:red;">BATCH SIZE: ${batchMembers.length}</b><br>
-            <b style="color:blue;">BATCH: ${batchSubject}</b><br>
-            <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
-                ${rollList}
-            </div>
-        </div>`;
-}
-            // Delete Button (Staff or Self)
+            // Delete Button Logic
             let deleteBtn = "";
             if (currentUserProfile.role !== 'Student' || myBooking) {
                 const targetId = myBooking ? myBooking.id : batchMembers[0].id;
                 const targetRoll = myBooking ? myBooking.student_roll : batchMembers[0].student_roll;
-                deleteBtn = `<button style="background:#000; color:#fff; border:none; padding:6px 10px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" 
-                             onclick="cancelBooking('${targetId}','${targetRoll}')">
-                             <i class="fas fa-trash-alt"></i></button>`;
+                deleteBtn = `<button style="background:#000; color:#fff; border:none; padding:6px 10px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" onclick="cancelBooking('${targetId}','${targetRoll}')"><i class="fas fa-trash-alt"></i></button>`;
             }
 
-            // List of Roll Numbers in the batch
-          const rollList = batchMembers.map(m => `• ${m.student_name} (${m.student_roll})`).join('<br>');
+            // Student Names and Rolls
+            const rollList = batchMembers.map(m => `• ${m.student_name || 'N/A'} (${m.student_roll})`).join('<br>');
 
             tdTime.innerHTML = `
                 ${deleteBtn}
                 <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
                 <div style="font-size:0.7rem; line-height:1.4;">
                     <b style="color:red;">BATCH SIZE: ${batchMembers.length}</b><br>
-                  <b style="color:blue;">BATCH: ${batchSubject}</b>
+                    <b style="color:blue;">BATCH: ${batchSubject}</b>
                     <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
                         ${rollList}
                     </div>
                 </div>`;
             
-            tdTime.title = `Subject: ${batchSubject}\nStudents: ${batchMembers.length}`;
+            tdTime.title = `Batch: ${batchSubject}\nStudents: ${batchMembers.length}`;
+
         } else {
-            // --- BLUE BOX (EMPTY SLOT) ---
+            // --- BLUE EMPTY STATE ---
             tdTime.className = 'time-slot'; 
             tdTime.innerText = time;
             tdTime.style.minWidth = window.innerWidth < 768 ? "150px" : "220px";
@@ -686,19 +667,15 @@ if (batchMembers.length > 0) {
 
             if (day === activeDayName) {
                 if (myBooking) {
-                    // I am already in this class
                     td.className = 'booked-cell';
                     td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
                 } else if (batchSubject && batchSubject !== currentCourse) {
-                    // SUBJECT MISMATCH (Biology vs Chemistry)
                     td.style.background = "#ffeae6";
                     td.style.border = "1px dashed red";
-                    td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject} ONLY</span>`;
+                    td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject}<br>ONLY</span>`;
                 } else {
-                    // AVAILABLE TO JOIN OR BOOK
                     const count = batchMembers.length;
                     const label = count > 0 ? `JOIN ${batchSubject}` : "BOOK SLOT";
-                    
                     if (currentUserProfile.role === 'Student') {
                         td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">${label}</button>`;
                     } else {
