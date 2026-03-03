@@ -2740,36 +2740,58 @@ async function handleLogout() {
 async function loadHomeDashboardStats() {
     if (!sessionInstID) return;
     
-    // A. Fetch Active Students (for Admissions count and Pending sum)
-    const { data: students, error: stuErr } = await db.from('students')
-        .select('pending_amount, due_dates') 
+    // ADDED 'due_dates' to the select statement below
+    const { data: students } = await db.from('students')
+        .select('paid_amount, pending_amount, due_dates') 
         .eq('institute_id', sessionInstID)
         .eq('status', 'Active');
 
-    // B. Fetch actual cash received from Payment History for the current year
-    const currentYear = new Date().getFullYear();
-    const { data: history, error: histErr } = await db.from('payment_history')
-        .select('amount')
-        .eq('institute_id', sessionInstID)
-        .gte('payment_date', `${currentYear}-01-01`)
-        .lte('payment_date', `${currentYear}-12-31`);
-
     if (students) {
         const totalStu = students.length;
-        // Calculation: Sum of all pending_amount from the students table
+        const totalColl = students.reduce((sum, s) => sum + (Number(s.paid_amount) || 0), 0);
         const totalPend = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
-        // Calculation: Sum of all amount from the payment_history table
-        const totalColl = history ? history.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
 
-        // Update UI Big Cards
         document.getElementById('home-total-stu').innerText = totalStu;
         document.getElementById('home-total-coll').innerText = "₹ " + totalColl.toLocaleString('en-IN');
         document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
+loadHomeInventoryStats();
+
+
+
+
+
+
+
+// --- START OF ADDED YEARLY COLLECTION LOGIC ---
+        const currentYear = new Date().getFullYear();
+        const { data: yearlyPayments } = await db.from('payment_history')
+            .select('amount')
+            .eq('institute_id', sessionInstID)
+            .gte('payment_date', `${currentYear}-01-01`)
+            .lte('payment_date', `${currentYear}-12-31`);
+            
+        const actualYearlyCollection = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
         
-        loadHomeInventoryStats(); 
+        // This overwrites the flawed "Active only" calculation with the true Year-to-Date revenue
+        document.getElementById('home-total-coll').innerText = "₹ " + actualYearlyCollection.toLocaleString('en-IN');
+        
+        // Updates the tiny text below the number so the owner knows it is Year-to-Date
+        const collSubtext = document.getElementById('home-total-coll').nextElementSibling;
+        if(collSubtext) collSubtext.innerText = "Collected in " + currentYear;
+        // --- END OF ADDED YEARLY COLLECTION LOGIC ---
+
+
+
+
+
+
+
+
+        // --- ADDED FOR FORECASTING ---
         generateFinancialForecast(students);
     }
 }
+
 /* ==========================================
    HOME DASHBOARD STATS LOGIC
    ========================================== */
@@ -2829,31 +2851,25 @@ async function generateRollNow() {
 }
 
 // 4. Validation & Add Student
-/* ==========================================
-   FIXED: ADD STUDENT (WITH AUTO-PAYMENT LOG)
-   ========================================== */
 async function addStudent() {
-    if (!sessionInstID) return alert("Error: Institute ID missing. Please log in again.");
+    if (!sessionInstID) return alert("Please log in again.");
     
     const roll = document.getElementById('stu-roll').value;
-    if (!roll) return alert("Error: Please generate a Roll Number first.");
+    if (!roll) return alert("Please generate a Roll Number first.");
 
-    const admissionDate = document.getElementById('stu-date').value;
-    const paidAmt = parseFloat(document.getElementById('stu-paid').value) || 0;
-
-    // 1. Prepare Main Student Data
     const stuData = {
         institute_id: sessionInstID,
-        admission_date: admissionDate,
+        admission_date: document.getElementById('stu-date').value,
         full_name: document.getElementById('stu-name').value,
         mobile: document.getElementById('stu-mobile').value,
         father_mobile: document.getElementById('stu-father').value,
         mother_mobile: document.getElementById('stu-mother').value,
         standard: document.getElementById('stu-standard').value,
+        // FIX: Read directly from the Text Box
         batch_time: document.getElementById('stu-batch').value, 
         course: document.getElementById('stu-course').value,
         total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
-        paid_amount: paidAmt,
+        paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
         roll_number: roll,
         due_dates: document.getElementById('stu-due-dates').value,
@@ -2861,48 +2877,19 @@ async function addStudent() {
         email: document.getElementById('stu-email').value
     };
 
-    // 2. Save to 'students' table
-    const { data: newStu, error: stuError } = await db.from('students').insert([stuData]).select();
+    const { data: newStu, error } = await db.from('students').insert([stuData]).select();
 
-    if (stuError) return alert("Save Error: " + stuError.message);
+    if (error) return alert("Save Error: " + error.message);
 
-    if (newStu && newStu[0]) {
-        const studentId = newStu[0].id;
+    await db.from('student_details').upsert([{
+        institute_id: sessionInstID,
+        student_id: newStu[0].id,
+        roll_number: roll,
+        course_end_date: document.getElementById('stu-end-date').value
+    }]);
 
-        // 3. Save to 'student_details' table
-        await db.from('student_details').upsert([{
-            institute_id: sessionInstID,
-            student_id: studentId,
-            roll_number: roll,
-            course_end_date: document.getElementById('stu-end-date').value
-        }]);
-
-        // --- THE CRITICAL FIX: LOG FIRST PAYMENT INTO HISTORY ---
-        if (paidAmt > 0) {
-            const dateObj = new Date(admissionDate);
-            const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-            const { error: payError } = await db.from('payment_history').insert([{
-                institute_id: sessionInstID,
-                student_id: studentId,
-                roll_number: roll,
-                amount: paidAmt,
-                payment_date: admissionDate,
-                month_year: monthYearStr,
-                course_name: stuData.course,
-                total_fees: stuData.total_fees,
-                pending_fees: stuData.pending_amount
-            }]);
-
-            if (payError) console.error("Initial payment log failed:", payError.message);
-        }
-
-        alert("SUCCESS! Student Registered & Initial Payment Logged in History.");
-        clearStudentForm();
-        
-        // Refresh Dashboard automatically
-        loadHomeDashboardStats(); 
-    }
+    alert("SUCCESS! Student Saved.");
+    clearStudentForm();
 }
 // 5. Fetch Details by Roll Number
 async function fetchStudentByRoll() {
@@ -6371,13 +6358,14 @@ window.showHomeChartPage = function(page) {
 
 async function generateFinancialForecast(students) {
     const forecastData = {};
-    const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+    const chartRows = [];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    // 1. Generate 6-month labels starting from ONE MONTH BACK (February)
+    // 1. GENERATE THE FIXED 6-MONTH WINDOW (1 Past + 1 Current + 4 Future)
     const displayMonths = [];
     let tempDate = new Date();
     tempDate.setDate(1); 
-    tempDate.setMonth(tempDate.getMonth() - 1); // Shifting back to FEBRUARY 2026
+    tempDate.setMonth(tempDate.getMonth() - 1); // Start from Last Month (e.g., February)
 
     for (let i = 0; i < 6; i++) {
         let mKey = monthNames[tempDate.getMonth()] + " " + tempDate.getFullYear();
@@ -6386,77 +6374,133 @@ async function generateFinancialForecast(students) {
         tempDate.setMonth(tempDate.getMonth() + 1);
     }
 
-    const pastDueAnchor = displayMonths[0]; // This is FEBRUARY 2026
+    const firstMonthKey = displayMonths[0]; // The "Past Month" anchor (February 2026)
 
-    // 2. Distribute Pending Amounts
+    // 2. ALLOCATE PENDING FEES (DYNAMIC CATCH-ALL LOGIC)
     students.forEach(s => {
-        const pending = parseFloat(s.pending_amount) || 0;
-        if (pending <= 0) return;
+        const totalPendingForStudent = parseFloat(s.pending_amount) || 0;
+        if (totalPendingForStudent <= 0) return;
 
-        let rawDates = s.due_dates ? s.due_dates.toUpperCase().split(',').map(d => d.trim()).filter(d => d !== "") : [];
+        let rawDates = [];
+        if (s.due_dates && s.due_dates.trim() !== "") {
+            rawDates = s.due_dates.split(',').map(d => d.trim()).filter(d => d !== "");
+        }
 
         if (rawDates.length > 0) {
-            const amtPerInstallment = pending / rawDates.length;
+            const perInstallment = totalPendingForStudent / rawDates.length;
+            let allocatedToWindow = 0;
 
             rawDates.forEach(dateStr => {
                 let matched = false;
                 displayMonths.forEach(mKey => {
-                    if (dateStr.includes(mKey)) {
-                        forecastData[mKey] += amtPerInstallment;
+                    if (dateStr.toLowerCase().includes(mKey.toLowerCase())) {
+                        forecastData[mKey] += perInstallment;
+                        allocatedToWindow += perInstallment;
                         matched = true;
                     }
                 });
-                
-                // If the date is not in the future window, it's considered Past Due (Feb)
+
+                // If installment date is in the deep past (before our window), add to first card
                 if (!matched) {
-                    forecastData[pastDueAnchor] += amtPerInstallment;
+                    let dObj = new Date(dateStr.replace(/(st|nd|rd|th)/i, ''));
+                    if (!isNaN(dObj) && dObj < new Date(displayMonths[0])) {
+                        forecastData[firstMonthKey] += perInstallment;
+                        allocatedToWindow += perInstallment;
+                    }
                 }
             });
+
+            // RESIDUAL LOGIC: If some money isn't accounted for by the string matching,
+            // or if the student joined in the past, dump the remainder into the Past Month card.
+            const remainder = totalPendingForStudent - allocatedToWindow;
+            if (remainder > 1) { // 1 rupee buffer for rounding
+                forecastData[firstMonthKey] += remainder;
+            }
+
         } else {
-            // IF NO DUE DATES: Move everything to FEBRUARY (Past Due)
-            forecastData[pastDueAnchor] += pending;
+            // FALLBACK: If NO due dates are mentioned, dump the whole pending amount 
+            // into the First Card (Past Month) because it is technically "Already Due"
+            forecastData[firstMonthKey] += totalPendingForStudent;
         }
     });
 
-    // 3. Render the Forecast Cards
+    // 3. FETCH DATA FOR GRAPHS (INSTITUTE SPECIFIC)
+    const currentYear = new Date().getFullYear();
+    const { data: yearlyPayments } = await db.from('payment_history')
+        .select('amount')
+        .eq('institute_id', sessionInstID)
+        .gte('payment_date', `${currentYear}-01-01`)
+        .lte('payment_date', `${currentYear}-12-31`);
+        
+    const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
+    const totalAdmissions = students.length;
+    const totalPendingGlobal = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
+
+    // 4. RENDER UI CARDS
     const cardContainer = document.getElementById('forecast-cards');
-    if (!cardContainer) return;
     cardContainer.innerHTML = "";
+    
+    const todayMonthStart = new Date();
+    todayMonthStart.setDate(1);
+    todayMonthStart.setHours(0,0,0,0);
 
-    const currentMonthLabel = monthNames[new Date().getMonth()] + " " + new Date().getFullYear();
-
-    displayMonths.forEach((month) => {
+    displayMonths.forEach(month => {
         const amt = Math.round(forecastData[month]);
-        
-        // Coloring Logic
-        let borderColor = "#f39c12"; // Default Orange
-        let subtext = "";
-        
-        if (month === pastDueAnchor) {
-            borderColor = "#ff0000"; // Red for Past Due
-            subtext = "(PAST DUE)";
-        } else if (month === currentMonthLabel) {
-            borderColor = "#1877F2"; // Blue for Current
-            subtext = "(CURRENT)";
-        }
+        const mDate = new Date(month);
+        const isPast = mDate < todayMonthStart;
 
         cardContainer.innerHTML += `
-            <div class="stat-card" style="padding: 15px; min-width: 150px; border-bottom: 5px solid ${borderColor}; background: white;">
-                <p style="font-size: 0.7rem; color: ${borderColor}; font-weight: 900; margin-bottom: 8px;">
-                    ${month} ${subtext}
+            <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid ${isPast ? '#ff0000' : '#f39c12'}; background: ${isPast ? '#fff5f5' : 'white'};">
+                <p style="font-size: 0.7rem; margin-bottom: 5px; color: ${isPast ? '#ff0000' : '#666'}; font-weight: bold;">
+                    ${month.toUpperCase()} ${isPast ? '(PAST DUE)' : ''}
                 </p>
-                <h4 style="font-size: 1.3rem !important; color: #000; margin: 0; text-decoration: none !important;">
-                    ₹${amt.toLocaleString('en-IN')}
-                </h4>
+                <h4 style="font-size: 1.2rem !important; color: #000;">₹${amt.toLocaleString('en-IN')}</h4>
             </div>
         `;
+        chartRows.push([month, totalAdmissions, totalReceived, totalPendingGlobal, amt]);
     });
 
-    // 4. Update the Google Charts
-    const chartRows = displayMonths.map(m => [m, students.length, 0, 0, forecastData[m]]);
-    if (typeof drawHomeForecastingChart === 'function') {
-        drawHomeForecastingChart(chartRows);
+    // 5. CUMULATIVE CHART DATA SYNC
+    let runningCollection = totalReceived;
+    let runningPending = totalPendingGlobal;
+
+    for (let i = 0; i < chartRows.length; i++) {
+        let monthlyIncoming = chartRows[i][4];
+        runningCollection += monthlyIncoming;
+        runningPending -= monthlyIncoming;
+        if (runningPending < 0) runningPending = 0; 
+
+        chartRows[i][2] = runningCollection; 
+        chartRows[i][3] = runningPending;    
+        chartRows[i].push(monthlyIncoming);  
     }
+
+    // 6. DYNAMIC ADMISSIONS (END DATE) LOGIC
+    const { data: dynStudents } = await db.from('students')
+        .select('student_details(course_end_date)')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    if (dynStudents) {
+        for (let i = 0; i < chartRows.length; i++) {
+            let monthName = chartRows[i][0]; 
+            let chartMonthDate = new Date(monthName + " 1"); 
+            let activeCount = 0;
+
+            dynStudents.forEach(s => {
+                let details = Array.isArray(s.student_details) ? s.student_details[0] : s.student_details;
+                let endStr = details ? details.course_end_date : null;
+                if (!endStr) { activeCount++; } 
+                else {
+                    let endDate = new Date(endStr);
+                    if (endDate >= chartMonthDate) activeCount++;
+                }
+            });
+            chartRows[i][1] = activeCount;
+        }
+    }
+
+    drawHomeForecastingChart(chartRows);
 }
 function drawHomeForecastingChart(chartRows) {
     var data = new google.visualization.DataTable();
