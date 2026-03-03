@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Time Table Generator</title>
+
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        /* --- GENERAL RESET & BASE STYLES --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            color: #000000; /* Black font strictly enforced */
+        }
+
+        body {
+            background-color: #ffffff;
+            padding-bottom: 60px;
+        }
+
+        /* --- TILTED 3D HEADER --- */
+        header {
+            text-align: center;
+            padding: 50px 20px 40px;
+            perspective: 1000px;
+        }
+
+        header h1 {
+            display: inline-block;
+            background: linear-gradient(135deg, #7FFFD4, #20B2AA);
+            border: 4px solid #000;
+            padding: 20px 40px;
+            border-radius: 15px;
+            transform: rotateZ(-2deg) rotateX(15deg) rotateY(-5deg);
+            box-shadow: 10px 10px 0px #000;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 2.2rem;
+            letter-spacing: 2px;
+        }
+
+        /* --- MISCHIEF WARNING BANNER --- */
+        #mischief-warning {
+            display: none; /* Shown via JS */
+            background: #ff4757;
+            color: #ffffff;
+            padding: 15px;
+            border: 3px solid #000;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-weight: 900;
+            text-align: center;
+            box-shadow: 5px 5px 0px #000;
+            animation: shake 0.5s infinite;
+        }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            100% { transform: translate(1px, 1px) rotate(0deg); }
+        }
+
+        /* --- FORM CONTAINER --- */
+        .form-container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto 40px;
+            border: 3px solid #000;
+            padding: 35px;
+            border-radius: 16px;
+            background-color: #ffffff;
+        }
+
+        #session-title {
+            text-align: center;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            font-weight: 900;
+            text-decoration: underline;
+            font-size: 1.6rem;
+        }
+
+        /* --- SUMMARY TABLE (SESSION DATA) --- */
+        .summary-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 30px;
+            border: 2px solid #000;
+            border-radius: 10px;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .summary-table th {
+            background: #7FFFD4;
+            padding: 15px;
+            border: 1px solid #000;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .summary-table td {
+            padding: 12px;
+            border: 1px solid #000;
+            text-align: center;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+
+        /* Tidy Batch Time Presentation */
+        .time-slot-pill {
+            display: block;
+            background: #f1f2f6;
+            border: 1px solid #000;
+            padding: 4px 8px;
+            margin: 4px auto;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            width: fit-content;
+            font-weight: 800;
+        }
+
+        .btn-select {
+            background: #20B2AA;
+            color: #fff;
+            border: 2px solid #000;
+            padding: 6px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 800;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        /* --- GRID INPUTS (DATE & TIME) --- */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-weight: 800;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+        }
+
+        input, select {
+            height: 55px;
+            padding: 10px 15px;
+            border: 2px solid #000;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: #ffffff;
+        }
+
+        /* Teal Background for Readonly (Date) */
+        input[readonly] {
+            background: #40E0D0; 
+            border-style: dashed;
+            cursor: not-allowed;
+            color: #000 !important;
+        }
+
+        .btn-generate {
+            background: linear-gradient(135deg, #7FFFD4, #20B2AA);
+            border: 3px solid #000;
+            padding: 20px;
+            font-size: 1.3rem;
+            font-weight: 900;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            text-transform: uppercase;
+            box-shadow: 6px 6px 0px #000;
+        }
+
+        /* --- TIMETABLE GRID (BOTTOM HALF) --- */
+        .timetable-container {
+            width: 95%;
+            margin: 0 auto;
+            display: none;
+            overflow-x: auto;
+            padding: 20px 10px;
+        }
+
+        .grid-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 12px;
+        }
+
+        .grid-table th, .grid-table td {
+            border-radius: 12px;
+            padding: 20px 15px;
+            text-align: center;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Headers: Parrot Green */
+        .grid-table th:not(.time-col) {
+            background: linear-gradient(135deg, #7CFC00, #32CD32);
+            font-weight: 900;
+        }
+
+        /* Time Column: Modern Blue */
+        th.time-col, td.time-slot {
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+            color: #ffffff;
+            font-weight: 900;
+        }
+
+        /* Booked State: Yellow Gradient */
+    /* Updated Blue Theme for Booked Cells */
+.booked-cell {
+    background: linear-gradient(135deg, #1e3799, #0652dd) !important; /* Deep Blue Gradient */
+    color: #ffffff !important;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    cursor: help;
+    transition: transform 0.2s;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+}
+
+.booked-cell:hover {
+    transform: scale(1.05);
+    z-index: 5;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.booked-cell small, .booked-cell b {
+    color: #ffffff !important;
+    display: block;
+}
+
+        /* Dark Delete Icon (For Teachers/Owners) */
+        .btn-cancel-mischief {
+            background: #2d3436;
+            color: #ffffff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+        .btn-cancel-mischief:hover { background: #000000; }
+
+        /* Book Button: Turquoise Gradient */
+        .btn-book {
+            background: linear-gradient(135deg, #40E0D0, #00CED1);
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 900;
+            width: 100%;
+            text-transform: uppercase;
+        }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 40px;
+            border: 4px solid #000;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 768px) {
+            header h1 { font-size: 1.4rem; padding: 15px; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Time-Table Generator - Auto</h1>
+    </header>
+
+    <div class="form-container">
+        <!-- Mischief Warning Banner -->
+        <div id="mischief-warning">
+            ⚠️ WARNING: YOU HAVE A HISTORY OF MULTIPLE CANCELLATIONS. FURTHER MISCHIEF WILL RESULT IN A BLOCK.
+        </div>
+
+        <!-- Session Header (User Name) -->
+        <h2 id="session-title">Identifying Session...</h2>
+
+        <!-- Dynamic Summary Table -->
+        <div class="summary-table-wrapper">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Roll No</th>
+                        <th>Student Name</th>
+                        <th>Teacher Allotted</th>
+                        <th>Teacher ID</th>
+                        <th>Subject</th>
+                        <th>Batch Name</th>
+                        <th>Batch Time</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="session-table-body">
+                    <!-- JavaScript will inject rows here -->
+                    <tr><td colspan="8">Searching for your assignments...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-grid">
+            <!-- 1. Booking Date (Readonly/Next Day Only) -->
+            <div class="input-group">
+                <label>1. Booking Date (Locked to Tomorrow)</label>
+                <input type="date" id="f-date" readonly>
+            </div>
+        </div>
+
+        <!-- Hidden inputs for data sync -->
+        <input type="hidden" id="f-roll">
+        <input type="hidden" id="f-student-name">
+        <input type="hidden" id="f-course">
+        <input type="hidden" id="f-teacher-id">
+        <input type="hidden" id="f-teacher-name">
+        <input type="hidden" id="f-official-slots">
+
+        <div id="preferred-slot-status" style="text-align: center; font-weight: 900; margin-bottom: 20px; font-size: 1.1rem;"></div>
+        
+        <button type="button" class="btn-generate" onclick="generateTimeTable()">Generate Booking Grid</button>
+
+<div id="mischief-warning-new" style="display: none; background: #ff4757; color: #fff; padding: 15px; border: 3px solid #000; border-radius: 10px; margin-top: 20px; font-weight: 900; text-align: center; box-shadow: 5px 5px 0px #000;">
+    ⚠️ WARNING: YOU HAVE A HISTORY OF MULTIPLE CANCELLATIONS. FURTHER MISCHIEF WILL RESULT IN A BLOCK.
+</div>
+    </div>
+
+    <!-- Timetable Grid -->
+    <div class="timetable-container" id="timetable-wrapper">
+        <table class="grid-table">
+            <thead>
+                <tr>
+                    <th class="time-col">TIME / DAY</th>
+                    <th>MONDAY</th>
+                    <th>TUESDAY</th>
+                    <th>WEDNESDAY</th>
+                    <th>THURSDAY</th>
+                    <th>FRIDAY</th>
+                    <th>SATURDAY</th>
+                    <th>SUNDAY</th>
+                </tr>
+            </thead>
+            <tbody id="timetable-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal-content" id="print-area">
+            <h2 style="text-decoration: underline; margin-bottom: 20px;">BOOKING CONFIRMATION</h2>
+            <p id="confirmation-text" style="font-weight: 600; line-height: 1.8;"></p>
+            <div style="margin-top: 30px;">
+                <button class="btn-generate" style="width: auto; padding: 10px 30px;" onclick="window.print()">PRINT RECEIPT</button>
+                <button class="btn-generate" style="width: auto; padding: 10px 30px; background: #ff4757;" onclick="closeModal()">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+// --- 1. SUPABASE INITIALIZATION ---
+     const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+    const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+
+    let sessionInstID = "";
+    let currentUserProfile = null;
+
+    /**
+     * 2. SESSION INITIALIZATION
+     */
+    async function initSession() {
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) {
+            alert("No active session found. Please login from the main application.");
+            return;
+        }
+
+        const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).single();
+        if (!profile) return;
+
+        currentUserProfile = profile;
+        sessionInstID = profile.institute_id;
+        
+        document.getElementById('session-title').innerText = `${profile.role.toUpperCase()} PORTAL: ${profile.full_name}`;
+        
+        // --- VALIDATION: LOCK CALENDAR TO TOMORROW ONLY ---
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dateStr = tomorrow.toISOString().split('T')[0];
+        const dateInput = document.getElementById('f-date');
+        
+        dateInput.value = dateStr;
+        dateInput.setAttribute('min', dateStr);
+        dateInput.setAttribute('max', dateStr);
+
+        // Mischief Check for Students
+        if (profile.role === 'Student') {
+            checkMischiefHistory(profile.full_name);
+        }
+
+        loadAssignmentSummary();
+    }
+
+    /**
+     * 3. MISCHIEF WARNING LOGIC
+     */
+async function checkMischiefHistory(studentRoll) {
+    if (!studentRoll) return;
+
+    const { count, error } = await db
+        .from('class_cancellations')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_roll', studentRoll);
+
+    const warningBox = document.getElementById('mischief-warning-new');
+    if (count >= 2) {
+        warningBox.style.display = 'block';
+    } else {
+        warningBox.style.display = 'none';
+    }
+}
+
+    /**
+     * 4. LOAD SUMMARY TABLE (TIDY PRESENTATION)
+     */
+    async function loadAssignmentSummary() {
+    const tbody = document.getElementById('session-table-body');
+    const userNameUpper = currentUserProfile.full_name.toUpperCase();
+
+    let query = db.from('list').select('*').eq('institute_id', sessionInstID);
+    if (currentUserProfile.role === 'Student') {
+        query = query.eq('student_name', userNameUpper);
+    } else if (currentUserProfile.role === 'Teacher') {
+        query = query.eq('teacher_name', userNameUpper);
+    }
+
+    const { data: listData } = await query;
+    const { data: batchData } = await db.from('batches').select('batch_name, batch_time').eq('institute_id', sessionInstID);
+
+    tbody.innerHTML = "";
+    if (!listData || listData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8">No active subject assignments found.</td></tr>';
+        return;
+    }
+
+    listData.forEach((item, index) => {
+        const batch = batchData?.find(b => b.batch_name === item.batch_name);
+        const rawTime = batch ? batch.batch_time : "";
+        
+        // Split times by comma and create dropdown options
+        const timeOptions = rawTime.split(',').map(t => 
+            `<option value="${t.trim()}">${t.trim()}</option>`
+        ).join('');
+
+        // Create a unique ID for the dropdown in this row
+        const selectId = `time-select-${index}`;
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${item.roll_number}</td>
+                <td>${item.student_name}</td>
+                <td>${item.teacher_name}</td>
+                <td>${item.teacher_id}</td>
+                <td>${item.course_name}</td>
+                <td>${item.batch_name}</td>
+                <td>
+                    <select id="${selectId}" style="height:35px; width:100%; font-size:0.8rem; border:1px solid #000;">
+                        ${timeOptions}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.course_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}')">SELECT</button>
+                </td>
+            </tr>`;
+    });
+}
+
+    function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
+    // Get the specific time selected in that row
+    const selectedTime = document.getElementById(selectId).value;
+
+    // Sync to hidden fields and the global f-time (even though UI is removed, logic needs it)
+    document.getElementById('f-roll').value = roll;
+    document.getElementById('f-student-name').value = sname;
+    document.getElementById('f-course').value = course;
+    document.getElementById('f-teacher-id').value = tid;
+    document.getElementById('f-teacher-name').value = tname;
+    document.getElementById('f-official-slots').value = allSlots;
+    
+    // Create a dummy f-time if it doesn't exist to store the choice
+    let fTime = document.getElementById('f-time');
+    if(!fTime) {
+        fTime = document.createElement('input');
+        fTime.type = 'hidden';
+        fTime.id = 'f-time';
+        document.body.appendChild(fTime);
+    }
+    fTime.value = selectedTime;
+
+    const statusDiv = document.getElementById('preferred-slot-status');
+    statusDiv.innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span> for ${course}`;
+    
+    alert(`Priority set to ${selectedTime}. Now click 'Generate Booking Grid'.`);
+checkMischiefHistory(roll);
+}
+
+    /**
+     * 5. GRID GENERATION (ROLE BASED)
+     */
+    async function generateTimeTable() {
+        const tid = document.getElementById('f-teacher-id').value;
+        const dateVal = document.getElementById('f-date').value;
+        const prefTime = document.getElementById('f-time').value;
+        const officialTime = document.getElementById('f-official-slots').value;
+        const statusDiv = document.getElementById('preferred-slot-status');
+
+        if (!tid) return alert("Please select an assignment from the table first.");
+
+        // Validation for Preferred Slot Message
+        if (officialTime.includes(prefTime)) {
+            statusDiv.innerText = "✅ PREFERRED SLOT IS WITHIN BATCH HOURS";
+            statusDiv.style.color = "green";
+        } else {
+            statusDiv.innerText = "❌ PREFERRED SLOT IS OUTSIDE BATCH HOURS";
+            statusDiv.style.color = "red";
+        }
+
+        const { data: bookings } = await db.from("class_bookings").select("*")
+            .eq("booking_date", dateVal).eq("teacher_id", tid).eq("institute_id", sessionInstID);
+
+        renderTimetableGrid(bookings, dateVal);
+    }
+
+function renderTimetableGrid(bookings, dateVal) {
+    const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
+    const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+    
+    const jsDay = new Date(dateVal).getDay();
+    const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
+    const currentTeacherName = document.getElementById('f-teacher-name').value;
+
+    const tbody = document.getElementById('timetable-body');
+    tbody.innerHTML = '';
+
+    SLOTS.forEach(time => {
+        const tr = document.createElement('tr');
+        
+        // --- LEFT COLUMN (TIME SLOT) ---
+        const tdTime = document.createElement('td'); 
+        const bDataRow = bookings?.find(b => b.time_slot === time);
+
+        if (bDataRow) {
+            tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)";
+            tdTime.style.color = "#000";
+            tdTime.style.border = "2px solid #000";
+            tdTime.style.position = "relative";
+            tdTime.style.minWidth = "200px";
+            tdTime.style.textAlign = "left";
+
+            let deleteIconHtml = "";
+            if (currentUserProfile.role !== 'Student') {
+                deleteIconHtml = `<button style="background:#2d3436; color:#fff; border:none; padding:4px 8px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" onclick="cancelBooking('${bDataRow.id}','${bDataRow.student_roll}','Unknown')"><i class="fas fa-trash-alt"></i></button>`;
+            }
+
+            tdTime.innerHTML = `
+                ${deleteIconHtml}
+                <div style="font-weight:900; text-decoration:underline; font-size:0.85rem;">${time}</div>
+                <div style="font-size:0.7rem; margin-top:5px;">
+                    <b>ROLL:</b> ${bDataRow.student_roll}<br>
+                    <b>TID:</b> ${bDataRow.teacher_id}<br>
+                    <b>TCH:</b> ${currentTeacherName}<br>
+                    <b>SUB:</b> ${bDataRow.course}
+                </div>`;
+        } else {
+            tdTime.className = 'time-slot'; 
+            tdTime.innerText = time;
+        }
+        tr.appendChild(tdTime);
+
+        // --- DAY COLUMNS ---
+        DAYS.forEach(day => {
+            const td = document.createElement('td');
+            if (day !== activeDayName) {
+                td.style.opacity = "0.2";
+                td.style.pointerEvents = "none";
+            }
+
+            const bData = bookings?.find(b => b.time_slot === time);
+            
+            if (bData && day === activeDayName) {
+                td.className = 'booked-cell';
+                td.innerHTML = `<b>ROLL: ${bData.student_roll}</b><br><small>${bData.course}</small>`;
+            } else {
+                if (currentUserProfile.role === 'Student') {
+                    td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
+                } else {
+                    td.innerHTML = `<span style="font-size:0.7rem; color:#999;">EMPTY</span>`;
+                }
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    document.getElementById('timetable-wrapper').style.display = 'block';
+}
+    /**
+     * 6. BOOKING VALIDATIONS
+     */
+  async function bookThisSlot(day, time) {
+    const roll = document.getElementById('f-roll').value;
+    const dateVal = document.getElementById('f-date').value;
+    const officialTime = document.getElementById('f-official-slots').value;
+    const course = document.getElementById('f-course').value;
+    const tid = document.getElementById('f-teacher-id').value;
+    const tname = document.getElementById('f-teacher-name').value;
+
+    if (!roll) return alert("Please select an assignment first.");
+
+    // --- 1. VALIDATION: MAX 3 CLASSES PER DAY ---
+    const { count, error: countErr } = await db
+        .from('class_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_roll', roll)
+        .eq('booking_date', dateVal);
+
+    if (count >= 3) {
+        alert("LIMIT REACHED: You cannot book more than 3 classes in a single day.");
+        return;
+    }
+
+    // --- 2. VALIDATION: OFFICIAL BATCH TIME ---
+    if (!officialTime.includes(time)) {
+        return alert("DENIED: Selected time is not within the Teacher's Batch schedule.");
+    }
+
+    // WhatsApp Confirmation (Optional but kept from your original code)
+    const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
+    if (tData?.mobile) {
+        const msg = `📚 Booking: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
+        window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
+        if (!confirm(`Sent WhatsApp to ${tname}? Click OK to finalize booking.`)) return;
+    }
+
+    // --- 3. INSERT BOOKING ---
+    const { error } = await db.from("class_bookings").insert({
+        institute_id: sessionInstID,
+        teacher_id: tid,
+        student_roll: roll,
+        //student_name: currentUserProfile.full_name.toUpperCase(),
+        booking_date: dateVal,
+        time_slot: time,
+        //day: day,
+        course: course
+    });
+
+    if (error) {
+        alert(error.message);
+    } else {
+        document.getElementById('confirmation-text').innerText = `Success! Class booked for ${course} on ${dateVal} at ${time}.`;
+        document.getElementById('confirm-modal').style.display = 'flex';
+        generateTimeTable(); // Refresh grid
+    }
+}
+
+    /**
+     * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
+     */
+    async function cancelBooking(id, roll, name) {
+        if (!confirm(`Cancel booking for ${name} (${roll})? This will be logged as a cancellation for the student.`)) return;
+
+        // Log the cancellation for mischief tracking
+        await db.from('class_cancellations').insert([{
+            student_roll: roll,
+            student_name: name.toUpperCase(),
+            cancelled_by: currentUserProfile.role,
+            institute_id: sessionInstID
+        }]);
+
+        // Delete the booking
+        const { error } = await db.from('class_bookings').delete().eq('id', id);
+        if (!error) {
+            alert("Booking cancelled and mischief logged.");
+            generateTimeTable();
+        }
+    }
+
+    function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
+
+    initSession();
+
+</script>
+</body>
+</html>

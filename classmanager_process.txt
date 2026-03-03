@@ -1,0 +1,31 @@
+Now. in simple language these are the steps for operating this software.
+
+1. The owner/admin opens the account by signing up in TAB 2. he gets the institute id in this format (CM-1234)
+2. The owner/admin then logs in with his credentials. for the owner, all the 26 tabs are visible to him
+3. Suppose, there is a teacher who now wants to join the institute. so, the owner/admin gives the institute id to the teacher and asks him to signup. the teacher signs up and gives the details to the owner/admin
+4. The owner/admin then generates the teacher id in the teacher portal in TAB 11 and passes on the teacher id to the teacher
+the teacher now can use the teacher id in teacher portal in TAB 11. The Teacher id is in this format : TCH-1234
+5. The owner/admin now has to create the Batch in batch management in TAB 5
+6. Suppose the parents walk in for enquiry, so for leads management, TAB 9 is to be filled up
+7. Now, there is a student who wants to join the institute. the owner/admin again gives him the institute id and asks him to sign up in TAB 2.
+8. The student passes on the details to the owner/admin. the owner/admin then generates the roll no of the student in the student management section in TAB 3
+The student can now use the roll no in Student portal TAB 12. Roll number is in this format : IMS-2026-1234
+9. For inserting scholarship details, TAB 23 is to be filled up
+10. The owner/admin now links the teacher and the student in student allocation in TAB 18
+11. The owner/admin now has to update the BATCH MASTER in TAB 25
+12. The owner/admin now has to update the Fee management section in TAB 4
+13. The owner/admin can update the attendance of students in TAB 6 and for teachers attendance in TAB 17
+14. For fee reminders, owner/admin can visit TAB 8
+15. For messages and notices, the owner/admin can visit TABS 19  & TAB 20
+16. For expense tracking, the owner/admin can visit TAB 10.
+17. For ID card and certificate generation, the owner/admin can visit TBA 13 & TAB 14
+18 For performance tracking of the students, TAB 15 is to be visited
+19. For inserting exam details of the students, TAB 16 is to be visited
+20. For inserting  alumni details, TAB 21 is to be filled up
+21. For inserting Inventory details, TAB 22 is to be filled up
+22. For generating PTM schedule, TAB 24 is to be filled up
+23. For teacher reviews, TAB 26 is to be filled up
+24. For various reports, TAB 7 is to be filled up
+25. For leave schedule of teachers, TAB 27 is to be visited
+26. For the logged in dashboard or visitor dashboard, u can view TAB 1
+

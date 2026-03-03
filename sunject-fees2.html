@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Wise Fees Portal</title>
+    
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        :root {
+            --aquamarine: #7FFFD4;
+            --white: #ffffff;
+            --black: #000000;
+        }
+
+        body {
+            background-color: var(--white);
+            color: var(--black);
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { font-size: 2.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+
+        .search-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 40px;
+            background: #f4f4f4;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid var(--black);
+            box-shadow: 5px 5px 0px var(--aquamarine);
+        }
+
+        input {
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: 2px solid var(--black);
+            border-radius: 8px;
+            width: 300px;
+            font-family: inherit;
+        }
+
+        .btn-generate {
+            background: var(--black);
+            color: var(--white);
+            border: none;
+            padding: 12px 30px;
+            font-weight: 800;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        .btn-generate:hover {
+            background: var(--aquamarine);
+            color: var(--black);
+        }
+
+        .table-container {
+            width: 100%;
+            max-width: 1100px;
+            background: white;
+            border: 3px solid var(--black);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 10px 10px 0px var(--aquamarine);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--black);
+            color: var(--white);
+            padding: 18px;
+            text-align: left;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        td {
+            padding: 15px 18px;
+            border-bottom: 1px solid #eee;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        tr:nth-child(even) { background: #fafafa; }
+
+        /* Footer Row Styling */
+        .total-row {
+            background: var(--black) !important;
+            color: var(--white);
+            font-weight: 900;
+            font-size: 1.1rem;
+        }
+
+        .total-row td { border: none; padding: 20px 18px; }
+        .text-recd { color: #27ae60; font-weight: 700; }
+        .text-pend { color: #e74c3c; font-weight: 700; }
+        .subject-col { text-transform: capitalize; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><i class="fas fa-file-invoice-dollar"></i> Subject Wise Fees Portal</h1>
+    </header>
+
+    <div class="search-container">
+        <input type="text" id="month-input" placeholder="e.g. February 2026">
+        <button class="btn-generate" onclick="loadPortalData()">Generate</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Subject name</th>
+                    <th>Total fees</th>
+                    <th>Total paid</th>
+                    <th>Total pending</th>
+                    <th>Remarks</th>
+                </tr>
+            </thead>
+            <tbody id="portal-body">
+                <!-- Data injected here -->
+            </tbody>
+            <tfoot>
+                <tr class="total-row" id="portal-footer">
+                    <!-- Totals injected here -->
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+<!-- INSERT YOUR NOTE HERE -->
+    <p style="text-align: center; font-weight: bold; color: #e74c3c; margin-top: 20px; font-size: 0.9rem; letter-spacing: 1px;">
+        * NOTE : THE ABOVE CALCULATION IS AS PER THE ADMISSION DATE OF THE STUDENT *
+    </p>
+
+
+    <script>
+        // --- 1. CONFIGURATION ---
+        const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+        const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+        const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+
+        let sessionInstID = "";
+
+        // --- 2. AUTHENTICATION ---
+        async function checkAuth() {
+            const { data: { user } } = await db.auth.getUser();
+            if (user) {
+                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+                if (profile) {
+                    sessionInstID = profile.institute_id;
+                    loadPortalData(); // Initial load
+                }
+            } else {
+                alert("Please log in to access this portal.");
+            }
+        }
+
+        // --- 3. DATA ENGINE ---
+        async function loadPortalData() {
+            const filterText = document.getElementById('month-input').value.trim().toLowerCase();
+            const tbody = document.getElementById('portal-body');
+            const tfoot = document.getElementById('portal-footer');
+
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Calculating Fees...</td></tr>";
+
+            try {
+                // Fetch ALL active students belonging to this institute
+                const { data: students, error } = await db.from('students')
+                    .select('course, total_fees, paid_amount, pending_amount, admission_date')
+                    .eq('institute_id', sessionInstID)
+                    .eq('status', 'Active');
+
+                if (error) throw error;
+
+                // Grouping Logic
+                const grouped = {};
+                let hasData = false;
+
+                students.forEach(s => {
+                    // Apply Month/Year Filter if provided by user
+                    if (filterText) {
+                        if (!s.admission_date) return; // Skip if no admission date
+                        
+                        const adDate = new Date(s.admission_date);
+                        const monthName = adDate.toLocaleString('default', { month: 'long' }).toLowerCase();
+                        const yearName = adDate.getFullYear().toString();
+                        const formattedMonthYear = `${monthName} ${yearName}`; // e.g., "february 2026"
+                        
+                        // Check if the typed text matches the admission month/year
+                        if (!formattedMonthYear.includes(filterText)) return;
+                    }
+
+                    hasData = true;
+                    // Group by Subject Name
+                    const sub = (s.course || "Unassigned").toLowerCase();
+                    
+                    if (!grouped[sub]) {
+                        grouped[sub] = { fees: 0, paid: 0, pend: 0 };
+                    }
+                    grouped[sub].fees += parseFloat(s.total_fees || 0);
+                    grouped[sub].paid += parseFloat(s.paid_amount || 0);
+                    grouped[sub].pend += parseFloat(s.pending_amount || 0);
+                });
+
+                // Render Rows
+                tbody.innerHTML = "";
+                let grandF = 0, grandR = 0, grandP = 0;
+
+                if (!hasData) {
+                    tbody.innerHTML = `<tr><td colspan='5' style='text-align:center;'>No records found for the given selection.</td></tr>`;
+                    tfoot.innerHTML = "";
+                    return;
+                }
+
+                for (const sub in grouped) {
+                    const row = grouped[sub];
+                    grandF += row.fees;
+                    grandR += row.paid;
+                    grandP += row.pend;
+
+                    // Generate Dynamic Remarks
+                    let remarks = "Pending Dues";
+                    if (row.pend === 0 && row.fees > 0) remarks = "Fully Paid";
+                    else if (row.fees === 0) remarks = "-";
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="subject-col">${sub}</td>
+                            <td>₹ ${row.fees.toLocaleString('en-IN')}</td>
+                            <td class="text-recd">₹ ${row.paid.toLocaleString('en-IN')}</td>
+                            <td class="text-pend">₹ ${row.pend.toLocaleString('en-IN')}</td>
+                            <td><small style="color:#666; font-style:italic;">${remarks}</small></td>
+                        </tr>
+                    `;
+                }
+
+                // Render Grand Total Footer
+                tfoot.innerHTML = `
+                    <td>TOTAL</td>
+                    <td>₹ ${grandF.toLocaleString('en-IN')}</td>
+                    <td style="color:var(--aquamarine)">₹ ${grandR.toLocaleString('en-IN')}</td>
+                    <td style="color:#ff6b6b">₹ ${grandP.toLocaleString('en-IN')}</td>
+                    <td></td>
+                `;
+
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        window.onload = checkAuth;
+    </script>
+</body>
+</html>

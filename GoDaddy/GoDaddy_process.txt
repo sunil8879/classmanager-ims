@@ -1,0 +1,102 @@
+GODADDY SETTINGS
+
+
+To connect your GitHub Pages site to your GoDaddy domain without using Vercel or Netlify, follow these exact steps.
+
+Phase 1: Prepare your GitHub Repository
+
+Go to your GitHub repository for classmanager.
+
+Click on Settings (top tab).
+
+On the left sidebar, click Pages.
+
+Under Build and deployment, ensure your "Source" is set to "Deploy from a branch" and your "Branch" is set (usually main or gh-pages) and folder is / (root).
+
+Under Custom domain, type your domain name (e.g., classmanager.life or www.classmanager.life).
+
+Click Save.
+
+Note: You will see a message "DNS check in progress." This is normal; we will fix it in the next phase.
+
+Phase 2: Configure GoDaddy DNS
+
+Now you must tell GoDaddy to send traffic to GitHub's servers.
+
+Log in to your GoDaddy Portfolio.
+
+Find your domain and click DNS (or Manage DNS).
+
+Delete any existing "A" records that point to a parked page or old host.
+
+Add 4 new "A" records to point to GitHub’s IP addresses.
+
+Click Add New Record for each one:
+
+Type: A | Name: @ | Value: 185.199.108.153
+
+Type: A | Name: @ | Value: 185.199.109.153
+
+Type: A | Name: @ | Value: 185.199.110.153
+
+Type: A | Name: @ | Value: 185.199.111.153
+
+Add 1 "CNAME" record for the www version:
+
+Type: CNAME
+
+Name: www
+
+Value: [your-github-username].github.io (Replace with your actual GitHub username).
+
+Save all changes.
+
+Phase 3: Verify on GitHub
+
+Go back to your GitHub Repository -> Settings -> Pages.
+
+Wait a few minutes and refresh the page.
+
+Once the DNS check passes, look for the checkbox "Enforce HTTPS".
+
+Check this box. (It might take up to an hour for the certificate to be issued; if it’s greyed out, wait and come back).
+
+Phase 4: Connect Supabase Auth to your Domain
+
+This is the most important step for your app to work. If you don't do this, users won't be able to log in to classmanager.life.
+
+Go to your Supabase Dashboard.
+
+Open your classmanager project.
+
+Go to Authentication -> URL Configuration.
+
+Site URL: Change this to your GoDaddy domain: https://www.classmanager.life (or your specific domain).
+
+Redirect URLs:
+
+Click Add URL.
+
+Enter: https://www.classmanager.life/**
+
+Click Save.
+
+Phase 5: Update your Code (GitHub)
+
+If you have your Supabase URL and Anon Key hardcoded or in an .env file, ensure they are correct.
+
+Since you are using GitHub Pages, remember that it only hosts Static Files (HTML/JS/CSS).
+
+Your supabaseUrl should still be https://xyzabc.supabase.co.
+
+Your supabaseKey should be your Anon Key.
+
+Troubleshooting Checklist:
+
+Site not loading? DNS changes can take anywhere from 10 minutes to 24 hours to "propagate" (spread across the internet). Be patient.
+
+Login not working? Check Phase 4. Most errors occur because the Redirect URL in Supabase doesn't match the URL in your browser exactly.
+
+404 on sub-pages? If you are using a React/Vue router, GitHub Pages needs a special 404.html file to handle routing. (If your app is just one page, you don't need to worry about this).
+
+Summary: Your GoDaddy domain now points to GitHub's IPs. GitHub sees the request, looks at your "Custom Domain" setting, and serves your code. Your code then talks to Supabase using the API. Your Cron-job keeps that Supabase API awake!

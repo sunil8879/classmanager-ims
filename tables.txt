@@ -1,0 +1,77 @@
+TABLE NAMES
+
+1. attendance
+2. batches
+3. certificates
+4. expenses
+5. institute_settings
+6. leads
+7. payment_history
+8. performance_tracking
+9. profiles
+10. student_details
+11. students
+12. teacher_details
+13. exam
+14. teachers_attendance
+15. student_allocations
+16. messages
+
+
+		CLASS MANAGER
+
+In this system, institute_id is the "Global Foreign Key" that appears in every table to keep the 500 institutes or more, separated.
+
+1. The Multi-Tenant Global Links
+
+These links ensure that no institute can see another's data.
+
+Table Name		Linked To		Foreign Key (Link)
+All 14 Data Tables		profiles		institute_id
+
+2. Student-Centric Links
+
+These links connect student records to the master student profile.
+
+Table Name		Linked To		Foreign Key (Link)
+student_details		students		student_id (UUID)
+attendance		students		roll_number
+payment_history		students		student_id and roll_number
+performance_tracking	students		roll_number
+exam			students		roll_number
+certificates		students		student_id
+student_allocations		students		roll_number
+
+3. Teacher & Operation Links
+
+These links connect staff and class schedules.
+
+Table Name		Linked To		Foreign Key (Link)
+teachers_attendance	teacher_details	teacher_id
+batches			teacher_details	teacher_id
+student_allocations		teacher_details	teacher_id
+students			batches		batch_time (Logical link)
+
+4. Management & Administrative Tables
+
+These tables are primarily linked to the Institute itself rather than individual students/teachers.
+
+Table Name		Linked To		Foreign Key (Link)
+expenses			profiles		institute_id
+leads			profiles		institute_id
+institute_settings		profiles		institute_id
+performance_tracking	teacher_details	teacher_name (Informational link)
+
+Summary of Keys:
+
+institute_id: The "Master Key" for the entire software.
+
+roll_number: The "Student Key" used for all reports (Attendance, Exam, Performance).
+
+teacher_id: The "Staff Key" used for tracking teacher presence and allocations.
+
+student_id: The "Database Internal Key" (UUID) used for core data integrity (e.g., linking basic profile to extended details).
+
+fee management and students table are not linked
+
+

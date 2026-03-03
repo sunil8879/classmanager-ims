@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Time Table Generator</title>
+
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800;900&display=swap');
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Poppins', sans-serif;
+        color: #000000; /* Black font on the whole page */
+    }
+
+    body {
+        background-color: #ffffff; /* Total white background */
+        padding-bottom: 60px;
+    }
+
+    /* --- TITLE: 3D BOX, AQUAMARINE GRADIENT, TILTED --- */
+    header {
+        text-align: center;
+        padding: 50px 20px 40px;
+        perspective: 1000px;
+    }
+
+    header h1 {
+        display: inline-block;
+        font-size: 0; /* Hides original HTML text to replace it */
+        background: linear-gradient(135deg, #7FFFD4, #20B2AA); /* Gradient aquamarine */
+        border: 4px solid #000;
+        padding: 20px 40px;
+        border-radius: 15px;
+        /* 3D tilt effect */
+        transform: rotateZ(-2deg) rotateX(15deg) rotateY(-5deg);
+        box-shadow: 10px 10px 0px #000, 15px 15px 25px rgba(0,0,0,0.2);
+        transition: transform 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    header h1:hover {
+        transform: rotateZ(0deg) rotateX(5deg) scale(1.05); /* Lifts up on hover */
+        box-shadow: 15px 15px 0px #000, 20px 20px 30px rgba(0,0,0,0.3);
+    }
+
+    header h1::before {
+        content: "TIME-TABLE GENERATOR - AUTO";
+        font-size: 2.5rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #000000;
+    }
+
+    /* --- TOP PORTION: FORM & EQUAL SIZED BOXES --- */
+    .form-container {
+        width: 90%;
+        max-width: 1200px;
+        margin: 0 auto 40px;
+        border: 3px solid #000;
+        padding: 35px;
+        border-radius: 16px;
+        background-color: #ffffff;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        transition: transform 0.3s;
+    }
+
+    .form-container:hover {
+        transform: translateY(-5px); /* Lift effect */
+        box-shadow: 0 15px 30px rgba(0,0,0,0.12);
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 25px;
+        margin-bottom: 30px;
+    }
+
+    .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .input-group label {
+        font-weight: 800;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+    }
+
+    /* Equal Sized Inputs & Selects */
+    input, select {
+        height: 55px; /* Ensures all boxes are exactly the same height */
+        padding: 10px 15px;
+        border: 2px solid #000;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        background: #ffffff;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    input:focus, select:focus {
+        outline: none;
+        border-color: #20B2AA;
+        box-shadow: 0 0 0 3px rgba(127, 255, 212, 0.4);
+    }
+
+    input:hover:not(), select:hover {
+        transform: translateY(-4px); /* Lift effect */
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    }
+
+    /* Teal Color for Greyed-out (Readonly) Fields */
+input[readonly] {
+    background: linear-gradient(135deg, #008080, #40E0D0); /* Gradient Teal */
+    color: #000; /* Black font strictly enforced */
+    border: 2px dashed #000;
+    cursor: not-allowed;
+}
+    
+    /* Input placeholder color correction for readability on Teal */
+    input::placeholder {
+        color: rgba(0, 0, 0, 0.6);
+    }
+
+    /* Fetch Button aligned with inputs */
+    .input-group > div {
+        display: flex;
+        gap: 8px;
+        height: 55px;
+    }
+
+    .btn-fetch {
+        height: 100%;
+        background: #f0f0f0;
+        color: #000;
+        border: 2px solid #000;
+        padding: 0 20px;
+        border-radius: 8px;
+        font-weight: 900;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .btn-fetch:hover {
+        transform: translateY(-4px); /* Lift effect */
+        box-shadow: 0 5px 0px #000;
+        background: #7FFFD4;
+    }
+
+    /* Main Generate Button */
+    .btn-generate {
+        background: linear-gradient(135deg, #7FFFD4, #20B2AA);
+        color: #000;
+        border: 3px solid #000;
+        padding: 20px;
+        font-size: 1.3rem;
+        font-weight: 900;
+        border-radius: 12px;
+        cursor: pointer;
+        width: 100%;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        box-shadow: 6px 6px 0px #000;
+    }
+
+    .btn-generate:hover {
+        transform: translate(-3px, -3px);
+        box-shadow: 9px 9px 0px #000;
+    }
+
+    /* --- BOTTOM HALF: TIMETABLE GRID (NO BLACK BACKGROUNDS/BORDERS) --- */
+    .timetable-container {
+        width: 95%;
+        margin: 0 auto;
+        display: none; 
+        overflow-x: auto;
+        padding: 20px 10px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 12px;
+        border: none;
+    }
+
+    th, td {
+        border: none; /* NO BLACK BORDERS IN BOTTOM HALF */
+        border-radius: 12px;
+        padding: 20px 15px;
+        text-align: center;
+        vertical-align: middle;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+    }
+
+    /* Timetable Card Lift Effect */
+    th:hover, td:hover {
+        transform: translateY(-10px) scale(1.03);
+        box-shadow: 0 15px 25px rgba(0,0,0,0.18);
+        z-index: 10;
+    }
+
+    /* DAYS: Gradient Parrot Green Only (No Black) */
+    th:not(.time-col) {
+        background: linear-gradient(135deg, #7CFC00, #32CD32);
+        font-weight: 900;
+        font-size: 1.1rem;
+        text-transform: uppercase;
+    }
+
+    /* TIME SLOTS: Gradient Modern Blue Only (No Black) */
+    th.time-col, td.time-slot {
+        background: linear-gradient(135deg, #00c6ff, #0072ff);
+        font-weight: 900;
+        font-size: 1.05rem;
+    }
+
+    /* Default Empty Cell */
+    td:not(.time-slot) {
+        background-color: #ffffff;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    .open-slot {
+        font-weight: 900;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+        opacity: 0.4;
+    }
+
+    /* BOOK BUTTON: Gradient Turquoise Only (No Black) */
+    .btn-book {
+        background: linear-gradient(135deg, #40E0D0, #00CED1);
+        color: #000;
+        border: none; /* No black border */
+        padding: 12px 25px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 900;
+        font-size: 1rem;
+        text-transform: uppercase;
+        box-shadow: 0 6px 15px rgba(0, 206, 209, 0.4);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        width: 100%;
+    }
+
+    .btn-book:hover {
+        transform: translateY(-5px); /* Lift effect */
+        box-shadow: 0 10px 20px rgba(0, 206, 209, 0.6);
+    }
+
+    /* BOOKED STATE: Gradient Yellow (No Black) */
+    td.booked-cell, td:has(.booked-tag) {
+        background: linear-gradient(135deg, #FFF500, #FFB300) !important;
+    }
+
+    .booked-tag {
+        background: transparent;
+        font-weight: 800;
+        font-size: 0.95rem;
+        margin: 5px 0;
+        padding: 5px;
+        text-align: left;
+        border-bottom: 2px solid rgba(0,0,0,0.1); /* Subtle non-black separator */
+    }
+
+    .booked-tag:last-child {
+        border-bottom: none;
+    }
+
+    /* --- MODAL --- */
+    .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(255, 255, 255, 0.8); /* White overlay instead of black */
+        backdrop-filter: blur(5px);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: #ffffff;
+        padding: 40px;
+        border: 4px solid #000;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 600px;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    .modal-content p {
+        font-size: 1.2rem;
+        line-height: 1.8;
+        margin-bottom: 30px;
+        font-weight: 600;
+    }
+
+    .btn-print, .btn-close {
+        background: #ffffff;
+        border: 3px solid #000;
+        padding: 12px 25px;
+        font-size: 1.1rem;
+        font-weight: 900;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 5px;
+        transition: all 0.3s;
+        text-transform: uppercase;
+    }
+
+    .btn-print:hover { transform: translateY(-4px); box-shadow: 0 5px 0px #000; background: #7FFFD4; }
+    .btn-close:hover { transform: translateY(-4px); box-shadow: 0 5px 0px #000; background: #ff4757; color: #fff;}
+
+    /* --- MOBILE RESPONSIVE --- */
+    @media (max-width: 768px) {
+        header h1 {
+            padding: 15px 20px;
+            transform: rotateZ(0deg) rotateX(0deg); /* Disable extreme 3D to fit screen */
+            box-shadow: 5px 5px 0px #000;
+        }
+        header h1::before {
+            font-size: 1.5rem;
+        }
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+        .form-container {
+            padding: 20px;
+        }
+    }
+
+    @media print {
+        body * { visibility: hidden; }
+        #confirm-modal, #print-area, #print-area * { visibility: visible; }
+        #confirm-modal { position: absolute; top: 0; left: 0; display: block; background: none; }
+        #print-area { position: absolute; top: 0; left: 0; width: 100%; border: none; box-shadow: none; }
+        .no-print { display: none !important; }
+    }
+</style>
+</head>
+<body>
+
+    <header>
+        <h1>Auto Time Table Generator</h1>
+    </header>
+
+    <div class="form-container">
+        <div class="form-grid">
+            <!-- 1. Student Roll Number -->
+            <div class="input-group">
+                <label>1. Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="f-roll" placeholder="Enter Roll Number" style="flex: 1;">
+                    <button type="button" class="btn-fetch" onclick="fetchStudent()">Fetch</button>
+                </div>
+            </div>
+
+            <!-- 2. Student Name -->
+            <div class="input-group">
+                <label>2. Student Name</label>
+                <input type="text" id="f-student-name" readonly placeholder="Auto-populated">
+            </div>
+
+            <!-- 3. Course Name -->
+            <div class="input-group">
+                <label>3. Course Name</label>
+                <input type="text" id="f-course" readonly placeholder="Auto-populated">
+            </div>
+
+            <!-- 5. Teacher ID -->
+           <select id="f-teacher">
+    <option value="">Select Teacher</option>
+</select>
+
+            <!-- 4. Teacher Name -->
+            <div class="input-group">
+                <label>4. Teacher Name</label>
+                <input type="text" id="f-teacher-name" readonly placeholder="Auto-populated">
+            </div>
+
+            <!-- 6. Day of the week -->
+            <div class="input-group">
+                <label>6. Booking Date</label>
+                <input type="date" id="f-date">
+            </div>
+
+
+<div class="input-group">
+    <label>Availability Status</label>
+    <input type="date" id="availability-status" placeholder="Select Availability Date">
+</div>
+
+
+
+            <!-- 7. Time Slot -->
+            <div class="input-group">
+                <label>7. Preferred Time Slot</label>
+                <select id="f-time">
+                    <option value="09:00 AM to 10:00 AM">09:00 AM to 10:00 AM</option>
+                    <option value="10:00 AM to 11:00 AM">10:00 AM to 11:00 AM</option>
+                    <option value="11:00 AM to 12:00 PM">11:00 AM to 12:00 PM</option>
+                    <option value="12:00 PM to 01:00 PM">12:00 PM to 01:00 PM</option>
+                    <option value="01:00 PM to 02:00 PM">01:00 PM to 02:00 PM</option>
+                    <option value="02:00 PM to 03:00 PM">02:00 PM to 03:00 PM</option>
+                    <option value="03:00 PM to 04:00 PM">03:00 PM to 04:00 PM</option>
+                    <option value="04:00 PM to 05:00 PM">04:00 PM to 05:00 PM</option>
+                    <option value="05:00 PM to 06:00 PM">05:00 PM to 06:00 PM</option>
+<option value="06:00 PM to 07:00 PM">06:00 PM to 07:00 PM</option>
+<option value="07:00 PM to 08:00 PM">07:00 PM to 08:00 PM</option>
+<option value="08:00 PM to 09:00 PM">08:00 PM to 09:00 PM</option>
+                </select>
+            </div>
+
+        
+        </div>
+
+        <button type="button" class="btn-generate" onclick="generateTimeTable()">GENERATE AUTO TIME TABLE</button>
+    </div>
+
+    <div class="timetable-container" id="timetable-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th class="time-col">TIME / DAY</th>
+                    <th class="day-mon">MONDAY</th>
+                    <th class="day-tue">TUESDAY</th>
+                    <th class="day-wed">WEDNESDAY</th>
+                    <th class="day-thu">THURSDAY</th>
+                    <th class="day-fri">FRIDAY</th>
+                    <th class="day-sat">SATURDAY</th>
+                    <th class="day-sun">SUNDAY</th>
+                </tr>
+            </thead>
+            <tbody id="timetable-body">
+                <!-- Rows injected by JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal-content" id="print-area">
+            <h2 style="margin-bottom: 15px; text-decoration: underline;">BOOKING CONFIRMATION</h2>
+            <p id="confirmation-text"></p>
+            <div class="no-print" style="margin-top: 20px;">
+                <button type="button" class="btn-print" onclick="window.print()"><i class="fas fa-print"></i> SAVE & PRINT</button>
+                <button type="button" class="btn-close" onclick="closeModal()">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. SUPABASE INITIALIZATION ---
+        const _supabaseUrl = 'https://erzwijnlbnwjdlluvxyk.supabase.co';
+        const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+        const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+
+        let sessionInstID = "";
+
+        async function checkCurrentSession() {
+            const { data: { user } } = await db.auth.getUser();
+            if (user) {
+                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).maybeSingle();
+                if (profile) sessionInstID = profile.institute_id;
+            }
+        }
+        checkCurrentSession();
+
+      const TIME_SLOTS = [
+    "09:00 AM to 10:00 AM",
+    "10:00 AM to 11:00 AM",
+    "11:00 AM to 12:00 PM",
+    "12:00 PM to 01:00 PM",
+    "01:00 PM to 02:00 PM",
+    "02:00 PM to 03:00 PM",
+    "03:00 PM to 04:00 PM",
+    "04:00 PM to 05:00 PM",
+    "05:00 PM to 06:00 PM",
+ "06:00 PM to 07:00 PM",
+ "07:00 PM to 08:00 PM",
+ "08:00 PM to 09:00 PM"
+];
+
+const DAYS = [
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+    "SUNDAY"
+];
+
+        // --- 2. DATABASE FETCH LOGIC ---
+       async function fetchStudent() {
+    const roll = document.getElementById('f-roll').value.trim().toUpperCase();
+
+    if (!roll) {
+        alert("Please enter Student Roll Number.");
+        return;
+    }
+
+    let query = db.from('students').select('full_name, course').eq('roll_number', roll);
+    if (sessionInstID) query = query.eq('institute_id', sessionInstID);
+
+    const { data, error } = await query.limit(1).maybeSingle();
+
+    if (error) {
+        console.error("Fetch Error:", error.message);
+        alert("Database Error: " + error.message);
+        return;
+    }
+
+    if (!data) {
+        alert("Student not found. Please verify the Roll Number.");
+        document.getElementById('f-student-name').value = '';
+        document.getElementById('f-course').value = '';
+        document.getElementById('f-teacher').innerHTML = '<option value="">Select Teacher</option>';
+        return;
+    }
+
+    document.getElementById('f-student-name').value = data.full_name || '';
+    document.getElementById('f-course').value = data.course || '';
+
+    // ✅ Populate teacher dropdown for this course
+    populateTeachersBySubject(data.course);
+}
+
+        async function fetchTeacher() {
+            const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
+
+            if (!tid) {
+                alert("Please enter Teacher ID.");
+                return;
+            }
+
+            let query = db.from('teacher_details').select('teacher_name').eq('id', tid);
+            if (sessionInstID) query = query.eq('institute_id', sessionInstID);
+
+            const { data, error } = await query.limit(1).maybeSingle();
+
+            if (error || !data) {
+                alert("Teacher not found.");
+                document.getElementById('f-teacher-name').value = '';
+                return;
+            }
+
+            document.getElementById('f-teacher-name').value = data.teacher_name || '';
+        }
+
+        // --- 3. GRID GENERATOR LOGIC ---
+ async function generateTimeTable() {
+
+    const dateVal = document.getElementById('f-date').value;
+
+    if (!dateVal) {
+        return alert("Please select booking date first.");
+    }
+
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
+
+    // 🔵 Fetch all bookings for selected date
+    const { data: bookings, error } = await db
+        .from("class_bookings")
+        .select("*")
+        .eq("institute_id", sessionInstID)
+        .eq("booking_date", dateVal);
+
+    if (error) {
+        console.error("Error fetching bookings:", error);
+        return;
+    }
+
+    const tbody = document.getElementById('timetable-body');
+    tbody.innerHTML = '';
+
+    TIME_SLOTS.forEach((timeStr, rowIndex) => {
+
+        const tr = document.createElement('tr');
+
+        // TIME COLUMN
+        const tdTime = document.createElement('td');
+        tdTime.className = 'time-slot';
+        tdTime.innerText = timeStr;
+        tr.appendChild(tdTime);
+
+        DAYS.forEach((dayStr, colIndex) => {
+
+            const td = document.createElement('td');
+            const cellId = `cell-${rowIndex}-${colIndex}`;
+            td.id = cellId;
+
+            // 🔴 Check if this slot is booked for this day & time
+            const isBooked = bookings?.some(b =>
+                b.time_slot === timeStr && b.day === dayStr
+            );
+
+            if (isBooked) {
+                td.innerHTML = `<span style="color:red; font-weight:bold;">SLOT BOOKED</span>`;
+                td.classList.add("booked-cell");
+            } else {
+                td.innerHTML = `
+                    <span class="open-slot">OPEN SLOT</span>
+                    <button type="button"
+                        class="btn-book"
+                        onclick="bookSlot('${dayStr}', '${timeStr}', '${cellId}')">
+                        BOOK
+                    </button>
+                `;
+            }
+
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('timetable-wrapper').style.display = 'block';
+}
+        function getOrdinalNum(n) {
+    n = Number(n);
+
+    if (n > 3 && n < 21) return n + "th";
+
+    switch (n % 10) {
+        case 1: return n + "st";
+        case 2: return n + "nd";
+        case 3: return n + "rd";
+        default: return n + "th";
+    }
+}
+      function formatDateReadable(dateStr) {
+    const date = new Date(dateStr);
+
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+
+    return `${getOrdinalNum(day)} ${month} ${year}`;
+}
+        // --- 4. BOOKING & CONFIRMATION LOGIC ---
+async function bookSlot(day, time, cellId) {
+    // 1️⃣ Get values from form
+    const roll = document.getElementById('f-roll').value.trim();
+    const student = document.getElementById('f-student-name').value.trim();
+    const course = document.getElementById('f-course').value;
+    const teacherSelect = document.getElementById("f-teacher");
+    const teacherId = teacherSelect.value;
+
+    const dateVal = document.getElementById('f-date').value;
+
+    // 2️⃣ Validation
+// 2️⃣ Validation
+if (!roll || !student) return alert("Please enter and fetch student details.");
+if (!course) return alert("Please select a course.");
+if (!teacherId) return alert("Please select a teacher.");
+if (!dateVal) return alert("Please select booking date.");
+
+// 🔴 Past date check
+const selectedDate = new Date(dateVal);
+const today = new Date();
+today.setHours(0,0,0,0); // ignore time
+if (selectedDate < today) {
+    return alert("Booking date cannot be in the past.");
+}
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
+
+// 🔵 Check if student has already booked this teacher 3 times today
+const { data: existingStudentBookings } = await db
+    .from("class_bookings")
+    .select("id")
+    .eq("institute_id", sessionInstID)
+    .eq("teacher_id", teacherId)
+    .eq("student_roll", roll)
+    .eq("booking_date", dateVal);
+
+if (existingStudentBookings.length >= 3) {
+    return alert("You cannot book this teacher more than 3 times in a day.");
+}
+
+    // 3️⃣ Check if teacher is already booked at this time
+    const { data: existingBooking } = await db
+        .from("class_bookings")
+        .select("id")
+        .eq("institute_id", sessionInstID)
+        .eq("teacher_id", teacherId)
+        .eq("booking_date", dateVal)
+        .eq("time_slot", time)
+        .maybeSingle();
+
+    if (existingBooking) return alert("This teacher is already booked in this time slot.");
+
+    // 4️⃣ Insert booking into Supabase
+    const { data: bookingData, error: insertError } = await db
+        .from("class_bookings")
+        .insert({
+            institute_id: sessionInstID,
+            teacher_id: teacherId,
+            student_roll: roll,
+            booking_date: dateVal,
+            time_slot: time,
+            course: course
+        
+        })
+        .select()
+        .single();
+
+    if (insertError) return alert("Error saving booking: " + insertError.message);
+
+    // 5️⃣ Update the timetable cell visually
+    const teacherName = teacherSelect.selectedOptions[0].dataset.name || '';
+    const cell = document.getElementById(cellId);
+    cell.innerHTML = `
+        <div class="booked-tag tag-teacher">Teacher: ${teacherName}</div>
+        <div class="booked-tag tag-student">Student: ${student}</div>
+        <div class="booked-tag tag-course">Course: ${course}</div>
+    `;
+
+    // 6️⃣ ✅ WhatsApp Notification to teacher
+    const teacherPhone = teacherSelect.selectedOptions[0].dataset.mobile; // include country code, e.g., 91XXXXXXXXXX
+    if (teacherPhone) {
+        const message = `
+📚 New Class Booking
+
+Student: ${student}
+Course: ${course}
+Date: ${dateVal}
+Time: ${time}
+Booking ID: ${bookingData.id}
+        `;
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
+        window.open(whatsappURL, "_blank"); // opens WhatsApp Web or app
+    }
+
+    alert("Booking saved successfully and teacher notified via WhatsApp.");
+}
+        function closeModal() {
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+
+
+async function authenticateForBooking() {
+
+    const authResponse = await db.auth.getUser();
+    const user = authResponse.data.user;
+
+    if (user) {
+        const profileResponse = await db
+            .from('profiles')
+            .select('institute_id')
+            .eq('id', user.id)
+            .single();
+
+        if (profileResponse.data) {
+            sessionInstID = profileResponse.data.institute_id;
+        }
+    }
+
+    if (!sessionInstID) {
+        alert("Not logged in. Please login from main app.");
+        return false;
+    }
+
+    return true;
+}
+
+
+async function populateTeachersBySubject(selectedCourse) {
+
+    const teacherSelect = document.getElementById("f-teacher");
+    teacherSelect.innerHTML = '<option value="">Loading...</option>';
+
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
+
+    const { data, error } = await db
+        .from("teacher_details")
+        .select("id, teacher_name, mobile, email, experience, rating")
+        .eq("institute_id", sessionInstID)
+        .eq("subject_taught", selectedCourse);
+
+    if (error) {
+        console.error(error);
+        teacherSelect.innerHTML = '<option value="">Error loading teachers</option>';
+        return;
+    }
+
+    teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+
+    if (!data || data.length === 0) {
+        teacherSelect.innerHTML = '<option value="">No teachers available</option>';
+        return;
+    }
+
+    data.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+    data.forEach(teacher => {
+
+        const option = document.createElement("option");
+
+        option.value = teacher.id;
+
+        option.textContent =
+            `${teacher.teacher_name} (${teacher.experience || 0} yrs exp) ⭐ ${teacher.rating || 'N/A'}`;
+
+        option.dataset.name = teacher.teacher_name;
+        option.dataset.mobile = teacher.mobile;
+        option.dataset.email = teacher.email;
+
+        teacherSelect.appendChild(option);
+    });
+}
+
+document.getElementById("f-teacher").addEventListener("change", function () {
+    const selectedOption = this.options[this.selectedIndex];
+
+    if (!this.value) {
+        document.getElementById("f-teacher-name").value = "";
+        document.getElementById("teacher-mobile").value = "";
+        document.getElementById("teacher-email").value = "";
+        return;
+    }
+
+    // ✅ Populate teacher name
+    document.getElementById("f-teacher-name").value =
+        selectedOption.dataset.name || "";
+
+    // Optional: populate mobile & email if you have inputs for them
+    document.getElementById("teacher-mobile").value =
+        selectedOption.dataset.mobile || "";
+
+    document.getElementById("teacher-email").value =
+        selectedOption.dataset.email || "";
+});
+
+
+
+
+
+async function validateBookingTime(teacherId, scheduledTime) {
+    // Fetch teacher availability from Supabase
+    const { data: teacher, error } = await supabase
+        .from('teacher_details')
+        .select('daily_availability')
+        .eq('teacher_id', teacherId)
+        .single();
+
+    if (error || !teacher || !teacher.daily_availability) {
+        alert("Teacher is not available on the selected date.");
+        return false;
+    }
+
+    const availDate = new Date(teacher.daily_availability);
+    const bookingDate = new Date(scheduledTime);
+
+    // Compare dates only (ignore time)
+    if (bookingDate.toDateString() !== availDate.toDateString()) {
+        alert("Booking is not on teacher's available date.");
+        return false;
+    }
+
+    // Check 2–4 hours before scheduled time
+    const now = new Date();
+    const diffHours = (bookingDate - now) / (1000 * 60 * 60);
+
+    if (diffHours < 2 || diffHours > 4) {
+        alert("Booking must be at least 2 hours and at most 4 hours before the scheduled time.");
+        return false;
+    }
+
+    return true;
+}
+
+
+
+
+
+
+
+/*
+async function bookClass() {
+
+  // 1️⃣ Get values from form
+  const studentName = document.getElementById("studentName").value;
+  const studentRoll = document.getElementById("studentRoll").value;
+  const bookingDate = document.getElementById("bookingDate").value;
+  const timeSlot = document.getElementById("timeSlot").value;
+  const teacherId = document.getElementById("teacherSelect").value;
+
+  // 2️⃣ Get logged in user
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+
+  if (!user) {
+    alert("Not logged in");
+    return;
+  }
+
+  // 3️⃣ Get institute_id from profiles
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("institute_id")
+    .eq("id", user.id)
+    .single();
+
+  const instituteId = profile.institute_id;
+
+  // 4️⃣ Get teacher mobile number
+  const { data: teacher } = await supabase
+    .from("teacher_details")
+    .select("mobile")
+    .eq("id", teacherId)
+    .single();
+
+  const teacherPhone = teacher.mobile; // Must be like 91XXXXXXXXXX
+
+  // 5️⃣ Insert booking
+  const { data, error } = await supabase
+    .from("class_bookings")
+    .insert([
+      {
+        institute_id: instituteId,
+        teacher_id: teacherId,
+        student_roll: studentRoll,
+        booking_date: bookingDate,
+        time_slot: timeSlot,
+        status: "pending"
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    alert("Booking failed: " + error.message);
+    return;
+  }
+
+  // 6️⃣ WhatsApp Message
+  const message = `
+📚 New Class Booking Request
+
+Student: ${studentName}
+Date: ${bookingDate}
+Time: ${timeSlot}
+Booking ID: ${data.id}
+
+Please confirm in dashboard.
+`;
+
+  const encodedMessage = encodeURIComponent(message);
+  const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
+
+  // 7️⃣ Open WhatsApp automatically
+  window.open(whatsappURL, "_blank");
+
+  alert("Booking saved. Teacher notified via WhatsApp.");
+}
+*/
+    </script>
+</body>
+</html>

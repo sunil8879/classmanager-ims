@@ -1,0 +1,23 @@
+LICCONNECT
+
+
+host: db.efduqdondmlzmwhfgkfz.supabase.co
+port: 5432
+database: postgres
+user: postgres
+password ;  M1@
+Driver : PostgreSQL JDBC Driver 42.7.2
+
+
+
+pg_dump -h db.efduqdondmlzmwhfgkfz.supabase.co -U postgres -d postgres > my_backup.sql
+
+
+
+CLASS MANAGER
+
+host: db.erzwijnlbnwjdlluvxyk.supabase.co
+port: 5432
+database: postgres
+user: postgres
+password : R2@R2@
