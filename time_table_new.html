@@ -517,30 +517,20 @@ async function checkMischiefHistory(studentRoll) {
     });
 }
 
-function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
+async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
     const selectedTime = document.getElementById(selectId).value;
     document.getElementById('f-roll').value = roll;
-    document.getElementById('f-student-name').value = sname;
-    document.getElementById('f-course').value = course;
     document.getElementById('f-teacher-id').value = tid;
-    document.getElementById('f-teacher-name').value = tname;
+    document.getElementById('f-course').value = course;
     document.getElementById('f-official-slots').value = allSlots;
-    
-    let fTime = document.getElementById('f-time');
-    if(!fTime) {
-        fTime = document.createElement('input'); fTime.type = 'hidden'; fTime.id = 'f-time';
-        document.body.appendChild(fTime);
-    }
-    fTime.value = selectedTime;
+    document.getElementById('f-teacher-name').value = tname;
 
-    const statusDiv = document.getElementById('preferred-slot-status');
-    statusDiv.innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span> for ${course}`;
-    
-    checkMischiefHistory(roll); // Check for warnings immediately
-    alert(`Priority set to ${selectedTime}. Now click 'Generate Booking Grid'.`);
-// Add these two lines at the end of syncSelection()
-const { count: c } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
-document.getElementById('mischief-warning-new').style.display = (c >= 2) ? 'block' : 'none';
+    // Show selection in UI
+    document.getElementById('preferred-slot-status').innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span>`;
+
+    // THE VALIDATION CHECK
+    const { count: c } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
+    document.getElementById('mischief-warning-new').style.display = (c >= 2) ? 'block' : 'none';
 }
 
     /**
@@ -627,36 +617,35 @@ async function bookThisSlot(day, time) {
     const date = document.getElementById('f-date').value;
     const tid = document.getElementById('f-teacher-id').value;
 
-    // 1. LIMIT VALIDATION (The "Stop" Switch)
+    // 1. LIMIT VALIDATION
     const { count } = await db.from('class_bookings').select('*', { count: 'exact', head: true }).eq('student_roll', roll).eq('booking_date', date);
-    if (count >= 3) return alert("STOP: You already have 3 bookings today!");
+    if (count >= 3) return alert("STOP: 3 Class Limit Reached!");
 
-    // 2. WHATSAPP VALIDATION
+    // 2. WHATSAPP REDIRECT
     const { data: t } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     window.open(`https://wa.me/91${t.mobile}?text=Booking request for ${time}`, "_blank");
-    if (!confirm("Did you send the WhatsApp message? Click OK to save booking.")) return;
+    if (!confirm("Confirm WhatsApp sent?")) return;
 
-    // 3. SAVE
+    // 3. SAVE TO DB
     await db.from("class_bookings").insert({ 
         institute_id: sessionInstID, teacher_id: tid, student_roll: roll, 
         booking_date: date, time_slot: time, course: document.getElementById('f-course').value 
     });
     generateTimeTable(); 
 }
-
     /**
      * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
      */
 async function cancelBooking(id, roll) {
-    if (!confirm("Cancel this class? This will be logged as MISCHIEF.")) return;
+    if (!confirm("Cancel this class? Mischief will be recorded.")) return;
 
-    // 1. Log the mischief
+    // 1. Log the mischief record
     await db.from('class_cancellations').insert([{ student_roll: roll, institute_id: sessionInstID }]);
 
-    // 2. Delete the booking
+    // 2. Delete the actual booking
     await db.from('class_bookings').delete().eq('id', id);
     
-    alert("Cancelled. Mischief recorded.");
+    alert("Cancelled.");
     generateTimeTable();
 }
 
