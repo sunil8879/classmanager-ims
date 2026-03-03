@@ -12,12 +12,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <style>
+        /* --- GENERAL RESET & BASE STYLES --- */
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
             font-family: 'Poppins', sans-serif;
-            color: #000000;
+            color: #000000; /* Black font strictly enforced */
         }
 
         body {
@@ -25,7 +26,7 @@
             padding-bottom: 60px;
         }
 
-        /* --- TITLE: 3D BOX, AQUAMARINE GRADIENT, TILTED --- */
+        /* --- TILTED 3D HEADER --- */
         header {
             text-align: center;
             padding: 50px 20px 40px;
@@ -46,7 +47,31 @@
             letter-spacing: 2px;
         }
 
-        /* --- FORM CONTAINER & SUMMARY TABLE --- */
+        /* --- MISCHIEF WARNING BANNER --- */
+        #mischief-warning {
+            display: none; /* Shown via JS */
+            background: #ff4757;
+            color: #ffffff;
+            padding: 15px;
+            border: 3px solid #000;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-weight: 900;
+            text-align: center;
+            box-shadow: 5px 5px 0px #000;
+            animation: shake 0.5s infinite;
+        }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            100% { transform: translate(1px, 1px) rotate(0deg); }
+        }
+
+        /* --- FORM CONTAINER --- */
         .form-container {
             width: 90%;
             max-width: 1200px;
@@ -55,23 +80,23 @@
             padding: 35px;
             border-radius: 16px;
             background-color: #ffffff;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
         }
 
         #session-title {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             text-transform: uppercase;
             font-weight: 900;
             text-decoration: underline;
-            font-size: 1.5rem;
+            font-size: 1.6rem;
         }
 
+        /* --- SUMMARY TABLE (SESSION DATA) --- */
         .summary-table-wrapper {
             overflow-x: auto;
             margin-bottom: 30px;
             border: 2px solid #000;
-            border-radius: 8px;
+            border-radius: 10px;
         }
 
         .summary-table {
@@ -82,7 +107,7 @@
 
         .summary-table th {
             background: #7FFFD4;
-            padding: 12px;
+            padding: 15px;
             border: 1px solid #000;
             font-weight: 800;
             text-transform: uppercase;
@@ -93,24 +118,32 @@
             border: 1px solid #000;
             text-align: center;
             font-weight: 600;
+            vertical-align: middle;
+        }
+
+        /* Tidy Batch Time Presentation */
+        .time-slot-pill {
+            display: block;
+            background: #f1f2f6;
+            border: 1px solid #000;
+            padding: 4px 8px;
+            margin: 4px auto;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            width: fit-content;
+            font-weight: 800;
         }
 
         .btn-select {
             background: #20B2AA;
-            color: white;
+            color: #fff;
             border: 2px solid #000;
-            padding: 5px 15px;
-            border-radius: 5px;
+            padding: 6px 15px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: 800;
             text-transform: uppercase;
-            transition: 0.3s;
-        }
-
-        .btn-select:hover {
-            background: #000;
-            color: #7FFFD4;
-            transform: scale(1.05);
+            box-shadow: 2px 2px 0px #000;
         }
 
         /* --- GRID INPUTS (DATE & TIME) --- */
@@ -143,6 +176,14 @@
             background: #ffffff;
         }
 
+        /* Teal Background for Readonly (Date) */
+        input[readonly] {
+            background: #40E0D0; 
+            border-style: dashed;
+            cursor: not-allowed;
+            color: #000 !important;
+        }
+
         .btn-generate {
             background: linear-gradient(135deg, #7FFFD4, #20B2AA);
             border: 3px solid #000;
@@ -154,12 +195,6 @@
             width: 100%;
             text-transform: uppercase;
             box-shadow: 6px 6px 0px #000;
-            transition: all 0.3s;
-        }
-
-        .btn-generate:hover {
-            transform: translate(-3px, -3px);
-            box-shadow: 9px 9px 0px #000;
         }
 
         /* --- TIMETABLE GRID (BOTTOM HALF) --- */
@@ -171,7 +206,7 @@
             padding: 20px 10px;
         }
 
-        table.grid-table {
+        .grid-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 12px;
@@ -184,26 +219,39 @@
             box-shadow: 0 6px 15px rgba(0,0,0,0.1);
         }
 
-        /* Days: Parrot Green */
+        /* Headers: Parrot Green */
         .grid-table th:not(.time-col) {
             background: linear-gradient(135deg, #7CFC00, #32CD32);
             font-weight: 900;
         }
 
-        /* Times: Modern Blue */
+        /* Time Column: Modern Blue */
         th.time-col, td.time-slot {
             background: linear-gradient(135deg, #00c6ff, #0072ff);
-            color: #fff;
+            color: #ffffff;
             font-weight: 900;
         }
 
-        /* Booked: Yellow */
+        /* Booked State: Yellow Gradient */
         .booked-cell {
             background: linear-gradient(135deg, #FFF500, #FFB300) !important;
             font-weight: 800;
         }
 
-        /* Book Button: Turquoise */
+        /* Dark Delete Icon (For Teachers/Owners) */
+        .btn-cancel-mischief {
+            background: #2d3436;
+            color: #ffffff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+        .btn-cancel-mischief:hover { background: #000000; }
+
+        /* Book Button: Turquoise Gradient */
         .btn-book {
             background: linear-gradient(135deg, #40E0D0, #00CED1);
             border: none;
@@ -219,7 +267,7 @@
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(5px);
             display: none;
             justify-content: center;
@@ -237,7 +285,7 @@
         }
 
         @media (max-width: 768px) {
-            header h1 { font-size: 1.5rem; padding: 15px; }
+            header h1 { font-size: 1.4rem; padding: 15px; }
             .form-grid { grid-template-columns: 1fr; }
         }
     </style>
@@ -249,10 +297,15 @@
     </header>
 
     <div class="form-container">
-        <!-- SESSION HEADER: Displays Name of Ravi / Aparna -->
-        <h2 id="session-title">Capturing Session...</h2>
+        <!-- Mischief Warning Banner -->
+        <div id="mischief-warning">
+            ⚠️ WARNING: YOU HAVE A HISTORY OF MULTIPLE CANCELLATIONS. FURTHER MISCHIEF WILL RESULT IN A BLOCK.
+        </div>
 
-        <!-- DYNAMIC SUMMARY TABLE -->
+        <!-- Session Header (User Name) -->
+        <h2 id="session-title">Identifying Session...</h2>
+
+        <!-- Dynamic Summary Table -->
         <div class="summary-table-wrapper">
             <table class="summary-table">
                 <thead>
@@ -268,17 +321,17 @@
                     </tr>
                 </thead>
                 <tbody id="session-table-body">
-                    <!-- Rows will be injected by JavaScript -->
-                    <tr><td colspan="8">Waiting for login session...</td></tr>
+                    <!-- JavaScript will inject rows here -->
+                    <tr><td colspan="8">Searching for your assignments...</td></tr>
                 </tbody>
             </table>
         </div>
 
         <div class="form-grid">
-            <!-- 1. Booking Date -->
+            <!-- 1. Booking Date (Readonly/Next Day Only) -->
             <div class="input-group">
-                <label>1. Booking Date (Next Day)</label>
-                <input type="date" id="f-date">
+                <label>1. Booking Date (Locked to Tomorrow)</label>
+                <input type="date" id="f-date" readonly>
             </div>
 
             <!-- 2. Preferred Time Slot -->
@@ -294,14 +347,11 @@
                     <option>03:00 PM to 04:00 PM</option>
                     <option>04:00 PM to 05:00 PM</option>
                     <option>05:00 PM to 06:00 PM</option>
-                    <option>06:00 PM to 07:00 PM</option>
-                    <option>07:00 PM to 08:00 PM</option>
-                    <option>08:00 PM to 09:00 PM</option>
                 </select>
             </div>
         </div>
 
-        <!-- HIDDEN FIELDS: Feeding the original logic -->
+        <!-- Hidden inputs for data sync -->
         <input type="hidden" id="f-roll">
         <input type="hidden" id="f-student-name">
         <input type="hidden" id="f-course">
@@ -309,11 +359,12 @@
         <input type="hidden" id="f-teacher-name">
         <input type="hidden" id="f-official-slots">
 
-        <div id="preferred-slot-status" style="text-align: center; font-weight: 900; margin-bottom: 15px;"></div>
+        <div id="preferred-slot-status" style="text-align: center; font-weight: 900; margin-bottom: 20px; font-size: 1.1rem;"></div>
         
         <button type="button" class="btn-generate" onclick="generateTimeTable()">Generate Booking Grid</button>
     </div>
 
+    <!-- Timetable Grid -->
     <div class="timetable-container" id="timetable-wrapper">
         <table class="grid-table">
             <thead>
@@ -335,17 +386,18 @@
     <!-- Confirmation Modal -->
     <div class="modal-overlay" id="confirm-modal">
         <div class="modal-content" id="print-area">
-            <h2 style="text-decoration: underline; margin-bottom: 15px;">BOOKING CONFIRMATION</h2>
-            <p id="confirmation-text" style="font-weight: 600; line-height: 1.6;"></p>
-            <div style="margin-top: 25px;">
-                <button class="btn-generate" style="width: auto; padding: 10px 30px;" onclick="window.print()">PRINT</button>
+            <h2 style="text-decoration: underline; margin-bottom: 20px;">BOOKING CONFIRMATION</h2>
+            <p id="confirmation-text" style="font-weight: 600; line-height: 1.8;"></p>
+            <div style="margin-top: 30px;">
+                <button class="btn-generate" style="width: auto; padding: 10px 30px;" onclick="window.print()">PRINT RECEIPT</button>
                 <button class="btn-generate" style="width: auto; padding: 10px 30px; background: #ff4757;" onclick="closeModal()">CLOSE</button>
             </div>
         </div>
     </div>
-<script>
- // --- 1. SUPABASE INITIALIZATION ---
-  const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+
+    <script>
+// --- 1. SUPABASE INITIALIZATION ---
+     const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
     const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
     const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
@@ -354,7 +406,6 @@
 
     /**
      * 2. SESSION INITIALIZATION
-     * Runs on page load to identify the Ravi (Student) or Aparna (Teacher)
      */
     async function initSession() {
         const { data: { user } } = await db.auth.getUser();
@@ -363,63 +414,77 @@
             return;
         }
 
-        // Fetch profile to get Role and Institute ID
-        const { data: profile, error } = await db
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-        if (error || !profile) {
-            console.error("Profile Error:", error);
-            return;
-        }
+        const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).single();
+        if (!profile) return;
 
         currentUserProfile = profile;
         sessionInstID = profile.institute_id;
         
-        // Update the page header with the User's name
         document.getElementById('session-title').innerText = `${profile.role.toUpperCase()} PORTAL: ${profile.full_name}`;
         
+        // --- VALIDATION: LOCK CALENDAR TO TOMORROW ONLY ---
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dateStr = tomorrow.toISOString().split('T')[0];
+        const dateInput = document.getElementById('f-date');
+        
+        dateInput.value = dateStr;
+        dateInput.setAttribute('min', dateStr);
+        dateInput.setAttribute('max', dateStr);
+
+        // Mischief Check for Students
+        if (profile.role === 'Student') {
+            checkMischiefHistory(profile.full_name);
+        }
+
         loadAssignmentSummary();
     }
 
     /**
-     * 3. CAPTURE DATA FROM LIST & BATCHES TABLES
-     * This populates the summary table with the specific assignments for the logged-in user.
+     * 3. MISCHIEF WARNING LOGIC
+     */
+    async function checkMischiefHistory(studentName) {
+        const { count, error } = await db
+            .from('class_cancellations')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_name', studentName.toUpperCase());
+
+        if (count >= 2) {
+            document.getElementById('mischief-warning').style.display = 'block';
+        }
+    }
+
+    /**
+     * 4. LOAD SUMMARY TABLE (TIDY PRESENTATION)
      */
     async function loadAssignmentSummary() {
         const tbody = document.getElementById('session-table-body');
         const userNameUpper = currentUserProfile.full_name.toUpperCase();
 
-        // 1. Get assignments from 'list' table matching the logged-in user and institute
         let query = db.from('list').select('*').eq('institute_id', sessionInstID);
-
         if (currentUserProfile.role === 'Student') {
             query = query.eq('student_name', userNameUpper);
         } else if (currentUserProfile.role === 'Teacher') {
             query = query.eq('teacher_name', userNameUpper);
         }
 
-        const { data: listData, error: listError } = await query;
+        const { data: listData } = await query;
+        const { data: batchData } = await db.from('batches').select('batch_name, batch_time').eq('institute_id', sessionInstID);
 
-        if (listError || !listData || listData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8">No active assignments found for your session.</td></tr>';
+        tbody.innerHTML = "";
+        if (!listData || listData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8">No active subject assignments found.</td></tr>';
             return;
         }
 
-        // 2. Fetch all batches to match timings
-        const { data: batchData } = await db.from('batches')
-            .select('batch_name, batch_time')
-            .eq('institute_id', sessionInstID);
-
-        // 3. Build the Table Rows
-        tbody.innerHTML = "";
         listData.forEach(item => {
-            const batchMatch = batchData ? batchData.find(b => b.batch_name === item.batch_name) : null;
-            const officialTime = batchMatch ? batchMatch.batch_time : "Time Not Set";
+            const batch = batchData?.find(b => b.batch_name === item.batch_name);
+            const rawTime = batch ? batch.batch_time : "N/A";
+            
+            // TIDY TIME PRESENTATION: Split by comma into pills
+            const tidyTimeHtml = rawTime.split(',').map(t => `<span class="time-slot-pill">${t.trim()}</span>`).join('');
 
-            const row = `
+            tbody.innerHTML += `
                 <tr>
                     <td>${item.roll_number}</td>
                     <td>${item.student_name}</td>
@@ -427,23 +492,15 @@
                     <td>${item.teacher_id}</td>
                     <td>${item.course_name}</td>
                     <td>${item.batch_name}</td>
-                    <td style="color: blue; font-weight: 800;">${officialTime}</td>
+                    <td>${tidyTimeHtml}</td>
                     <td>
-                        <button class="btn-select" onclick="syncFields('${item.roll_number}', '${item.student_name}', '${item.course_name}', '${item.teacher_id}', '${item.teacher_name}', '${officialTime}')">
-                            SELECT
-                        </button>
+                        <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.course_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}')">SELECT</button>
                     </td>
-                </tr>
-            `;
-            tbody.innerHTML += row;
+                </tr>`;
         });
     }
 
-    /**
-     * 4. SYNC FIELDS
-     * Bridges the selected table row to the hidden inputs for the booking logic
-     */
-    function syncFields(roll, sname, course, tid, tname, slots) {
+    function syncSelection(roll, sname, course, tid, tname, slots) {
         document.getElementById('f-roll').value = roll;
         document.getElementById('f-student-name').value = sname;
         document.getElementById('f-course').value = course;
@@ -451,16 +508,14 @@
         document.getElementById('f-teacher-name').value = tname;
         document.getElementById('f-official-slots').value = slots;
         
-        // Visual feedback
         const statusDiv = document.getElementById('preferred-slot-status');
-        statusDiv.innerText = `Selected: ${course} with ${tname}`;
+        statusDiv.innerText = `LOCKED: ${course} (${tname})`;
         statusDiv.style.color = "#20B2AA";
-        
-        alert(`Subject ${course} selected. Now select a date and preferred time below.`);
+        alert(`Details synced for ${course}. Now generate the grid.`);
     }
 
     /**
-     * 5. GENERATE BOOKING GRID
+     * 5. GRID GENERATION (ROLE BASED)
      */
     async function generateTimeTable() {
         const tid = document.getElementById('f-teacher-id').value;
@@ -469,36 +524,27 @@
         const officialTime = document.getElementById('f-official-slots').value;
         const statusDiv = document.getElementById('preferred-slot-status');
 
-        if (!tid) return alert("Please SELECT an assignment from the table above first.");
-        if (!dateVal) return alert("Please select a Booking Date.");
+        if (!tid) return alert("Please select an assignment from the table first.");
 
-        // Validation: Check if Preferred Time Slot is within official batch hours
+        // Validation for Preferred Slot Message
         if (officialTime.includes(prefTime)) {
-            statusDiv.innerText = "✅ THE PREFERRED SLOT IS AVAILABLE"; 
+            statusDiv.innerText = "✅ PREFERRED SLOT IS WITHIN BATCH HOURS";
             statusDiv.style.color = "green";
         } else {
-            statusDiv.innerText = "❌ THE PREFERRED SLOT IS OUTSIDE BATCH HOURS"; 
+            statusDiv.innerText = "❌ PREFERRED SLOT IS OUTSIDE BATCH HOURS";
             statusDiv.style.color = "red";
         }
 
-        // Fetch existing bookings for this teacher on this date
-        const { data: bookings } = await db.from("class_bookings")
-            .select("*")
-            .eq("booking_date", dateVal)
-            .eq("teacher_id", tid)
-            .eq("institute_id", sessionInstID);
+        const { data: bookings } = await db.from("class_bookings").select("*")
+            .eq("booking_date", dateVal).eq("teacher_id", tid).eq("institute_id", sessionInstID);
 
-        renderGrid(bookings, dateVal);
+        renderTimetableGrid(bookings, dateVal);
     }
 
-    /**
-     * 6. RENDER GRID
-     */
-    function renderGrid(bookings, dateVal) {
-        const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM", "06:00 PM to 07:00 PM", "07:00 PM to 08:00 PM", "08:00 PM to 09:00 PM"];
+    function renderTimetableGrid(bookings, dateVal) {
+        const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
         const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
         
-        // Sync day index: JS getDay() returns 0 for Sunday, 1 for Monday...
         const jsDay = new Date(dateVal).getDay();
         const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
 
@@ -507,20 +553,13 @@
 
         SLOTS.forEach(time => {
             const tr = document.createElement('tr');
-            
-            // Time Cell
-            const tdTime = document.createElement('td'); 
-            tdTime.className = 'time-slot'; 
-            tdTime.innerText = time;
+            const tdTime = document.createElement('td'); tdTime.className = 'time-slot'; tdTime.innerText = time;
             tr.appendChild(tdTime);
 
-            // Day Cells
             DAYS.forEach(day => {
                 const td = document.createElement('td');
-                
-                // Dim non-selected days
                 if (day !== activeDayName) {
-                    td.style.opacity = "0.2"; 
+                    td.style.opacity = "0.2";
                     td.style.pointerEvents = "none";
                 }
 
@@ -530,10 +569,18 @@
                     const bData = bookings.find(b => b.time_slot === time);
                     td.className = 'booked-cell';
                     td.innerHTML = `BOOKED<br><small>${bData.student_roll}</small>`;
-                    // Add delete for mischief/security
-                    td.innerHTML += `<br><button style="background:red;color:#fff;border:none;padding:2px 5px;cursor:pointer;font-size:0.6rem;margin-top:5px;" onclick="deleteBooking('${bData.id}')">X</button>`;
+                    
+                    // --- DARK DELETE ICON: STAFF ONLY ---
+                    if (currentUserProfile.role !== 'Student') {
+                        td.innerHTML += `<br><button class="btn-cancel-mischief" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')"><i class="fas fa-trash-alt"></i></button>`;
+                    }
                 } else {
-                    td.innerHTML = `OPEN<br><button class="btn-book" onclick="processBooking('${day}', '${time}')">BOOK</button>`;
+                    // --- READ ONLY FOR STAFF ---
+                    if (currentUserProfile.role === 'Student') {
+                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
+                    } else {
+                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">VIEW ONLY</span>`;
+                    }
                 }
                 tr.appendChild(td);
             });
@@ -543,37 +590,43 @@
     }
 
     /**
-     * 7. PROCESS BOOKING & WHATSAPP
+     * 6. BOOKING VALIDATIONS
      */
-    async function processBooking(day, time) {
+    async function bookThisSlot(day, time) {
         const roll = document.getElementById('f-roll').value;
-        const sname = document.getElementById('f-student-name').value;
+        const dateVal = document.getElementById('f-date').value;
+        const officialTime = document.getElementById('f-official-slots').value;
         const course = document.getElementById('f-course').value;
         const tid = document.getElementById('f-teacher-id').value;
         const tname = document.getElementById('f-teacher-name').value;
-        const officialTime = document.getElementById('f-official-slots').value;
-        const dateVal = document.getElementById('f-date').value;
 
-        // Restriction: Must match batch time
-        if (!officialTime.includes(time)) {
-            return alert(`DENIED: You can only book classes during the Teacher's official batch hours (${officialTime}).`);
+        if (!officialTime.includes(time)) return alert("DENIED: Selected time is not within the Teacher's Batch schedule.");
+
+        // --- VALIDATION: MAX 3 CLASSES PER DAY ---
+        const { count, error: countErr } = await db
+            .from('class_bookings')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_roll', roll)
+            .eq('booking_date', dateVal);
+
+        if (count >= 3) {
+            return alert("MISCHIEF BLOCK: You are not allowed to book more than 3 classes in a single day.");
         }
 
-        // Fetch teacher mobile for WhatsApp
+        // WhatsApp Confirmation
         const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
-
-        if (tData && tData.mobile) {
-            const waMsg = `📚 *Class Booking Notification*\n\nStudent: ${sname} (${roll})\nSubject: ${course}\nDate: ${dateVal}\nTime: ${time}\n\nPlease note this in your schedule.`;
-            window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(waMsg)}`, "_blank");
-            
-            if (!confirm(`WhatsApp has been opened for ${tname}. Did you send the message? Click OK only if sent.`)) return;
+        if (tData?.mobile) {
+            const msg = `📚 Booking: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
+            window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
+            if (!confirm(`Sent WhatsApp to ${tname}? Click OK to finalize booking.`)) return;
         }
 
-        // Insert into Supabase
+        // Insert Record
         const { error } = await db.from("class_bookings").insert({
             institute_id: sessionInstID,
             teacher_id: tid,
             student_roll: roll,
+            student_name: currentUserProfile.full_name.toUpperCase(),
             booking_date: dateVal,
             time_slot: time,
             day: day,
@@ -581,32 +634,39 @@
         });
 
         if (error) {
-            alert("Error saving booking: " + error.message);
+            alert(error.message);
         } else {
-            document.getElementById('confirmation-text').innerText = `SUCCESS! Class for ${course} confirmed with ${tname} on ${dateVal} at ${time}.`;
+            document.getElementById('confirmation-text').innerText = `Success! Class booked for ${course} on ${dateVal} at ${time}.`;
             document.getElementById('confirm-modal').style.display = 'flex';
-            generateTimeTable(); // Refresh grid
+            generateTimeTable();
         }
     }
 
-    async function deleteBooking(id) {
-        if (prompt("Enter Security PIN to Delete:") === "1234") {
-            await db.from('class_bookings').delete().eq('id', id);
+    /**
+     * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
+     */
+    async function cancelBooking(id, roll, name) {
+        if (!confirm(`Cancel booking for ${name} (${roll})? This will be logged as a cancellation for the student.`)) return;
+
+        // Log the cancellation for mischief tracking
+        await db.from('class_cancellations').insert([{
+            student_roll: roll,
+            student_name: name.toUpperCase(),
+            cancelled_by: currentUserProfile.role,
+            institute_id: sessionInstID
+        }]);
+
+        // Delete the booking
+        const { error } = await db.from('class_bookings').delete().eq('id', id);
+        if (!error) {
+            alert("Booking cancelled and mischief logged.");
             generateTimeTable();
-        } else {
-            alert("Invalid PIN.");
         }
     }
 
     function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
 
-    // On Load
-    window.onload = function() {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById('f-date').value = tomorrow.toISOString().split('T')[0];
-        initSession();
-    };
+    initSession();
 
 </script>
 </body>
