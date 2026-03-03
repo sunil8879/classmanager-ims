@@ -2851,25 +2851,29 @@ async function generateRollNow() {
 }
 
 // 4. Validation & Add Student
+// 4. Validation & Add Student (FIXED TO LOG INITIAL PAYMENT TO DASHBOARD)
 async function addStudent() {
     if (!sessionInstID) return alert("Please log in again.");
     
     const roll = document.getElementById('stu-roll').value;
     if (!roll) return alert("Please generate a Roll Number first.");
 
+    const paidNow = parseFloat(document.getElementById('stu-paid').value) || 0;
+    const totalFees = parseFloat(document.getElementById('stu-total').value) || 0;
+    const admissionDate = document.getElementById('stu-date').value;
+
     const stuData = {
         institute_id: sessionInstID,
-        admission_date: document.getElementById('stu-date').value,
+        admission_date: admissionDate,
         full_name: document.getElementById('stu-name').value,
         mobile: document.getElementById('stu-mobile').value,
         father_mobile: document.getElementById('stu-father').value,
         mother_mobile: document.getElementById('stu-mother').value,
         standard: document.getElementById('stu-standard').value,
-        // FIX: Read directly from the Text Box
         batch_time: document.getElementById('stu-batch').value, 
         course: document.getElementById('stu-course').value,
-        total_fees: parseFloat(document.getElementById('stu-total').value) || 0,
-        paid_amount: parseFloat(document.getElementById('stu-paid').value) || 0,
+        total_fees: totalFees,
+        paid_amount: paidNow,
         pending_amount: parseFloat(document.getElementById('stu-pending').value) || 0,
         roll_number: roll,
         due_dates: document.getElementById('stu-due-dates').value,
@@ -2877,10 +2881,12 @@ async function addStudent() {
         email: document.getElementById('stu-email').value
     };
 
+    // 1. Insert into Students Master Table
     const { data: newStu, error } = await db.from('students').insert([stuData]).select();
 
     if (error) return alert("Save Error: " + error.message);
 
+    // 2. Insert into Student Details (Metadata)
     await db.from('student_details').upsert([{
         institute_id: sessionInstID,
         student_id: newStu[0].id,
@@ -2888,8 +2894,26 @@ async function addStudent() {
         course_end_date: document.getElementById('stu-end-date').value
     }]);
 
-    alert("SUCCESS! Student Saved.");
+    // --- NEW LOGIC: Log Initial Payment to History so it shows on Dashboard ---
+    if (paidNow > 0) {
+        const monthYearStr = new Date(admissionDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        await db.from('payment_history').insert([{
+            institute_id: sessionInstID,
+            student_id: newStu[0].id,
+            roll_number: roll,
+            amount: paidNow,
+            payment_date: admissionDate,
+            month_year: monthYearStr,
+            course_name: stuData.course,
+            total_fees: totalFees,
+            pending_fees: stuData.pending_amount
+        }]);
+    }
+
+    alert("SUCCESS! Student Saved and Payment Logged to Dashboard.");
     clearStudentForm();
+    loadHomeDashboardStats(); // Refresh dashboard numbers immediately
 }
 // 5. Fetch Details by Roll Number
 async function fetchStudentByRoll() {
