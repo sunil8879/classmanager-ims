@@ -498,43 +498,56 @@ async function loadAssignmentSummary() {
     const tbody = document.getElementById('session-table-body');
     const userNameUpper = currentUserProfile.full_name.toUpperCase();
 
+    // 1. Fetch user assignments
     let query = db.from('list').select('*').eq('institute_id', sessionInstID);
     if (currentUserProfile.role === 'Student') {
         query = query.eq('student_name', userNameUpper);
     } else if (currentUserProfile.role === 'Teacher') {
         query = query.eq('teacher_name', userNameUpper);
     }
-
     const { data: listData } = await query;
-const { data: batchData } = await db.from('batches').select('batch_name, batch_time, students_allotted').eq('institute_id', sessionInstID);
+
+    // 2. Fetch all batches to get the 'students_allotted' (Capacity)
+    // We fetch 'subject_name' because that is what your screenshot shows
+    const { data: batchData } = await db.from('batches')
+        .select('teacher_id, subject_name, students_allotted, batch_time')
+        .eq('institute_id', sessionInstID);
 
     tbody.innerHTML = "";
     if (!listData || listData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8">No active subject assignments found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8">No active assignments found.</td></tr>';
         return;
     }
-// --- Inside loadAssignmentSummary() ---
-listData.forEach((item, index) => {
-    const batch = batchData?.find(b => b.batch_name === item.batch_name);
-    const rawTime = batch ? batch.batch_time : "";
-    const actualCapacity = batch ? (batch.students_allotted || 10) : 10; 
-    const selectId = "time-select-" + index;
-    const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
 
-    tbody.innerHTML += `
-        <tr>
-            <td>${item.roll_number}</td>
-            <td>${item.student_name}</td>
-            <td>${item.teacher_name}</td>
-            <td>${item.teacher_id}</td>
-            <td>${item.course_name}</td>
-            <td>${item.batch_name} (Max: ${actualCapacity})</td>
-            <td><select id="${selectId}">${timeOptions}</select></td>
-            <td>
-                <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${actualCapacity}')">SELECT</button>
-            </td>
-        </tr>`;
-});
+    listData.forEach((item, index) => {
+        // --- IMPROVED MATCHING LOGIC ---
+        // We match by Teacher ID AND the Batch/Subject Name to get the correct capacity from your screenshot
+        const batchRow = batchData?.find(b => 
+            b.teacher_id === item.teacher_id && 
+            b.subject_name === item.batch_name
+        );
+
+        const rawTime = batchRow ? batchRow.batch_time : "";
+        // Pull the exact figure from 'students_allotted' column
+        const actualCapacity = batchRow ? (batchRow.students_allotted || 10) : 10; 
+
+        const selectId = "time-select-" + index;
+        const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${item.roll_number}</td>
+                <td>${item.student_name}</td>
+                <td>${item.teacher_name}</td>
+                <td>${item.teacher_id}</td>
+                <td>${item.course_name}</td>
+                <td>${item.batch_name} (Max: ${actualCapacity})</td>
+                <td><select id="${selectId}">${timeOptions}</select></td>
+                <td>
+                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${actualCapacity}')">SELECT</button>
+                </td>
+            </tr>`;
+    });
 }
 async function syncSelection(roll, sname, bname, tid, tname, allSlots, selectId, actualCapacity) {
     const selectedTime = document.getElementById(selectId).value;
