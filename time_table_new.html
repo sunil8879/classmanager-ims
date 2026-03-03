@@ -538,6 +538,9 @@ function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
     
     checkMischiefHistory(roll); // Check for warnings immediately
     alert(`Priority set to ${selectedTime}. Now click 'Generate Booking Grid'.`);
+// Add these two lines at the end of syncSelection()
+const { count: c } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
+document.getElementById('mischief-warning-new').style.display = (c >= 2) ? 'block' : 'none';
 }
 
     /**
@@ -621,79 +624,40 @@ function renderTimetableGrid(bookings, dateVal) {
      */
 async function bookThisSlot(day, time) {
     const roll = document.getElementById('f-roll').value;
-    const dateVal = document.getElementById('f-date').value;
-    const officialTime = document.getElementById('f-official-slots').value;
-    const course = document.getElementById('f-course').value;
+    const date = document.getElementById('f-date').value;
     const tid = document.getElementById('f-teacher-id').value;
-    const tname = document.getElementById('f-teacher-name').value;
 
-    if (!roll) return alert("Please select an assignment from the table first.");
+    // 1. LIMIT VALIDATION (The "Stop" Switch)
+    const { count } = await db.from('class_bookings').select('*', { count: 'exact', head: true }).eq('student_roll', roll).eq('booking_date', date);
+    if (count >= 3) return alert("STOP: You already have 3 bookings today!");
 
-    // --- 1. STRICT 3-CLASS LIMIT CHECK ---
-    const { count, error: countErr } = await db
-        .from('class_bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll)
-        .eq('booking_date', dateVal);
+    // 2. WHATSAPP VALIDATION
+    const { data: t } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
+    window.open(`https://wa.me/91${t.mobile}?text=Booking request for ${time}`, "_blank");
+    if (!confirm("Did you send the WhatsApp message? Click OK to save booking.")) return;
 
-    if (count >= 3) {
-        return alert("STOP: You have already booked 3 classes for this day. You cannot book more.");
-    }
-
-    if (!officialTime.includes(time)) {
-        return alert("DENIED: This time is not in the Teacher's Batch schedule.");
-    }
-
-    // --- 2. WHATSAPP FLOW (Mandatory) ---
-    const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
-    if (tData && tData.mobile) {
-        const msg = `Booking Request: ${currentUserProfile.full_name} (Roll: ${roll}) for ${course} at ${time} on ${dateVal}.`;
-        window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
-        
-        const confirmSave = confirm("WhatsApp page opened. Did you send the message? Click OK to finalize your booking in the database.");
-        if (!confirmSave) return;
-    } else {
-        alert("Teacher mobile not found. Proceeding with database booking...");
-    }
-
-    // --- 3. DATABASE INSERT ---
-    const { error } = await db.from("class_bookings").insert({
-        institute_id: sessionInstID,
-        teacher_id: tid,
-        student_roll: roll,
-        booking_date: dateVal,
-        time_slot: time,
-        course: course
+    // 3. SAVE
+    await db.from("class_bookings").insert({ 
+        institute_id: sessionInstID, teacher_id: tid, student_roll: roll, 
+        booking_date: date, time_slot: time, course: document.getElementById('f-course').value 
     });
-
-    if (error) {
-        alert("Error: " + error.message);
-    } else {
-        document.getElementById('confirmation-text').innerText = `Success! Booked for ${course} on ${dateVal} at ${time}.`;
-        document.getElementById('confirm-modal').style.display = 'flex';
-        generateTimeTable(); 
-    }
+    generateTimeTable(); 
 }
 
     /**
      * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
      */
-async function cancelBooking(id, roll, name) {
-    if (!confirm(`Cancel this booking? This will be recorded as a cancellation for student roll: ${roll}.`)) return;
+async function cancelBooking(id, roll) {
+    if (!confirm("Cancel this class? This will be logged as MISCHIEF.")) return;
 
-    // Log Mischief
-    await db.from('class_cancellations').insert([{
-        student_roll: roll,
-        cancelled_by: currentUserProfile.role,
-        institute_id: sessionInstID
-    }]);
+    // 1. Log the mischief
+    await db.from('class_cancellations').insert([{ student_roll: roll, institute_id: sessionInstID }]);
 
-    const { error } = await db.from('class_bookings').delete().eq('id', id);
-    if (!error) {
-        alert("Booking cancelled and history updated.");
-        generateTimeTable();
-        checkMischiefHistory(roll);
-    }
+    // 2. Delete the booking
+    await db.from('class_bookings').delete().eq('id', id);
+    
+    alert("Cancelled. Mischief recorded.");
+    generateTimeTable();
 }
 
     function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
