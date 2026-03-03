@@ -437,10 +437,10 @@ input[readonly] {
 
 
 
-<!-- NEW: Select Subject Dropdown -->
+<!-- Master Assignment Dropdown -->
 <div class="input-group">
-    <label>4. Choose Subject to Book</label>
-    <select id="f-subject-choice" onchange="fetchTeachersForChosenSubject()">
+    <label>4. Select Your Assigned Batch</label>
+    <select id="f-batch-choice" onchange="fetchBatchDetails()">
         <option value="">-- Fetch Student First --</option>
     </select>
 </div>
@@ -607,41 +607,77 @@ const DAYS = [
 
         // --- 2. DATABASE FETCH LOGIC ---
 // --- 1. FETCH STUDENT & POPULATE SUBJECTS ---
-// --- COMPLETE FETCH STUDENT FUNCTION ---
 async function fetchStudent() {
     const roll = document.getElementById('f-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter Student Roll Number.");
     if (!sessionInstID) await checkCurrentSession();
 
-    const { data, error } = await db.from('students')
-        .select('full_name, course')
+    // 1. LOOK IN THE 'list' TABLE (Batch Master)
+    const { data: assignments, error } = await db.from('list')
+        .select('teacher_name, course_name, batch_name, student_name, teacher_id')
         .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
+
+    if (error || !assignments || assignments.length === 0) {
+        return alert("No batch assignments found in Batch Master (List Table) for this Roll Number.");
+    }
+
+    // 2. Fill the Student Name (taken from the first assignment found)
+    document.getElementById('f-student-name').value = assignments[0].student_name;
+
+    // 3. Fill the 'Assigned Batch' dropdown
+    const batchDropdown = document.getElementById('f-batch-choice');
+    batchDropdown.innerHTML = '<option value="">-- Select a Batch --</option>';
+
+    assignments.forEach(item => {
+        let opt = document.createElement('option');
+        // We store the Batch Name as the value
+        opt.value = item.batch_name;
+        // We show: Subject Name (Batch Name)
+        opt.text = `${item.course_name} (${item.batch_name})`;
+        
+        // Save the IDs so we don't have to fetch them again
+        opt.dataset.teacherId = item.teacher_id;
+        opt.dataset.teacherName = item.teacher_name;
+        opt.dataset.course = item.course_name;
+        
+        batchDropdown.appendChild(opt);
+    });
+
+    alert("Assignments loaded! Pick your batch from dropdown 4.");
+}
+
+
+async function fetchBatchDetails() {
+    const dropdown = document.getElementById('f-batch-choice');
+    const selectedBatch = dropdown.options[dropdown.selectedIndex];
+    
+    if (!dropdown.value) return;
+
+    // 1. Auto-fill the Teacher and Course boxes from the data we already have
+    document.getElementById('f-teacher').value = selectedBatch.dataset.teacherId;
+    document.getElementById('f-teacher-name').value = selectedBatch.dataset.teacherName;
+    document.getElementById('f-course').value = selectedBatch.dataset.course;
+
+    // 2. FETCH THE TIME from the 'batches' table using the Batch Name
+    const { data: batchInfo, error } = await db.from('batches')
+        .select('batch_time')
+        .eq('batch_name', dropdown.value)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (error || !data) return alert("Student not found.");
-
-    document.getElementById('f-student-name').value = data.full_name || '';
-    document.getElementById('f-course').value = data.course || '';
-
-    const subjectDropdown = document.getElementById('f-subject-choice');
-    subjectDropdown.innerHTML = '<option value="">-- Select Subject --</option>';
-
-    if (data.course) {
-        // Splits "MATHS (10AM), SCIENCE (11AM)" into a list
-        const listItems = data.course.split(',');
-        listItems.forEach(item => {
-            // Cleans "MATHS (10AM)" to just "MATHS"
-            const cleanName = item.split('(')[0].trim().toUpperCase();
-            if (cleanName) {
-                let opt = document.createElement('option');
-                opt.value = cleanName;
-                opt.text = cleanName;
-                subjectDropdown.appendChild(opt);
-            }
-        });
+    const slotsInput = document.getElementById("f-teacher-available-slots");
+    
+    if (batchInfo) {
+        slotsInput.value = batchInfo.batch_time;
+        slotsInput.style.color = "#000";
+    } else {
+        slotsInput.value = "Timing not found in Batches table.";
     }
 }
+
+
+
 // --- 2. FETCH TEACHERS LINKED TO THAT SPECIFIC SUBJECT ---
 async function fetchTeachersForChosenSubject() {
     const chosenSubject = document.getElementById('f-subject-choice').value;
@@ -677,62 +713,7 @@ async function fetchTeachersForChosenSubject() {
     });
 }
 // --- 3. SHOW THE SPECIFIC TIME SLOTS FOR THAT SUBJECT ---
-// --- 3. SHOW THE SPECIFIC TIME SLOTS FOR THAT SUBJECT ---
-document.getElementById("f-teacher").addEventListener("change", function () {
-    const selectedOption = this.options[this.selectedIndex];
-    const slotsInput = document.getElementById("f-teacher-available-slots");
-    const nameInput = document.getElementById("f-teacher-name");
-    
-    // Get subject from dropdown 4
-    const chosenSubject = document.getElementById('f-subject-choice').value || "";
 
-    if (!this.value) {
-        nameInput.value = "";
-        slotsInput.value = "";
-        return;
-    }
-
-    nameInput.value = selectedOption.dataset.name || "";
-
-    try {
-        // 1. Check if there is a Batch Time (Section 5)
-        if (selectedOption.dataset.batchTime && selectedOption.dataset.batchTime !== "") {
-            slotsInput.value = selectedOption.dataset.batchTime;
-        } 
-        // 2. Check if there is a Slot Map (Section 11)
-        else if (selectedOption.dataset.slotMap) {
-            const rawData = selectedOption.dataset.slotMap;
-            let slotMap = null;
-
-            // Safely parse
-            if (typeof rawData === 'string' && rawData !== "") {
-                slotMap = JSON.parse(rawData);
-            } else {
-                slotMap = rawData;
-            }
-
-            // --- THE SAFETY CHECK ---
-            // This prevents the "can't convert undefined to object" error
-            if (slotMap && typeof slotMap === 'object') {
-                let specificSlots = "";
-                Object.keys(slotMap).forEach(key => {
-                    if (key.trim().toUpperCase() === chosenSubject.trim().toUpperCase()) {
-                        specificSlots = slotMap[key];
-                    }
-                });
-                slotsInput.value = specificSlots || "No slots assigned for this subject.";
-            } else {
-                slotsInput.value = "No timing map found.";
-            }
-        } 
-        else {
-            slotsInput.value = "No timing data available.";
-        }
-    } catch (e) {
-        console.error("JSON Error:", e);
-        slotsInput.value = "ERROR READING TEACHER TIMINGS";
-    }
-});// End of Listener (Correctly closed)
         async function fetchTeacher() {
             const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
 
