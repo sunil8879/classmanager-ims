@@ -387,6 +387,7 @@
         <input type="hidden" id="f-teacher-id">
         <input type="hidden" id="f-teacher-name">
         <input type="hidden" id="f-official-slots">
+<input type="hidden" id="f-capacity">
 
         <div id="preferred-slot-status" style="text-align: center; font-weight: 900; margin-bottom: 20px; font-size: 1.1rem;"></div>
         
@@ -512,34 +513,30 @@ async function loadAssignmentSummary() {
         tbody.innerHTML = '<tr><td colspan="8">No active subject assignments found.</td></tr>';
         return;
     }
+listData.forEach((item, index) => {
+    const batch = batchData?.find(b => b.batch_name === item.batch_name);
+    const rawTime = batch ? batch.batch_time : "";
+    const totalCap = batch ? (batch.capacity || 10) : 10; // Default to 10 if empty
 
-    listData.forEach((item, index) => {
-        const batch = batchData?.find(b => b.batch_name === item.batch_name);
-        const rawTime = batch ? batch.batch_time : "";
-        const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
-        const selectId = "time-select-" + index;
+    const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
+    const selectId = "time-select-" + index;
 
-        // SAFE STRING HANDLING: Escape quotes in names/batches
-        const sNameSafe = item.student_name.replace(/'/g, "\\'");
-        const bNameSafe = item.batch_name.replace(/'/g, "\\'");
-        const tNameSafe = item.teacher_name.replace(/'/g, "\\'");
-
-        tbody.innerHTML += `
-            <tr>
-                <td>${item.roll_number}</td>
-                <td>${item.student_name}</td>
-                <td>${item.teacher_name}</td>
-                <td>${item.teacher_id}</td>
-                <td>${item.course_name}</td>
-                <td>${item.batch_name}</td>
-                <td><select id="${selectId}">${timeOptions}</select></td>
-                <td>
-                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${sNameSafe}','${bNameSafe}','${item.teacher_id}','${tNameSafe}','${rawTime}', '${selectId}')">SELECT</button>
-                </td>
-            </tr>`;
-    });
+    tbody.innerHTML += `
+        <tr>
+            <td>${item.roll_number}</td>
+            <td>${item.student_name}</td>
+            <td>${item.teacher_name}</td>
+            <td>${item.teacher_id}</td>
+            <td>${item.course_name}</td>
+            <td>${item.batch_name} (Cap: ${totalCap})</td>
+            <td><select id="${selectId}">${timeOptions}</select></td>
+            <td>
+                <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${totalCap}')">SELECT</button>
+            </td>
+        </tr>`;
+});
 }
-async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
+async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId, totalCap) {
     const selectedTime = document.getElementById(selectId).value;
 
     // 1. Sync hidden inputs
@@ -549,6 +546,7 @@ async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId
     document.getElementById('f-teacher-id').value = tid;
     document.getElementById('f-teacher-name').value = tname;
     document.getElementById('f-official-slots').value = allSlots;
+document.getElementById('f-capacity').value = totalCap; // Store capacity
     
     // 2. Manage the missing 'f-time' field (Hidden storage)
     let fTime = document.getElementById('f-time');
@@ -640,16 +638,18 @@ async function renderTimetableGrid(bookings, dateVal) {
                 return `• ${name} (${m.student_roll})`;
             }).join('<br>');
 
-            tdTime.innerHTML = `
-                ${deleteBtn}
-                <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
-                <div style="font-size:0.7rem; line-height:1.4;">
-                    <b style="color:red;">BATCH SIZE: ${batchMembers.length}</b><br>
-                    <b style="color:blue;">BATCH: ${batchSubject}</b>
-                    <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
-                        ${rollList}
-                    </div>
-                </div>`;
+const totalCap = document.getElementById('f-capacity').value || 10;
+
+         tdTime.innerHTML = `
+    ${deleteBtn}
+    <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
+    <div style="font-size:0.7rem; line-height:1.4;">
+        <b style="color:red;">SIZE: ${batchMembers.length} / ${totalCap}</b><br>
+        <b style="color:blue;">BATCH: ${batchSubject}</b>
+        <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
+            ${rollList}
+        </div>
+    </div>`;
         } else {
             tdTime.className = 'time-slot'; 
             tdTime.innerText = time;
@@ -686,54 +686,107 @@ async function renderTimetableGrid(bookings, dateVal) {
      * 6. BOOKING VALIDATIONS
      */
 async function bookThisSlot(day, time) {
+    // 1. GET ALL NECESSARY DATA FROM THE UI
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
     const officialTime = document.getElementById('f-official-slots').value;
-    const currentCourse = document.getElementById('f-course').value; 
+    const currentBatch = document.getElementById('f-course').value; // Stores Batch Name
     const tid = document.getElementById('f-teacher-id').value;
     const tname = document.getElementById('f-teacher-name').value;
+    
+    // Get capacity (default to 10 if not found)
+    const totalCapacity = parseInt(document.getElementById('f-capacity').value || 10);
 
-    if (!roll) return alert("Please select an assignment from the table first.");
-
-    // 1. LIMIT VALIDATIONS
-    const { count: bCount } = await db.from('class_bookings').select('*', { count: 'exact', head: true }).eq('student_roll', roll).eq('booking_date', dateVal);
-    if (bCount >= 3) return alert("🛑 ERROR: Daily limit of 3 reached!");
-
-    const { count: cCount } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
-    if (cCount >= 2) return alert("🛑 ACCESS DENIED: Too many cancellations!");
-
-    // 2. BATCH VALIDATION
-    const { data: exBatch } = await db.from('class_bookings').select('course').eq('teacher_id', tid).eq('booking_date', dateVal).eq('time_slot', time).limit(1);
-    if (exBatch && exBatch.length > 0 && exBatch[0].course !== currentCourse) {
-        return alert("❌ BATCH CONFLICT: This slot is for " + exBatch[0].course);
+    // Safety check: ensure a student is selected
+    if (!roll) {
+        alert("Please select an assignment from the summary table first.");
+        return;
     }
 
-    // 3. OFFICIAL TIME VALIDATION
-    if (!officialTime.includes(time)) return alert("❌ DENIED: Outside official schedule.");
+    // 2. VALIDATION: DAILY BOOKING LIMIT (MAX 3)
+    const { count: bCount } = await db.from('class_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_roll', roll)
+        .eq('booking_date', dateVal);
 
-    // 4. WHATSAPP FLOW
+    if (bCount >= 3) {
+        alert("🛑 ACCESS DENIED: You have already reached the daily limit of 3 classes.");
+        return;
+    }
+
+    // 3. VALIDATION: MISCHIEF/CANCELLATION HISTORY (MAX 2)
+    const { count: cCount } = await db.from('class_cancellations')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_roll', roll);
+
+    if (cCount >= 2) {
+        alert("🛑 ACCESS DENIED: History of multiple cancellations. Booking blocked.");
+        return;
+    }
+
+    // 4. VALIDATION: BATCH CAPACITY (e.g., 10/10)
+    // We count how many students are ALREADY in this specific teacher's slot
+    const { count: currentBatchSize } = await db.from('class_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('teacher_id', tid)
+        .eq('booking_date', dateVal)
+        .eq('time_slot', time);
+
+    if (currentBatchSize >= totalCapacity) {
+        alert(`🛑 BATCH FULL: This slot has reached its maximum capacity of ${totalCapacity} students.`);
+        return;
+    }
+
+    // 5. VALIDATION: BATCH NAME MATCHING
+    const { data: existingBatch } = await db.from('class_bookings')
+        .select('course')
+        .eq('teacher_id', tid)
+        .eq('booking_date', dateVal)
+        .eq('time_slot', time)
+        .limit(1);
+
+    if (existingBatch && existingBatch.length > 0) {
+        const batchInProgress = existingBatch[0].course;
+        if (batchInProgress !== currentBatch) {
+            alert(`❌ BATCH CONFLICT: This slot is reserved for "${batchInProgress}". You are in "${currentBatch}" and cannot join.`);
+            return;
+        }
+    }
+
+    // 6. VALIDATION: OFFICIAL BATCH TIME SCHEDULE
+    if (!officialTime.includes(time)) {
+        alert("❌ DENIED: This time is not within the official batch schedule.");
+        return;
+    }
+
+    // 7. WHATSAPP CONFIRMATION FLOW
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
-    if (tData?.mobile) {
-        const msg = "Booking: " + currentCourse + " on " + dateVal + " at " + time;
+    if (tData && tData.mobile) {
+        const msg = "Booking Request: Batch " + currentBatch + " (Roll: " + roll + ") on " + dateVal + " at " + time;
         window.open("https://wa.me/91" + tData.mobile + "?text=" + encodeURIComponent(msg), "_blank");
-        if (!confirm("Confirm WhatsApp sent?")) return;
+        
+        const confirmSave = confirm("WhatsApp opened. Did you send the message? Click OK to save your booking.");
+        if (!confirmSave) return;
     }
 
-    // 5. SAVE TO DATABASE (student_name removed to fix error)
-    const { error: insertErr } = await db.from("class_bookings").insert({
+    // 8. FINAL DATABASE INSERT
+    // We exclude 'student_name' here to avoid the Schema Cache error
+    const { error: insertError } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
         student_roll: roll,
         booking_date: dateVal,
         time_slot: time,
-        course: currentCourse
+        course: currentBatch
     });
 
-    if (insertErr) {
-        alert("Database Error: " + insertErr.message);
+    if (insertError) {
+        alert("Database Error: " + insertError.message);
     } else {
-        document.getElementById('confirmation-text').innerText = "Success! Booked for " + currentCourse;
+        document.getElementById('confirmation-text').innerText = "Success! Booked for " + currentBatch + " at " + time;
         document.getElementById('confirm-modal').style.display = 'flex';
+        
+        // Refresh the grid to update the Capacity Display (e.g., 1/10 to 2/10)
         generateTimeTable(); 
     }
 }
