@@ -305,6 +305,31 @@
             header h1 { font-size: 1.4rem; padding: 15px; }
             .form-grid { grid-template-columns: 1fr; }
         }
+
+
+
+
+
+
+
+
+
+
+/* FORCE BLUE STYLE FOR BOOKED CELLS */
+.grid-table td.booked-cell {
+    background: linear-gradient(135deg, #00416A, #1e3799) !important;
+    color: #ffffff !important;
+    border: 2px solid #000 !important;
+    padding: 10px !important;
+    text-align: left !important;
+    vertical-align: top !important;
+    font-size: 0.75rem !important;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5) !important;
+}
+
+.booked-cell b { color: #fff !important; font-size: 0.85rem; display: block; margin-bottom: 2px; }
+.booked-cell span { color: #ffffff !important; display: block; line-height: 1.2; }
+.booked-cell hr { border: 0; border-top: 1px solid rgba(255,255,255,0.4); margin: 5px 0; }
     </style>
 </head>
 <body>
@@ -582,27 +607,43 @@ function renderTimetableGrid(bookings, dateVal) {
                     td.style.pointerEvents = "none";
                 }
 
-                const bData = bookings?.find(b => b.time_slot === time);
-                
-                if (bData) {
-                    // --- BOOKED STATE (Blue Theme + Full Info) ---
-                    td.className = 'booked-cell';
-                    td.innerHTML = `
-                        <b>${bData.student_name}</b>
-                        <small>Roll: ${bData.student_roll}</small>
-                        <hr style="margin:4px 0; opacity:0.3; border:0; border-top:1px solid white;">
-                        <small>T.ID: ${bData.teacher_id}</small>
-                        <small>Sub: ${bData.course}</small>
-                    `;
+             // 1. IMPROVED MATCHING: Normalize strings to avoid "Not Working" due to spaces/case
+const bData = bookings?.find(b => 
+    b.time_slot.trim().toUpperCase() === time.trim().toUpperCase()
+);
 
-                    // Hover Pop-up window
-                    td.title = `STUDENT: ${bData.student_name} (${bData.student_roll})\nTEACHER: ${currentTeacherName}\nSUBJECT: ${bData.course}`;
+if (bData) {
+    // --- THE BOOKED STATE ---
+    td.className = 'booked-cell';
+    
+    // Get teacher name from the form since it's not usually in the booking record
+    const tName = document.getElementById('f-teacher-name').value || "Assigned Teacher";
 
-                    // DELETE ICON (Enabled for Staff/Owners, Hidden for Students)
-                    if (currentUserProfile.role !== 'Student') {
-                        td.innerHTML += `<button class="btn-cancel-mischief" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')"><i class="fas fa-trash-alt"></i></button>`;
-                    }
-                } else {
+    // Cell Content
+    td.innerHTML = `
+        <b><i class="fas fa-user-graduate"></i> ${bData.student_name}</b>
+        <span><b>Roll:</b> ${bData.student_roll}</span>
+        <hr>
+        <span><b>T.ID:</b> ${bData.teacher_id}</span>
+        <span><b>T.Name:</b> ${tName}</span>
+        <span><b>Sub:</b> ${bData.course}</span>
+    `;
+
+    // HOVER POPUP (Tooltip)
+    td.title = `
+        STUDENT: ${bData.student_name}
+        ROLL NO: ${bData.student_roll}
+        TEACHER ID: ${bData.teacher_id}
+        TEACHER: ${tName}
+        SUBJECT: ${bData.course}
+        TIME: ${time}
+    `.replace(/\s+/g, ' '); // Cleans up the tooltip text
+
+    // Show delete button for non-students
+    if (currentUserProfile.role !== 'Student') {
+        td.innerHTML += `<button class="btn-cancel-mischief" style="width:100%; margin-top:5px;" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')"><i class="fas fa-trash-alt"></i> CANCEL</button>`;
+    }
+}else {
                     // --- OPEN STATE ---
                     if (currentUserProfile.role === 'Student') {
                         td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
