@@ -648,16 +648,16 @@ async function fetchTeachersForChosenSubject() {
     const teacherSelect = document.getElementById("f-teacher");
     if (!chosenSubject) return;
 
-    teacherSelect.innerHTML = '<option value="">Searching batches...</option>';
+    teacherSelect.innerHTML = '<option value="">Searching...</option>';
 
-    // We look in the 'batches' table because that's where Section 5 saves data
+    // Look in the 'batches' table
     const { data: batchList, error } = await db.from('batches')
         .select('teacher_id, teacher_name, batch_time, subject_name')
         .eq('institute_id', sessionInstID)
         .ilike('subject_name', `%${chosenSubject}%`);
 
     if (error || !batchList || batchList.length === 0) {
-        teacherSelect.innerHTML = '<option value="">No active batches found</option>';
+        teacherSelect.innerHTML = '<option value="">No Batch created for this subject</option>';
         return;
     }
 
@@ -667,9 +667,12 @@ async function fetchTeachersForChosenSubject() {
         opt.value = b.teacher_id;
         opt.text = b.teacher_name;
         
-        // Save the specific batch time to the dropdown
+        // Save metadata
         opt.dataset.name = b.teacher_name;
-        opt.dataset.batchTime = b.batch_time; 
+        opt.dataset.batchTime = b.batch_time || ""; 
+        // We set an empty JSON string to prevent the "undefined" error
+        opt.dataset.slotMap = "{}"; 
+        
         teacherSelect.appendChild(opt);
     });
 }
@@ -680,8 +683,8 @@ document.getElementById("f-teacher").addEventListener("change", function () {
     const slotsInput = document.getElementById("f-teacher-available-slots");
     const nameInput = document.getElementById("f-teacher-name");
     
-    // We need to know which subject was picked in dropdown 4
-    const chosenSubject = document.getElementById('f-subject-choice').value;
+    // Get subject from dropdown 4
+    const chosenSubject = document.getElementById('f-subject-choice').value || "";
 
     if (!this.value) {
         nameInput.value = "";
@@ -689,40 +692,47 @@ document.getElementById("f-teacher").addEventListener("change", function () {
         return;
     }
 
-    // 1. Set the Teacher's Name
     nameInput.value = selectedOption.dataset.name || "";
 
-    // 2. Try to find the time slots
     try {
-        // Priority 1: Check if we have a direct Batch Time (from the Batches table)
-        if (selectedOption.dataset.batchTime) {
+        // 1. Check if there is a Batch Time (Section 5)
+        if (selectedOption.dataset.batchTime && selectedOption.dataset.batchTime !== "") {
             slotsInput.value = selectedOption.dataset.batchTime;
         } 
-        // Priority 2: Check if we have a JSON Map (from the Teacher Details table)
+        // 2. Check if there is a Slot Map (Section 11)
         else if (selectedOption.dataset.slotMap) {
             const rawData = selectedOption.dataset.slotMap;
-            
-            // Safely parse the map
-            let slotMap = (typeof rawData === 'string') ? JSON.parse(rawData) : rawData;
-            let specificSlots = "";
+            let slotMap = null;
 
-            // Loop through the map to find the slot for the student's chosen subject
-            Object.keys(slotMap).forEach(key => {
-                if (key.trim().toUpperCase() === chosenSubject.toUpperCase()) {
-                    specificSlots = slotMap[key];
-                }
-            });
+            // Safely parse
+            if (typeof rawData === 'string' && rawData !== "") {
+                slotMap = JSON.parse(rawData);
+            } else {
+                slotMap = rawData;
+            }
 
-            slotsInput.value = specificSlots || "No specific slots found for this subject.";
+            // --- THE SAFETY CHECK ---
+            // This prevents the "can't convert undefined to object" error
+            if (slotMap && typeof slotMap === 'object') {
+                let specificSlots = "";
+                Object.keys(slotMap).forEach(key => {
+                    if (key.trim().toUpperCase() === chosenSubject.trim().toUpperCase()) {
+                        specificSlots = slotMap[key];
+                    }
+                });
+                slotsInput.value = specificSlots || "No slots assigned for this subject.";
+            } else {
+                slotsInput.value = "No timing map found.";
+            }
         } 
         else {
-            slotsInput.value = "No timing data found in the database.";
+            slotsInput.value = "No timing data available.";
         }
     } catch (e) {
-        console.error("Timetable Error:", e);
-        slotsInput.value = "Error reading teacher timings.";
+        console.error("JSON Error:", e);
+        slotsInput.value = "ERROR READING TEACHER TIMINGS";
     }
-}); // End of Listener (Correctly closed)
+});// End of Listener (Correctly closed)
         async function fetchTeacher() {
             const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
 
