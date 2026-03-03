@@ -584,79 +584,75 @@
     }
 
 function renderTimetableGrid(bookings, dateVal) {
-        const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
-        const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
-        
-        const jsDay = new Date(dateVal).getDay();
-        const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
-        const currentTeacherName = document.getElementById('f-teacher-name').value;
-
-        const tbody = document.getElementById('timetable-body');
-        tbody.innerHTML = '';
-
-        SLOTS.forEach(time => {
-            const tr = document.createElement('tr');
-            const tdTime = document.createElement('td'); tdTime.className = 'time-slot'; tdTime.innerText = time;
-            tr.appendChild(tdTime);
-
-            DAYS.forEach(day => {
-                const td = document.createElement('td');
-                // Lock other days
-                if (day !== activeDayName) {
-                    td.style.opacity = "0.2";
-                    td.style.pointerEvents = "none";
-                }
-
-             // 1. IMPROVED MATCHING: Normalize strings to avoid "Not Working" due to spaces/case
-const bData = bookings?.find(b => 
-    b.time_slot.trim().toUpperCase() === time.trim().toUpperCase()
-);
-
-if (bData) {
-    // --- THE BOOKED STATE ---
-    td.className = 'booked-cell';
+    const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
+    const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
     
-    // Get teacher name from the form since it's not usually in the booking record
-    const tName = document.getElementById('f-teacher-name').value || "Assigned Teacher";
+    // Calculate which day of the week the selected date is
+    const jsDay = new Date(dateVal).getDay(); 
+    const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
+    
+    const tName = document.getElementById('f-teacher-name').value || "N/A";
+    const tbody = document.getElementById('timetable-body');
+    tbody.innerHTML = '';
 
-    // Cell Content
-    td.innerHTML = `
-        <b><i class="fas fa-user-graduate"></i> ${bData.student_name}</b>
-        <span><b>Roll:</b> ${bData.student_roll}</span>
-        <hr>
-        <span><b>T.ID:</b> ${bData.teacher_id}</span>
-        <span><b>T.Name:</b> ${tName}</span>
-        <span><b>Sub:</b> ${bData.course}</span>
-    `;
+    SLOTS.forEach(time => {
+        const tr = document.createElement('tr');
+        
+        // Time Column
+        const tdTime = document.createElement('td'); 
+        tdTime.className = 'time-slot'; 
+        tdTime.innerText = time;
+        tr.appendChild(tdTime);
 
-    // HOVER POPUP (Tooltip)
-    td.title = `
-        STUDENT: ${bData.student_name}
-        ROLL NO: ${bData.student_roll}
-        TEACHER ID: ${bData.teacher_id}
-        TEACHER: ${tName}
-        SUBJECT: ${bData.course}
-        TIME: ${time}
-    `.replace(/\s+/g, ' '); // Cleans up the tooltip text
+        DAYS.forEach(day => {
+            const td = document.createElement('td');
+            
+            // Check if this specific Day and Time is booked in the database
+            const bData = bookings?.find(b => 
+                b.time_slot.trim() === time.trim() && 
+                b.day.toUpperCase() === day.toUpperCase()
+            );
 
-    // Show delete button for non-students
-    if (currentUserProfile.role !== 'Student') {
-        td.innerHTML += `<button class="btn-cancel-mischief" style="width:100%; margin-top:5px;" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')"><i class="fas fa-trash-alt"></i> CANCEL</button>`;
-    }
-}else {
-                    // --- OPEN STATE ---
+            if (bData) {
+                // 1. APPLY THE BLUE COLOR
+                td.className = 'booked-cell';
+
+                // 2. INJECT ALL REQUIRED INFO
+                td.innerHTML = `
+                    <b>${bData.student_name}</b>
+                    <small>Roll: ${bData.student_roll}</small>
+                    <hr>
+                    <small>T.ID: ${bData.teacher_id}</small>
+                    <small>T.Name: ${tName}</small>
+                    <small>Sub: ${bData.course}</small>
+                `;
+
+                // 3. ADD HOVER POPUP (TOOLTIP)
+                td.title = `STUDENT: ${bData.student_name}\nROLL: ${bData.student_roll}\nTEACHER ID: ${bData.teacher_id}\nTEACHER: ${tName}\nSUBJECT: ${bData.course}`;
+
+                // Add Delete button for Staff
+                if (currentUserProfile.role !== 'Student') {
+                    td.innerHTML += `<button class="btn-cancel-mischief" style="font-size:10px; padding:2px; width:100%;" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')">CANCEL</button>`;
+                }
+            } else {
+                // If not booked, check if it's the "active" day to show the Book button
+                if (day === activeDayName) {
                     if (currentUserProfile.role === 'Student') {
                         td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
                     } else {
-                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">VIEW ONLY</span>`;
+                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">EMPTY</span>`;
                     }
+                } else {
+                    // Dim out other days
+                    td.style.opacity = "0.2";
                 }
-                tr.appendChild(td);
-            });
-            tbody.appendChild(tr);
+            }
+            tr.appendChild(td);
         });
-        document.getElementById('timetable-wrapper').style.display = 'block';
-    }
+        tbody.appendChild(tr);
+    });
+    document.getElementById('timetable-wrapper').style.display = 'block';
+}
     /**
      * 6. BOOKING VALIDATIONS
      */
