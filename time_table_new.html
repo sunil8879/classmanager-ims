@@ -519,46 +519,45 @@ async function checkMischiefHistory(studentRoll) {
 
 async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
     const selectedTime = document.getElementById(selectId).value;
+    
+    // 1. Sync hidden inputs
     document.getElementById('f-roll').value = roll;
     document.getElementById('f-teacher-id').value = tid;
     document.getElementById('f-course').value = course;
     document.getElementById('f-official-slots').value = allSlots;
     document.getElementById('f-teacher-name').value = tname;
 
-    // Show selection in UI
-    document.getElementById('preferred-slot-status').innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span>`;
+    // 2. Create/Update the missing 'f-time' field
+    let fTime = document.getElementById('f-time');
+    if(!fTime) {
+        fTime = document.createElement('input'); fTime.type = 'hidden'; fTime.id = 'f-time';
+        document.body.appendChild(fTime);
+    }
+    fTime.value = selectedTime;
 
-    // THE VALIDATION CHECK
-    const { count: c } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
-    document.getElementById('mischief-warning-new').style.display = (c >= 2) ? 'block' : 'none';
+    // 3. Update UI and Check Mischief Warning
+    document.getElementById('preferred-slot-status').innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span>`;
+    const { count } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
+    document.getElementById('mischief-warning-new').style.display = (count >= 2) ? 'block' : 'none';
+    
+    alert("Selection synced. Now click 'Generate Booking Grid'.");
 }
 
     /**
      * 5. GRID GENERATION (ROLE BASED)
      */
-    async function generateTimeTable() {
-        const tid = document.getElementById('f-teacher-id').value;
-        const dateVal = document.getElementById('f-date').value;
-        const prefTime = document.getElementById('f-time').value;
-        const officialTime = document.getElementById('f-official-slots').value;
-        const statusDiv = document.getElementById('preferred-slot-status');
+async function generateTimeTable() {
+    const tid = document.getElementById('f-teacher-id').value;
+    const dateVal = document.getElementById('f-date').value;
+    const fTimeElem = document.getElementById('f-time');
 
-        if (!tid) return alert("Please select an assignment from the table first.");
+    if (!tid || !fTimeElem) return alert("Please click 'SELECT' on a student row first!");
 
-        // Validation for Preferred Slot Message
-        if (officialTime.includes(prefTime)) {
-            statusDiv.innerText = "✅ PREFERRED SLOT IS WITHIN BATCH HOURS";
-            statusDiv.style.color = "green";
-        } else {
-            statusDiv.innerText = "❌ PREFERRED SLOT IS OUTSIDE BATCH HOURS";
-            statusDiv.style.color = "red";
-        }
+    const { data: bookings } = await db.from("class_bookings").select("*")
+        .eq("booking_date", dateVal).eq("teacher_id", tid).eq("institute_id", sessionInstID);
 
-        const { data: bookings } = await db.from("class_bookings").select("*")
-            .eq("booking_date", dateVal).eq("teacher_id", tid).eq("institute_id", sessionInstID);
-
-        renderTimetableGrid(bookings, dateVal);
-    }
+    renderTimetableGrid(bookings, dateVal);
+}
 
 function renderTimetableGrid(bookings, dateVal) {
     const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
