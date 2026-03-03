@@ -638,22 +638,23 @@ async function fetchStudent() {
 
 // --- 2. FETCH TEACHERS LINKED TO THAT SPECIFIC SUBJECT ---
 async function fetchTeachersForChosenSubject() {
-    const chosenSubject = document.getElementById('f-subject-choice').value;
+    const chosenSubject = document.getElementById('f-subject-choice').value.trim();
     const teacherSelect = document.getElementById("f-teacher");
     
     if (!chosenSubject) return;
     
-    teacherSelect.innerHTML = '<option value="">Searching...</option>';
+    teacherSelect.innerHTML = '<option value="">Searching teachers...</option>';
 
-    // 3. Find Teachers who teach this specific subject in this institute
+    // Correct table: teacher_details
+    // Correct columns: availability, time_of_slot, subject_taught
     const { data: teachers, error } = await db.from('teacher_details')
         .select('id, teacher_name, mobile, availability, time_of_slot, rating')
         .eq('institute_id', sessionInstID)
-        .ilike('subject_taught', `%${chosenSubject}%`)
+        .ilike('subject_taught', `%${chosenSubject}%`) // Finds subject even if listed with others
         .eq('status', 'Active');
 
     if (error || !teachers || teachers.length === 0) {
-        teacherSelect.innerHTML = '<option value="">No Teachers Found</option>';
+        teacherSelect.innerHTML = '<option value="">No Active Teachers for this subject</option>';
         return;
     }
 
@@ -663,15 +664,14 @@ async function fetchTeachersForChosenSubject() {
         opt.value = t.id;
         opt.text = `${t.teacher_name} (⭐ ${t.rating || 0})`;
         
-        // Save metadata to use when the user selects a teacher
+        // Map the database columns to the dataset
         opt.dataset.name = t.teacher_name;
         opt.dataset.mobile = t.mobile;
         opt.dataset.availability = t.availability;
-        opt.dataset.slotMap = t.time_of_slot; // JSON String
+        opt.dataset.slotMap = JSON.stringify(t.time_of_slot); // Important: Ensure it's stringified
         teacherSelect.appendChild(opt);
     });
 }
-
 // --- 3. SHOW THE SPECIFIC TIME SLOTS FOR THAT SUBJECT ---
 document.getElementById("f-teacher").addEventListener("change", function () {
     const selectedOption = this.options[this.selectedIndex];
@@ -1076,54 +1076,63 @@ async function populateTeachersBySubject(studentCourse) {
 // --- 3. SYNC BATCH TIMINGS (Capture the exact subject timings for the teacher) ---
 document.getElementById("f-teacher").addEventListener("change", function () {
     const selectedOption = this.options[this.selectedIndex];
-    const studentCourse = document.getElementById('f-course').value.trim().toUpperCase();
-    const slotsDisplay = document.getElementById("f-teacher-available-slots");
-    const nameDisplay = document.getElementById("f-teacher-name");
+    const slotsInput = document.getElementById("f-teacher-available-slots");
+    const nameInput = document.getElementById("f-teacher-name");
+    
+    // Get the subject the student chose from the dropdown
+    const chosenSubject = document.getElementById('f-subject-choice').value.trim().toUpperCase();
 
-    if (!this.value) {
-        nameDisplay.value = "";
-        slotsDisplay.value = "";
+    if (!this.value || !chosenSubject) {
+        nameInput.value = "";
+        slotsInput.value = "";
         return;
     }
 
-    nameDisplay.value = selectedOption.dataset.name;
+    // Populate Teacher Name
+    nameInput.value = selectedOption.dataset.name || "";
 
-    // Logic to extract subject-specific timing from the Teacher's Profile
     try {
-        const rawMap = selectedOption.dataset.slotMap;
         const avail = selectedOption.dataset.availability;
-        
-        // If teacher marked as unavailable
+        const rawMap = selectedOption.dataset.slotMap; // This is the 'time_of_slot' column
+
         if (avail === "No") {
-            slotsDisplay.value = "TEACHER IS NOT AVAILABLE TOMORROW";
+            slotsInput.value = "TEACHER MARKED UNAVAILABLE IN PORTAL";
             return;
         }
 
-        // Parse the Slot Map (JSON set in Teacher Portal)
-        const slotMap = JSON.parse(rawMap);
-        let foundSlots = "";
+        // Parse the JSON safely
+        let slotMap = {};
+        if (typeof rawMap === 'string') {
+            slotMap = JSON.parse(rawMap);
+        } else {
+            slotMap = rawMap; // Supabase sometimes auto-parses JSON
+        }
 
-        // Look for the specific timing for the student's course
-        Object.keys(slotMap).forEach(subject => {
-            if (subject.toUpperCase() === studentCourse) {
-                foundSlots = slotMap[subject];
+        // FIND THE SLOT (Fuzzy Match Logic)
+        let foundSlots = "";
+        
+        // Loop through the keys in the teacher's time_of_slot JSON
+        Object.keys(slotMap).forEach(key => {
+            // Clean both strings: remove spaces and make UPPERCASE
+            if (key.trim().toUpperCase() === chosenSubject) {
+                foundSlots = slotMap[key];
             }
         });
 
         if (foundSlots) {
-            slotsDisplay.value = foundSlots;
-            // Update the Time Selection dropdown to only show the relevant slot if needed
-            // Or just inform the student
+            slotsInput.value = foundSlots;
+            slotsInput.style.color = "#000"; // Ensure visibility
         } else {
-            slotsDisplay.value = "No specific slots found for this subject.";
+            // Debugging helper: tells you what it found vs what it wanted
+            console.log("Looking for:", chosenSubject, "Available in Map:", Object.keys(slotMap));
+            slotsInput.value = "NO SLOTS FOUND FOR SUBJECT: " + chosenSubject;
         }
-        
+
     } catch (e) {
-        console.error("Slot Parsing Error:", e);
-        slotsDisplay.value = "Error reading teacher timings.";
+        console.error("JSON Error:", e);
+        slotsInput.value = "ERROR READING TEACHER TIMINGS";
     }
 });
-
 
 
 // --- ADD THIS AT THE VERY BOTTOM OF YOUR SCRIPT TAG ---
