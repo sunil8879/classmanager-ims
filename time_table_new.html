@@ -493,7 +493,7 @@ async function checkMischiefHistory(studentRoll) {
     /**
      * 4. LOAD SUMMARY TABLE (TIDY PRESENTATION)
      */
-    async function loadAssignmentSummary() {
+async function loadAssignmentSummary() {
     const tbody = document.getElementById('session-table-body');
     const userNameUpper = currentUserProfile.full_name.toUpperCase();
 
@@ -516,14 +516,13 @@ async function checkMischiefHistory(studentRoll) {
     listData.forEach((item, index) => {
         const batch = batchData?.find(b => b.batch_name === item.batch_name);
         const rawTime = batch ? batch.batch_time : "";
-        
-        // Split times by comma and create dropdown options
-        const timeOptions = rawTime.split(',').map(t => 
-            `<option value="${t.trim()}">${t.trim()}</option>`
-        ).join('');
+        const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
+        const selectId = "time-select-" + index;
 
-        // Create a unique ID for the dropdown in this row
-        const selectId = `time-select-${index}`;
+        // SAFE STRING HANDLING: Escape quotes in names/batches
+        const sNameSafe = item.student_name.replace(/'/g, "\\'");
+        const bNameSafe = item.batch_name.replace(/'/g, "\\'");
+        const tNameSafe = item.teacher_name.replace(/'/g, "\\'");
 
         tbody.innerHTML += `
             <tr>
@@ -533,18 +532,13 @@ async function checkMischiefHistory(studentRoll) {
                 <td>${item.teacher_id}</td>
                 <td>${item.course_name}</td>
                 <td>${item.batch_name}</td>
+                <td><select id="${selectId}">${timeOptions}</select></td>
                 <td>
-                    <select id="${selectId}" style="height:35px; width:100%; font-size:0.8rem; border:1px solid #000;">
-                        ${timeOptions}
-                    </select>
-                </td>
-                <td>
-                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}')">SELECT</button>
+                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${sNameSafe}','${bNameSafe}','${item.teacher_id}','${tNameSafe}','${rawTime}', '${selectId}')">SELECT</button>
                 </td>
             </tr>`;
     });
 }
-
 async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
     const selectedTime = document.getElementById(selectId).value;
 
@@ -722,86 +716,70 @@ if (batchMembers.length > 0) {
      * 6. BOOKING VALIDATIONS
      */
 async function bookThisSlot(day, time) {
-    // 1. GET DATA
-    const roll = document.getElementById('f-roll').value;
-    const dateVal = document.getElementById('f-date').value;
-    const officialTime = document.getElementById('f-official-slots').value;
-    const currentCourse = document.getElementById('f-course').value; 
-    const tid = document.getElementById('f-teacher-id').value;
-    const tname = document.getElementById('f-teacher-name').value;
+    var roll = document.getElementById('f-roll').value;
+    var dateVal = document.getElementById('f-date').value;
+    var officialTime = document.getElementById('f-official-slots').value;
+    var currentBatch = document.getElementById('f-course').value; 
+    var tid = document.getElementById('f-teacher-id').value;
 
     if (!roll) {
         alert("Please select an assignment from the table first.");
         return;
     }
 
-    // 2. VALIDATION: MAX 3 PER DAY
-    const { count: bCount } = await db.from('class_bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll)
-        .eq('booking_date', dateVal);
-
-    if (bCount >= 3) {
-        alert("🛑 ACCESS DENIED: Daily limit of 3 classes reached!");
+    // 1. LIMIT VALIDATION
+    var bRes = await db.from('class_bookings').select('*', { count: 'exact', head: true }).eq('student_roll', roll).eq('booking_date', dateVal);
+    if (bRes.count >= 3) {
+        alert("ERROR: Daily limit of 3 classes reached!");
         return;
     }
 
-    // 3. VALIDATION: MISCHIEF CHECK
-    const { count: cCount } = await db.from('class_cancellations')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll);
-
-    if (cCount >= 2) {
-        alert("🛑 ACCESS DENIED: Too many cancellations recorded!");
+    // 2. MISCHIEF VALIDATION
+    var cRes = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
+    if (cRes.count >= 2) {
+        alert("ACCESS DENIED: Too many cancellations!");
         return;
     }
 
-    // 4. VALIDATION: BATCH MATCHING
-    const { data: exBatch } = await db.from('class_bookings')
-        .select('course')
-        .eq('teacher_id', tid)
-        .eq('booking_date', dateVal)
-        .eq('time_slot', time)
-        .limit(1);
-
-    if (exBatch && exBatch.length > 0) {
-        if (exBatch[0].course !== currentCourse) {
-            alert("❌ BATCH CONFLICT: This slot is reserved for " + exBatch[0].course);
+    // 3. BATCH VALIDATION
+    var exRes = await db.from('class_bookings').select('course').eq('teacher_id', tid).eq('booking_date', dateVal).eq('time_slot', time).limit(1);
+    if (exRes.data && exRes.data.length > 0) {
+        if (exRes.data[0].course !== currentBatch) {
+            alert("BATCH CONFLICT: This slot is for " + exRes.data[0].course);
             return;
         }
     }
 
-    // 5. VALIDATION: OFFICIAL TIME
-    if (!officialTime.includes(time)) {
-        alert("❌ DENIED: Outside official batch schedule.");
+    // 4. OFFICIAL TIME VALIDATION
+    if (officialTime.indexOf(time) === -1) {
+        alert("DENIED: Outside teacher schedule.");
         return;
     }
 
-    // 6. WHATSAPP FLOW (FIXED SYNTAX)
-    const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
-    if (tData && tData.mobile) {
-        const msg = "Booking for Batch: " + currentCourse + " on " + dateVal + " at " + time;
-        window.open("https://wa.me/91" + tData.mobile + "?text=" + encodeURIComponent(msg), "_blank");
-        
-        const confirmSave = confirm("WhatsApp opened. Did you send the message? Click OK to save.");
-        if (!confirmSave) return;
+    // 5. WHATSAPP FLOW (CLEAN STRING BUILDING)
+    var tMobileRes = await db.from('teacher_details').select('mobile').eq('id', tid).single();
+    if (tMobileRes.data && tMobileRes.data.mobile) {
+        var msgText = "Booking: " + currentBatch + " on " + dateVal + " at " + time;
+        var waUrl = "https://wa.me/91" + tMobileRes.data.mobile + "?text=" + encodeURIComponent(msgText);
+        window.open(waUrl, "_blank");
+        if (!confirm("Confirm WhatsApp sent?")) return;
     }
 
-    // 7. SAVE TO DATABASE
-    const { error: insertErr } = await db.from("class_bookings").insert({
+    // 6. SAVE TO DATABASE
+    var insertRes = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
         student_roll: roll,
         student_name: currentUserProfile.full_name.toUpperCase(),
         booking_date: dateVal,
         time_slot: time,
-        course: currentCourse
+        course: currentBatch
     });
 
-    if (insertErr) {
-        alert("Database Error: " + insertErr.message);
+    if (insertRes.error) {
+        alert("Error: " + insertRes.error.message);
     } else {
-        document.getElementById('confirmation-text').innerText = "Success! Class booked for " + currentCourse;
+        document.getElementById('confirmation-text').innerText = "Success! Booked for " + currentBatch;
         document.getElementById('confirm-modal').style.display = 'flex';
         generateTimeTable(); 
     }
