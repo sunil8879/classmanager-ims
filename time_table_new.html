@@ -506,7 +506,7 @@ async function loadAssignmentSummary() {
     }
 
     const { data: listData } = await query;
-    const { data: batchData } = await db.from('batches').select('batch_name, batch_time').eq('institute_id', sessionInstID);
+ const { data: batchData } = await db.from('batches').select('batch_name, batch_time, students_allotted').eq('institute_id', sessionInstID);
 
     tbody.innerHTML = "";
     if (!listData || listData.length === 0) {
@@ -516,10 +516,11 @@ async function loadAssignmentSummary() {
 listData.forEach((item, index) => {
     const batch = batchData?.find(b => b.batch_name === item.batch_name);
     const rawTime = batch ? batch.batch_time : "";
-    const totalCap = batch ? (batch.capacity || 10) : 10; // Default to 10 if empty
+    // Pull the actual capacity from the 'students_allotted' column
+    const totalCap = batch ? (batch.students_allotted || 10) : 10; 
 
-    const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
     const selectId = "time-select-" + index;
+    const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
 
     tbody.innerHTML += `
         <tr>
@@ -536,7 +537,7 @@ listData.forEach((item, index) => {
         </tr>`;
 });
 }
-async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId, totalCap) {
+async function syncSelection(roll, sname, bname, tid, tname, allSlots, selectId, totalCap) {
     const selectedTime = document.getElementById(selectId).value;
 
     // 1. Sync hidden inputs
@@ -546,7 +547,7 @@ async function syncSelection(roll, sname, course, tid, tname, allSlots, selectId
     document.getElementById('f-teacher-id').value = tid;
     document.getElementById('f-teacher-name').value = tname;
     document.getElementById('f-official-slots').value = allSlots;
-document.getElementById('f-capacity').value = totalCap; // Store capacity
+document.getElementById('f-capacity').value = totalCap; 
     
     // 2. Manage the missing 'f-time' field (Hidden storage)
     let fTime = document.getElementById('f-time');
@@ -644,7 +645,7 @@ const totalCap = document.getElementById('f-capacity').value || 10;
     ${deleteBtn}
     <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
     <div style="font-size:0.7rem; line-height:1.4;">
-        <b style="color:red;">SIZE: ${batchMembers.length} / ${totalCap}</b><br>
+  <b style="color:red;">SIZE: ${batchMembers.length} / ${totalCap}</b>
         <b style="color:blue;">BATCH: ${batchSubject}</b>
         <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
             ${rollList}
@@ -695,8 +696,7 @@ async function bookThisSlot(day, time) {
     const tname = document.getElementById('f-teacher-name').value;
     
     // Get capacity (default to 10 if not found)
-    const totalCapacity = parseInt(document.getElementById('f-capacity').value || 10);
-
+ const totalCap = parseInt(document.getElementById('f-capacity').value || 10);
     // Safety check: ensure a student is selected
     if (!roll) {
         alert("Please select an assignment from the summary table first.");
@@ -726,16 +726,15 @@ async function bookThisSlot(day, time) {
 
     // 4. VALIDATION: BATCH CAPACITY (e.g., 10/10)
     // We count how many students are ALREADY in this specific teacher's slot
-    const { count: currentBatchSize } = await db.from('class_bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('teacher_id', tid)
-        .eq('booking_date', dateVal)
-        .eq('time_slot', time);
+   const { count: currentSize } = await db.from('class_bookings')
+    .select('*', { count: 'exact', head: true })
+    .eq('teacher_id', tid)
+    .eq('booking_date', dateVal)
+    .eq('time_slot', time);
 
-    if (currentBatchSize >= totalCapacity) {
-        alert(`🛑 BATCH FULL: This slot has reached its maximum capacity of ${totalCapacity} students.`);
-        return;
-    }
+if (currentSize >= totalCap) {
+    return alert("🛑 BATCH FULL: This batch has reached its maximum capacity of " + totalCap + " students.");
+}
 
     // 5. VALIDATION: BATCH NAME MATCHING
     const { data: existingBatch } = await db.from('class_bookings')
