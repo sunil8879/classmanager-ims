@@ -346,58 +346,58 @@
     checkCurrentSession();
 
     // 1. FETCH FROM LIST TABLE
-    async function fetchStudent() {
-        const roll = document.getElementById('f-roll').value.trim().toUpperCase();
-        if (!roll) return alert("Please enter Student Roll Number.");
-        if (!sessionInstID) await checkCurrentSession();
+ async function fetchStudent() {
+            const roll = document.getElementById('f-roll').value.trim().toUpperCase();
+            if (!roll) return alert("Enter Roll Number.");
+            if (!sessionInstID) await checkCurrentSession();
 
-        const { data: assignments, error } = await db.from('list')
-            .select('teacher_name, course_name, batch_name, student_name, teacher_id')
-            .eq('roll_number', roll).eq('institute_id', sessionInstID);
+            // Fetch ALL assignments for this student
+            const { data: assignments, error } = await db.from('list')
+                .select('*').eq('roll_number', roll).eq('institute_id', sessionInstID);
 
-        if (error || !assignments || assignments.length === 0) {
-            return alert("No Assignments found for this Roll Number in Master List.");
+            if (error || !assignments || assignments.length === 0) return alert("No assignments found.");
+
+            currentStudentAssignments = assignments;
+            document.getElementById('f-student-name').value = assignments[0].student_name;
+
+            const idSel = document.getElementById('f-teacher-id');
+            const nameSel = document.getElementById('f-teacher-name');
+            const batchSel = document.getElementById('f-batch-name');
+
+            // Clear and Fill dropdowns with all subjects found
+            idSel.innerHTML = ''; nameSel.innerHTML = ''; batchSel.innerHTML = '';
+            assignments.forEach((item, index) => {
+                idSel.innerHTML += `<option value="${index}">${item.teacher_id}</option>`;
+                nameSel.innerHTML += `<option value="${index}">${item.teacher_name} (${item.course_name})</option>`;
+                batchSel.innerHTML += `<option value="${index}">${item.batch_name}</option>`;
+            });
+
+            syncAssignments('id'); 
         }
-
-        currentStudentAssignments = assignments;
-        document.getElementById('f-student-name').value = assignments[0].student_name;
-
-        const idSel = document.getElementById('f-teacher-id');
-        const nameSel = document.getElementById('f-teacher-name');
-        const batchSel = document.getElementById('f-batch-name');
-
-        idSel.innerHTML = ''; nameSel.innerHTML = ''; batchSel.innerHTML = '';
-
-        assignments.forEach((item, index) => {
-            idSel.innerHTML += `<option value="${index}">${item.teacher_id}</option>`;
-            nameSel.innerHTML += `<option value="${index}">${item.teacher_name}</option>`;
-            batchSel.innerHTML += `<option value="${index}">${item.batch_name}</option>`;
-        });
-
-        syncAssignments('id');
-        alert("Records Fetched Successfully!");
-    }
-
     // 2. SYNC DROPDOWNS & FETCH FROM BATCHES
-    async function syncAssignments(changedType) {
-        let index;
-        if (changedType === 'id') index = document.getElementById('f-teacher-id').value;
-        else if (changedType === 'name') index = document.getElementById('f-teacher-name').value;
-        else index = document.getElementById('f-batch-name').value;
+async function syncAssignments(type) {
+            const idField = document.getElementById('f-teacher-id');
+            const nameField = document.getElementById('f-teacher-name');
+            const batchField = document.getElementById('f-batch-name');
+            
+            // Get the index from whichever dropdown was clicked
+            const index = (type === 'id') ? idField.value : (type === 'name' ? nameField.value : batchField.value);
+            if (index === "") return;
 
-        if (index === "") return;
+            // Sync all three dropdowns to the same index
+            idField.value = index; nameField.value = index; batchField.value = index;
 
-        document.getElementById('f-teacher-id').value = index;
-        document.getElementById('f-teacher-name').value = index;
-        document.getElementById('f-batch-name').value = index;
+            const selected = currentStudentAssignments[index];
+            document.getElementById('f-course').value = selected.course_name;
 
-        const selected = currentStudentAssignments[index];
-        document.getElementById('f-course').value = selected.course_name;
+            // Fetch the EXACT timing for this specific batch name
+            const { data: batch } = await db.from('batches')
+                .select('batch_time')
+                .eq('batch_name', selected.batch_name)
+                .eq('institute_id', sessionInstID).maybeSingle();
 
-        // FETCH OFFICIAL TIME
-        const { data: batch } = await db.from('batches').select('batch_time').eq('batch_name', selected.batch_name).eq('institute_id', sessionInstID).maybeSingle();
-        document.getElementById('f-teacher-available-slots').value = batch ? batch.batch_time : "Time not found in Batches.";
-    }
+            document.getElementById('f-teacher-available-slots').value = batch ? batch.batch_time : "Timing Not Set.";
+        }
 
     // 3. GENERATE GRID
     async function generateTimeTable() {
