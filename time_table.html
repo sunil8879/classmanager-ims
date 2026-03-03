@@ -432,6 +432,11 @@ input[readonly] {
                 <input type="text" id="f-course" readonly placeholder="Auto-populated">
             </div>
 
+
+
+
+
+
 <!-- NEW: Select Subject Dropdown -->
 <div class="input-group">
     <label>4. Choose Subject to Book</label>
@@ -602,40 +607,55 @@ const DAYS = [
 
         // --- 2. DATABASE FETCH LOGIC ---
 // --- 1. FETCH STUDENT & POPULATE SUBJECTS ---
+// --- COMPLETE FETCH STUDENT FUNCTION ---
 async function fetchStudent() {
+    // 1. Get the Roll Number from the box
     const roll = document.getElementById('f-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter Student Roll Number.");
 
+    // 2. Ensure we know which Institute is logged in
     if (!sessionInstID) await checkCurrentSession();
 
-    // 1. Get Student Name and their list of Courses
-    const { data: stu, error } = await db.from('students')
+    // 3. Get the data from the 'students' table in Supabase
+    const { data, error } = await db.from('students')
         .select('full_name, course')
         .eq('roll_number', roll)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (error || !stu) return alert("Student not found.");
+    if (error) return alert("Database Error: " + error.message);
+    if (!data) return alert("Student not found. Check Roll Number.");
 
-    document.getElementById('f-student-name').value = stu.full_name;
-    document.getElementById('f-course').value = stu.course;
+    // 4. Fill the readonly text boxes
+    document.getElementById('f-student-name').value = data.full_name || '';
+    document.getElementById('f-course').value = data.course || '';
 
-    // 2. Break the course string (e.g., "Maths, Science") into a dropdown
+    // 5. Get the 'Choose Subject' dropdown element
     const subjectDropdown = document.getElementById('f-subject-choice');
-    subjectDropdown.innerHTML = '<option value="">-- Select Subject --</option>';
     
-    if (stu.course) {
-        const subjects = stu.course.split(',').map(s => s.trim());
-        subjects.forEach(sub => {
-            let opt = document.createElement('option');
-            opt.value = sub.toUpperCase();
-            opt.text = sub.toUpperCase();
-            subjectDropdown.appendChild(opt);
-        });
-    }
-    alert("Student found! Now choose a subject from the new dropdown.");
-}
+    // 6. Reset the dropdown and add the default starting option
+    subjectDropdown.innerHTML = '<option value="">-- Select Subject --</option>';
 
+    // 7. Split the course string and clean it
+    // Example: "MATHS (10:00 AM), SCIENCE (11:00 AM)" becomes a list
+    if (data.course) {
+        const listItems = data.course.split(',');
+
+        listItems.forEach(item => {
+            // Remove everything after the bracket to get the clean name
+            // Example: "MATHS (10:00 AM)" -> "MATHS"
+            const cleanName = item.split('(')[0].trim().toUpperCase();
+
+            if (cleanName) {
+                let opt = document.createElement('option');
+                opt.value = cleanName;
+                opt.text = cleanName;
+                subjectDropdown.appendChild(opt);
+            }
+        });
+        alert("Student found! Now pick a subject from the choice dropdown.");
+    }
+}
 // --- 2. FETCH TEACHERS LINKED TO THAT SPECIFIC SUBJECT ---
 async function fetchTeachersForChosenSubject() {
     const chosenSubject = document.getElementById('f-subject-choice').value.trim();
@@ -643,39 +663,34 @@ async function fetchTeachersForChosenSubject() {
     
     if (!chosenSubject) return;
     
-    teacherSelect.innerHTML = '<option value="">Searching teachers...</option>';
+    teacherSelect.innerHTML = '<option value="">Searching batches...</option>';
 
-    // Correct table: teacher_details
-    // Correct columns: availability, time_of_slot, subject_taught
-    const { data: teachers, error } = await db.from('teacher_details')
-        .select('id, teacher_name, mobile, availability, time_of_slot, rating')
+    // LOOK IN THE 'batches' TABLE (Section 5)
+    const { data: batchList, error } = await db.from('batches')
+        .select('teacher_id, teacher_name, batch_time, subject_name')
         .eq('institute_id', sessionInstID)
-        .ilike('subject_taught', `%${chosenSubject}%`) // Finds subject even if listed with others
-        .eq('status', 'Active');
+        .ilike('subject_name', `%${chosenSubject}%`); // Match the subject
 
-    if (error || !teachers || teachers.length === 0) {
-        teacherSelect.innerHTML = '<option value="">No Active Teachers for this subject</option>';
+    if (error || !batchList || batchList.length === 0) {
+        teacherSelect.innerHTML = '<option value="">No Batch created for this subject</option>';
         return;
     }
 
     teacherSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
-    teachers.forEach(t => {
+    batchList.forEach(b => {
         let opt = document.createElement('option');
-        opt.value = t.id;
-        opt.text = `${t.teacher_name} (⭐ ${t.rating || 0})`;
+        opt.value = b.teacher_id;
+        opt.text = `${b.teacher_name} (Batch: ${b.batch_name || 'Active'})`;
         
-        // Map the database columns to the dataset
-        opt.dataset.name = t.teacher_name;
-        opt.dataset.mobile = t.mobile;
-        opt.dataset.availability = t.availability;
-        opt.dataset.slotMap = JSON.stringify(t.time_of_slot); // Important: Ensure it's stringified
+        // STORE THE BATCH DATA
+        opt.dataset.name = b.teacher_name;
+        opt.dataset.batchTime = b.batch_time; // This comes from Section 5
         teacherSelect.appendChild(opt);
     });
 }
 // --- 3. SHOW THE SPECIFIC TIME SLOTS FOR THAT SUBJECT ---
 document.getElementById("f-teacher").addEventListener("change", function () {
     const selectedOption = this.options[this.selectedIndex];
-    const chosenSubject = document.getElementById('f-subject-choice').value;
     const slotsInput = document.getElementById("f-teacher-available-slots");
     const nameInput = document.getElementById("f-teacher-name");
 
@@ -686,16 +701,9 @@ document.getElementById("f-teacher").addEventListener("change", function () {
     }
 
     nameInput.value = selectedOption.dataset.name;
-
-    try {
-        const slotMap = JSON.parse(selectedOption.dataset.slotMap);
-        const avail = selectedOption.dataset.availability;
-
-        if (avail === "No") {
-            slotsInput.value = "TEACHER UNAVAILABLE TODAY";
-            return;
-        }
-
+    // Show the time assigned in Section 5 (Batch Management)
+    slotsInput.value = selectedOption.dataset.batchTime || "No time assigned to this batch.";
+});
         // Find the slot for the CHOSEN subject specifically
         let specificSlots = "";
         Object.keys(slotMap).forEach(key => {
