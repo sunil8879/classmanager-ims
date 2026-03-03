@@ -539,7 +539,7 @@ async function checkMischiefHistory(studentRoll) {
                     </select>
                 </td>
                 <td>
-                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.course_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}')">SELECT</button>
+                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}')">SELECT</button>
                 </td>
             </tr>`;
     });
@@ -648,14 +648,14 @@ function renderTimetableGrid(bookings, dateVal) {
             }
 
             // List of Roll Numbers in the batch
-            const rollList = batchMembers.map(m => `• Roll: ${m.student_roll}`).join('<br>');
+          const rollList = batchMembers.map(m => `• ${m.student_name} (${m.student_roll})`).join('<br>');
 
             tdTime.innerHTML = `
                 ${deleteBtn}
                 <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
                 <div style="font-size:0.7rem; line-height:1.4;">
                     <b style="color:red;">BATCH SIZE: ${batchMembers.length}</b><br>
-                    <b style="color:blue;">SUB: ${batchSubject}</b><br>
+                  <b style="color:blue;">BATCH: ${batchSubject}</b>
                     <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
                         ${rollList}
                     </div>
@@ -736,12 +736,13 @@ async function bookThisSlot(day, time) {
         .eq('time_slot', time)
         .limit(1);
 
-    if (existingBatch && existingBatch.length > 0) {
-        const batchSubject = existingBatch[0].course;
-        if (batchSubject !== currentCourse) {
-            return alert(`❌ SUBJECT CONFLICT: This ${time} slot is a "${batchSubject}" batch. You are assigned to "${currentCourse}" and cannot join.`);
-        }
+// Change the validation check (around line 664) to this:
+if (existingBatch && existingBatch.length > 0) {
+    const activeBatchName = existingBatch[0].course; 
+    if (activeBatchName !== currentCourse) {
+        return alert(`❌ BATCH CONFLICT: This slot is already booked for the "${activeBatchName}" batch. You belong to "${currentCourse}" and cannot join.`);
     }
+}
 
     // --- 4. BATCH TIME VALIDATION ---
     if (!officialTime.includes(time)) return alert("❌ DENIED: Not within Teacher's Batch schedule.");
@@ -749,13 +750,14 @@ async function bookThisSlot(day, time) {
     // --- 5. WHATSAPP FLOW ---
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     if (tData?.mobile) {
-        window.open(`https://wa.me/91${tData.mobile}?text=Booking: ${currentCourse} at ${time}`, "_blank");
+       // Update the WhatsApp message line (around line 673):
+window.open(`https://wa.me/91${tData.mobile}?text=Booking: Batch ${currentCourse} at ${time}`, "_blank");
         if (!confirm("WhatsApp opened. Confirm sent?")) return;
     }
 
     // --- 6. SAVE ---
     const { error } = await db.from("class_bookings").insert({
-        institute_id: sessionInstID, teacher_id: tid, student_roll: roll, 
+        institute_id: sessionInstID, teacher_id: tid, student_roll: roll, student_name: currentUserProfile.full_name.toUpperCase(),
         booking_date: dateVal, time_slot: time, course: currentCourse
     });
 
