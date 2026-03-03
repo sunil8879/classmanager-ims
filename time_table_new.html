@@ -449,21 +449,9 @@
      * 3. MISCHIEF WARNING LOGIC
      */
 async function checkMischiefHistory(studentRoll) {
-    if (!studentRoll) return;
-
-    const { count, error } = await db
-        .from('class_cancellations')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_roll', studentRoll);
-
-    const warningBox = document.getElementById('mischief-warning-new');
-    if (count >= 2) {
-        warningBox.style.display = 'block';
-    } else {
-        warningBox.style.display = 'none';
-    }
+    const { count } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', studentRoll);
+    document.getElementById('mischief-warning-new').style.display = (count >= 2) ? 'block' : 'none';
 }
-
     /**
      * 4. LOAD SUMMARY TABLE (TIDY PRESENTATION)
      */
@@ -518,12 +506,8 @@ async function checkMischiefHistory(studentRoll) {
             </tr>`;
     });
 }
-
-    function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
-    // Get the specific time selected in that row
+function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
     const selectedTime = document.getElementById(selectId).value;
-
-    // Sync to hidden fields and the global f-time (even though UI is removed, logic needs it)
     document.getElementById('f-roll').value = roll;
     document.getElementById('f-student-name').value = sname;
     document.getElementById('f-course').value = course;
@@ -531,21 +515,18 @@ async function checkMischiefHistory(studentRoll) {
     document.getElementById('f-teacher-name').value = tname;
     document.getElementById('f-official-slots').value = allSlots;
     
-    // Create a dummy f-time if it doesn't exist to store the choice
+    // Store selected time
     let fTime = document.getElementById('f-time');
     if(!fTime) {
-        fTime = document.createElement('input');
-        fTime.type = 'hidden';
-        fTime.id = 'f-time';
+        fTime = document.createElement('input'); fTime.type = 'hidden'; fTime.id = 'f-time';
         document.body.appendChild(fTime);
     }
     fTime.value = selectedTime;
 
-    const statusDiv = document.getElementById('preferred-slot-status');
-    statusDiv.innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span> for ${course}`;
+    document.getElementById('preferred-slot-status').innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span>`;
     
-    alert(`Priority set to ${selectedTime}. Now click 'Generate Booking Grid'.`);
-checkMischiefHistory(roll);
+    // --- TRIGGER MISCHIEF CHECK ---
+    checkMischiefHistory(roll);
 }
 
     /**
@@ -601,13 +582,17 @@ function renderTimetableGrid(bookings, dateVal) {
             tdTime.style.minWidth = "200px";
             tdTime.style.textAlign = "left";
 
-            let deleteIconHtml = "";
-            if (currentUserProfile.role !== 'Student') {
-                deleteIconHtml = `<button style="background:#2d3436; color:#fff; border:none; padding:4px 8px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" onclick="cancelBooking('${bDataRow.id}','${bDataRow.student_roll}','Unknown')"><i class="fas fa-trash-alt"></i></button>`;
-            }
+          let deleteBtn = "";
+    const loggedInRoll = document.getElementById('f-roll').value;
 
-            tdTime.innerHTML = `
-                ${deleteIconHtml}
+    // Show delete icon if User is Teacher/Owner OR if it is the Student's OWN booking
+    if (currentUserProfile.role !== 'Student' || bDataRow.student_roll === loggedInRoll) {
+        deleteBtn = `<button style="background:#000; color:#fff; border:none; padding:4px 8px; position:absolute; top:5px; right:5px; cursor:pointer;" 
+                     onclick="cancelBooking('${bDataRow.id}','${bDataRow.student_roll}')">
+                     <i class="fas fa-trash-alt"></i></button>`;
+    }
+
+           tdTime.innerHTML = `${deleteBtn} 
                 <div style="font-weight:900; text-decoration:underline; font-size:0.85rem;">${time}</div>
                 <div style="font-size:0.7rem; margin-top:5px;">
                     <b>ROLL:</b> ${bDataRow.student_roll}<br>
@@ -650,83 +635,61 @@ function renderTimetableGrid(bookings, dateVal) {
     /**
      * 6. BOOKING VALIDATIONS
      */
-  async function bookThisSlot(day, time) {
+async function bookThisSlot(day, time) {
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
-    const officialTime = document.getElementById('f-official-slots').value;
     const course = document.getElementById('f-course').value;
     const tid = document.getElementById('f-teacher-id').value;
-    const tname = document.getElementById('f-teacher-name').value;
 
-    if (!roll) return alert("Please select an assignment first.");
+    if (!roll) return alert("Please select your assignment from the table first.");
 
-    // --- 1. VALIDATION: MAX 3 CLASSES PER DAY ---
-    const { count, error: countErr } = await db
-        .from('class_bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll)
-        .eq('booking_date', dateVal);
+    // --- LIMIT CHECK: MAX 3 PER DAY ---
+    const { count } = await db.from('class_bookings').select('*', { count: 'exact', head: true })
+        .eq('student_roll', roll).eq('booking_date', dateVal);
 
     if (count >= 3) {
-        alert("LIMIT REACHED: You cannot book more than 3 classes in a single day.");
+        alert("ACCESS DENIED: You have already booked 3 classes for this day. You cannot book more.");
         return;
     }
 
-    // --- 2. VALIDATION: OFFICIAL BATCH TIME ---
-    if (!officialTime.includes(time)) {
-        return alert("DENIED: Selected time is not within the Teacher's Batch schedule.");
-    }
-
-    // WhatsApp Confirmation (Optional but kept from your original code)
-    const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
-    if (tData?.mobile) {
-        const msg = `📚 Booking: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
-        window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
-        if (!confirm(`Sent WhatsApp to ${tname}? Click OK to finalize booking.`)) return;
-    }
-
-    // --- 3. INSERT BOOKING ---
+    // Insert Booking
     const { error } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
         student_roll: roll,
-        //student_name: currentUserProfile.full_name.toUpperCase(),
         booking_date: dateVal,
         time_slot: time,
-        //day: day,
         course: course
     });
 
-    if (error) {
-        alert(error.message);
-    } else {
-        document.getElementById('confirmation-text').innerText = `Success! Class booked for ${course} on ${dateVal} at ${time}.`;
-        document.getElementById('confirm-modal').style.display = 'flex';
-        generateTimeTable(); // Refresh grid
+    if (error) { alert(error.message); } 
+    else {
+        alert("Booking Successful!");
+        generateTimeTable(); // Refresh the grid
     }
 }
 
     /**
      * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
      */
-    async function cancelBooking(id, roll, name) {
-        if (!confirm(`Cancel booking for ${name} (${roll})? This will be logged as a cancellation for the student.`)) return;
+async function cancelBooking(bookingId, studentRoll) {
+    if (!confirm("Are you sure you want to cancel this class? This will be logged against the student's history.")) return;
 
-        // Log the cancellation for mischief tracking
-        await db.from('class_cancellations').insert([{
-            student_roll: roll,
-            student_name: name.toUpperCase(),
-            cancelled_by: currentUserProfile.role,
-            institute_id: sessionInstID
-        }]);
+    // 1. Log the cancellation for mischief tracking
+    await db.from('class_cancellations').insert([{
+        student_roll: studentRoll,
+        institute_id: sessionInstID
+    }]);
 
-        // Delete the booking
-        const { error } = await db.from('class_bookings').delete().eq('id', id);
-        if (!error) {
-            alert("Booking cancelled and mischief logged.");
-            generateTimeTable();
-        }
+    // 2. Delete the actual booking
+    const { error } = await db.from('class_bookings').delete().eq('id', bookingId);
+
+    if (!error) {
+        alert("Booking cancelled and history updated.");
+        generateTimeTable(); // Refresh grid
+        checkMischiefHistory(studentRoll); // Update warning message
     }
+}
 
     function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
 
