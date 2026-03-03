@@ -355,6 +355,18 @@
     font-size: 0.8rem;
     font-weight: bold;
 }
+
+
+
+
+/* YELLOW STYLE FOR TIME COLUMN */
+.time-slot.is-taken {
+    background: #FFD700 !important; /* Yellow */
+    color: #000 !important;
+    border: 2px solid #000 !important;
+    cursor: help;
+    font-weight: 900 !important;
+}
     </style>
 </head>
 <body>
@@ -614,9 +626,7 @@ function renderTimetableGrid(bookings, dateVal) {
     
     const jsDay = new Date(dateVal).getDay();
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
-    
-    // Get Teacher Name from the sync hidden input
-    const tName = document.getElementById('f-teacher-name').value || "Teacher";
+    const tName = document.getElementById('f-teacher-name').value;
 
     const tbody = document.getElementById('timetable-body');
     tbody.innerHTML = '';
@@ -624,121 +634,73 @@ function renderTimetableGrid(bookings, dateVal) {
     SLOTS.forEach(time => {
         const tr = document.createElement('tr');
         
-        // --- 1. THE TIME COLUMN (EXTREME LEFT) ---
+        // --- LEFT COLUMN: TIME ---
         const tdTime = document.createElement('td'); 
         tdTime.className = 'time-slot'; 
         tdTime.innerText = time;
 
-        // Check if ANY booking exists for this specific time in the data we fetched
-        const bookingInfo = bookings?.find(b => b.time_slot.trim() === time.trim());
+        // Check if this slot is booked (Matching only by time_slot)
+        const bData = bookings?.find(b => b.time_slot.trim() === time.trim());
 
-        if (bookingInfo) {
-            // APPLY YELLOW COLOR
-            tdTime.classList.add('slot-booked');
-            
-            // SET HOVER POPUP (Title attribute is universal for Owner/Teacher/Student)
-            tdTime.title = `
-                ⚠️ SLOT BOOKED
-                ----------------------
-                STUDENT: ${bookingInfo.student_name}
-                ROLL NO: ${bookingInfo.student_roll}
-                TEACHER ID: ${bookingInfo.teacher_id}
-                TEACHER: ${tName}
-                COURSE: ${bookingInfo.course}
-            `.replace(/^\s+/gm, ''); // Removes leading spaces for a clean popup
+        if (bData) {
+            tdTime.classList.add('is-taken');
+            // THE HOVER POPUP INFO
+            tdTime.title = `BOOKING DETAILS:\nStudent: ${bData.student_name}\nRoll: ${bData.student_roll}\nTeacher ID: ${bData.teacher_id}\nTeacher: ${tName}\nSubject: ${bData.course}`;
         }
-        
         tr.appendChild(tdTime);
 
-        // --- 2. THE DAY COLUMNS ---
+        // --- OTHER COLUMNS: DAYS ---
         DAYS.forEach(day => {
             const td = document.createElement('td');
             
-            // Lock other days
-            if (day !== activeDayName) {
-                td.style.opacity = "0.15";
-                td.style.pointerEvents = "none";
-            }
-
-            // Find booking for this specific cell
-            const cellBooking = bookings?.find(b => 
-                b.time_slot.trim() === time.trim() && 
-                b.day.toUpperCase() === day.toUpperCase()
-            );
-
-            if (cellBooking) {
-                // If booked, we can show a simple "Busy" text inside
-                td.innerHTML = `<span style="font-weight:bold; color:red;">OCCUPIED</span>`;
-                td.style.backgroundColor = "#f1f1f1";
-            } else {
-                // If not booked, and it's the active day, show the book button
-                if (day === activeDayName && currentUserProfile.role === 'Student') {
+            // Highlight only the active day (Tomorrow)
+            if (day === activeDayName) {
+                if (bData) {
+                    td.innerHTML = `<b style="color:red;">BOOKED</b>`;
+                } else if (currentUserProfile.role === 'Student') {
                     td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
-                } else if (day === activeDayName) {
-                    td.innerHTML = `<small>AVAILABLE</small>`;
+                } else {
+                    td.innerHTML = `OPEN`;
                 }
+            } else {
+                td.style.opacity = "0.2";
             }
             tr.appendChild(td);
         });
-        
         tbody.appendChild(tr);
     });
-    
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
     /**
      * 6. BOOKING VALIDATIONS
      */
-    async function bookThisSlot(day, time) {
-        const roll = document.getElementById('f-roll').value;
-        const dateVal = document.getElementById('f-date').value;
-        const officialTime = document.getElementById('f-official-slots').value;
-        const course = document.getElementById('f-course').value;
-        const tid = document.getElementById('f-teacher-id').value;
-        const tname = document.getElementById('f-teacher-name').value;
+async function bookThisSlot(day, time) {
+    const roll = document.getElementById('f-roll').value;
+    const dateVal = document.getElementById('f-date').value;
+    const officialTime = document.getElementById('f-official-slots').value;
+    const course = document.getElementById('f-course').value;
+    const tid = document.getElementById('f-teacher-id').value;
 
-        if (!officialTime.includes(time)) return alert("DENIED: Selected time is not within the Teacher's Batch schedule.");
+    if (!officialTime.includes(time)) return alert("DENIED: Outside Batch hours.");
 
-        // --- VALIDATION: MAX 3 CLASSES PER DAY ---
-        const { count, error: countErr } = await db
-            .from('class_bookings')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_roll', roll)
-            .eq('booking_date', dateVal);
+    // Insert Record (REMOVED 'day' TO FIX YOUR ERROR)
+    const { error } = await db.from("class_bookings").insert({
+        institute_id: sessionInstID,
+        teacher_id: tid,
+        student_roll: roll,
+        student_name: currentUserProfile.full_name.toUpperCase(),
+        booking_date: dateVal,
+        time_slot: time,
+        course: course
+    });
 
-        if (count >= 3) {
-            return alert("MISCHIEF BLOCK: You are not allowed to book more than 3 classes in a single day.");
-        }
-
-        // WhatsApp Confirmation
-        const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
-        if (tData?.mobile) {
-            const msg = `📚 Booking: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
-            window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
-            if (!confirm(`Sent WhatsApp to ${tname}? Click OK to finalize booking.`)) return;
-        }
-
-        // Insert Record
-        const { error } = await db.from("class_bookings").insert({
-            institute_id: sessionInstID,
-            teacher_id: tid,
-            student_roll: roll,
-            student_name: currentUserProfile.full_name.toUpperCase(),
-            booking_date: dateVal,
-            time_slot: time,
-            day: day,
-            course: course
-        });
-
-        if (error) {
-            alert(error.message);
-        } else {
-            document.getElementById('confirmation-text').innerText = `Success! Class booked for ${course} on ${dateVal} at ${time}.`;
-            document.getElementById('confirm-modal').style.display = 'flex';
-            generateTimeTable();
-        }
+    if (error) {
+        alert("Database Error: " + error.message);
+    } else {
+        alert("Success!");
+        generateTimeTable();
     }
-
+}
     /**
      * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
      */
