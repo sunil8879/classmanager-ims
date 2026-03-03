@@ -346,25 +346,25 @@
     checkCurrentSession();
 
     // 1. FETCH FROM LIST TABLE
- async function fetchStudent() {
+async function fetchStudent() {
             const roll = document.getElementById('f-roll').value.trim().toUpperCase();
             if (!roll) return alert("Enter Roll Number.");
             if (!sessionInstID) await checkCurrentSession();
 
-            // Fetch ALL assignments for this student
+            // Logic: Fetch ALL rows from 'list' table for this student
             const { data: assignments, error } = await db.from('list')
                 .select('*').eq('roll_number', roll).eq('institute_id', sessionInstID);
 
-            if (error || !assignments || assignments.length === 0) return alert("No assignments found.");
+            if (error || !assignments || assignments.length === 0) return alert("No assignments found in Batch Master.");
 
             currentStudentAssignments = assignments;
             document.getElementById('f-student-name').value = assignments[0].student_name;
 
+            // Logic: Fill dropdowns with EVERY subject found
             const idSel = document.getElementById('f-teacher-id');
             const nameSel = document.getElementById('f-teacher-name');
             const batchSel = document.getElementById('f-batch-name');
 
-            // Clear and Fill dropdowns with all subjects found
             idSel.innerHTML = ''; nameSel.innerHTML = ''; batchSel.innerHTML = '';
             assignments.forEach((item, index) => {
                 idSel.innerHTML += `<option value="${index}">${item.teacher_id}</option>`;
@@ -372,33 +372,31 @@
                 batchSel.innerHTML += `<option value="${index}">${item.batch_name}</option>`;
             });
 
-            syncAssignments('id'); 
+            syncAssignments('id'); // Trigger timing for the first subject
         }
     // 2. SYNC DROPDOWNS & FETCH FROM BATCHES
 async function syncAssignments(type) {
-            const idField = document.getElementById('f-teacher-id');
-            const nameField = document.getElementById('f-teacher-name');
-            const batchField = document.getElementById('f-batch-name');
-            
-            // Get the index from whichever dropdown was clicked
-            const index = (type === 'id') ? idField.value : (type === 'name' ? nameField.value : batchField.value);
+            // Logic: Get the index from whichever dropdown was touched
+            const trigger = document.getElementById(type === 'id' ? 'f-teacher-id' : (type === 'name' ? 'f-teacher-name' : 'f-batch-name'));
+            const index = trigger.value;
             if (index === "") return;
 
-            // Sync all three dropdowns to the same index
-            idField.value = index; nameField.value = index; batchField.value = index;
+            // Logic: Force all dropdowns to match that specific index
+            document.getElementById('f-teacher-id').value = index;
+            document.getElementById('f-teacher-name').value = index;
+            document.getElementById('f-batch-name').value = index;
 
             const selected = currentStudentAssignments[index];
             document.getElementById('f-course').value = selected.course_name;
 
-            // Fetch the EXACT timing for this specific batch name
+            // Logic: Fetch the EXACT timing from 'batches' table using the Batch Name
             const { data: batch } = await db.from('batches')
                 .select('batch_time')
                 .eq('batch_name', selected.batch_name)
                 .eq('institute_id', sessionInstID).maybeSingle();
 
-            document.getElementById('f-teacher-available-slots').value = batch ? batch.batch_time : "Timing Not Set.";
+            document.getElementById('f-teacher-available-slots').value = batch ? batch.batch_time : "Time not assigned.";
         }
-
     // 3. GENERATE GRID
     async function generateTimeTable() {
         const dateVal = document.getElementById('f-date').value;
