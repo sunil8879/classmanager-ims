@@ -305,6 +305,34 @@
             header h1 { font-size: 1.4rem; padding: 15px; }
             .form-grid { grid-template-columns: 1fr; }
         }
+
+
+
+/* --- MOBILE FIX FOR YELLOW BOX & DELETE ICON --- */
+@media (max-width: 768px) {
+    .timetable-container {
+        display: block !important;
+        overflow-x: auto !important; /* Allows swiping left/right to see all days */
+        -webkit-overflow-scrolling: touch;
+    }
+    .grid-table {
+        min-width: 1000px !important; /* Stops the table from squashing columns */
+    }
+    /* Style specifically for the Yellow Booking Column on Mobile */
+    .grid-table td:first-child {
+        min-width: 160px !important; /* Ensures space for Roll, Teacher, and Subject info */
+        padding: 12px 8px !important;
+        font-size: 0.75rem !important;
+        line-height: 1.4 !important;
+    }
+    /* Ensure Delete Icon is large enough for touch */
+    .grid-table td:first-child button {
+        padding: 8px 10px !important;
+        font-size: 1rem !important;
+        top: 2px !important;
+        right: 2px !important;
+    }
+}
     </style>
 </head>
 <body>
@@ -597,7 +625,7 @@ function renderTimetableGrid(bookings, dateVal) {
             tdTime.style.color = "#000";
             tdTime.style.border = "2px solid #000";
             tdTime.style.position = "relative";
-            tdTime.style.minWidth = "210px";
+           tdTime.style.minWidth = window.innerWidth < 768 ? "160px" : "210px";
             tdTime.style.textAlign = "left";
             tdTime.style.padding = "10px";
 
