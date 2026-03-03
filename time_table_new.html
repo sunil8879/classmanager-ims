@@ -722,107 +722,88 @@ if (batchMembers.length > 0) {
      * 6. BOOKING VALIDATIONS
      */
 async function bookThisSlot(day, time) {
-    // 1. GET ALL NECESSARY DATA FROM HIDDEN INPUTS
+    // 1. GET DATA
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
     const officialTime = document.getElementById('f-official-slots').value;
-    const currentCourse = document.getElementById('f-course').value; // This stores the Batch Name
+    const currentCourse = document.getElementById('f-course').value; 
     const tid = document.getElementById('f-teacher-id').value;
     const tname = document.getElementById('f-teacher-name').value;
 
-    // Safety check: ensure a student is selected
     if (!roll) {
-        alert("Please select an assignment from the summary table first.");
+        alert("Please select an assignment from the table first.");
         return;
     }
 
-    // 2. VALIDATION: DAILY BOOKING LIMIT (MAX 3)
-    const { count: bookingCount, error: countErr } = await db
-        .from('class_bookings')
+    // 2. VALIDATION: MAX 3 PER DAY
+    const { count: bCount } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
         .eq('student_roll', roll)
         .eq('booking_date', dateVal);
 
-    if (bookingCount >= 3) {
-        alert("🛑 ACCESS DENIED: You have already reached the daily limit of 3 classes.");
+    if (bCount >= 3) {
+        alert("🛑 ACCESS DENIED: Daily limit of 3 classes reached!");
         return;
     }
 
-    // 3. VALIDATION: MISCHIEF/CANCELLATION HISTORY (MAX 2)
-    const { count: mischiefCount } = await db
-        .from('class_cancellations')
+    // 3. VALIDATION: MISCHIEF CHECK
+    const { count: cCount } = await db.from('class_cancellations')
         .select('*', { count: 'exact', head: true })
         .eq('student_roll', roll);
 
-    if (mischiefCount >= 2) {
-        alert("🛑 ACCESS DENIED: You have a history of multiple cancellations. Booking is blocked.");
+    if (cCount >= 2) {
+        alert("🛑 ACCESS DENIED: Too many cancellations recorded!");
         return;
     }
 
-    // 4. VALIDATION: BATCH MATCHING (e.g., Biology student cannot join Chemistry batch)
-    // We check if this teacher already has a different batch scheduled at this specific time
-    const { data: existingBatchData } = await db
-        .from('class_bookings')
+    // 4. VALIDATION: BATCH MATCHING
+    const { data: exBatch } = await db.from('class_bookings')
         .select('course')
         .eq('teacher_id', tid)
         .eq('booking_date', dateVal)
         .eq('time_slot', time)
         .limit(1);
 
-    if (existingBatchData && existingBatchData.length > 0) {
-        const batchInProgress = existingBatchData[0].course;
-        if (batchInProgress !== currentCourse) {
-            alert(`❌ BATCH CONFLICT: This slot is already reserved for the "${batchInProgress}" batch. You are in the "${currentCourse}" batch and cannot join.`);
+    if (exBatch && exBatch.length > 0) {
+        if (exBatch[0].course !== currentCourse) {
+            alert("❌ BATCH CONFLICT: This slot is reserved for " + exBatch[0].course);
             return;
         }
     }
 
-    // 5. VALIDATION: OFFICIAL BATCH TIME SCHEDULE
+    // 5. VALIDATION: OFFICIAL TIME
     if (!officialTime.includes(time)) {
-        alert("❌ DENIED: This time slot is not within your teacher's official batch schedule.");
+        alert("❌ DENIED: Outside official batch schedule.");
         return;
     }
 
-    // 6. WHATSAPP CONFIRMATION FLOW
-    const { data: tData } = await db
-        .from('teacher_details')
-        .select('mobile')
-        .eq('id', tid)
-        .single();
-
+    // 6. WHATSAPP FLOW (FIXED SYNTAX)
+    const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     if (tData && tData.mobile) {
-        const whatsappMsg = `Hello ${tname}, I am booking a slot for Batch: ${currentCourse} on ${dateVal} at ${time}. (Roll: ${roll})`;
-        window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(whatsappMsg)}`, "_blank");
+        const msg = "Booking for Batch: " + currentCourse + " on " + dateVal + " at " + time;
+        window.open("https://wa.me/91" + tData.mobile + "?text=" + encodeURIComponent(msg), "_blank");
         
-        // Final confirmation before writing to database
-        const confirmSave = confirm("WhatsApp page opened. Did you send the message to the teacher? Click OK to finalize your booking.");
+        const confirmSave = confirm("WhatsApp opened. Did you send the message? Click OK to save.");
         if (!confirmSave) return;
-    } else {
-        alert("Teacher contact details not found. Proceeding to book anyway...");
     }
 
-    // 7. FINAL DATABASE INSERT
-    // We include student_name so it appears in the Yellow Box
-    const { error: insertError } = await db.from("class_bookings").insert({
+    // 7. SAVE TO DATABASE
+    const { error: insertErr } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
         student_roll: roll,
         student_name: currentUserProfile.full_name.toUpperCase(),
         booking_date: dateVal,
         time_slot: time,
-        course: currentCourse // Stores the Batch Name
+        course: currentCourse
     });
 
-    if (insertError) {
-        // If this fails with "Schema Cache", the 'student_name' column is missing in your DB
-        alert("Database Error: " + insertError.message);
+    if (insertErr) {
+        alert("Database Error: " + insertErr.message);
     } else {
-        // 8. SUCCESS ACTIONS
-        document.getElementById('confirmation-text').innerText = `Success! Your class for ${currentCourse} has been booked for ${dateVal} at ${time}.`;
+        document.getElementById('confirmation-text').innerText = "Success! Class booked for " + currentCourse;
         document.getElementById('confirm-modal').style.display = 'flex';
-        
-        // Refresh the grid to show the new Yellow Box immediately
-        generateTimeTable();
+        generateTimeTable(); 
     }
 }
     /**
