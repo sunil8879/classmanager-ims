@@ -363,6 +363,10 @@
         <div id="preferred-slot-status" style="text-align: center; font-weight: 900; margin-bottom: 20px; font-size: 1.1rem;"></div>
         
         <button type="button" class="btn-generate" onclick="generateTimeTable()">Generate Booking Grid</button>
+
+<div id="mischief-warning-new" style="display: none; background: #ff4757; color: #fff; padding: 15px; border: 3px solid #000; border-radius: 10px; margin-top: 20px; font-weight: 900; text-align: center; box-shadow: 5px 5px 0px #000;">
+    ⚠️ WARNING: YOU HAVE A HISTORY OF MULTIPLE CANCELLATIONS. FURTHER MISCHIEF WILL RESULT IN A BLOCK.
+</div>
     </div>
 
     <!-- Timetable Grid -->
@@ -444,16 +448,21 @@
     /**
      * 3. MISCHIEF WARNING LOGIC
      */
-    async function checkMischiefHistory(studentName) {
-        const { count, error } = await db
-            .from('class_cancellations')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_name', studentName.toUpperCase());
+async function checkMischiefHistory(studentRoll) {
+    if (!studentRoll) return;
 
-        if (count >= 2) {
-            document.getElementById('mischief-warning').style.display = 'block';
-        }
+    const { count, error } = await db
+        .from('class_cancellations')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_roll', studentRoll);
+
+    const warningBox = document.getElementById('mischief-warning-new');
+    if (count >= 2) {
+        warningBox.style.display = 'block';
+    } else {
+        warningBox.style.display = 'none';
     }
+}
 
     /**
      * 4. LOAD SUMMARY TABLE (TIDY PRESENTATION)
@@ -536,6 +545,7 @@
     statusDiv.innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span> for ${course}`;
     
     alert(`Priority set to ${selectedTime}. Now click 'Generate Booking Grid'.`);
+checkMischiefHistory(roll);
 }
 
     /**
@@ -665,55 +675,61 @@ function renderTimetableGrid(bookings, dateVal) {
     /**
      * 6. BOOKING VALIDATIONS
      */
-    async function bookThisSlot(day, time) {
-        const roll = document.getElementById('f-roll').value;
-        const dateVal = document.getElementById('f-date').value;
-        const officialTime = document.getElementById('f-official-slots').value;
-        const course = document.getElementById('f-course').value;
-        const tid = document.getElementById('f-teacher-id').value;
-        const tname = document.getElementById('f-teacher-name').value;
+  async function bookThisSlot(day, time) {
+    const roll = document.getElementById('f-roll').value;
+    const dateVal = document.getElementById('f-date').value;
+    const officialTime = document.getElementById('f-official-slots').value;
+    const course = document.getElementById('f-course').value;
+    const tid = document.getElementById('f-teacher-id').value;
+    const tname = document.getElementById('f-teacher-name').value;
 
-        if (!officialTime.includes(time)) return alert("DENIED: Selected time is not within the Teacher's Batch schedule.");
+    if (!roll) return alert("Please select an assignment first.");
 
-        // --- VALIDATION: MAX 3 CLASSES PER DAY ---
-        const { count, error: countErr } = await db
-            .from('class_bookings')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_roll', roll)
-            .eq('booking_date', dateVal);
+    // --- 1. VALIDATION: MAX 3 CLASSES PER DAY ---
+    const { count, error: countErr } = await db
+        .from('class_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_roll', roll)
+        .eq('booking_date', dateVal);
 
-        if (count >= 3) {
-            return alert("MISCHIEF BLOCK: You are not allowed to book more than 3 classes in a single day.");
-        }
-
-        // WhatsApp Confirmation
-        const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
-        if (tData?.mobile) {
-            const msg = `📚 Booking: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
-            window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
-            if (!confirm(`Sent WhatsApp to ${tname}? Click OK to finalize booking.`)) return;
-        }
-
-        // Insert Record
-        const { error } = await db.from("class_bookings").insert({
-            institute_id: sessionInstID,
-            teacher_id: tid,
-            student_roll: roll,
-            student_name: currentUserProfile.full_name.toUpperCase(),
-            booking_date: dateVal,
-            time_slot: time,
-            day: day,
-            course: course
-        });
-
-        if (error) {
-            alert(error.message);
-        } else {
-            document.getElementById('confirmation-text').innerText = `Success! Class booked for ${course} on ${dateVal} at ${time}.`;
-            document.getElementById('confirm-modal').style.display = 'flex';
-            generateTimeTable();
-        }
+    if (count >= 3) {
+        alert("LIMIT REACHED: You cannot book more than 3 classes in a single day.");
+        return;
     }
+
+    // --- 2. VALIDATION: OFFICIAL BATCH TIME ---
+    if (!officialTime.includes(time)) {
+        return alert("DENIED: Selected time is not within the Teacher's Batch schedule.");
+    }
+
+    // WhatsApp Confirmation (Optional but kept from your original code)
+    const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
+    if (tData?.mobile) {
+        const msg = `📚 Booking: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
+        window.open(`https://wa.me/91${tData.mobile}?text=${encodeURIComponent(msg)}`, "_blank");
+        if (!confirm(`Sent WhatsApp to ${tname}? Click OK to finalize booking.`)) return;
+    }
+
+    // --- 3. INSERT BOOKING ---
+    const { error } = await db.from("class_bookings").insert({
+        institute_id: sessionInstID,
+        teacher_id: tid,
+        student_roll: roll,
+        student_name: currentUserProfile.full_name.toUpperCase(),
+        booking_date: dateVal,
+        time_slot: time,
+        day: day,
+        course: course
+    });
+
+    if (error) {
+        alert(error.message);
+    } else {
+        document.getElementById('confirmation-text').innerText = `Success! Class booked for ${course} on ${dateVal} at ${time}.`;
+        document.getElementById('confirm-modal').style.display = 'flex';
+        generateTimeTable(); // Refresh grid
+    }
+}
 
     /**
      * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
