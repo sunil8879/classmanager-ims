@@ -653,13 +653,7 @@ function renderTimetableGrid(bookings, dateVal) {
      * 6. BOOKING VALIDATIONS
      */
 async function bookThisSlot(day, time) {
-// --- STRICT VALIDATION BLOCK ---
-const { count: bCount } = await db.from('class_bookings').select('*', { count: 'exact', head: true }).eq('student_roll', roll).eq('booking_date', dateVal);
-if (bCount >= 3) return alert("ERROR: Daily limit of 3 classes reached!");
-
-const { count: cCount } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
-if (cCount >= 2) return alert("ACCESS DENIED: Too many cancellations on your record!");
-// --- END VALIDATION BLOCK ---
+    // --- 1. GET DATA FIRST (CRITICAL: THIS MUST BE AT THE TOP) ---
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
     const officialTime = document.getElementById('f-official-slots').value;
@@ -669,22 +663,19 @@ if (cCount >= 2) return alert("ACCESS DENIED: Too many cancellations on your rec
 
     if (!roll) return alert("Please select an assignment from the table first.");
 
-    // --- 1. VALIDATION: MAX 3 CLASSES PER DAY ---
-    const { count } = await db.from('class_bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll)
-        .eq('booking_date', dateVal);
+    // --- 2. STRICT VALIDATIONS (3 CLASS LIMIT & 2 CANCELLATION BLOCK) ---
+    const { count: bCount } = await db.from('class_bookings').select('*', { count: 'exact', head: true }).eq('student_roll', roll).eq('booking_date', dateVal);
+    if (bCount >= 3) return alert("🛑 ACCESS DENIED: Daily limit of 3 classes reached!");
 
-    if (count >= 3) {
-        return alert("🛑 ACCESS DENIED: You have already booked 3 classes for this day. This is the daily limit.");
-    }
+    const { count: cCount } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
+    if (cCount >= 2) return alert("🛑 ACCESS DENIED: History of too many cancellations. Booking blocked!");
 
-    // --- 2. VALIDATION: OFFICIAL BATCH TIME ---
+    // --- 3. BATCH TIME VALIDATION ---
     if (!officialTime.includes(time)) {
         return alert("❌ DENIED: Selected time is not within the Teacher's Batch schedule.");
     }
 
-    // --- 3. WHATSAPP FLOW (MANDATORY) ---
+    // --- 4. WHATSAPP FLOW (MANDATORY) ---
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     if (tData?.mobile) {
         const msg = `📚 Booking Request: ${currentUserProfile.full_name} (${roll}) for ${course} at ${time} on ${dateVal}.`;
@@ -694,7 +685,7 @@ if (cCount >= 2) return alert("ACCESS DENIED: Too many cancellations on your rec
         if (!confirmSave) return;
     }
 
-    // --- 4. INSERT RECORD ---
+    // --- 5. INSERT RECORD ---
     const { error } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
