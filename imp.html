@@ -636,6 +636,10 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 
 
+
+
+
+
         <div class="dashboard-stats" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px;">
             <div class="stat-card" style="border-bottom: 5px solid #27ae60;">
                 <p>ADMISSIONS</p><h4 id="home-total-stu">0</h4><small>Active Students</small>
@@ -2538,6 +2542,10 @@ async function checkCurrentSession() {
 
             document.getElementById('auth-status-bar').style.display = 'flex';
             document.getElementById('user-greeting').innerText = `Welcome ${sessionUserName} (${sessionInstID})`;
+
+
+document.getElementById('user-greeting').insertAdjacentHTML('afterend', `<a href="time_table_new.html" target="_blank" style="margin-left:20px; background:#20B2AA; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-weight:bold; border:2px solid #000;">BOOK CLASSES</a>`);
+
             
             // SHOW the Stats, HIDE the "Still managing manually" text
             document.getElementById('home-visitor-view').style.display = 'none';
