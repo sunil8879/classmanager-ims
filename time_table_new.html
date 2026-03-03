@@ -350,22 +350,6 @@
                 <label>1. Booking Date (Locked to Tomorrow)</label>
                 <input type="date" id="f-date" readonly>
             </div>
-
-            <!-- 2. Preferred Time Slot -->
-            <div class="input-group">
-                <label>2. Preferred Time Slot</label>
-                <select id="f-time">
-                    <option>09:00 AM to 10:00 AM</option>
-                    <option>10:00 AM to 11:00 AM</option>
-                    <option>11:00 AM to 12:00 PM</option>
-                    <option>12:00 PM to 01:00 PM</option>
-                    <option>01:00 PM to 02:00 PM</option>
-                    <option>02:00 PM to 03:00 PM</option>
-                    <option>03:00 PM to 04:00 PM</option>
-                    <option>04:00 PM to 05:00 PM</option>
-                    <option>05:00 PM to 06:00 PM</option>
-                </select>
-            </div>
         </div>
 
         <!-- Hidden inputs for data sync -->
@@ -475,61 +459,84 @@
      * 4. LOAD SUMMARY TABLE (TIDY PRESENTATION)
      */
     async function loadAssignmentSummary() {
-        const tbody = document.getElementById('session-table-body');
-        const userNameUpper = currentUserProfile.full_name.toUpperCase();
+    const tbody = document.getElementById('session-table-body');
+    const userNameUpper = currentUserProfile.full_name.toUpperCase();
 
-        let query = db.from('list').select('*').eq('institute_id', sessionInstID);
-        if (currentUserProfile.role === 'Student') {
-            query = query.eq('student_name', userNameUpper);
-        } else if (currentUserProfile.role === 'Teacher') {
-            query = query.eq('teacher_name', userNameUpper);
-        }
-
-        const { data: listData } = await query;
-        const { data: batchData } = await db.from('batches').select('batch_name, batch_time').eq('institute_id', sessionInstID);
-
-        tbody.innerHTML = "";
-        if (!listData || listData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8">No active subject assignments found.</td></tr>';
-            return;
-        }
-
-        listData.forEach(item => {
-            const batch = batchData?.find(b => b.batch_name === item.batch_name);
-            const rawTime = batch ? batch.batch_time : "N/A";
-            
-            // TIDY TIME PRESENTATION: Split by comma into pills
-            const tidyTimeHtml = rawTime.split(',').map(t => `<span class="time-slot-pill">${t.trim()}</span>`).join('');
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${item.roll_number}</td>
-                    <td>${item.student_name}</td>
-                    <td>${item.teacher_name}</td>
-                    <td>${item.teacher_id}</td>
-                    <td>${item.course_name}</td>
-                    <td>${item.batch_name}</td>
-                    <td>${tidyTimeHtml}</td>
-                    <td>
-                        <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.course_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}')">SELECT</button>
-                    </td>
-                </tr>`;
-        });
+    let query = db.from('list').select('*').eq('institute_id', sessionInstID);
+    if (currentUserProfile.role === 'Student') {
+        query = query.eq('student_name', userNameUpper);
+    } else if (currentUserProfile.role === 'Teacher') {
+        query = query.eq('teacher_name', userNameUpper);
     }
 
-    function syncSelection(roll, sname, course, tid, tname, slots) {
-        document.getElementById('f-roll').value = roll;
-        document.getElementById('f-student-name').value = sname;
-        document.getElementById('f-course').value = course;
-        document.getElementById('f-teacher-id').value = tid;
-        document.getElementById('f-teacher-name').value = tname;
-        document.getElementById('f-official-slots').value = slots;
+    const { data: listData } = await query;
+    const { data: batchData } = await db.from('batches').select('batch_name, batch_time').eq('institute_id', sessionInstID);
+
+    tbody.innerHTML = "";
+    if (!listData || listData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8">No active subject assignments found.</td></tr>';
+        return;
+    }
+
+    listData.forEach((item, index) => {
+        const batch = batchData?.find(b => b.batch_name === item.batch_name);
+        const rawTime = batch ? batch.batch_time : "";
         
-        const statusDiv = document.getElementById('preferred-slot-status');
-        statusDiv.innerText = `LOCKED: ${course} (${tname})`;
-        statusDiv.style.color = "#20B2AA";
-        alert(`Details synced for ${course}. Now generate the grid.`);
+        // Split times by comma and create dropdown options
+        const timeOptions = rawTime.split(',').map(t => 
+            `<option value="${t.trim()}">${t.trim()}</option>`
+        ).join('');
+
+        // Create a unique ID for the dropdown in this row
+        const selectId = `time-select-${index}`;
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${item.roll_number}</td>
+                <td>${item.student_name}</td>
+                <td>${item.teacher_name}</td>
+                <td>${item.teacher_id}</td>
+                <td>${item.course_name}</td>
+                <td>${item.batch_name}</td>
+                <td>
+                    <select id="${selectId}" style="height:35px; width:100%; font-size:0.8rem; border:1px solid #000;">
+                        ${timeOptions}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.course_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}')">SELECT</button>
+                </td>
+            </tr>`;
+    });
+}
+
+    function syncSelection(roll, sname, course, tid, tname, allSlots, selectId) {
+    // Get the specific time selected in that row
+    const selectedTime = document.getElementById(selectId).value;
+
+    // Sync to hidden fields and the global f-time (even though UI is removed, logic needs it)
+    document.getElementById('f-roll').value = roll;
+    document.getElementById('f-student-name').value = sname;
+    document.getElementById('f-course').value = course;
+    document.getElementById('f-teacher-id').value = tid;
+    document.getElementById('f-teacher-name').value = tname;
+    document.getElementById('f-official-slots').value = allSlots;
+    
+    // Create a dummy f-time if it doesn't exist to store the choice
+    let fTime = document.getElementById('f-time');
+    if(!fTime) {
+        fTime = document.createElement('input');
+        fTime.type = 'hidden';
+        fTime.id = 'f-time';
+        document.body.appendChild(fTime);
     }
+    fTime.value = selectedTime;
+
+    const statusDiv = document.getElementById('preferred-slot-status');
+    statusDiv.innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span> for ${course}`;
+    
+    alert(`Priority set to ${selectedTime}. Now click 'Generate Booking Grid'.`);
+}
 
     /**
      * 5. GRID GENERATION (ROLE BASED)
@@ -559,90 +566,63 @@
     }
 
 function renderTimetableGrid(bookings, dateVal) {
-    const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
-    const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
-    
-    const jsDay = new Date(dateVal).getDay();
-    const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
-    const currentTeacherName = document.getElementById('f-teacher-name').value;
-
-    const tbody = document.getElementById('timetable-body');
-    tbody.innerHTML = '';
-
-    SLOTS.forEach(time => {
-        const tr = document.createElement('tr');
-        const tdTime = document.createElement('td'); 
+        const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
+        const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
         
-        // --- NEW LOGIC: CHECK IF ROW IS BOOKED ---
-        const bDataRow = bookings?.find(b => b.time_slot === time);
+        const jsDay = new Date(dateVal).getDay();
+        const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
+        const currentTeacherName = document.getElementById('f-teacher-name').value;
 
-        if (bDataRow) {
-            // APPLY YELLOW THEME TO LEFT TIME SLOT
-            tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)"; // Bright Yellow
-            tdTime.style.color = "#000000";
-            tdTime.style.border = "2px solid #000";
-            tdTime.style.fontWeight = "800";
-            tdTime.style.padding = "10px";
-            tdTime.style.minWidth = "180px";
-            tdTime.innerHTML = `
-                <div style="font-size: 0.85rem; text-decoration: underline;">${time}</div>
-                <div style="font-size: 0.65rem; margin-top: 5px; text-align: left; line-height: 1.2;">
-                    <b>STU:</b> ${bDataRow.student_name}<br>
-                    <b>ROLL:</b> ${bDataRow.student_roll}<br>
-                    <b>TID:</b> ${bDataRow.teacher_id}<br>
-                    <b>TCH:</b> ${currentTeacherName}<br>
-                    <b>SUB:</b> ${bDataRow.course}
-                </div>
-            `;
-            // Hover Tooltip
-            tdTime.title = `BOOKED SLOT DETAILS:\nStudent: ${bDataRow.student_name} (${bDataRow.student_roll})\nTeacher: ${currentTeacherName} (${bDataRow.teacher_id})\nSubject: ${bDataRow.course}`;
-        } else {
-            // DEFAULT BLUE THEME FOR EMPTY SLOTS
-            tdTime.className = 'time-slot'; 
-            tdTime.innerText = time;
-        }
-        
-        tr.appendChild(tdTime);
+        const tbody = document.getElementById('timetable-body');
+        tbody.innerHTML = '';
 
-        DAYS.forEach(day => {
-            const td = document.createElement('td');
-            // Lock other days
-            if (day !== activeDayName) {
-                td.style.opacity = "0.2";
-                td.style.pointerEvents = "none";
-            }
+        SLOTS.forEach(time => {
+            const tr = document.createElement('tr');
+            const tdTime = document.createElement('td'); tdTime.className = 'time-slot'; tdTime.innerText = time;
+            tr.appendChild(tdTime);
 
-            const bData = bookings?.find(b => b.time_slot === time && b.day === day);
-            
-            if (bData) {
-                // --- BOOKED STATE (Blue Theme) ---
-                td.className = 'booked-cell';
-                td.innerHTML = `
-                    <b>${bData.student_name}</b>
-                    <small>Roll: ${bData.student_roll}</small>
-                    <hr style="margin:4px 0; opacity:0.3; border:0; border-top:1px solid white;">
-                    <small>Sub: ${bData.course}</small>
-                `;
-
-                td.title = `STUDENT: ${bData.student_name}\nTEACHER: ${currentTeacherName}\nSUBJECT: ${bData.course}`;
-
-                if (currentUserProfile.role !== 'Student') {
-                    td.innerHTML += `<button class="btn-cancel-mischief" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')"><i class="fas fa-trash-alt"></i></button>`;
+            DAYS.forEach(day => {
+                const td = document.createElement('td');
+                // Lock other days
+                if (day !== activeDayName) {
+                    td.style.opacity = "0.2";
+                    td.style.pointerEvents = "none";
                 }
-            } else {
-                // --- OPEN STATE ---
-                if (currentUserProfile.role === 'Student') {
-                    td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
+
+                const bData = bookings?.find(b => b.time_slot === time);
+                
+                if (bData) {
+                    // --- BOOKED STATE (Blue Theme + Full Info) ---
+                    td.className = 'booked-cell';
+                    td.innerHTML = `
+                        <b>${bData.student_name}</b>
+                        <small>Roll: ${bData.student_roll}</small>
+                        <hr style="margin:4px 0; opacity:0.3; border:0; border-top:1px solid white;">
+                        <small>T.ID: ${bData.teacher_id}</small>
+                        <small>Sub: ${bData.course}</small>
+                    `;
+
+                    // Hover Pop-up window
+                    td.title = `STUDENT: ${bData.student_name} (${bData.student_roll})\nTEACHER: ${currentTeacherName}\nSUBJECT: ${bData.course}`;
+
+                    // DELETE ICON (Enabled for Staff/Owners, Hidden for Students)
+                    if (currentUserProfile.role !== 'Student') {
+                        td.innerHTML += `<button class="btn-cancel-mischief" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')"><i class="fas fa-trash-alt"></i></button>`;
+                    }
                 } else {
-                    td.innerHTML = `<span style="font-size:0.7rem; color:#999;">VIEW ONLY</span>`;
+                    // --- OPEN STATE ---
+                    if (currentUserProfile.role === 'Student') {
+                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
+                    } else {
+                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">VIEW ONLY</span>`;
+                    }
                 }
-            }
-            tr.appendChild(td);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
         });
-        tbody.appendChild(tr);
-    });
-    document.getElementById('timetable-wrapper').style.display = 'block';
-}
+        document.getElementById('timetable-wrapper').style.display = 'block';
+    }
     /**
      * 6. BOOKING VALIDATIONS
      */
