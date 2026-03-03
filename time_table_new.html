@@ -498,7 +498,7 @@ async function loadAssignmentSummary() {
     const tbody = document.getElementById('session-table-body');
     const userNameUpper = currentUserProfile.full_name.toUpperCase();
 
-    // 1. Fetch current user assignments from the 'list' table
+    // 1. Fetch user assignments from 'list'
     let query = db.from('list').select('*').eq('institute_id', sessionInstID);
     if (currentUserProfile.role === 'Student') {
         query = query.eq('student_name', userNameUpper);
@@ -507,9 +507,9 @@ async function loadAssignmentSummary() {
     }
     const { data: listData } = await query;
 
-    // 2. Fetch data directly from the 'batches' table as per your screenshot
+    // 2. Fetch ALL fields from 'batches' as requested
     const { data: batchData } = await db.from('batches')
-        .select('teacher_id, subject_name, students_allotted, batch_time')
+        .select('teacher_id, teacher_name, batch_name, batch_time, subject_name, students_allotted')
         .eq('institute_id', sessionInstID);
 
     tbody.innerHTML = "";
@@ -519,14 +519,15 @@ async function loadAssignmentSummary() {
     }
 
     listData.forEach((item, index) => {
-        // Find the matching row in the batches table using Teacher ID and Subject Name
-        // We use .toUpperCase() to ensure "Physics" matches "PHYSICS"
+        // MATCHING LOGIC: 
+        // We match the 'teacher_id' and we check if the Batch name matches 'subject_name' or 'batch_name'
         const bRow = batchData?.find(b => 
             b.teacher_id === item.teacher_id && 
-            b.subject_name.toUpperCase() === item.batch_name.toUpperCase()
+            (b.subject_name.toUpperCase() === item.batch_name.toUpperCase() || 
+             b.batch_name.toUpperCase() === item.batch_name.toUpperCase())
         );
 
-        // Fetch the exact number from your 'students_allotted' column
+        // Fetch exact students_allotted and batch_time from the matched row
         const capacityVal = bRow ? bRow.students_allotted : 10; 
         const rawTime = bRow ? bRow.batch_time : "";
 
