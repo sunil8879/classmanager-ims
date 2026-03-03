@@ -2754,26 +2754,19 @@ async function loadHomeDashboardStats() {
         .gte('payment_date', `${currentYear}-01-01`)
         .lte('payment_date', `${currentYear}-12-31`);
 
-    if (stuErr) {
-        console.error("Error fetching students:", stuErr.message);
-        return;
-    }
-
     if (students) {
         const totalStu = students.length;
         // Calculation: Sum of all pending_amount from the students table
         const totalPend = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
-        // Calculation: Sum of all amount from the payment_history table (Actual Cash)
+        // Calculation: Sum of all amount from the payment_history table
         const totalColl = history ? history.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
 
-        // Update UI Cards
+        // Update UI Big Cards
         document.getElementById('home-total-stu').innerText = totalStu;
         document.getElementById('home-total-coll').innerText = "₹ " + totalColl.toLocaleString('en-IN');
         document.getElementById('home-total-pend').innerText = "₹ " + totalPend.toLocaleString('en-IN');
         
-        // Load the secondary stats
         loadHomeInventoryStats(); 
-        // Trigger the Forecast Logic
         generateFinancialForecast(students);
     }
 }
@@ -6380,67 +6373,77 @@ async function generateFinancialForecast(students) {
     const forecastData = {};
     const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
-    // 1. Generate 6-month labels starting from TODAY (Current Month)
+    // 1. Generate 6-month labels starting from ONE MONTH BACK (February)
     const displayMonths = [];
     let tempDate = new Date();
-    tempDate.setDate(1); // Set to 1st to avoid month-end skip bugs
+    tempDate.setDate(1); 
+    tempDate.setMonth(tempDate.getMonth() - 1); // Shifting back to FEBRUARY 2026
 
     for (let i = 0; i < 6; i++) {
         let mKey = monthNames[tempDate.getMonth()] + " " + tempDate.getFullYear();
         displayMonths.push(mKey);
-        forecastData[mKey] = 0; // Initialize with 0
+        forecastData[mKey] = 0; 
         tempDate.setMonth(tempDate.getMonth() + 1);
     }
 
-    const currentMonthKey = displayMonths[0]; // This will be "MARCH 2026"
+    const pastDueAnchor = displayMonths[0]; // This is FEBRUARY 2026
 
-    // 2. Map Pending Amounts to Months
+    // 2. Distribute Pending Amounts
     students.forEach(s => {
         const pending = parseFloat(s.pending_amount) || 0;
         if (pending <= 0) return;
 
-        // Clean and split the due_dates string from database
         let rawDates = s.due_dates ? s.due_dates.toUpperCase().split(',').map(d => d.trim()).filter(d => d !== "") : [];
 
         if (rawDates.length > 0) {
-            // Split total pending by number of installments
             const amtPerInstallment = pending / rawDates.length;
 
             rawDates.forEach(dateStr => {
                 let matched = false;
                 displayMonths.forEach(mKey => {
-                    // Check if "APRIL 2026" exists inside the user's typed string
                     if (dateStr.includes(mKey)) {
                         forecastData[mKey] += amtPerInstallment;
                         matched = true;
                     }
                 });
                 
-                // If the user typed a date outside our 6-month window or an invalid date
-                // We add it to the "Current Month" as it is technically due.
+                // If the date is not in the future window, it's considered Past Due (Feb)
                 if (!matched) {
-                    forecastData[currentMonthKey] += amtPerInstallment;
+                    forecastData[pastDueAnchor] += amtPerInstallment;
                 }
             });
         } else {
-            // If the "Due Dates" field is totally EMPTY, put all pending money in the Current Month
-            forecastData[currentMonthKey] += pending;
+            // IF NO DUE DATES: Move everything to FEBRUARY (Past Due)
+            forecastData[pastDueAnchor] += pending;
         }
     });
 
-    // 3. Render the Forecast Cards in the HTML
+    // 3. Render the Forecast Cards
     const cardContainer = document.getElementById('forecast-cards');
     if (!cardContainer) return;
     cardContainer.innerHTML = "";
 
-    displayMonths.forEach((month, index) => {
+    const currentMonthLabel = monthNames[new Date().getMonth()] + " " + new Date().getFullYear();
+
+    displayMonths.forEach((month) => {
         const amt = Math.round(forecastData[month]);
-        const isCurrent = (index === 0); // Style the first card (Current Month) differently
+        
+        // Coloring Logic
+        let borderColor = "#f39c12"; // Default Orange
+        let subtext = "";
+        
+        if (month === pastDueAnchor) {
+            borderColor = "#ff0000"; // Red for Past Due
+            subtext = "(PAST DUE)";
+        } else if (month === currentMonthLabel) {
+            borderColor = "#1877F2"; // Blue for Current
+            subtext = "(CURRENT)";
+        }
 
         cardContainer.innerHTML += `
-            <div class="stat-card" style="padding: 15px; min-width: 150px; border-bottom: 5px solid ${isCurrent ? '#1877F2' : '#f39c12'}; background: white;">
-                <p style="font-size: 0.75rem; color: ${isCurrent ? '#1877F2' : '#666'}; font-weight: 900; margin-bottom: 8px;">
-                    ${month} ${isCurrent ? '(CURRENT)' : ''}
+            <div class="stat-card" style="padding: 15px; min-width: 150px; border-bottom: 5px solid ${borderColor}; background: white;">
+                <p style="font-size: 0.7rem; color: ${borderColor}; font-weight: 900; margin-bottom: 8px;">
+                    ${month} ${subtext}
                 </p>
                 <h4 style="font-size: 1.3rem !important; color: #000; margin: 0; text-decoration: none !important;">
                     ₹${amt.toLocaleString('en-IN')}
@@ -6449,8 +6452,7 @@ async function generateFinancialForecast(students) {
         `;
     });
 
-    // 4. (Optional) Sync with Google Charts if the function exists
-    // Prepare rows: [Month, Admissions, Collection, Pending, Forecast]
+    // 4. Update the Google Charts
     const chartRows = displayMonths.map(m => [m, students.length, 0, 0, forecastData[m]]);
     if (typeof drawHomeForecastingChart === 'function') {
         drawHomeForecastingChart(chartRows);
