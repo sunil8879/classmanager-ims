@@ -513,12 +513,11 @@ const { data: batchData } = await db.from('batches').select('batch_name, batch_t
         tbody.innerHTML = '<tr><td colspan="8">No active subject assignments found.</td></tr>';
         return;
     }
+// --- Inside loadAssignmentSummary() ---
 listData.forEach((item, index) => {
     const batch = batchData?.find(b => b.batch_name === item.batch_name);
     const rawTime = batch ? batch.batch_time : "";
-    // Pull the exact figure from the 'students_allotted' column in your screenshot
     const actualCapacity = batch ? (batch.students_allotted || 10) : 10; 
-
     const selectId = "time-select-" + index;
     const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
 
@@ -540,45 +539,29 @@ listData.forEach((item, index) => {
 async function syncSelection(roll, sname, bname, tid, tname, allSlots, selectId, actualCapacity) {
     const selectedTime = document.getElementById(selectId).value;
 
-    // 1. Sync hidden inputs
+    // 1. Sync hidden inputs (Use 'bname' which is passed from the table)
     document.getElementById('f-roll').value = roll;
     document.getElementById('f-student-name').value = sname;
-    document.getElementById('f-course').value = course;
+    document.getElementById('f-course').value = bname; // FIXED: Changed 'course' to 'bname'
     document.getElementById('f-teacher-id').value = tid;
     document.getElementById('f-teacher-name').value = tname;
     document.getElementById('f-official-slots').value = allSlots;
-document.getElementById('f-capacity').value = actualCapacity; 
+    document.getElementById('f-capacity').value = actualCapacity; // Save Capacity
     
-    // 2. Manage the missing 'f-time' field (Hidden storage)
+    // 2. Manage the missing 'f-time' field
     let fTime = document.getElementById('f-time');
     if(!fTime) {
-        fTime = document.createElement('input'); 
-        fTime.type = 'hidden'; 
-        fTime.id = 'f-time';
+        fTime = document.createElement('input'); fTime.type = 'hidden'; fTime.id = 'f-time';
         document.body.appendChild(fTime);
     }
     fTime.value = selectedTime;
-// --- UPDATE WARNING BOX ---
-const { count: c } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
-document.getElementById('mischief-warning-new').style.display = (c >= 2) ? 'block' : 'none';
 
-    // 3. Update UI Status message
-    const statusDiv = document.getElementById('preferred-slot-status');
-    statusDiv.innerHTML = `SELECTED: <span style="color:red; font-size:1.3rem;">${selectedTime}</span> for ${course}`;
+    // 3. Update UI and Check Mischief
+    document.getElementById('preferred-slot-status').innerHTML = `SELECTED: <span style="color:red">${selectedTime}</span> for ${bname}`;
+    const { count } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
+    document.getElementById('mischief-warning-new').style.display = (count >= 2) ? 'block' : 'none';
     
-    // 4. THE VALIDATION: Check for Mischief History
-    const { count } = await db.from('class_cancellations')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll);
-
-    const warningBox = document.getElementById('mischief-warning-new');
-    if (count >= 2) {
-        warningBox.style.display = 'block';
-    } else {
-        warningBox.style.display = 'none';
-    }
-
-    alert(`Selection synced for ${sname}. Now click 'Generate Booking Grid'.`);
+    alert("Selection synced for " + sname + ". Now click 'Generate Booking Grid'.");
 }
     /**
      * 5. GRID GENERATION (ROLE BASED)
