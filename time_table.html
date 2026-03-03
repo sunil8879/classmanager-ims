@@ -410,80 +410,75 @@ input[readonly] {
     </header>
 
     <div class="form-container">
-     <div class="form-grid">
-    <!-- 1. Student Roll Number -->
-    <div class="input-group">
-        <label>1. Student Roll Number</label>
-        <div style="display: flex; gap: 5px;">
-            <input type="text" id="f-roll" placeholder="Enter Roll Number" style="flex: 1;">
-            <button type="button" class="btn-fetch" onclick="fetchStudent()">Fetch</button>
+        <div class="form-grid">
+          <!-- 1. Student Roll Number -->
+            <div class="input-group">
+                <label>1. Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="f-roll" placeholder="Enter Roll Number" style="flex: 1;">
+                    <button type="button" class="btn-fetch" onclick="fetchStudent()">Fetch</button>
+                </div>
+            </div>
+
+            <!-- 2. Student Name -->
+            <div class="input-group">
+                <label>2. Student Name</label>
+                <input type="text" id="f-student-name" readonly placeholder="Auto-populated">
+            </div>
+
+            <!-- 3. Teacher ID Dropdown -->
+            <div class="input-group">
+                <label>3. Teacher ID</label>
+                <select id="f-teacher-id" onchange="syncAssignments('id')">
+                    <option value="">-- Fetch Roll No --</option>
+                </select>
+            </div>
+
+            <!-- 4. Teacher Name Dropdown -->
+            <div class="input-group">
+                <label>4. Teacher Name</label>
+                <select id="f-teacher-name" onchange="syncAssignments('name')">
+                    <option value="">-- Fetch Roll No --</option>
+                </select>
+            </div>
+
+            <!-- 5. Batch Name Dropdown -->
+            <div class="input-group">
+                <label>5. Batch Name</label>
+                <select id="f-batch-name" onchange="syncAssignments('batch')">
+                    <option value="">-- Fetch Roll No --</option>
+                </select>
+            </div>
+
+            <!-- Hidden Course Field -->
+            <input type="hidden" id="f-course">
+
+            <!-- 6. Booking Date -->
+            <div class="input-group">
+                <label>6. Booking Date</label>
+                <input type="date" id="f-date">
+            </div>
+
+            <!-- 7. Preferred Time Slot -->
+            <div class="input-group">
+                <label>7. Preferred Time Slot</label>
+                <select id="f-time">
+                    <option value="09:00 AM to 10:00 AM">09:00 AM to 10:00 AM</option>
+                    <option value="10:00 AM to 11:00 AM">10:00 AM to 11:00 AM</option>
+                    <option value="11:00 AM to 12:00 PM">11:00 AM to 12:00 PM</option>
+                    <option value="12:00 PM to 01:00 PM">12:00 PM to 01:00 PM</option>
+                    <option value="01:00 PM to 02:00 PM">01:00 PM to 02:00 PM</option>
+                    <option value="02:00 PM to 03:00 PM">02:00 PM to 03:00 PM</option>
+                    <option value="03:00 PM to 04:00 PM">03:00 PM to 04:00 PM</option>
+                    <option value="04:00 PM to 05:00 PM">04:00 PM to 05:00 PM</option>
+                    <option value="05:00 PM to 06:00 PM">05:00 PM to 06:00 PM</option>
+                    <option value="06:00 PM to 07:00 PM">06:00 PM to 07:00 PM</option>
+                    <option value="07:00 PM to 08:00 PM">07:00 PM to 08:00 PM</option>
+                    <option value="08:00 PM to 09:00 PM">08:00 PM to 09:00 PM</option>
+                </select>
+            </div>
+        
         </div>
-    </div>
-
-    <!-- 2. Student Name -->
-    <div class="input-group">
-        <label>2. Student Name</label>
-        <input type="text" id="f-student-name" readonly placeholder="Auto-populated">
-    </div>
-
-    <!-- 3. Teacher ID Dropdown -->
-    <div class="input-group">
-        <label>3. Teacher ID</label>
-        <select id="f-teacher-id" onchange="syncAssignments('id')">
-            <option value="">-- Fetch Roll No --</option>
-        </select>
-    </div>
-
-    <!-- 4. Teacher Name Dropdown -->
-    <div class="input-group">
-        <label>4. Teacher Name</label>
-        <select id="f-teacher-name" onchange="syncAssignments('name')">
-            <option value="">-- Fetch Roll No --</option>
-        </select>
-    </div>
-
-    <!-- 5. Batch Name Dropdown -->
-    <div class="input-group">
-        <label>5. Batch Name</label>
-        <select id="f-batch-name" onchange="syncAssignments('batch')">
-            <option value="">-- Fetch Roll No --</option>
-        </select>
-    </div>
-
-    <!-- Hidden Course Field (Used for the database saving later) -->
-    <input type="hidden" id="f-course">
-
-    <!-- 6. Booking Date -->
-    <div class="input-group">
-        <label>6. Booking Date</label>
-        <input type="date" id="f-date">
-    </div>
-
-    <!-- 7. Preferred Time Slot -->
-    <div class="input-group">
-        <label>7. Preferred Time Slot</label>
-        <select id="f-time">
-            <option value="09:00 AM to 10:00 AM">09:00 AM to 10:00 AM</option>
-            <option value="10:00 AM to 11:00 AM">10:00 AM to 11:00 AM</option>
-            <option value="11:00 AM to 12:00 PM">11:00 AM to 12:00 PM</option>
-            <option value="12:00 PM to 01:00 PM">12:00 PM to 01:00 PM</option>
-            <option value="01:00 PM to 02:00 PM">01:00 PM to 02:00 PM</option>
-            <option value="02:00 PM to 03:00 PM">02:00 PM to 03:00 PM</option>
-            <option value="03:00 PM to 04:00 PM">03:00 PM to 04:00 PM</option>
-            <option value="04:00 PM to 05:00 PM">04:00 PM to 05:00 PM</option>
-            <option value="05:00 PM to 06:00 PM">05:00 PM to 06:00 PM</option>
-            <option value="06:00 PM to 07:00 PM">06:00 PM to 07:00 PM</option>
-            <option value="07:00 PM to 08:00 PM">07:00 PM to 08:00 PM</option>
-            <option value="08:00 PM to 09:00 PM">08:00 PM to 09:00 PM</option>
-        </select>
-    </div>
-</div>
-
-<!-- Teal Box for Available Slots -->
-<div class="input-group" style="width: 90%; max-width: 1200px; margin: 0 auto 20px;">
-    <label style="color: #20B2AA;">Teacher's Official Batch Time Slot (From Section 5)</label>
-    <input type="text" id="f-teacher-available-slots" readonly placeholder="Select teacher to see time..." style="font-weight:bold;">
-</div>
 
 
 
@@ -529,105 +524,79 @@ input[readonly] {
 
     <script>
         // --- 1. SUPABASE INITIALIZATION ---
-// --- 1. INITIALIZATION & DATABASE CONNECTION ---
-const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+       const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+        const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+        const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
 let sessionInstID = "";
-let currentStudentAssignments = []; 
+        let currentStudentAssignments = []; 
 
-const TIME_SLOTS = [
-    "09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM",
-    "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM",
-    "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM",
-    "06:00 PM to 07:00 PM", "07:00 PM to 08:00 PM", "08:00 PM to 09:00 PM"
-];
+        async function checkCurrentSession() {
+            const { data: { user } } = await db.auth.getUser();
+            if (user) {
+                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).maybeSingle();
+                if (profile) sessionInstID = profile.institute_id;
+            }
+        }
+        checkCurrentSession();
 
-const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+        async function fetchStudent() {
+            const roll = document.getElementById('f-roll').value.trim().toUpperCase();
+            if (!roll) return alert("Please enter Student Roll Number.");
+            if (!sessionInstID) await checkCurrentSession();
 
-// --- 2. AUTHENTICATION HELPERS ---
-async function checkCurrentSession() {
-    const { data: { user } } = await db.auth.getUser();
-    if (user) {
-        const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).maybeSingle();
-        if (profile) sessionInstID = profile.institute_id;
-    }
-}
-checkCurrentSession();
+            const { data: assignments, error } = await db.from('list')
+                .select('teacher_name, course_name, batch_name, student_name, teacher_id')
+                .eq('roll_number', roll)
+                .eq('institute_id', sessionInstID);
 
-async function authenticateForBooking() {
-    await checkCurrentSession();
-    if (!sessionInstID) {
-        alert("Session error. Please ensure you are logged into the main application.");
-        return false;
-    }
-    return true;
-}
+            if (error || !assignments || assignments.length === 0) {
+                return alert("No records found in Batch Master (List) for this Roll Number.");
+            }
 
-// --- 3. FETCH STUDENT & LINKED DATA (USE LIST TABLE) ---
-async function fetchStudent() {
-    const roll = document.getElementById('f-roll').value.trim().toUpperCase();
-    if (!roll) return alert("Please enter Student Roll Number.");
-    if (!sessionInstID) await authenticateForBooking();
+            currentStudentAssignments = assignments;
+            document.getElementById('f-student-name').value = assignments[0].student_name;
 
-    const { data: assignments, error } = await db.from('list')
-        .select('teacher_name, course_name, batch_name, student_name, teacher_id')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID);
+            const idSelect = document.getElementById('f-teacher-id');
+            const nameSelect = document.getElementById('f-teacher-name');
+            const batchSelect = document.getElementById('f-batch-name');
 
-    if (error || !assignments || assignments.length === 0) {
-        return alert("No batch assignments found for this Roll Number in Batch Master (List).");
-    }
+            idSelect.innerHTML = ''; nameSelect.innerHTML = ''; batchSelect.innerHTML = '';
 
-    currentStudentAssignments = assignments;
-    document.getElementById('f-student-name').value = assignments[0].student_name;
+            assignments.forEach((item, index) => {
+                idSelect.innerHTML += `<option value="${index}">${item.teacher_id}</option>`;
+                nameSelect.innerHTML += `<option value="${index}">${item.teacher_name}</option>`;
+                batchSelect.innerHTML += `<option value="${index}">${item.batch_name}</option>`;
+            });
 
-    const idSelect = document.getElementById('f-teacher-id');
-    const nameSelect = document.getElementById('f-teacher-name');
-    const batchSelect = document.getElementById('f-batch-name');
+            syncAssignments('id'); 
+            alert("Assignments loaded! Choose teacher to see timings.");
+        }
 
-    idSelect.innerHTML = '';
-    nameSelect.innerHTML = '';
-    batchSelect.innerHTML = '';
+        async function syncAssignments(changedType) {
+            let index;
+            if (changedType === 'id') index = document.getElementById('f-teacher-id').value;
+            else if (changedType === 'name') index = document.getElementById('f-teacher-name').value;
+            else index = document.getElementById('f-batch-name').value;
 
-    assignments.forEach((item, index) => {
-        idSelect.innerHTML += `<option value="${index}">${item.teacher_id}</option>`;
-        nameSelect.innerHTML += `<option value="${index}">${item.teacher_name}</option>`;
-        batchSelect.innerHTML += `<option value="${index}">${item.batch_name}</option>`;
-    });
+            if (index === "") return;
 
-    syncAssignments('id'); 
-    alert("Records Loaded! Dropdowns 3, 4, and 5 are now synced.");
-}
+            document.getElementById('f-teacher-id').value = index;
+            document.getElementById('f-teacher-name').value = index;
+            document.getElementById('f-batch-name').value = index;
 
-// --- 4. SYNC THE 3 DROPDOWNS & FETCH TIME (USE BATCHES TABLE) ---
-async function syncAssignments(changedType) {
-    let index;
-    if (changedType === 'id') index = document.getElementById('f-teacher-id').value;
-    else if (changedType === 'name') index = document.getElementById('f-teacher-name').value;
-    else index = document.getElementById('f-batch-name').value;
+            const selected = currentStudentAssignments[index];
+            document.getElementById('f-course').value = selected.course_name;
 
-    if (index === "") return;
+            const { data: batchInfo } = await db.from('batches')
+                .select('batch_time')
+                .eq('batch_name', selected.batch_name)
+                .eq('institute_id', sessionInstID).maybeSingle();
 
-    document.getElementById('f-teacher-id').value = index;
-    document.getElementById('f-teacher-name').value = index;
-    document.getElementById('f-batch-name').value = index;
-
-    const selected = currentStudentAssignments[index];
-    document.getElementById('f-course').value = selected.course_name;
-
-    const { data: batchInfo } = await db.from('batches')
-        .select('batch_time')
-        .eq('batch_name', selected.batch_name)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    const slotsInput = document.getElementById("f-teacher-available-slots");
-    slotsInput.value = batchInfo ? batchInfo.batch_time : "Time not assigned in Section 5.";
-}
-
-// --- 5. GENERATE TIMETABLE GRID ---
+            document.getElementById("f-teacher-available-slots").value = batchInfo ? batchInfo.batch_time : "Time not found.";
+        }
+        // --- 3. GRID GENERATOR LOGIC ---
+// --- 3. GRID GENERATOR LOGIC (FIXED BRACES) ---
 async function generateTimeTable() {
     const dateVal = document.getElementById('f-date').value;
     const roll = document.getElementById('f-roll').value.trim();
@@ -636,15 +605,16 @@ async function generateTimeTable() {
     const officialBatchTime = document.getElementById('f-teacher-available-slots').value;
     const preferredTime = document.getElementById('f-time').value;
 
-    if (!roll || idSelect.selectedIndex === -1) return alert("Fetch Roll Number and select Teacher first.");
+    if (!roll || idSelect.selectedIndex === -1) return alert("Please Fetch Roll Number first.");
 
     const teacherId = idSelect.options[idSelect.selectedIndex].text;
 
+    // PREFERRED SLOT VALIDATION
     if (officialBatchTime.includes(preferredTime)) {
-        statusDiv.innerText = "✅ PREFERRED SLOT IS AVAILABLE";
+        statusDiv.innerText = "✅ THE PREFERRED SLOT IS AVAILABLE";
         statusDiv.style.color = "#2ed573";
     } else {
-        statusDiv.innerText = "❌ PREFERRED SLOT NOT IN BATCH HOURS";
+        statusDiv.innerText = "❌ THE PREFERRED SLOT IS NOT IN TEACHER'S BATCH HOURS";
         statusDiv.style.color = "#ff4757";
     }
 
@@ -665,7 +635,8 @@ async function generateTimeTable() {
             const cellId = `cell-${rowIndex}-${colIndex}`;
             td.id = cellId;
 
-            const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(dateVal).getDay()];
+            const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+            const activeDayName = daysOfWeek[new Date(dateVal).getDay()];
             if (dayStr.toUpperCase() !== activeDayName) {
                 td.style.opacity = "0.3";
                 td.style.pointerEvents = "none";
@@ -674,12 +645,12 @@ async function generateTimeTable() {
             const isBooked = bookings?.some(b => b.time_slot === timeStr && b.day === dayStr && b.teacher_id === teacherId);
 
             if (isBooked) {
-                td.innerHTML = `<span style="color:red; font-weight:bold;">TEACHER BOOKED</span>`;
+                td.innerHTML = `<span style="color:red; font-weight:bold;">BOOKED</span>`;
                 td.classList.add("booked-cell");
                 const bData = bookings.find(b => b.time_slot === timeStr && b.teacher_id === teacherId);
-                if (bData) td.innerHTML += `<br><button type="button" style="background:red; color:white; border:2px solid black; padding:4px 8px; font-size:0.7rem; cursor:pointer; margin-top:10px; border-radius:4px;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE</button>`;
+                if (bData) td.innerHTML += `<br><button type="button" style="background:red; color:white; border:1px solid black; padding:4px 8px; font-size:0.7rem; cursor:pointer; margin-top:10px; border-radius:4px;" onclick="deleteFakeBooking('${bData.id}')">❌ DELETE</button>`;
             } else {
-                td.innerHTML = `<span class="open-slot">OPEN SLOT</span><br><button type="button" class="btn-book" onclick="bookSlot('${dayStr}', '${timeStr}', '${cellId}')">BOOK</button>`;
+                td.innerHTML = `<span class="open-slot">OPEN</span><br><button type="button" class="btn-book" onclick="bookSlot('${dayStr}', '${timeStr}', '${cellId}')">BOOK</button>`;
             }
             tr.appendChild(td);
         });
@@ -688,7 +659,6 @@ async function generateTimeTable() {
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
 
-// --- 6. BOOK SLOT & SAVE TO DATABASE ---
 async function bookSlot(day, time, cellId) {
     const roll = document.getElementById('f-roll').value.trim();
     const student = document.getElementById('f-student-name').value.trim();
@@ -701,50 +671,429 @@ async function bookSlot(day, time, cellId) {
     const teacherId = idSelect.options[idSelect.selectedIndex].text;
     const teacherName = nameSelect.options[nameSelect.selectedIndex].text;
 
-    if (!officialBatchTime.includes(time)) return alert("❌ DENIED: Slot not in official batch timings.");
-    if (!sessionInstID) await authenticateForBooking();
+    // TOMORROW CHECK
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0,0,0,0);
+    const selDate = new Date(dateVal); selDate.setHours(0,0,0,0);
+    if (selDate.getTime() !== tomorrow.getTime()) return alert("❌ Bookings are ONLY allowed for Tomorrow (" + tomorrow.toDateString() + ")");
 
+    // BATCH TIME CHECK
+    if (!officialBatchTime.includes(time)) return alert("❌ SLOT NOT ALLOWED: Must match Teal Box timings.");
+
+    // WHATSAPP & MISCHIEF CHECK
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', teacherId).eq('institute_id', sessionInstID).single();
-    
     if (tData && tData.mobile) {
         const cleanPhone = tData.mobile.replace(/\D/g, '');
         const finalPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
-        const msg = `📚 *New Timetable Booking*\nStudent: ${student}\nSubject: ${course}\nDate: ${dateVal}\nTime: ${time}`;
+        const msg = `📚 New Booking\nStudent: ${student}\nSubject: ${course}\nDate: ${dateVal}\nTime: ${time}`;
         window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, "_blank");
 
-        if (!window.confirm("Did you send the message to " + teacherName + "? Click OK to confirm booking.")) return;
+        const userConfirmed = window.confirm("DID YOU SEND THE MESSAGE TO " + teacherName + "?\n\nClick OK ONLY if you sent it.");
+        if (userConfirmed === false) return alert("Booking Cancelled.");
+
+        const alertMsg = `⚠️ MISCHIEF ALERT: Student ${student} clicked CONFIRM but might not have sent the message.`;
+        window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(alertMsg)}`, "_blank");
     }
 
     const { data: bookingData, error: insertError } = await db.from("class_bookings").insert({
-        institute_id: sessionInstID, teacher_id: teacherId, student_roll: roll,
-        booking_date: dateVal, time_slot: time, day: day, course: course
+        institute_id: sessionInstID, teacher_id: teacherId, student_roll: roll, booking_date: dateVal, time_slot: time, day: day, course: course
     }).select().single();
 
     if (insertError) return alert("Error: " + insertError.message);
 
     const cell = document.getElementById(cellId);
-    cell.innerHTML = `<div class="booked-tag"><b>BOOKED</b></div><div class="booked-tag">Teacher: ${teacherName}</div><button type="button" style="background:red; color:white; border:2px solid black; padding:4px 8px; font-size:0.7rem; cursor:pointer; margin-top:5px; border-radius:4px;" onclick="deleteFakeBooking('${bookingData.id}')">❌ DELETE</button>`;
+    cell.innerHTML = `<div class="booked-tag">BOOKED</div><div class="booked-tag">${teacherName}</div><button type="button" style="background:red; color:white; border:1px solid black; padding:4px 8px; font-size:0.7rem; cursor:pointer; margin-top:5px; border-radius:4px;" onclick="deleteFakeBooking('${bookingData.id}')">❌ DELETE</button>`;
     cell.classList.add("booked-cell");
-    alert("Booking successfully saved!");
+    alert("Booking Saved Successfully.");
 }
+        function getOrdinalNum(n) {
+    n = Number(n);
 
-// --- 7. MISC HELPERS ---
-async function deleteFakeBooking(bookingId) {
-    const pin = prompt("TEACHER ONLY: Enter PIN to delete:");
-    if (pin !== "1234") return alert("Invalid PIN.");
-    const { error } = await db.from('class_bookings').delete().eq('id', bookingId);
-    if (!error) { alert("Slot Freed!"); generateTimeTable(); }
+    if (n > 3 && n < 21) return n + "th";
+
+    switch (n % 10) {
+        case 1: return n + "st";
+        case 2: return n + "nd";
+        case 3: return n + "rd";
+        default: return n + "th";
+    }
 }
+      function formatDateReadable(dateStr) {
+    const date = new Date(dateStr);
 
-window.onload = function() {
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+
+    return `${getOrdinalNum(day)} ${month} ${year}`;
+}
+// --- 4. BOOKING & CONFIRMATION LOGIC ---
+async function bookSlot(day, time, cellId) {
+    // 1️⃣ Get values from form
+    const roll = document.getElementById('f-roll').value.trim();
+    const student = document.getElementById('f-student-name').value.trim();
+    const course = document.getElementById('f-course').value;
+    const teacherSelect = document.getElementById("f-teacher");
+    const teacherId = teacherSelect.value;
+    const dateVal = document.getElementById('f-date').value;
+
+    // --- DATE/DAY SYNC CHECK ---
+    const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const selectedDateObj = new Date(dateVal);
+    const actualDayName = daysOfWeek[selectedDateObj.getDay()];
+
+    if (day.toUpperCase() !== actualDayName) {
+        alert(`❌ DATE CONFLICT: ${dateVal} is a ${actualDayName}. \n\nYou cannot book this in the ${day} column.`);
+        return;
+    }
+
+    // --- ONLY TOMORROW CHECK ---
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateInput = document.getElementById('f-date');
-    if (dateInput) {
-        dateInput.value = tomorrow.toISOString().split('T')[0];
-        dateInput.setAttribute('min', dateInput.value);
+    tomorrow.setHours(0, 0, 0, 0);
+    selectedDateObj.setHours(0, 0, 0, 0);
+
+    if (selectedDateObj.getTime() !== tomorrow.getTime()) {
+        alert(`❌ INVALID DATE: Bookings are ONLY allowed for Tomorrow (${tomorrow.toDateString()}).`);
+        return;
     }
-};
+
+    // 2️⃣ Standard Form Validation
+    if (!roll || !student) return alert("Please enter and fetch student details.");
+    if (!course) return alert("Please select a course.");
+    if (!teacherId) return alert("Please select a teacher.");
+    if (!dateVal) return alert("Please select booking date.");
+
+    // 🔴 Past date check
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (selectedDateObj < today) {
+        return alert("Booking date cannot be in the past.");
+    }
+
+    // 🚨 RULE 1: STRICT AVAILABILITY ENFORCEMENT
+    const selectedOption = teacherSelect.options[teacherSelect.selectedIndex];
+    const allowedSlots = selectedOption.dataset.timeslots || "";
+    const availStatus = selectedOption.dataset.availability || "No";
+
+    if (availStatus !== "Yes" || !allowedSlots.includes(time)) {
+        return alert("BOOKING NOT AVAILABLE FOR THIS TIME SLOT.");
+    }
+
+    // 3️⃣ Pre-Check: Is teacher already booked?
+    if (!sessionInstID) {
+        const isAuth = await authenticateForBooking();
+        if (!isAuth) return;
+    }
+
+    const { data: existingBooking } = await db
+        .from("class_bookings")
+        .select("id")
+        .eq("institute_id", sessionInstID)
+        .eq("teacher_id", teacherId)
+        .eq("booking_date", dateVal)
+        .eq("time_slot", time)
+        .maybeSingle();
+
+    if (existingBooking) return alert("This teacher is already booked in this time slot.");
+
+// ============================================================
+    // 4️⃣ WHATSAPP & MISCHIEF CHECK (FIREFOX COMPATIBLE)
+    // ============================================================
+    const teacherPhone = selectedOption.dataset.mobile;
+    const teacherName = selectedOption.dataset.name;
+
+    if (teacherPhone) {
+        // ADDED: Country Code Fix for your 10-digit issue
+        const cleanPhone = teacherPhone.replace(/\D/g, '');
+        const finalPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+
+        const message = `📚 New Class Booking\n\nStudent: ${student}\nCourse: ${course}\nDate: ${dateVal}\nTime: ${time}`;
+        const whatsappURL = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
+        
+        // Open WhatsApp
+        window.open(whatsappURL, "_blank");
+
+        // FIREFOX FIX: Explicitly wait for the user to answer the prompt
+        const userConfirmed = window.confirm(`DID YOU SEND THE MESSAGE TO ${teacherName}?\n\nClick OK only if you sent it. Click CANCEL to stop.`);
+
+        if (userConfirmed === false) {
+            alert("Booking Cancelled by User.");
+            return; // This stops Firefox from saving to the DB
+        }
+
+        // Mischief Alert
+        const alertMsg = `⚠️ MISCHIEF ALERT: Student ${student} (Roll: ${roll}) clicked CONFIRM but may not have sent the message.`;
+        window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(alertMsg)}`, "_blank");
+
+    } else {
+        return alert("Teacher phone missing.");
+    }
+    // ============================================================
+    // 5️⃣ SAVE TO DATABASE (Only reached if user clicks OK)
+    // ============================================================
+    const { data: bookingData, error: insertError } = await db
+        .from("class_bookings")
+        .insert({
+            institute_id: sessionInstID,
+            teacher_id: teacherId,
+            student_roll: roll,
+            booking_date: dateVal,
+            time_slot: time,
+            course: course
+        })
+        .select()
+        .single();
+
+// --- UPDATE THIS SECTION AT THE END OF bookSlot() ---
+    if (insertError) return alert("Error saving booking: " + insertError.message);
+
+    // 6️⃣ Update the timetable cell visually (NOW INCLUDING THE DELETE BUTTON)
+    const cell = document.getElementById(cellId);
+    cell.innerHTML = `
+        <div class="booked-tag">Teacher: ${teacherName}</div>
+        <div class="booked-tag">Student: ${student}</div>
+        <button type="button" style="background:red; color:white; border:2px solid black; padding:4px 8px; font-size:0.75rem; cursor:pointer; margin-top:10px; border-radius:4px; font-weight:bold;" onclick="deleteFakeBooking('${bookingData.id}')">❌ DELETE FAKE</button>
+    `;
+    cell.classList.add("booked-cell");
+
+    alert("Booking successfully saved. (If this was a test, use the RED button to delete it).");
+}
+        function closeModal() {
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+
+
+async function authenticateForBooking() {
+
+    const authResponse = await db.auth.getUser();
+    const user = authResponse.data.user;
+
+    if (user) {
+        const profileResponse = await db
+            .from('profiles')
+            .select('institute_id')
+            .eq('id', user.id)
+            .single();
+
+        if (profileResponse.data) {
+            sessionInstID = profileResponse.data.institute_id;
+        }
+    }
+
+    if (!sessionInstID) {
+        alert("Not logged in. Please login from main app.");
+        return false;
+    }
+
+    return true;
+}
+
+
+// --- 2. SYNC TEACHER DATA (Find Teachers linked to the Student's Course) ---
+async function populateTeachersBySubject(studentCourse) {
+    const teacherSelect = document.getElementById("f-teacher");
+    teacherSelect.innerHTML = '<option value="">Searching for teachers...</option>';
+
+    if (!sessionInstID) await checkCurrentSession();
+
+    // Fetch teachers who teach this subject
+    // We use ilike to match even if the student is enrolled in multiple courses
+    const { data, error } = await db.from('teacher_details')
+        .select('id, teacher_name, mobile, availability, time_of_slot, rating, experience')
+        .eq('institute_id', sessionInstID)
+        .ilike('subject_taught', `%${studentCourse}%`)
+        .eq('status', 'Active');
+
+    if (error || !data || data.length === 0) {
+        teacherSelect.innerHTML = '<option value="">No Active Teachers for this course</option>';
+        return;
+    }
+
+    // Sort by rating (highest first)
+    data.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+    teacherSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+    data.forEach(t => {
+        let opt = document.createElement('option');
+        opt.value = t.id;
+        opt.text = `${t.teacher_name} (⭐ ${t.rating || 0})`;
+        
+        // Store crucial metadata in the dropdown option
+        opt.dataset.name = t.teacher_name;
+        opt.dataset.mobile = t.mobile;
+        opt.dataset.availability = t.availability;
+        opt.dataset.slotMap = t.time_of_slot; // This is the JSON string
+        
+        teacherSelect.appendChild(opt);
+    });
+}
+
+
+
+
+
+
+
+// --- 3. SYNC BATCH TIMINGS (Capture the exact subject timings for the teacher) ---
+document.getElementById("f-teacher").addEventListener("change", function () {
+    const selectedOption = this.options[this.selectedIndex];
+    const slotsInput = document.getElementById("f-teacher-available-slots");
+    const nameInput = document.getElementById("f-teacher-name");
+    
+    // Get the subject the student chose from the dropdown
+    const chosenSubject = document.getElementById('f-subject-choice').value.trim().toUpperCase();
+
+    if (!this.value || !chosenSubject) {
+        nameInput.value = "";
+        slotsInput.value = "";
+        return;
+    }
+
+    // Populate Teacher Name
+    nameInput.value = selectedOption.dataset.name || "";
+
+    try {
+        const avail = selectedOption.dataset.availability;
+        const rawMap = selectedOption.dataset.slotMap; // This is the 'time_of_slot' column
+
+        if (avail === "No") {
+            slotsInput.value = "TEACHER MARKED UNAVAILABLE IN PORTAL";
+            return;
+        }
+
+        // Parse the JSON safely
+        let slotMap = {};
+        if (typeof rawMap === 'string') {
+            slotMap = JSON.parse(rawMap);
+        } else {
+            slotMap = rawMap; // Supabase sometimes auto-parses JSON
+        }
+
+        // FIND THE SLOT (Fuzzy Match Logic)
+        let foundSlots = "";
+        
+        // Loop through the keys in the teacher's time_of_slot JSON
+        Object.keys(slotMap).forEach(key => {
+            // Clean both strings: remove spaces and make UPPERCASE
+            if (key.trim().toUpperCase() === chosenSubject) {
+                foundSlots = slotMap[key];
+            }
+        });
+
+        if (foundSlots) {
+            slotsInput.value = foundSlots;
+            slotsInput.style.color = "#000"; // Ensure visibility
+        } else {
+            // Debugging helper: tells you what it found vs what it wanted
+            console.log("Looking for:", chosenSubject, "Available in Map:", Object.keys(slotMap));
+            slotsInput.value = "NO SLOTS FOUND FOR SUBJECT: " + chosenSubject;
+        }
+
+    } catch (e) {
+        console.error("JSON Error:", e);
+        slotsInput.value = "ERROR READING TEACHER TIMINGS";
+    }
+});
+
+
+// --- ADD THIS AT THE VERY BOTTOM OF YOUR SCRIPT TAG ---
+async function deleteFakeBooking(bookingId) {
+    const pin = prompt("TEACHER ONLY: Enter Security PIN to delete:");
+    if (pin !== "1234") return alert("Invalid PIN.");
+
+    if (confirm("Delete this fake booking and open the slot?")) {
+        const { error } = await db.from('class_bookings').delete().eq('id', bookingId);
+        if (error) alert("Error: " + error.message);
+        else {
+            alert("Slot Freed!");
+            generateTimeTable(); // Refresh the grid
+        }
+    }
+}
+
+
+
+
+
+/*
+async function bookClass() {
+
+  // 1️⃣ Get values from form
+  const studentName = document.getElementById("studentName").value;
+  const studentRoll = document.getElementById("studentRoll").value;
+  const bookingDate = document.getElementById("bookingDate").value;
+  const timeSlot = document.getElementById("timeSlot").value;
+  const teacherId = document.getElementById("teacherSelect").value;
+
+  // 2️⃣ Get logged in user
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+
+  if (!user) {
+    alert("Not logged in");
+    return;
+  }
+
+  // 3️⃣ Get institute_id from profiles
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("institute_id")
+    .eq("id", user.id)
+    .single();
+
+  const instituteId = profile.institute_id;
+
+  // 4️⃣ Get teacher mobile number
+  const { data: teacher } = await supabase
+    .from("teacher_details")
+    .select("mobile")
+    .eq("id", teacherId)
+    .single();
+
+  const teacherPhone = teacher.mobile; // Must be like 91XXXXXXXXXX
+
+  // 5️⃣ Insert booking
+  const { data, error } = await supabase
+    .from("class_bookings")
+    .insert([
+      {
+        institute_id: instituteId,
+        teacher_id: teacherId,
+        student_roll: studentRoll,
+        booking_date: bookingDate,
+        time_slot: timeSlot,
+        status: "pending"
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    alert("Booking failed: " + error.message);
+    return;
+  }
+
+  // 6️⃣ WhatsApp Message
+  const message = `
+📚 New Class Booking Request
+
+Student: ${studentName}
+Date: ${bookingDate}
+Time: ${timeSlot}
+Booking ID: ${data.id}
+
+Please confirm in dashboard.
+`;
+
+  const encodedMessage = encodeURIComponent(message);
+  const whatsappURL = `https://wa.me/${teacherPhone}?text=${encodedMessage}`;
+
+  // 7️⃣ Open WhatsApp automatically
+  window.open(whatsappURL, "_blank");
+
+  alert("Booking saved. Teacher notified via WhatsApp.");
+}
+*/
     </script>
 </body>
 </html>
