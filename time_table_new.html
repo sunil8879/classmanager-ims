@@ -607,9 +607,12 @@ function renderTimetableGrid(bookings, dateVal) {
     const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
     
+    // Determine the day name based on selected date
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(dateVal).getDay()];
-    const currentTeacherName = document.getElementById('f-teacher-name').value;
+    
+    // Get logged-in info for "JOIN" logic
     const loggedInRoll = document.getElementById('f-roll').value;
+    const currentTeacherName = document.getElementById('f-teacher-name').value;
 
     const tbody = document.getElementById('timetable-body');
     tbody.innerHTML = '';
@@ -617,64 +620,89 @@ function renderTimetableGrid(bookings, dateVal) {
     SLOTS.forEach(time => {
         const tr = document.createElement('tr');
         const tdTime = document.createElement('td'); 
-        const bData = bookings?.find(b => b.time_slot === time);
+        
+        // --- MULTI-STUDENT LOGIC ---
+        // Filter finds ALL students booked for this specific teacher and time
+        const batchMembers = bookings?.filter(b => b.time_slot === time) || [];
+        // Check if the current logged-in student is already in this batch
+        const myBooking = batchMembers.find(b => b.student_roll === loggedInRoll);
 
-        if (bData) {
-            // --- BOOKED STATE (YELLOW THEME) ---
+        if (batchMembers.length > 0) {
+            // --- YELLOW BOOKING BOX (BATCH VIEW) ---
             tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)";
             tdTime.style.color = "#000";
             tdTime.style.border = "2px solid #000";
             tdTime.style.position = "relative";
-           tdTime.style.minWidth = window.innerWidth < 768 ? "160px" : "210px";
             tdTime.style.textAlign = "left";
             tdTime.style.padding = "10px";
+            // Mobile compliance: Dynamic width
+            tdTime.style.minWidth = window.innerWidth < 768 ? "160px" : "220px";
 
-            // Delete logic: Staff can delete anything. Student can delete ONLY their own.
+            // Delete Icon Logic
             let deleteBtn = "";
-            if (currentUserProfile.role !== 'Student' || bData.student_roll === loggedInRoll) {
-                deleteBtn = `<button style="background:#000; color:#fff; border:none; padding:5px 8px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" 
-                             onclick="cancelBooking('${bData.id}','${bData.student_roll}')">
+            // Show if Staff OR if current user has a booking here to cancel
+            if (currentUserProfile.role !== 'Student' || myBooking) {
+                const targetId = myBooking ? myBooking.id : batchMembers[0].id;
+                const targetRoll = myBooking ? myBooking.student_roll : batchMembers[0].student_roll;
+                deleteBtn = `<button style="background:#000; color:#fff; border:none; padding:6px 10px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" 
+                             onclick="cancelBooking('${targetId}','${targetRoll}')">
                              <i class="fas fa-trash-alt"></i></button>`;
             }
+
+            // Generate list of all student roll numbers in this batch
+            const rollListHtml = batchMembers.map(m => `• Roll: ${m.student_roll}`).join('<br>');
 
             tdTime.innerHTML = `
                 ${deleteBtn}
                 <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
                 <div style="font-size:0.7rem; line-height:1.4;">
-                    <b>ROLL:</b> ${bData.student_roll}<br>
-                    <b>TID:</b> ${bData.teacher_id}<br>
+                    <b style="color:red;">BATCH SIZE: ${batchMembers.length}</b><br>
                     <b>TCH:</b> ${currentTeacherName}<br>
-                    <b>SUB:</b> ${bData.course}
+                    <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
+                        ${rollListHtml}
+                    </div>
                 </div>`;
             
-            tdTime.title = `Full Details:\nRoll: ${bData.student_roll}\nTeacher: ${currentTeacherName}\nSubject: ${bData.course}`;
+            tdTime.title = `Total Students: ${batchMembers.length}\nTeacher: ${currentTeacherName}`;
         } else {
-            // EMPTY STATE (BLUE THEME)
+            // --- EMPTY TIME SLOT (BLUE THEME) ---
             tdTime.className = 'time-slot'; 
             tdTime.innerText = time;
+            tdTime.style.minWidth = window.innerWidth < 768 ? "160px" : "220px";
         }
         tr.appendChild(tdTime);
 
+        // --- DAY COLUMNS ---
         DAYS.forEach(day => {
             const td = document.createElement('td');
+            // Dim days that are not the selected date
             if (day !== activeDayName) {
                 td.style.opacity = "0.2";
                 td.style.pointerEvents = "none";
             }
-            if (bData && day === activeDayName) {
-                td.className = 'booked-cell';
-                td.innerHTML = `<b>ROLL: ${bData.student_roll}</b><br><small>${bData.course}</small>`;
-            } else if (day === activeDayName) {
-                if (currentUserProfile.role === 'Student') {
-                    td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
+
+            if (day === activeDayName) {
+                if (myBooking) {
+                    // Current User is already in this batch
+                    td.className = 'booked-cell';
+                    td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>Roll: ${myBooking.student_roll}</small><br><small>Batch Active</small>`;
                 } else {
-                    td.innerHTML = `<span style="font-size:0.7rem; color:#999;">EMPTY</span>`;
+                    // User is NOT in this batch. Allow them to JOIN.
+                    const count = batchMembers.length;
+                    const btnLabel = count > 0 ? `JOIN BATCH (${count})` : "BOOK SLOT";
+                    
+                    if (currentUserProfile.role === 'Student') {
+                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">${btnLabel}</button>`;
+                    } else {
+                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">${count > 0 ? count + ' Students' : 'EMPTY'}</span>`;
+                    }
                 }
             }
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
     });
+    // Display the grid
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
     /**
