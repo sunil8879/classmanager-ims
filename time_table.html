@@ -432,10 +432,21 @@ input[readonly] {
                 <input type="text" id="f-course" readonly placeholder="Auto-populated">
             </div>
 
-            <!-- 5. Teacher ID -->
-           <select id="f-teacher">
-    <option value="">Select Teacher</option>
-</select>
+<!-- NEW: Select Subject Dropdown -->
+<div class="input-group">
+    <label>4. Choose Subject to Book</label>
+    <select id="f-subject-choice" onchange="fetchTeachersForChosenSubject()">
+        <option value="">-- Fetch Student First --</option>
+    </select>
+</div>
+
+<!-- Teacher Selection -->
+<div class="input-group">
+    <label>5. Select Teacher</label>
+    <select id="f-teacher">
+        <option value="">-- Choose Subject First --</option>
+    </select>
+</div>
 
             <!-- 4. Teacher Name -->
             <div class="input-group">
@@ -590,41 +601,114 @@ const DAYS = [
 ];
 
         // --- 2. DATABASE FETCH LOGIC ---
-    async function fetchStudent() {
+// --- 1. FETCH STUDENT & POPULATE SUBJECTS ---
+async function fetchStudent() {
     const roll = document.getElementById('f-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter Student Roll Number.");
 
-    if (!roll) {
-        alert("Please enter Student Roll Number.");
-        return;
-    }
-
-    // Ensure we are only searching within the logged-in institute
     if (!sessionInstID) await checkCurrentSession();
 
-    const { data, error } = await db.from('students')
+    // 1. Get Student Name and their list of Courses
+    const { data: stu, error } = await db.from('students')
         .select('full_name, course')
         .eq('roll_number', roll)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (error) {
-        alert("Error: " + error.message);
-        return;
+    if (error || !stu) return alert("Student not found.");
+
+    document.getElementById('f-student-name').value = stu.full_name;
+    document.getElementById('f-course').value = stu.course;
+
+    // 2. Break the course string (e.g., "Maths, Science") into a dropdown
+    const subjectDropdown = document.getElementById('f-subject-choice');
+    subjectDropdown.innerHTML = '<option value="">-- Select Subject --</option>';
+    
+    if (stu.course) {
+        const subjects = stu.course.split(',').map(s => s.trim());
+        subjects.forEach(sub => {
+            let opt = document.createElement('option');
+            opt.value = sub.toUpperCase();
+            opt.text = sub.toUpperCase();
+            subjectDropdown.appendChild(opt);
+        });
     }
-
-    if (!data) {
-        alert("Student Roll Number not found in this institute.");
-        return;
-    }
-
-    // Populate Fields
-    document.getElementById('f-student-name').value = data.full_name;
-    document.getElementById('f-course').value = data.course;
-
-    // Automatically trigger teacher search based on student's course
-    populateTeachersBySubject(data.course);
+    alert("Student found! Now choose a subject from the new dropdown.");
 }
 
+// --- 2. FETCH TEACHERS LINKED TO THAT SPECIFIC SUBJECT ---
+async function fetchTeachersForChosenSubject() {
+    const chosenSubject = document.getElementById('f-subject-choice').value;
+    const teacherSelect = document.getElementById("f-teacher");
+    
+    if (!chosenSubject) return;
+    
+    teacherSelect.innerHTML = '<option value="">Searching...</option>';
+
+    // 3. Find Teachers who teach this specific subject in this institute
+    const { data: teachers, error } = await db.from('teacher_details')
+        .select('id, teacher_name, mobile, availability, time_of_slot, rating')
+        .eq('institute_id', sessionInstID)
+        .ilike('subject_taught', `%${chosenSubject}%`)
+        .eq('status', 'Active');
+
+    if (error || !teachers || teachers.length === 0) {
+        teacherSelect.innerHTML = '<option value="">No Teachers Found</option>';
+        return;
+    }
+
+    teacherSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+    teachers.forEach(t => {
+        let opt = document.createElement('option');
+        opt.value = t.id;
+        opt.text = `${t.teacher_name} (⭐ ${t.rating || 0})`;
+        
+        // Save metadata to use when the user selects a teacher
+        opt.dataset.name = t.teacher_name;
+        opt.dataset.mobile = t.mobile;
+        opt.dataset.availability = t.availability;
+        opt.dataset.slotMap = t.time_of_slot; // JSON String
+        teacherSelect.appendChild(opt);
+    });
+}
+
+// --- 3. SHOW THE SPECIFIC TIME SLOTS FOR THAT SUBJECT ---
+document.getElementById("f-teacher").addEventListener("change", function () {
+    const selectedOption = this.options[this.selectedIndex];
+    const chosenSubject = document.getElementById('f-subject-choice').value;
+    const slotsInput = document.getElementById("f-teacher-available-slots");
+    const nameInput = document.getElementById("f-teacher-name");
+
+    if (!this.value) {
+        nameInput.value = "";
+        slotsInput.value = "";
+        return;
+    }
+
+    nameInput.value = selectedOption.dataset.name;
+
+    try {
+        const slotMap = JSON.parse(selectedOption.dataset.slotMap);
+        const avail = selectedOption.dataset.availability;
+
+        if (avail === "No") {
+            slotsInput.value = "TEACHER UNAVAILABLE TODAY";
+            return;
+        }
+
+        // Find the slot for the CHOSEN subject specifically
+        let specificSlots = "";
+        Object.keys(slotMap).forEach(key => {
+            if (key.trim().toUpperCase() === chosenSubject.toUpperCase()) {
+                specificSlots = slotMap[key];
+            }
+        });
+
+        slotsInput.value = specificSlots || "No slots assigned for this subject.";
+    } catch (e) {
+        slotsInput.value = "Error loading timings.";
+    }
+});
 
         async function fetchTeacher() {
             const tid = document.getElementById('f-teacher-id').value.trim().toUpperCase();
