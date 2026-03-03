@@ -330,6 +330,31 @@
 .booked-cell b { color: #fff !important; font-size: 0.85rem; display: block; margin-bottom: 2px; }
 .booked-cell span { color: #ffffff !important; display: block; line-height: 1.2; }
 .booked-cell hr { border: 0; border-top: 1px solid rgba(255,255,255,0.4); margin: 5px 0; }
+
+
+
+/* YELLOW STYLE FOR THE TIME COLUMN WHEN BOOKED */
+.time-slot.slot-booked {
+    background: #FFD700 !important; /* Solid Yellow */
+    color: #000000 !important;
+    border: 3px solid #000000 !important;
+    position: relative;
+    cursor: help;
+    animation: pulse-yellow 2s infinite;
+}
+
+@keyframes pulse-yellow {
+    0% { box-shadow: 0 0 0 0px rgba(255, 215, 0, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+    100% { box-shadow: 0 0 0 0px rgba(255, 215, 0, 0); }
+}
+
+/* Tooltip text adjustment */
+.time-slot.slot-booked::after {
+    content: ' ⓘ';
+    font-size: 0.8rem;
+    font-weight: bold;
+}
     </style>
 </head>
 <body>
@@ -587,70 +612,78 @@ function renderTimetableGrid(bookings, dateVal) {
     const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM"];
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
     
-    // Calculate which day of the week the selected date is
-    const jsDay = new Date(dateVal).getDay(); 
+    const jsDay = new Date(dateVal).getDay();
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][jsDay];
     
-    const tName = document.getElementById('f-teacher-name').value || "N/A";
+    // Get Teacher Name from the sync hidden input
+    const tName = document.getElementById('f-teacher-name').value || "Teacher";
+
     const tbody = document.getElementById('timetable-body');
     tbody.innerHTML = '';
 
     SLOTS.forEach(time => {
         const tr = document.createElement('tr');
         
-        // Time Column
+        // --- 1. THE TIME COLUMN (EXTREME LEFT) ---
         const tdTime = document.createElement('td'); 
         tdTime.className = 'time-slot'; 
         tdTime.innerText = time;
+
+        // Check if ANY booking exists for this specific time in the data we fetched
+        const bookingInfo = bookings?.find(b => b.time_slot.trim() === time.trim());
+
+        if (bookingInfo) {
+            // APPLY YELLOW COLOR
+            tdTime.classList.add('slot-booked');
+            
+            // SET HOVER POPUP (Title attribute is universal for Owner/Teacher/Student)
+            tdTime.title = `
+                ⚠️ SLOT BOOKED
+                ----------------------
+                STUDENT: ${bookingInfo.student_name}
+                ROLL NO: ${bookingInfo.student_roll}
+                TEACHER ID: ${bookingInfo.teacher_id}
+                TEACHER: ${tName}
+                COURSE: ${bookingInfo.course}
+            `.replace(/^\s+/gm, ''); // Removes leading spaces for a clean popup
+        }
+        
         tr.appendChild(tdTime);
 
+        // --- 2. THE DAY COLUMNS ---
         DAYS.forEach(day => {
             const td = document.createElement('td');
             
-            // Check if this specific Day and Time is booked in the database
-            const bData = bookings?.find(b => 
+            // Lock other days
+            if (day !== activeDayName) {
+                td.style.opacity = "0.15";
+                td.style.pointerEvents = "none";
+            }
+
+            // Find booking for this specific cell
+            const cellBooking = bookings?.find(b => 
                 b.time_slot.trim() === time.trim() && 
                 b.day.toUpperCase() === day.toUpperCase()
             );
 
-            if (bData) {
-                // 1. APPLY THE BLUE COLOR
-                td.className = 'booked-cell';
-
-                // 2. INJECT ALL REQUIRED INFO
-                td.innerHTML = `
-                    <b>${bData.student_name}</b>
-                    <small>Roll: ${bData.student_roll}</small>
-                    <hr>
-                    <small>T.ID: ${bData.teacher_id}</small>
-                    <small>T.Name: ${tName}</small>
-                    <small>Sub: ${bData.course}</small>
-                `;
-
-                // 3. ADD HOVER POPUP (TOOLTIP)
-                td.title = `STUDENT: ${bData.student_name}\nROLL: ${bData.student_roll}\nTEACHER ID: ${bData.teacher_id}\nTEACHER: ${tName}\nSUBJECT: ${bData.course}`;
-
-                // Add Delete button for Staff
-                if (currentUserProfile.role !== 'Student') {
-                    td.innerHTML += `<button class="btn-cancel-mischief" style="font-size:10px; padding:2px; width:100%;" onclick="cancelBooking('${bData.id}','${bData.student_roll}','${bData.student_name}')">CANCEL</button>`;
-                }
+            if (cellBooking) {
+                // If booked, we can show a simple "Busy" text inside
+                td.innerHTML = `<span style="font-weight:bold; color:red;">OCCUPIED</span>`;
+                td.style.backgroundColor = "#f1f1f1";
             } else {
-                // If not booked, check if it's the "active" day to show the Book button
-                if (day === activeDayName) {
-                    if (currentUserProfile.role === 'Student') {
-                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
-                    } else {
-                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">EMPTY</span>`;
-                    }
-                } else {
-                    // Dim out other days
-                    td.style.opacity = "0.2";
+                // If not booked, and it's the active day, show the book button
+                if (day === activeDayName && currentUserProfile.role === 'Student') {
+                    td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')">BOOK</button>`;
+                } else if (day === activeDayName) {
+                    td.innerHTML = `<small>AVAILABLE</small>`;
                 }
             }
             tr.appendChild(td);
         });
+        
         tbody.appendChild(tr);
     });
+    
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
     /**
