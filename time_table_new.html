@@ -719,14 +719,14 @@ async function bookThisSlot(day, time) {
     }
 
     // --- 2. VALIDATION: DAILY BOOKING LIMIT (MAX 3) ---
-    const { count: bCount } = await db.from('class_bookings')
+   const { count: bCount } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
         .eq('student_roll', roll)
         .eq('booking_date', dateVal);
 
-    if (bCount >= 3) {
-        alert("🛑 ACCESS DENIED: You cannot book more than 3 sessions on a given day.");
-        return;
+    if (Number(bCount) >= 3) {
+        alert("🛑 ACCESS DENIED: You have already booked 3 sessions for this day.");
+        return; // Stops the process
     }
 
     // --- 3. VALIDATION: CANCELLATION MISCHIEF CHECK (TODAY ONLY) ---
@@ -799,14 +799,16 @@ async function bookThisSlot(day, time) {
 async function cancelBooking(id, roll) {
     if (!confirm(`Are you sure? This will be recorded as a cancellation for student roll ${roll}.`)) return;
 
-    // 1. Log the cancellation to the Mischief Table
+// Log the cancellation (mischief)
     const { error: logErr } = await db.from('class_cancellations').insert([{
         student_roll: roll,
         cancelled_by: currentUserProfile.role,
         institute_id: sessionInstID
     }]);
 
-    if (logErr) return alert("Error logging mischief: " + logErr.message);
+    if (logErr) {
+        console.warn("Mischief not logged. Did you run the SQL to create the table?");
+    }
 
     // 2. Count cancellations for THIS student for TODAY specifically
     const startOfToday = new Date();
