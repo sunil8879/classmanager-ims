@@ -492,73 +492,88 @@ async function checkMischiefHistory(studentRoll) {
     
 async function loadAssignmentSummary() {
     const tbody = document.getElementById('session-table-body');
+    if (!currentUserProfile || !sessionInstID) return;
+
     const userNameUpper = currentUserProfile.full_name.toUpperCase();
-    const targetDate = document.getElementById('f-date').value; // Tomorrow's Date
-
-    // 1. Fetch user assignments (who this student is allowed to study with)
-    let query = db.from('list').select('*').eq('institute_id', sessionInstID);
-    if (currentUserProfile.role === 'Student') {
-        query = query.eq('student_name', userNameUpper);
-    } else if (currentUserProfile.role === 'Teacher') {
-        query = query.eq('teacher_name', userNameUpper);
-    }
-    const { data: listData } = await query;
-
-    // 2. Fetch Batch Capacity from 'batches'
-    const { data: batchData } = await db.from('batches')
-        .select('teacher_id, batch_name, subject_name, students_allotted')
-        .eq('institute_id', sessionInstID);
-
-    // 3. CRITICAL: Fetch ALL bookings for "Tomorrow" to calculate Balance
-    const { data: currentBookings } = await db.from('class_bookings')
-        .select('course, time_slot')
-        .eq('booking_date', targetDate)
-        .eq('institute_id', sessionInstID);
-
-    tbody.innerHTML = "";
-    if (!listData || listData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10">No active assignments found.</td></tr>';
-        return;
+    
+    // 1. Safe Date Fetch (Defaults to tomorrow if box is empty)
+    let targetDate = document.getElementById('f-date').value;
+    if (!targetDate) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        targetDate = tomorrow.toISOString().split('T')[0];
     }
 
-    listData.forEach((item, index) => {
-        const bRow = batchData?.find(b => 
-            b.teacher_id === item.teacher_id && 
-            (b.subject_name.toUpperCase() === item.batch_name.toUpperCase() || 
-             b.batch_name.toUpperCase() === item.batch_name.toUpperCase())
-        );
+    try {
+        // 2. Fetch Assignments
+        let query = db.from('list').select('*').eq('institute_id', sessionInstID);
+        if (currentUserProfile.role === 'Student') {
+            query = query.eq('student_name', userNameUpper);
+        } else if (currentUserProfile.role === 'Teacher') {
+            query = query.eq('teacher_name', userNameUpper);
+        }
+        const { data: listData, error: listErr } = await query;
+        if (listErr) throw listErr;
 
-        const totalAllotted = bRow ? bRow.students_allotted : 0;
-        
-        // CALCULATE BALANCE: Total Seats - Bookings for this Batch for Tomorrow
-        // We filter bookings where the 'course' matches the 'batch_name'
-        const bookedCount = currentBookings?.filter(b => b.course === item.batch_name).length || 0;
-        const balanceSeats = totalAllotted - bookedCount;
+        // 3. Fetch Capacities
+        const { data: batchData } = await db.from('batches')
+            .select('teacher_id, batch_name, subject_name, students_allotted, batch_time')
+            .eq('institute_id', sessionInstID);
 
-        const selectId = "time-select-" + index;
-        const rawTime = bRow ? bRow.batch_time : "";
-        const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
+        // 4. Fetch Bookings for "Tomorrow" to calculate real-time balance
+        const { data: currentBookings } = await db.from('class_bookings')
+            .select('course, time_slot')
+            .eq('booking_date', targetDate)
+            .eq('institute_id', sessionInstID);
 
-        tbody.innerHTML += `
-            <tr>
-                <td>${item.roll_number}</td>
-                <td>${item.student_name}</td>
-                <td>${item.teacher_name}</td>
-                <td>${item.teacher_id}</td>
-                <td>${item.course_name}</td>
-                <td style="font-weight:bold;">${item.batch_name}</td>
-                <td style="color: blue; font-weight:800;">${totalAllotted}</td>
-                <td style="color: ${balanceSeats <= 0 ? 'red' : 'green'}; font-weight:800;">${balanceSeats}</td>
-                <td>
-                    <select id="${selectId}" style="width: 100%; height: 40px; border: 2px solid #000; border-radius: 4px; font-weight: bold; background: #fff8e1;">
-                        ${timeOptions}
-                    </select>
-                </td>
-                <td>
-                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${totalAllotted}')">SELECT</button>
-                </td>
-            </tr>`;
-    });
+        tbody.innerHTML = "";
+        if (!listData || listData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No active assignments found.</td></tr>';
+            return;
+        }
+
+        listData.forEach((item, index) => {
+            // Find batch info
+            const bRow = batchData?.find(b => 
+                b.teacher_id === item.teacher_id && 
+                (b.subject_name.toUpperCase() === item.batch_name.toUpperCase() || 
+                 b.batch_name.toUpperCase() === item.batch_name.toUpperCase())
+            );
+
+            const totalAllotted = bRow ? (parseInt(bRow.students_allotted) || 0) : 0;
+            const rawTime = bRow ? bRow.batch_time : "";
+            
+            // Calculate Balance based on Bookings table
+            const bookedCount = currentBookings?.filter(b => b.course === item.batch_name).length || 0;
+            const balanceSeats = totalAllotted - bookedCount;
+
+            const selectId = "time-select-" + index;
+            const timeOptions = rawTime ? rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.roll_number}</td>
+                    <td>${item.student_name}</td>
+                    <td>${item.teacher_name}</td>
+                    <td>${item.teacher_id}</td>
+                    <td>${item.course_name}</td>
+                    <td style="font-weight:bold;">${item.batch_name}</td>
+                    <td style="color: blue; font-weight:800;">${totalAllotted}</td>
+                    <td style="color: ${balanceSeats <= 0 ? 'red' : 'green'}; font-weight:800;">${balanceSeats}</td>
+                    <td>
+                        <select id="${selectId}" style="width: 100%; height: 40px; border: 2px solid #000; border-radius: 4px; font-weight: bold; background: #fff8e1;">
+                            ${timeOptions}
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${totalAllotted}')">SELECT</button>
+                    </td>
+                </tr>`;
+        });
+    } catch (err) {
+        console.error("Table Load Error:", err);
+        tbody.innerHTML = '<tr><td colspan="10" style="color:red">Error loading data. Please refresh.</td></tr>';
+    }
 }
 async function syncSelection(roll, sname, bname, tid, tname, allSlots, selectId, actualCapacity) {
     const selectedTime = document.getElementById(selectId).value;
@@ -690,6 +705,7 @@ const totalCap = document.getElementById('f-capacity').value || 10;
 }
    
 async function bookThisSlot(day, time) {
+    // 1. GET ALL NECESSARY DATA FROM THE UI
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
     const officialTime = document.getElementById('f-official-slots').value;
@@ -697,22 +713,26 @@ async function bookThisSlot(day, time) {
     const tid = document.getElementById('f-teacher-id').value;
     const maxAllowed = parseInt(document.getElementById('f-capacity').value || 10);
 
-    if (!roll) return alert("Please select a student from the summary table first.");
+    if (!roll) {
+        alert("Please select an assignment from the summary table first.");
+        return;
+    }
 
-    // --- 1. VALIDATION: DAILY BOOKING LIMIT (STRICT COUNT) ---
-    const { count: bCount, error: countErr } = await db.from('class_bookings')
+    // --- 2. VALIDATION: DAILY BOOKING LIMIT (MAX 3) ---
+    const { count: bCount } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
         .eq('student_roll', roll)
         .eq('booking_date', dateVal);
 
     if (bCount >= 3) {
-        alert("🛑 ERROR: You have already booked 3 sessions for " + dateVal + ". You cannot book more.");
+        alert("🛑 ACCESS DENIED: You cannot book more than 3 sessions on a given day.");
         return;
     }
 
-    // --- 2. VALIDATION: CANCELLATION MISCHIEF ---
+    // --- 3. VALIDATION: CANCELLATION MISCHIEF CHECK (TODAY ONLY) ---
     const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    startOfToday.setHours(0, 0, 0, 0); 
+
     const { data: cancelData } = await db.from('class_cancellations')
         .select('created_at')
         .eq('student_roll', roll)
@@ -720,32 +740,41 @@ async function bookThisSlot(day, time) {
         .gte('created_at', startOfToday.toISOString());
 
     const todayCancelsCount = cancelData ? cancelData.length : 0;
+
     if (todayCancelsCount >= 4) {
-        alert("🛑 ACCESS BLOCKED: Daily cancellation limit reached.");
+        alert("🛑 ACCESS BLOCKED: You have reached the daily cancellation limit. Booking is suspended for today.");
         return;
     }
 
-    // --- 3. VALIDATION: BATCH CAPACITY ---
-    const { count: currentBatchSize } = await db.from('class_bookings')
+    // --- 4. VALIDATION: BATCH CAPACITY ---
+    const { count: currentSize } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
         .eq('teacher_id', tid)
         .eq('booking_date', dateVal)
         .eq('time_slot', time);
 
-    if (currentBatchSize >= maxAllowed) {
-        alert("🛑 BATCH FULL: No more seats available in this time slot.");
+    if (currentSize >= maxAllowed) {
+        alert("🛑 BATCH FULL: This batch is limited to " + maxAllowed + " students only.");
         return;
     }
 
-    // --- 4. WHATSAPP & INSERT ---
+    // --- 5. VALIDATION: OFFICIAL BATCH TIME SCHEDULE ---
+    if (!officialTime.includes(time)) {
+        alert("❌ DENIED: This time is not within the official batch schedule.");
+        return;
+    }
+
+    // --- 6. WHATSAPP CONFIRMATION FLOW (PRESERVED) ---
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     if (tData && tData.mobile) {
-        const msg = "Booking Request: " + currentBatch + " (Roll: " + roll + ") on " + dateVal + " at " + time;
+        const msg = "Booking Request: Batch " + currentBatch + " (Roll: " + roll + ") on " + dateVal + " at " + time;
         window.open("https://wa.me/91" + tData.mobile + "?text=" + encodeURIComponent(msg), "_blank");
-        const confirmSave = confirm("Did you send the WhatsApp? Click OK to confirm booking.");
+        
+        const confirmSave = confirm("WhatsApp opened. Did you send the message? Click OK to save your booking.");
         if (!confirmSave) return;
     }
 
+    // --- 7. FINAL DATABASE INSERT ---
     const { error: insertError } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
@@ -758,12 +787,11 @@ async function bookThisSlot(day, time) {
     if (insertError) {
         alert("Database Error: " + insertError.message);
     } else {
-        alert("Success! Slot Booked.");
+        alert("Success! Slot Booked for " + currentBatch);
         
-        // REFRESH THE SUMMARY TABLE (To update Balance Seats)
-        await loadAssignmentSummary();
-        
-        // REFRESH THE GRID
+        // --- 8. REFRESH SUMMARY TABLE & GRID ---
+        // This ensures Balance Seats update immediately after booking
+        await loadAssignmentSummary(); 
         generateTimeTable(); 
     }
 }
@@ -807,6 +835,7 @@ async function cancelBooking(id, roll) {
         
         // 4. Refresh Grid (Important Functionality Preserved)
         generateTimeTable(); 
+await loadAssignmentSummary();
         
         // 5. Update the banner warning visibility (Important Functionality Preserved)
         const { count: totalHistoryCount } = await db.from('class_cancellations')
