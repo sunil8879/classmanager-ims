@@ -3446,12 +3446,15 @@ async function generateUPIQR() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
+
+const bCheck = document.getElementById('batch-name').value.trim().toUpperCase(); const tCheck = document.getElementById('batch-teacher-id').value; if ((await db.from('batches').select('id').eq('institute_id', sessionInstID).eq('teacher_id', tCheck).eq('batch_name', bCheck).maybeSingle()).data) return alert("THE BATCH IS ALREADY CREATED");
+
 if (document.getElementById('batch-slots-display').innerText.includes("No slots found")) return alert("🛑 ERROR: Teacher-Subject Mismatch! This teacher is not registered to teach " + document.getElementById('batch-subject').value);
     const batchName = document.getElementById('batch-name').value;
     const displaySlots = document.getElementById('batch-slots-display').innerText;
     const subject = document.getElementById('batch-subject').value;
 
-if ((await db.from('batches').select('id').eq('institute_id', sessionInstID).eq('teacher_id', document.getElementById('batch-teacher-id').value).eq('batch_name', batchName).maybeSingle()).data) return alert("THE BATCH IS ALREADY CREATED");
+
 
     // Validation
     if (!batchName || !subject) return alert("Please enter Batch Name and Subject.");
