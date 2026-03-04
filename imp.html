@@ -1759,49 +1759,55 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 <!-- 15. PERFORMANCE TRACKING -->
 <section id="tracking" class="content-section">
-    <div class="card">
-        <h3><i class="fas fa-chart-line"></i> Student Performance Tracking</h3>
-        <div class="form-grid">
-            <input type="text" id="perf-fetch-mobile" placeholder="Enter Student Mobile">
-            <button class="btn-fetch" onclick="fetchPerformanceData()">Fetch Performance</button>
+<!-- UPDATED EXAM SCORES & GRADING SECTION -->
+<div class="card" style="background: #f0fffb; border: 1px solid var(--aquamarine);">
+    <h4><i class="fas fa-poll-h"></i> Subject-Wise Exam Analysis</h4>
+    <div class="form-grid">
+        <!-- 1. COURSE DROPDOWN -->
+        <div class="input-group">
+            <label>1. Select Course</label>
+            <select id="perf-course-list" onchange="syncCoursePerformanceData()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+                <option value="">-- Fetch Mobile First --</option>
+            </select>
         </div>
 
-        <hr style="margin: 20px 0;">
+        <!-- 2. TEACHER (AUTOPOLULATED) -->
+        <div class="input-group">
+            <label>2. Allotted Teacher</label>
+            <input type="text" id="perf-teacher-name" readonly style="background:#eee;" placeholder="Auto-filled">
+        </div>
 
-        <!-- Performance Dashboard (Hidden until fetched) -->
-        <div id="performance-report-area" style="display: none;">
-            <div class="form-grid">
-                <div class="input-group"><label>Date Today</label><input type="text" id="perf-today" readonly></div>
-                <div class="input-group"><label>Full Name</label><input type="text" id="perf-name" readonly></div>
-                <div class="input-group"><label>Roll Number</label><input type="text" id="perf-roll" readonly></div>
-                <div class="input-group"><label>Course</label><input type="text" id="perf-course" readonly></div>
-                <div class="input-group"><label>Date of Joining</label><input type="text" id="perf-joining" readonly></div>
-                <div class="input-group"><label>Course Duration</label><input type="text" id="perf-duration" readonly></div>
-            </div>
+        <!-- 3. TOTAL MARKS -->
+        <div class="input-group">
+            <label>3. Total Marks (Course Sum)</label>
+            <input type="number" id="perf-total-marks" readonly style="background:#eee;">
+        </div>
 
-            <div class="dashboard-stats" style="margin: 20px 0;">
-                <div class="stat-card" style="border-bottom-color: #ff0000;">
-                    <p>Days Absent (This Month)</p>
-                    <h4 id="perf-absent">0</h4>
-                </div>
-                <div class="stat-card" style="border-bottom-color: #27ae60;">
-                    <p>Attendance %</p>
-                    <h4 id="perf-attendance-pct">0%</h4>
-                </div>
-            </div>
+        <!-- 4. MARKS OBTAINED -->
+        <div class="input-group">
+            <label>4. Marks Obtained</label>
+            <input type="number" id="perf-obt-marks" readonly style="background:#eee;">
+        </div>
 
-            <div class="card" style="background: #f0fffb; border: 1px solid var(--aquamarine);">
-                <h4>Exam Scores & Grading</h4>
-                <div class="form-grid">
-                    <div class="input-group"><label>Total Marks Secured</label><input type="number" id="perf-marks" oninput="calculateAvgScore()"></div>
-                    <div class="input-group"><label>Total No. of Exams</label><input type="number" id="perf-exam-count" oninput="calculateAvgScore()"></div>
-                    <div class="input-group"><label>Average Score (%)</label><input type="text" id="perf-avg-display" readonly style="font-weight: bold; color: #007bff;"></div>
-                    <div class="input-group"><label>Teacher's Name</label><input type="text" id="perf-teacher"></div>
-                </div>
-                <button class="btn-add" style="width: 100%; margin-top: 10px;" onclick="savePerformanceData()">Update Performance Record</button>
-            </div>
+        <!-- 5. PERCENTAGE -->
+        <div class="input-group">
+            <label>5. Percentage Obtained (%)</label>
+            <input type="text" id="perf-pct-val" readonly style="background:#eee; font-weight: bold; color: #007bff;">
+        </div>
+
+        <!-- 7. RESULT -->
+        <div class="input-group">
+            <label>7. Status / Grade</label>
+            <input type="text" id="perf-result-val" readonly style="background:#eee; font-weight: bold;">
+        </div>
+
+        <!-- 6. GLOBAL AVG (FULL WIDTH) -->
+        <div class="input-group" style="grid-column: 1 / -1; margin-top: 15px;">
+            <label style="color: #ff0000; font-weight: 900; display: block; text-align: center;">6. STUDENT GLOBAL AVERAGE % (All Combined Courses)</label>
+            <input type="text" id="perf-global-avg" readonly style="background: #fff8f8; border: 2px solid #ff0000; font-size: 1.5rem; text-align: center; color: #ff0000; font-weight: 900;" placeholder="0.00%">
         </div>
     </div>
+</div>
 </section>
 
 
@@ -5449,71 +5455,90 @@ function calculateAvgScore() {
 }
 
 // 2. Fetch and Calculate All Data
+// 1. Modified Main Fetch Function
 async function fetchPerformanceData() {
     const mobile = document.getElementById('perf-fetch-mobile').value.trim();
     if (!mobile) return alert("Please enter Mobile Number");
 
     try {
-        // 1. GET STUDENT + ROLL NO (From Students Table)
-        const { data: student, error: sErr } = await db.from('students').select('*')
-            .eq('mobile', mobile).eq('institute_id', sessionInstID).maybeSingle();
+        const { data: student } = await db.from('students').select('*').eq('mobile', mobile).eq('institute_id', sessionInstID).maybeSingle();
+        if (!student) return alert("Student not found.");
         
-        if (!student) return alert("Student not found in your institute.");
         const roll = student.roll_number;
 
-        // 2. GET DURATION (From Student_Details Table)
-        const { data: details } = await db.from('student_details').select('course_end_date')
-            .eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+        // Fill Basic Info
+        document.getElementById('perf-name').value = student.full_name;
+        document.getElementById('perf-roll').value = roll;
+        document.getElementById('perf-joining').value = student.admission_date;
+        document.getElementById('perf-today').value = new Date().toLocaleDateString();
 
-        // 3. GET TEACHER NAME (From Batches Table by matching Batch Time)
-        const { data: batch } = await db.from('batches').select('teacher_name')
-            .eq('batch_time', student.batch_time).eq('institute_id', sessionInstID).maybeSingle();
-
-        // 4. GET EXAMS & CALCULATE ACCURATE PERCENTAGE (Raw Math)
-        const { data: exams } = await db.from('exam').select('marks_obtained, total_marks')
-            .eq('roll_number', roll).eq('institute_id', sessionInstID);
-
-        let totalObt = 0, totalPoss = 0, count = 0;
-        if (exams && exams.length > 0) {
-            count = exams.length;
-            exams.forEach(e => {
-                totalObt += parseFloat(e.marks_obtained || 0);
-                totalPoss += parseFloat(e.total_marks || 0);
+        // 1. POPULATE COURSE DROPDOWN (From the courses they have actually taken exams for)
+        const { data: examRecords } = await db.from('exam').select('course_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
+        const courseSelect = document.getElementById('perf-course-list');
+        courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+        
+        if (examRecords && examRecords.length > 0) {
+            const uniqueCourses = [...new Set(examRecords.map(e => e.course_name))];
+            uniqueCourses.forEach(c => {
+                let opt = document.createElement('option');
+                opt.value = c; opt.text = c;
+                courseSelect.appendChild(opt);
             });
         }
 
-        // 5. GET ATTENDANCE (This Month)
+        // 2. CALCULATE GLOBAL AVERAGE (Sum of every exam ever taken)
+        const { data: allExams } = await db.from('exam').select('marks_obtained, total_marks').eq('roll_number', roll).eq('institute_id', sessionInstID);
+        if (allExams && allExams.length > 0) {
+            let tObt = allExams.reduce((sum, e) => sum + (parseFloat(e.marks_obtained) || 0), 0);
+            let tPoss = allExams.reduce((sum, e) => sum + (parseFloat(e.total_marks) || 0), 0);
+            document.getElementById('perf-global-avg').value = ((tObt / tPoss) * 100).toFixed(2) + "%";
+        }
+
+        // 3. FETCH ATTENDANCE (Summary)
         const monthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        const { data: att } = await db.from('attendance').select('status')
-            .eq('roll_number', roll).eq('month_year', monthYear).eq('institute_id', sessionInstID);
-
+        const { data: att } = await db.from('attendance').select('status').eq('roll_number', roll).eq('month_year', monthYear).eq('institute_id', sessionInstID);
         let abs = att?.filter(a => a.status === 'Absent').length || 0;
-        let pct = att?.length > 0 ? (((att.length - abs) / att.length) * 100).toFixed(1) : "100";
-
-        // 6. POPULATE UI WITH FULL DATA
-        document.getElementById('perf-name').value = student.full_name;
-        document.getElementById('perf-roll').value = roll;
-        document.getElementById('perf-course').value = student.course;
-        document.getElementById('perf-joining').value = student.admission_date;
-        
-        // Fix for Duration: Show joining to end date
-        document.getElementById('perf-duration').value = details?.course_end_date ? `${student.admission_date} to ${details.course_end_date}` : "Ongoing";
-        
-        // Fix for Teacher: Use data from Batches table
-        document.getElementById('perf-teacher').value = batch?.teacher_name || "Not Assigned in Batches";
-        
         document.getElementById('perf-absent').innerText = abs;
-        document.getElementById('perf-attendance-pct').innerText = pct + "%";
-        document.getElementById('perf-marks').value = totalObt;
-        document.getElementById('perf-exam-count').value = count;
-        
-        // Final Math Fix: (Total Obtained / Total Possible) * 100
-        const finalAvg = totalPoss > 0 ? ((totalObt / totalPoss) * 100).toFixed(2) : "0.00";
-        document.getElementById('perf-avg-display').value = finalAvg + "%";
+        document.getElementById('perf-attendance-pct').innerText = att?.length > 0 ? (((att.length - abs) / att.length) * 100).toFixed(1) + "%" : "100%";
 
         document.getElementById('performance-report-area').style.display = 'block';
 
-    } catch (err) { alert("System Error: " + err.message); }
+    } catch (err) { console.error(err); }
+}
+
+// 2. New Function: Sync Data when a specific Course is selected
+async function syncCoursePerformanceData() {
+    const roll = document.getElementById('perf-roll').value;
+    const course = document.getElementById('perf-course-list').value;
+    if (!course) return;
+
+    // A. Fetch Subject-Specific Marks (Aggregated if multiple exams were held)
+    const { data: exams } = await db.from('exam')
+        .select('marks_obtained, total_marks, result')
+        .eq('roll_number', roll)
+        .eq('course_name', course)
+        .eq('institute_id', sessionInstID);
+
+    if (exams && exams.length > 0) {
+        const totalPossible = exams.reduce((sum, e) => sum + parseFloat(e.total_marks), 0);
+        const totalObtained = exams.reduce((sum, e) => sum + parseFloat(e.marks_obtained), 0);
+        const pct = (totalObtained / totalPossible) * 100;
+
+        document.getElementById('perf-total-marks').value = totalPossible;
+        document.getElementById('perf-obt-marks').value = totalObtained;
+        document.getElementById('perf-pct-val').value = pct.toFixed(2) + "%";
+        document.getElementById('perf-result-val').value = exams[exams.length - 1].result; // Show latest result
+    }
+
+    // B. Fetch Allotted Teacher for this subject (From Module 18)
+    const { data: alloc } = await db.from('student_allocations')
+        .select('teacher_name')
+        .eq('roll_number', roll)
+        .eq('subject', course)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    document.getElementById('perf-teacher-name').value = alloc ? alloc.teacher_name : "Not Assigned";
 }
 // 3. Save performance to database
 async function savePerformanceData() {
