@@ -1205,6 +1205,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                     <option value="fee">2. Fee Collection Report</option>
                     <option value="exam">3. Exam Report</option>
                     <option value="t-attendance">4. Teachers Attendance Report</option>
+<option value="teacher-rating">5. Teacher Appraisal Report</option>
                 </select>
             </div>
         </div>
@@ -1272,6 +1273,34 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     </div>
 </div>
     </div>
+
+<!-- TEACHER RATING REPORT INPUTS -->
+<div id="report-ui-teacher-rating" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Today's Date</label>
+            <input type="date" id="rep-rat-date" readonly>
+        </div>
+        <div class="input-group">
+            <label>Select Teacher</label>
+            <select id="rep-rat-tid" onchange="populateTeacherRatName()">
+                <option value="">-- Select Teacher --</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Full Name</label>
+            <input type="text" id="rep-rat-name" readonly style="background:#eee;">
+        </div>
+        <div class="input-group">
+            <label>Report Month (For List All)</label>
+            <input type="month" id="rep-rat-month">
+        </div>
+    </div>
+    <div class="button-row">
+        <button class="btn-fetch" onclick="generateSingleTeacherReport()">FETCH (Single)</button>
+        <button class="btn-add" style="background:#8e44ad;" onclick="generateAllTeacherReport()">LIST ALL RECORDS</button>
+    </div>
+</div>
 
     <!-- REPORT DISPLAY AREA -->
     <div id="report-output-area" style="display:none;" class="card">
@@ -4123,6 +4152,14 @@ function toggleReportUI() {
     document.getElementById('report-ui-fee').style.display = (val === 'fee') ? 'block' : 'none';
     document.getElementById('report-ui-t-attendance').style.display = (val === 't-attendance') ? 'block' : 'none'; // ADD THIS LINE
     document.getElementById('report-output-area').style.display = 'none';
+// Add this line inside your toggleReportUI function
+document.getElementById('report-ui-teacher-rating').style.display = (val === 'teacher-rating') ? 'block' : 'none';
+
+// Also add this trigger to load the teachers into the dropdown
+if (val === 'teacher-rating') {
+    document.getElementById('rep-rat-date').value = new Date().toISOString().split('T')[0];
+    loadTeacherReportDropdown();
+}
 }
 
 // 2. Auto-populate name in report
@@ -9348,6 +9385,119 @@ document.getElementById('tch-time-checkboxes').addEventListener('change', functi
         }
     }
 });
+
+
+
+
+
+// 1. Load Teachers into the Dropdown
+async function loadTeacherReportDropdown() {
+    const select = document.getElementById('rep-rat-tid');
+    const { data } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID).eq('status', 'Active');
+    
+    select.innerHTML = '<option value="">-- Select Teacher --</option>';
+    if (data) {
+        data.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.id;
+            opt.dataset.name = t.teacher_name;
+            select.appendChild(opt);
+        });
+    }
+}
+
+// 2. Auto-populate Name
+function populateTeacherRatName() {
+    const sel = document.getElementById('rep-rat-tid');
+    document.getElementById('rep-rat-name').value = sel.options[sel.selectedIndex].dataset.name || "";
+}
+
+// 3. Helper: Calculate Category
+function getRatingCategory(avg) {
+    if (avg < 3.5) return "<span style='color:red;'>AVERAGE</span>";
+    if (avg < 4.0) return "<span style='color:orange;'>GOOD</span>";
+    if (avg < 4.7) return "<span style='color:blue;'>GREAT</span>";
+    return "<span style='color:green;'>EXCELLENT</span>";
+}
+
+// 4. Generate Single Teacher Report
+async function generateSingleTeacherReport() {
+    const tid = document.getElementById('rep-rat-tid').value;
+    const name = document.getElementById('rep-rat-name').value;
+    if (!tid) return alert("Select a teacher first.");
+
+    const { data: revs } = await db.from('reviews').select('rating').eq('teacher_id', tid).eq('institute_id', sessionInstID);
+
+    const totalReviews = revs ? revs.length : 0;
+    const avgScore = totalReviews > 0 ? (revs.reduce((sum, r) => sum + r.rating, 0) / totalReviews).toFixed(2) : 0;
+    const category = getRatingCategory(avgScore);
+
+    // Update Output UI
+    document.getElementById('rep-title').innerText = "Teacher Appraisal Report";
+    document.getElementById('rep-summary-text').innerHTML = `<b>Teacher:</b> ${name} (${tid}) | <b>Date:</b> ${document.getElementById('rep-rat-date').value}`;
+    
+    document.getElementById('rep-table-head').innerHTML = `<tr><th>Metric</th><th>Details</th></tr>`;
+    document.getElementById('rep-table-body').innerHTML = `
+        <tr><td>Total Reviews Received</td><td>${totalReviews}</td></tr>
+        <tr><td>Average Score</td><td>${avgScore} / 5.0</td></tr>
+        <tr><td>Performance Category</td><td><b>${category}</b></td></tr>
+    `;
+
+    document.getElementById('rep-stats-boxes').innerHTML = ""; // Clear stats for single view
+    document.getElementById('report-output-area').style.display = 'block';
+    document.getElementById('filter_div').style.display = 'none';
+    document.getElementById('chart_div').style.display = 'none';
+}
+
+// 5. Generate All Teachers Report (Table Format)
+async function generateAllTeacherReport() {
+    const monthVal = document.getElementById('rep-rat-month').value;
+    if (!monthVal) return alert("Select Report Month first.");
+
+    const dateObj = new Date(monthVal + "-01");
+    const monthYearLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const { data: teachers } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID);
+    const { data: allRevs } = await db.from('reviews').select('*').eq('institute_id', sessionInstID);
+
+    let tableBody = "";
+    
+    teachers.forEach(t => {
+        const tRevs = allRevs ? allRevs.filter(r => r.teacher_id === t.id) : [];
+        const count = tRevs.length;
+        const avg = count > 0 ? (tRevs.reduce((sum, r) => sum + r.rating, 0) / count).toFixed(2) : "0.00";
+        const cat = getRatingCategory(avg);
+
+        tableBody += `
+            <tr>
+                <td>${t.id}</td>
+                <td>${t.teacher_name}</td>
+                <td>${count}</td>
+                <td>${avg}</td>
+                <td><b>${cat}</b></td>
+            </tr>
+        `;
+    });
+
+    document.getElementById('rep-title').innerText = `Consolidated Appraisal: ${monthYearLabel}`;
+    document.getElementById('rep-summary-text').innerHTML = `* Note: Ratings are calculated based on lifetime student feedback submitted through Section 26.`;
+    document.getElementById('rep-table-head').innerHTML = `
+        <tr>
+            <th>Teacher ID</th>
+            <th>Teacher Name</th>
+            <th>Total Reviews</th>
+            <th>Avg Score</th>
+            <th>Category</th>
+        </tr>`;
+    document.getElementById('rep-table-body').innerHTML = tableBody;
+
+    document.getElementById('rep-stats-boxes').innerHTML = "";
+    document.getElementById('report-output-area').style.display = 'block';
+    document.getElementById('filter_div').style.display = 'none';
+    document.getElementById('chart_div').style.display = 'none';
+}
+
 
 
 
