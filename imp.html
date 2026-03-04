@@ -6118,19 +6118,38 @@ async function connectToOwner() {
     else alert("Owner number not found.");
 }
 
+// 1. Corrected Teacher Search (Uses Partial Match)
 async function fetchTeachersBySubject() {
     const sub = document.getElementById('wa-teacher-subject').value;
-    let query = db.from('teacher_details').select('teacher_name, mobile, subject_taught').eq('institute_id', sessionInstID);
-    if (sub !== "All") query = query.eq('subject_taught', sub);
-    const { data } = await query;
+    let query = db.from('teacher_details')
+        .select('teacher_name, mobile, subject_taught')
+        .eq('institute_id', sessionInstID);
+
+    if (sub !== "All") {
+        // Use % symbols to find the subject even if other subjects are listed in the same box
+        query = query.ilike('subject_taught', `%${sub}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) console.error("Search Error:", error.message);
     displayWAContactList(data);
 }
 
+// 2. Corrected Student Search (Uses Partial Match)
 async function fetchStudentsByCourse() {
     const crs = document.getElementById('wa-student-course').value;
-    let query = db.from('students').select('full_name, mobile, course').eq('institute_id', sessionInstID).eq('status', 'Active');
-    if (crs !== "All") query = query.eq('course', crs);
-    const { data } = await query;
+    let query = db.from('students')
+        .select('full_name, mobile, course')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    if (crs !== "All") {
+        // Use % symbols to find the course even if the student is taking multiple courses
+        query = query.ilike('course', `%${crs}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) console.error("Search Error:", error.message);
     displayWAContactList(data);
 }
 
