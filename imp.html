@@ -1238,6 +1238,55 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 <!-- 6. ADMIN DASHBOARD -->
 <!-- ADMIN DASHBOARD: REPORTS CENTER -->
 <section id="admin" class="content-section">
+
+
+<!-- ADMIN STATS BLOCK (Required to stop the crash) -->
+<div class="card" style="border-top: 5px solid #27ae60; margin-bottom: 20px;">
+    <h3><i class="fas fa-chart-line"></i> Operational Overview</h3>
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Filter Type</label>
+            <select id="admin-filter-type" onchange="toggleAdminCalendar()">
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+        </div>
+        <div class="input-group" id="admin-month-container">
+            <label>Select Month</label>
+            <input type="month" id="admin-filter-month" onchange="loadAdminDashboard()">
+        </div>
+        <div class="input-group" id="admin-year-container" style="display:none;">
+            <label>Select Year</label>
+            <input type="number" id="admin-filter-year" value="2026" onchange="loadAdminDashboard()">
+        </div>
+        <div class="input-group" id="admin-quarter-container" style="display:none;">
+            <label>Select Quarter</label>
+            <select id="admin-filter-quarter" onchange="loadAdminDashboard()">
+                <option value="1">Q1 (Jan-Mar)</option>
+                <option value="2">Q2 (Apr-Jun)</option>
+                <option value="3">Q3 (Jul-Sep)</option>
+                <option value="4">Q4 (Oct-Dec)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- STATS LABELS -->
+    <div class="dashboard-stats" style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="stat-card" style="background: white; padding: 15px; border: 1px solid #000; border-radius: 8px;">
+            <p style="font-weight:bold; color:#666;">NEW ADMISSIONS (<span class="filter-label">Month</span>)</p>
+            <h4 id="dash-students" style="font-size: 2rem !important; text-decoration: none !important;">0</h4>
+        </div>
+        <div class="stat-card" style="background: white; padding: 15px; border: 1px solid #000; border-radius: 8px;">
+            <p style="font-weight:bold; color:#666;">COLLECTION (<span class="filter-label">Month</span>)</p>
+            <h4 id="dash-revenue" style="font-size: 2rem !important; text-decoration: none !important;">₹ 0</h4>
+        </div>
+    </div>
+</div>
+
+
+
+
     <div class="card" style="margin-bottom: 20px; border-top: 5px solid #1877F2;">
         <h3><i class="fas fa-file-invoice"></i> Reports Center</h3>
         <div class="form-grid">
