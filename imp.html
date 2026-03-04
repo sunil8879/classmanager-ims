@@ -1251,6 +1251,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                     <option value="t-attendance">4. Teachers Attendance Report</option>
 <option value="teacher-rating">5. Teacher Appraisal Report</option>
 <option value="profit-loss">6. Profit & Loss (P&L) Report</option>
+<option value="leads-conversion">7. Leads & Conversion Report</option>
                 </select>
             </div>
         </div>
@@ -1357,6 +1358,18 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     <div class="button-row">
         <button class="btn-add" style="background:#20B2AA;" onclick="generatePLReport('snapshot')">SNAPSHOT VIEW</button>
         <button class="btn-fetch" style="background:#673ab7;" onclick="generatePLReport('detailed')">DETAILED VIEW</button>
+    </div>
+</div>
+<!-- LEADS & CONVERSION REPORT INPUTS -->
+<div id="report-ui-leads" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Select Report Month & Year</label>
+            <input type="month" id="rep-leads-month">
+        </div>
+    </div>
+    <div class="button-row">
+        <button class="btn-add" style="background:#f39c12;" onclick="generateLeadsReport()">GENERATE SALES REPORT</button>
     </div>
 </div>
 
@@ -4213,6 +4226,7 @@ function toggleReportUI() {
 // Add this line inside your toggleReportUI function
 document.getElementById('report-ui-teacher-rating').style.display = (val === 'teacher-rating') ? 'block' : 'none';
 document.getElementById('report-ui-pl').style.display = (val === 'profit-loss') ? 'block' : 'none';
+document.getElementById('report-ui-leads').style.display = (val === 'leads-conversion') ? 'block' : 'none';
 
 // Also add this trigger to load the teachers into the dropdown
 if (val === 'teacher-rating') {
@@ -9661,6 +9675,92 @@ async function generatePLReport(viewType) {
         document.getElementById('filter_div').style.display = 'none';
         document.getElementById('chart_div').style.display = 'none';
         document.getElementById('rep-stats-boxes').innerHTML = "";
+
+    } catch (err) {
+        alert("Error generating report: " + err.message);
+    }
+}
+
+
+
+// 1. Helper: Sales Remarks Logic
+function getSalesRemarks(pct) {
+    if (pct >= 70) return "<b style='color:green;'>OUTSTANDING</b>";
+    if (pct >= 45) return "<b style='color:green;'>EXCELLENT SYSTEM</b>";
+    if (pct >= 35) return "<b style='color:blue;'>VERY GOOD</b>";
+    if (pct >= 25) return "<b style='color:teal;'>HEALTHY</b>";
+    if (pct < 20) return `
+        <b style='color:red;'>SOMETHING IS WRONG</b><br>
+        <small style='color:#666;'>Possible issues: Pricing issue, Weak counsellor, Poor follow-up, Competition nearby, No urgency.</small>
+    `;
+    return "Normal";
+}
+
+// 2. Main Leads Engine
+async function generateLeadsReport() {
+    const monthVal = document.getElementById('rep-leads-month').value;
+    if (!monthVal) return alert("Please select a month.");
+
+    const dateObj = new Date(monthVal + "-01");
+    const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    try {
+        // A. FETCH LEADS for selected month
+        const { data: leads } = await db.from('leads').select('*').eq('institute_id', sessionInstID);
+        // Filter by date_of_visit (YYYY-MM)
+        const monthLeads = leads ? leads.filter(l => l.date_of_visit && l.date_of_visit.startsWith(monthVal)) : [];
+
+        // B. FETCH MARKETING COST
+        const { data: exp } = await db.from('expenses').select('marketing').eq('month_year', monthVal).eq('institute_id', sessionInstID).maybeSingle();
+        const marketCost = exp ? parseFloat(exp.marketing || 0) : 0;
+
+        // C. FETCH REVENUE (Fees + Inventory)
+        const { data: fees } = await db.from('payment_history').select('amount').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
+        const { data: inv } = await db.from('inventory_sales').select('total_paid').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
+        const totalRevenue = (fees?.reduce((s, f) => s + parseFloat(f.amount), 0) || 0) + (inv?.reduce((s, i) => s + parseFloat(i.total_paid), 0) || 0);
+
+        // --- DATA AGGREGATION ---
+        const totalLeads = monthLeads.length;
+        const converted = monthLeads.filter(l => l.status === 'Converted').length;
+        const convPct = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(1) : 0;
+
+        // Find Best Selling Course & Source
+        const courseMap = {}; const sourceMap = {};
+        monthLeads.forEach(l => {
+            courseMap[l.interested_course] = (courseMap[l.interested_course] || 0) + 1;
+            sourceMap[l.reference] = (sourceMap[l.reference] || 0) + 1;
+        });
+
+        const bestCourse = Object.keys(courseMap).reduce((a, b) => courseMap[a] > courseMap[b] ? a : b, "N/A");
+        const bestSource = Object.keys(sourceMap).reduce((a, b) => sourceMap[a] > sourceMap[b] ? a : b, "N/A");
+
+        // Financial Ratios
+        const cpl = totalLeads > 0 ? (marketCost / totalLeads).toFixed(2) : 0;
+        const cpa = converted > 0 ? (marketCost / converted).toFixed(2) : 0;
+        const revPerLead = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(2) : 0;
+
+        // --- RENDER OUTPUT ---
+        document.getElementById('rep-title').innerText = `Leads & Conversion Report: ${monthYearStr}`;
+        document.getElementById('rep-summary-text').innerHTML = `Marketing Performance & Enrollment ROI Summary`;
+        
+        document.getElementById('rep-table-head').innerHTML = `<tr><th>Metric</th><th>Results</th></tr>`;
+        document.getElementById('rep-table-body').innerHTML = `
+            <tr><td>Total Enquiries & Walk-ins</td><td><b>${totalLeads}</b></td></tr>
+            <tr><td>Total Converted Admissions</td><td style="color:green;"><b>${converted}</b></td></tr>
+            <tr><td>Conversion Percentage</td><td><b>${convPct}%</b></td></tr>
+            <tr><td>Best Selling Course</td><td>${bestCourse}</td></tr>
+            <tr><td>Top Lead Source</td><td>${bestSource}</td></tr>
+            <tr style="background:#f9f9f9;"><td><b>Marketing ROI</b></td><td></td></tr>
+            <tr><td>Cost Per Lead (CPL)</td><td>₹ ${cpl}</td></tr>
+            <tr><td>Cost Per Acquisition (CPA)</td><td>₹ ${cpa}</td></tr>
+            <tr><td>Revenue Per Lead</td><td style="color:blue;">₹ ${revPerLead}</td></tr>
+            <tr><td>Sales Performance Status</td><td>${getSalesRemarks(parseFloat(convPct))}</td></tr>
+        `;
+
+        document.getElementById('report-output-area').style.display = 'block';
+        document.getElementById('rep-stats-boxes').innerHTML = "";
+        document.getElementById('filter_div').style.display = 'none';
+        document.getElementById('chart_div').style.display = 'none';
 
     } catch (err) {
         alert("Error generating report: " + err.message);
