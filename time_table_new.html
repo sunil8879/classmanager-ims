@@ -701,48 +701,57 @@ async function bookThisSlot(day, time) {
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
     const officialTime = document.getElementById('f-official-slots').value;
-    const currentBatch = document.getElementById('f-course').value; // Stores Batch Name
+    const currentBatch = document.getElementById('f-course').value; 
     const tid = document.getElementById('f-teacher-id').value;
     const tname = document.getElementById('f-teacher-name').value;
-    
-    // Get capacity (default to 10 if not found)
-const maxAllowed = parseInt(document.getElementById('f-capacity').value || 10);
-    // Safety check: ensure a student is selected
+    const maxAllowed = parseInt(document.getElementById('f-capacity').value || 10);
+
     if (!roll) {
         alert("Please select an assignment from the summary table first.");
         return;
     }
 
-    // 2. VALIDATION: DAILY BOOKING LIMIT (MAX 3)
+    // --- NEW VALIDATION 1: DAILY BOOKING LIMIT (MAX 3) ---
     const { count: bCount } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
         .eq('student_roll', roll)
         .eq('booking_date', dateVal);
 
     if (bCount >= 3) {
-        alert("🛑 ACCESS DENIED: You have already reached the daily limit of 3 classes.");
+        alert("🛑 ERROR: You cannot book more than 3 sessions on a given day.");
         return;
     }
 
-    // 3. VALIDATION: MISCHIEF/CANCELLATION HISTORY (MAX 2)
-    const { count: cCount } = await db.from('class_cancellations')
+    // --- NEW VALIDATION 2: CANCELLATION MISCHIEF CHECK (TODAY ONLY) ---
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0); // Get timestamp for the start of today
+
+    const { data: cancelData } = await db.from('class_cancellations')
+        .select('created_at')
+        .eq('student_roll', roll)
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startOfToday.toISOString());
+
+    const todayCancelsCount = cancelData ? cancelData.length : 0;
+
+    if (todayCancelsCount >= 4) {
+        alert("🛑 ACCESS BLOCKED: You have reached the daily cancellation limit. Booking is suspended for today.");
+        return;
+    } else if (todayCancelsCount === 3) {
+        alert("⚠️ WARNING: You have already cancelled 3 slots today. One more cancellation will result in a block.");
+        // We let them continue to WhatsApp/Booking, but they are warned.
+    }
+
+    // 4. VALIDATION: BATCH CAPACITY
+    const { count: currentSize } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll);
+        .eq('teacher_id', tid)
+        .eq('booking_date', dateVal)
+        .eq('time_slot', time);
 
-    if (cCount >= 2) {
-        alert("🛑 ACCESS DENIED: History of multiple cancellations. Booking blocked.");
-        return;
+    if (currentSize >= maxAllowed) {
+        return alert("🛑 BATCH FULL: This batch is limited to " + maxAllowed + " students only.");
     }
-
-const { count: currentSize } = await db.from('class_bookings')
-    .select('*', { count: 'exact', head: true })
-    .eq('teacher_id', tid)
-    .eq('booking_date', dateVal)
-    .eq('time_slot', time);
-
-if (currentSize >= maxAllowed) {
-    return alert("🛑 BATCH FULL: This batch is limited to " + maxAllowed + " students only.");
-}
 
     // 5. VALIDATION: BATCH NAME MATCHING
     const { data: existingBatch } = await db.from('class_bookings')
@@ -766,7 +775,7 @@ if (currentSize >= maxAllowed) {
         return;
     }
 
-    // 7. WHATSAPP CONFIRMATION FLOW
+    // 7. WHATSAPP CONFIRMATION FLOW (STRICTLY PRESERVED)
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     if (tData && tData.mobile) {
         const msg = "Booking Request: Batch " + currentBatch + " (Roll: " + roll + ") on " + dateVal + " at " + time;
@@ -777,7 +786,6 @@ if (currentSize >= maxAllowed) {
     }
 
     // 8. FINAL DATABASE INSERT
-    // We exclude 'student_name' here to avoid the Schema Cache error
     const { error: insertError } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
@@ -792,38 +800,58 @@ if (currentSize >= maxAllowed) {
     } else {
         document.getElementById('confirmation-text').innerText = "Success! Booked for " + currentBatch + " at " + time;
         document.getElementById('confirm-modal').style.display = 'flex';
-        
-        // Refresh the grid to update the Capacity Display (e.g., 1/10 to 2/10)
         generateTimeTable(); 
     }
 }
     /**
-     * 7. CANCELLATION & MISCHIEF LOGGING (STAFF ONLY)
-     */
 async function cancelBooking(id, roll) {
     if (!confirm(`Are you sure? This will be recorded as a cancellation for student roll ${roll}.`)) return;
-// --- RECORD MISCHIEF ---
-await db.from('class_cancellations').insert([{ student_roll: roll, institute_id: sessionInstID }]);
 
-    // 1. Log to Mischief Table
+    // 1. Log the cancellation to the Mischief Table
     const { error: logErr } = await db.from('class_cancellations').insert([{
         student_roll: roll,
         cancelled_by: currentUserProfile.role,
         institute_id: sessionInstID
     }]);
 
-    // 2. Delete from Bookings Table
+    if (logErr) return alert("Error logging mischief: " + logErr.message);
+
+    // 2. Count cancellations for THIS student for TODAY specifically
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const { data: todayData } = await db.from('class_cancellations')
+        .select('id')
+        .eq('student_roll', roll)
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startOfToday.toISOString());
+
+    const cancelCount = todayData ? todayData.length : 0;
+
+    // --- NEW WARNING LOGIC ---
+    if (cancelCount === 3) {
+        alert("⚠️ WARNING: You have now cancelled 3 slots today. One more cancellation will result in a block for the rest of the day.");
+    } else if (cancelCount >= 4) {
+        alert("🛑 ACCESS BLOCKED: You have cancelled 4 times today. You are now blocked from further bookings until tomorrow.");
+    }
+
+    // 3. Delete from the Bookings Table (Important Functionality Preserved)
     const { error: delErr } = await db.from('class_bookings').delete().eq('id', id);
 
     if (!delErr) {
-        alert("Booking cancelled and history updated.");
-        generateTimeTable(); // Refresh Grid
+        alert("Booking successfully cancelled and history updated.");
         
-        // Refresh the mischief warning visibility
-        const { count } = await db.from('class_cancellations').select('*', { count: 'exact', head: true }).eq('student_roll', roll);
-        document.getElementById('mischief-warning-new').style.display = (count >= 2) ? 'block' : 'none';
+        // 4. Refresh Grid (Important Functionality Preserved)
+        generateTimeTable(); 
+        
+        // 5. Update the banner warning visibility (Important Functionality Preserved)
+        const { count: totalHistoryCount } = await db.from('class_cancellations')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_roll', roll);
+            
+        document.getElementById('mischief-warning-new').style.display = (totalHistoryCount >= 2) ? 'block' : 'none';
     } else {
-        alert("Error: " + delErr.message);
+        alert("Error deleting booking: " + delErr.message);
     }
 }
     function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
