@@ -1250,6 +1250,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                     <option value="exam">3. Exam Report</option>
                     <option value="t-attendance">4. Teachers Attendance Report</option>
 <option value="teacher-rating">5. Teacher Appraisal Report</option>
+<option value="profit-loss">6. Profit & Loss (P&L) Report</option>
                 </select>
             </div>
         </div>
@@ -1343,6 +1344,19 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     <div class="button-row">
         <button class="btn-fetch" onclick="generateSingleTeacherReport()">FETCH (Single)</button>
         <button class="btn-add" style="background:#8e44ad;" onclick="generateAllTeacherReport()">LIST ALL RECORDS</button>
+    </div>
+</div>
+<!-- P&L REPORT INPUTS -->
+<div id="report-ui-pl" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Select Report Month & Year</label>
+            <input type="month" id="rep-pl-month">
+        </div>
+    </div>
+    <div class="button-row">
+        <button class="btn-add" style="background:#20B2AA;" onclick="generatePLReport('snapshot')">SNAPSHOT VIEW</button>
+        <button class="btn-fetch" style="background:#673ab7;" onclick="generatePLReport('detailed')">DETAILED VIEW</button>
     </div>
 </div>
 
@@ -4198,6 +4212,7 @@ function toggleReportUI() {
     document.getElementById('report-output-area').style.display = 'none';
 // Add this line inside your toggleReportUI function
 document.getElementById('report-ui-teacher-rating').style.display = (val === 'teacher-rating') ? 'block' : 'none';
+document.getElementById('report-ui-pl').style.display = (val === 'profit-loss') ? 'block' : 'none';
 
 // Also add this trigger to load the teachers into the dropdown
 if (val === 'teacher-rating') {
@@ -9550,6 +9565,107 @@ document.querySelectorAll('.content-section').forEach(s => {
 }
 
 
+
+
+
+// 1. Helper: Cost to Income Ratio Label
+function getRatioLabel(ratio) {
+    if (ratio <= 40) return `<span style="color:green;">${ratio}% (Very Good)</span>`;
+    if (ratio <= 60) return `<span style="color:orange;">${ratio}% (Acceptable)</span>`;
+    if (ratio > 100) return `<span style="color:purple; font-weight:900;">${ratio}% (Loss)</span>`;
+    if (ratio > 70) return `<span style="color:red; font-weight:bold;">${ratio}% (Dangerous)</span>`;
+    return `${ratio}%`;
+}
+
+// 2. Main P&L Engine
+async function generatePLReport(viewType) {
+    const monthVal = document.getElementById('rep-pl-month').value;
+    if (!monthVal) return alert("Please select a month first.");
+
+    // Convert YYYY-MM to "Month YYYY" (e.g. February 2026)
+    const dateObj = new Date(monthVal + "-01");
+    const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    try {
+        // A. FETCH EXPENSES
+        const { data: expData } = await db.from('expenses').select('*').eq('month_year', monthVal).eq('institute_id', sessionInstID).maybeSingle();
+        
+        // B. FETCH COLLECTION (Fees + Inventory)
+        const { data: fees } = await db.from('payment_history').select('amount').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
+        const { data: inv } = await db.from('inventory_sales').select('total_paid').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
+        
+        // C. FETCH GLOBAL PENDING
+        const { data: students } = await db.from('students').select('pending_amount').eq('status', 'Active').eq('institute_id', sessionInstID);
+
+        // --- MATH CALCULATIONS ---
+        const totalExp = expData ? parseFloat(expData.total_expenses || 0) : 0;
+        const totalFees = fees ? fees.reduce((sum, f) => sum + parseFloat(f.amount), 0) : 0;
+        const totalInv = inv ? inv.reduce((sum, i) => sum + parseFloat(i.total_paid), 0) : 0;
+        const totalColl = totalFees + totalInv;
+        const totalPend = students ? students.reduce((sum, s) => sum + parseFloat(s.pending_amount), 0) : 0;
+        const grossProfit = totalColl - totalExp;
+        const ratio = totalColl > 0 ? Math.round((totalExp / totalColl) * 100) : (totalExp > 0 ? 101 : 0);
+
+        // --- DYNAMIC REMARKS (Major vs Minor Expense) ---
+        let remarks = "No expense data recorded.";
+        if (expData && totalExp > 0) {
+            const items = [
+                { n: "Rent", v: expData.rent },
+                { n: "Electricity", v: expData.electricity },
+                { n: "Maintenance", v: expData.maintenance },
+                { n: "Teacher Sal", v: expData.teacher_salary },
+                { n: "Admin Sal", v: expData.admin_salary },
+                { n: "Marketing", v: expData.marketing },
+                { n: "Others", v: expData.other_exp }
+            ].sort((a, b) => b.v - a.v);
+
+            const major = items[0];
+            const minor = items.filter(i => i.v > 0).pop() || major;
+            const majorPct = Math.round((major.v / totalExp) * 100);
+            const minorPct = Math.round((minor.v / totalExp) * 100);
+            remarks = `Major Expense: ${major.n} (${majorPct}% of total) | Minor Expense: ${minor.n} (${minorPct}% of total)`;
+        }
+
+        // --- RENDER OUTPUT ---
+        document.getElementById('rep-title').innerText = `Profit & Loss Statement: ${monthYearStr}`;
+        document.getElementById('rep-summary-text').innerHTML = `<b>Report Type:</b> ${viewType.toUpperCase()} | <b>Generated on:</b> ${new Date().toLocaleDateString()}`;
+        
+        // Detailed View table construction
+        let detailedHtml = "";
+        if (viewType === 'detailed' && expData) {
+            detailedHtml = `
+                <tr style="background:#f0f0f0;"><td colspan="2"><b>EXPENSE BREAKDOWN</b></td></tr>
+                <tr><td>Rent</td><td>₹${expData.rent}</td></tr>
+                <tr><td>Electricity</td><td>₹${expData.electricity}</td></tr>
+                <tr><td>Maintenance</td><td>₹${expData.maintenance}</td></tr>
+                <tr><td>Teacher Salaries</td><td>₹${expData.teacher_salary}</td></tr>
+                <tr><td>Admin Salaries</td><td>₹${expData.admin_salary}</td></tr>
+                <tr><td>Sales & Marketing</td><td>₹${expData.marketing}</td></tr>
+                <tr><td>Other (Internet/Bills)</td><td>₹${expData.other_exp}</td></tr>
+                <tr style="background:#f0f0f0;"><td colspan="2"><b>TOTAL SUMMARY</b></td></tr>
+            `;
+        }
+
+        document.getElementById('rep-table-head').innerHTML = `<tr><th>Financial Metric</th><th>Amount / Value</th></tr>`;
+        document.getElementById('rep-table-body').innerHTML = `
+            ${detailedHtml}
+            <tr><td>Total Monthly Expenses</td><td style="color:red;">₹ ${totalExp.toLocaleString()}</td></tr>
+            <tr><td>Total Collection (Fees + Inventory)</td><td style="color:green;">₹ ${totalColl.toLocaleString()}</td></tr>
+            <tr><td>Total Global Pending</td><td style="color:orange;">₹ ${totalPend.toLocaleString()}</td></tr>
+            <tr style="background:#e0f2f1; font-weight:bold;"><td>GROSS PROFIT / LOSS</td><td>₹ ${grossProfit.toLocaleString()}</td></tr>
+            <tr><td>Cost-to-Income Ratio</td><td>${getRatioLabel(ratio)}</td></tr>
+            <tr><td>Financial Remarks</td><td><small>${remarks}</small></td></tr>
+        `;
+
+        document.getElementById('report-output-area').style.display = 'block';
+        document.getElementById('filter_div').style.display = 'none';
+        document.getElementById('chart_div').style.display = 'none';
+        document.getElementById('rep-stats-boxes').innerHTML = "";
+
+    } catch (err) {
+        alert("Error generating report: " + err.message);
+    }
+}
 
 
 
