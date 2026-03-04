@@ -2239,7 +2239,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
         
         <div class="input-group"><label>Teacher ID</label><input type="text" id="ptm-tid" readonly style="background:#eee;"></div>
         <div class="input-group"><label>Teacher Name</label><input type="text" id="ptm-tname" readonly style="background:#eee;"></div>
-        <div class="input-group"><label>Teacher Mobile</label><input type="text" id="ptm-tmob" readonly style="background:#eee;"></div>
+     
 
         <!-- DYNAMIC DROPDOWN FOR SLOTS -->
         <div class="input-group">
@@ -7516,7 +7516,7 @@ function addMinutesToTime(timeStr, minsToAdd) {
     return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
 }
 
-// 1. Triggered by "Fetch Teachers" button
+// 1. Triggered by "Fetch Teachers" button - Corrected to prevent duplicates
 async function fetchPTMAllocations() {
     const roll = document.getElementById('ptm-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter a Roll Number.");
@@ -7536,8 +7536,19 @@ async function fetchPTMAllocations() {
     courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
 
     if (allocs && allocs.length > 0) {
+        // --- NEW LOGIC TO PREVENT DUPLICATES ---
+        const seenEntries = new Set(); 
+
         for (let a of allocs) {
+            // Create a unique key using Teacher ID and Subject
+            const uniqueKey = `${a.teacher_id}-${a.subject}`.toUpperCase();
+            
+            // If we have already added this specific Teacher-Subject combo, skip it
+            if (seenEntries.has(uniqueKey)) continue; 
+            seenEntries.add(uniqueKey);
+
             const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', a.teacher_id).maybeSingle();
+            
             let opt = document.createElement('option');
             opt.value = a.subject;
             opt.text = `${a.subject} (${a.teacher_name})`;
@@ -7546,7 +7557,7 @@ async function fetchPTMAllocations() {
             opt.dataset.tmob = tData ? tData.mobile : "";
             courseSelect.appendChild(opt);
         }
-        alert("Teachers loaded. Now pick a Course.");
+        alert(`Found ${seenEntries.size} unique courses. Now pick a Course.`);
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
