@@ -1759,58 +1759,86 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 <!-- 15. PERFORMANCE TRACKING -->
 <section id="tracking" class="content-section">
-<!-- UPDATED EXAM SCORES & GRADING SECTION -->
-<div class="card" style="background: #f0fffb; border: 1px solid var(--aquamarine);">
-    <h4><i class="fas fa-poll-h"></i> Subject-Wise Exam Analysis</h4>
-    <div class="form-grid">
-        <!-- 1. COURSE DROPDOWN -->
-        <div class="input-group">
-            <label>1. Select Course</label>
-            <select id="perf-course-list" onchange="syncCoursePerformanceData()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
-                <option value="">-- Fetch Mobile First --</option>
-            </select>
+    <div class="card">
+        <h3><i class="fas fa-chart-line"></i> Student Performance Tracking</h3>
+        
+        <!-- LOOKUP BAR -->
+        <div class="form-grid" style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+            <div class="input-group">
+                <label>Enter Student Roll Number</label>
+                <input type="text" id="perf-fetch-roll" placeholder="IMS-XXXX">
+            </div>
+            <div style="text-align: center; align-self: end;"><b>OR</b></div>
+            <div class="input-group">
+                <label>Enter Student Mobile</label>
+                <input type="text" id="perf-fetch-mobile" placeholder="10-Digit Mobile">
+            </div>
+            <button class="btn-fetch" onclick="fetchPerformanceData()" style="height: 45px; margin-top: 25px;">FETCH DATA</button>
         </div>
 
-        <!-- 2. TEACHER (AUTOPOLULATED) -->
-        <div class="input-group">
-            <label>2. Allotted Teacher</label>
-            <input type="text" id="perf-teacher-name" readonly style="background:#eee;" placeholder="Auto-filled">
-        </div>
+        <hr style="margin: 20px 0;">
 
-        <!-- 3. TOTAL MARKS -->
-        <div class="input-group">
-            <label>3. Total Marks (Course Sum)</label>
-            <input type="number" id="perf-total-marks" readonly style="background:#eee;">
-        </div>
+        <!-- 1. BASIC STUDENT DETAILS -->
+        <div id="performance-report-area" style="display: none;">
+            <div class="form-grid">
+                <div class="input-group"><label>Date Today</label><input type="text" id="perf-today" readonly></div>
+                <div class="input-group"><label>Full Name</label><input type="text" id="perf-name" readonly></div>
+                <div class="input-group"><label>Roll Number</label><input type="text" id="perf-roll" readonly></div>
+                <div class="input-group"><label>Date of Joining</label><input type="text" id="perf-joining" readonly></div>
+            </div>
 
-        <!-- 4. MARKS OBTAINED -->
-        <div class="input-group">
-            <label>4. Marks Obtained</label>
-            <input type="number" id="perf-obt-marks" readonly style="background:#eee;">
-        </div>
+            <!-- 2. ATTENDANCE RECORD DETAILS -->
+            <div class="card" style="margin-top: 20px; border-top: 5px solid #27ae60;">
+                <h4><i class="fas fa-calendar-check"></i> Attendance Record Details</h4>
+                <div class="dashboard-stats" style="margin-bottom: 15px;">
+                    <div class="stat-card" style="padding: 10px; border-bottom: 3px solid red;">
+                        <small>Days Absent</small><h4 id="perf-absent" style="margin:0 !important; text-decoration: none !important;">0</h4>
+                    </div>
+                    <div class="stat-card" style="padding: 10px; border-bottom: 3px solid green;">
+                        <small>Attendance %</small><h4 id="perf-attendance-pct" style="margin:0 !important; text-decoration: none !important;">0%</h4>
+                    </div>
+                </div>
+                <!-- SCROLLABLE ATTENDANCE LOG -->
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px; background: white;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead style="position: sticky; top: 0; background: #eee;">
+                            <tr>
+                                <th style="padding: 10px; border-bottom: 1px solid #ddd;">Attendance Date</th>
+                                <th style="padding: 10px; border-bottom: 1px solid #ddd;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="perf-attendance-log">
+                            <!-- Rows like 2026-02-15 | Present injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-        <!-- 5. PERCENTAGE -->
-        <div class="input-group">
-            <label>5. Percentage Obtained (%)</label>
-            <input type="text" id="perf-pct-val" readonly style="background:#eee; font-weight: bold; color: #007bff;">
-        </div>
-
-        <!-- 7. RESULT -->
-        <div class="input-group">
-            <label>7. Status / Grade</label>
-            <input type="text" id="perf-result-val" readonly style="background:#eee; font-weight: bold;">
-        </div>
-
-        <!-- 6. GLOBAL AVG (FULL WIDTH) -->
-        <div class="input-group" style="grid-column: 1 / -1; margin-top: 15px;">
-            <label style="color: #ff0000; font-weight: 900; display: block; text-align: center;">6. STUDENT GLOBAL AVERAGE % (All Combined Courses)</label>
-            <input type="text" id="perf-global-avg" readonly style="background: #fff8f8; border: 2px solid #ff0000; font-size: 1.5rem; text-align: center; color: #ff0000; font-weight: 900;" placeholder="0.00%">
+            <!-- 3. EXAM SCORES & GRADING (STAYS DYNAMIC AS REQUESTED) -->
+            <div class="card" style="background: #f0fffb; border: 1px solid var(--aquamarine); margin-top: 20px;">
+                <h4><i class="fas fa-poll-h"></i> Subject-Wise Exam Analysis</h4>
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label>1. Course Name</label>
+                        <select id="perf-course-list" onchange="syncCoursePerformanceData()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+                            <option value="">-- Select Course --</option>
+                        </select>
+                    </div>
+                    <div class="input-group"><label>2. Teacher Name</label><input type="text" id="perf-teacher-name" readonly style="background:#eee;"></div>
+                    <div class="input-group"><label>3. Total Marks</label><input type="number" id="perf-total-marks" readonly style="background:#eee;"></div>
+                    <div class="input-group"><label>4. Marks Obtained</label><input type="number" id="perf-obt-marks" readonly style="background:#eee;"></div>
+                    <div class="input-group"><label>5. Percentage Obtained (%)</label><input type="text" id="perf-pct-val" readonly style="background:#eee; font-weight: bold; color: #007bff;"></div>
+                    <div class="input-group"><label>7. Result</label><input type="text" id="perf-result-val" readonly style="background:#eee; font-weight: bold;"></div>
+                    
+                    <div class="input-group" style="grid-column: 1 / -1; margin-top: 15px;">
+                        <label style="color: #ff0000; font-weight: 900; display: block; text-align: center;">6. STUDENT TOTAL AVERAGE % (Across All Subjects)</label>
+                        <input type="text" id="perf-global-avg" readonly style="background: #fff8f8; border: 2px solid #ff0000; font-size: 1.5rem; text-align: center; color: #ff0000; font-weight: 900;" placeholder="0.00%">
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 </section>
-
-
 
 
 
@@ -5457,22 +5485,49 @@ function calculateAvgScore() {
 // 2. Fetch and Calculate All Data
 // 1. Modified Main Fetch Function
 async function fetchPerformanceData() {
-    const mobile = document.getElementById('perf-fetch-mobile').value.trim();
-    if (!mobile) return alert("Please enter Mobile Number");
+    const rollInp = document.getElementById('perf-fetch-roll').value.trim().toUpperCase();
+    const mobInp = document.getElementById('perf-fetch-mobile').value.trim();
+    
+    if (!rollInp && !mobInp) return alert("Please enter Roll Number or Mobile Number.");
 
     try {
-        const { data: student } = await db.from('students').select('*').eq('mobile', mobile).eq('institute_id', sessionInstID).maybeSingle();
+        // 1. Fetch Student Info
+        let query = db.from('students').select('*').eq('institute_id', sessionInstID);
+        if (rollInp) query = query.eq('roll_number', rollInp);
+        else query = query.eq('mobile', mobInp);
+
+        const { data: student, error: sErr } = await query.maybeSingle();
         if (!student) return alert("Student not found.");
         
         const roll = student.roll_number;
 
-        // Fill Basic Info
+        // Populate Basic Info
         document.getElementById('perf-name').value = student.full_name;
         document.getElementById('perf-roll').value = roll;
         document.getElementById('perf-joining').value = student.admission_date;
         document.getElementById('perf-today').value = new Date().toLocaleDateString();
 
-        // 1. POPULATE COURSE DROPDOWN (From the courses they have actually taken exams for)
+        // 2. Fetch Detailed Attendance Log (Date and Status)
+        const { data: attHistory } = await db.from('attendance')
+            .select('attendance_date, status')
+            .eq('roll_number', roll)
+            .eq('institute_id', sessionInstID)
+            .order('attendance_date', { ascending: false });
+
+        const logBody = document.getElementById('perf-attendance-log');
+        logBody.innerHTML = "";
+        let absCount = 0;
+
+        if (attHistory) {
+            attHistory.forEach(row => {
+                if (row.status === 'Absent') absCount++;
+                logBody.innerHTML += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${row.attendance_date}</td><td style="padding:8px; border-bottom:1px solid #eee; color:${row.status === 'Present' ? 'green' : 'red'}; font-weight:bold;">${row.status}</td></tr>`;
+            });
+            document.getElementById('perf-absent').innerText = absCount;
+            document.getElementById('perf-attendance-pct').innerText = attHistory.length > 0 ? (((attHistory.length - absCount) / attHistory.length) * 100).toFixed(1) + "%" : "100%";
+        }
+
+        // 3. Populate Course Dropdown for Exams
         const { data: examRecords } = await db.from('exam').select('course_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
         const courseSelect = document.getElementById('perf-course-list');
         courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
@@ -5486,33 +5541,27 @@ async function fetchPerformanceData() {
             });
         }
 
-        // 2. CALCULATE GLOBAL AVERAGE (Sum of every exam ever taken)
+        // 4. Calculate Global Average %
         const { data: allExams } = await db.from('exam').select('marks_obtained, total_marks').eq('roll_number', roll).eq('institute_id', sessionInstID);
         if (allExams && allExams.length > 0) {
             let tObt = allExams.reduce((sum, e) => sum + (parseFloat(e.marks_obtained) || 0), 0);
             let tPoss = allExams.reduce((sum, e) => sum + (parseFloat(e.total_marks) || 0), 0);
             document.getElementById('perf-global-avg').value = ((tObt / tPoss) * 100).toFixed(2) + "%";
+        } else {
+            document.getElementById('perf-global-avg').value = "0.00%";
         }
-
-        // 3. FETCH ATTENDANCE (Summary)
-        const monthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        const { data: att } = await db.from('attendance').select('status').eq('roll_number', roll).eq('month_year', monthYear).eq('institute_id', sessionInstID);
-        let abs = att?.filter(a => a.status === 'Absent').length || 0;
-        document.getElementById('perf-absent').innerText = abs;
-        document.getElementById('perf-attendance-pct').innerText = att?.length > 0 ? (((att.length - abs) / att.length) * 100).toFixed(1) + "%" : "100%";
 
         document.getElementById('performance-report-area').style.display = 'block';
 
     } catch (err) { console.error(err); }
 }
 
-// 2. New Function: Sync Data when a specific Course is selected
 async function syncCoursePerformanceData() {
     const roll = document.getElementById('perf-roll').value;
     const course = document.getElementById('perf-course-list').value;
     if (!course) return;
 
-    // A. Fetch Subject-Specific Marks (Aggregated if multiple exams were held)
+    // A. Fetch Specific Course Marks
     const { data: exams } = await db.from('exam')
         .select('marks_obtained, total_marks, result')
         .eq('roll_number', roll)
@@ -5527,18 +5576,12 @@ async function syncCoursePerformanceData() {
         document.getElementById('perf-total-marks').value = totalPossible;
         document.getElementById('perf-obt-marks').value = totalObtained;
         document.getElementById('perf-pct-val').value = pct.toFixed(2) + "%";
-        document.getElementById('perf-result-val').value = exams[exams.length - 1].result; // Show latest result
+        document.getElementById('perf-result-val').value = exams[exams.length - 1].result;
     }
 
-    // B. Fetch Allotted Teacher for this subject (From Module 18)
-    const { data: alloc } = await db.from('student_allocations')
-        .select('teacher_name')
-        .eq('roll_number', roll)
-        .eq('subject', course)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    document.getElementById('perf-teacher-name').value = alloc ? alloc.teacher_name : "Not Assigned";
+    // B. Fetch Teacher (Module 18)
+    const { data: alloc } = await db.from('student_allocations').select('teacher_name').eq('roll_number', roll).eq('subject', course).eq('institute_id', sessionInstID).maybeSingle();
+    document.getElementById('perf-teacher-name').value = alloc ? alloc.teacher_name : "Not Allotted";
 }
 // 3. Save performance to database
 async function savePerformanceData() {
