@@ -353,18 +353,20 @@
         <!-- Dynamic Summary Table -->
         <div class="summary-table-wrapper">
             <table class="summary-table">
-                <thead>
-                    <tr>
-                        <th>Roll No</th>
-                        <th>Student Name</th>
-                        <th>Teacher Allotted</th>
-                        <th>Teacher ID</th>
-                        <th>Subject</th>
-                        <th>Batch Name</th>
-                        <th>Batch Time</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
+               <thead>
+    <tr>
+        <th>Roll No</th>
+        <th>Student Name</th>
+        <th>Teacher Allotted</th>
+        <th>Teacher ID</th>
+        <th>Subject</th>
+        <th>Batch Name</th>
+        <th>Seats Allotted</th> <!-- NEW -->
+        <th>Balance Seats</th>  <!-- NEW -->
+        <th style="width: 200px;">Batch Time</th>
+        <th>Action</th>
+    </tr>
+</thead>
                 <tbody id="session-table-body">
                     <!-- JavaScript will inject rows here -->
                     <tr><td colspan="8">Searching for your assignments...</td></tr>
@@ -507,29 +509,34 @@ async function loadAssignmentSummary() {
     }
     const { data: listData } = await query;
 
-    // 2. Fetch ALL fields from 'batches' as requested
+    // 2. Fetch Batch Metadata (Capacity & Official Timings)
     const { data: batchData } = await db.from('batches')
-        .select('teacher_id, teacher_name, batch_name, batch_time, subject_name, students_allotted')
+        .select('teacher_id, batch_name, batch_time, subject_name, students_allotted')
         .eq('institute_id', sessionInstID);
+
+    // 3. Fetch current filling from 'list' to calculate balance globally
+    const { data: allAssignments } = await db.from('list').select('batch_name').eq('institute_id', sessionInstID);
 
     tbody.innerHTML = "";
     if (!listData || listData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8">No active assignments found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10">No active assignments found.</td></tr>';
         return;
     }
 
     listData.forEach((item, index) => {
-        // MATCHING LOGIC: 
-        // We match the 'teacher_id' and we check if the Batch name matches 'subject_name' or 'batch_name'
+        // Find matching batch metadata
         const bRow = batchData?.find(b => 
             b.teacher_id === item.teacher_id && 
             (b.subject_name.toUpperCase() === item.batch_name.toUpperCase() || 
              b.batch_name.toUpperCase() === item.batch_name.toUpperCase())
         );
 
-        // Fetch exact students_allotted and batch_time from the matched row
-        const capacityVal = bRow ? bRow.students_allotted : 10; 
+        const totalAllotted = bRow ? bRow.students_allotted : 0;
         const rawTime = bRow ? bRow.batch_time : "";
+        
+        // Calculate Balance: Total Allotted - Count of students currently in this specific batch name
+        const currentlyFilled = allAssignments?.filter(a => a.batch_name === item.batch_name).length || 0;
+        const balanceSeats = totalAllotted - currentlyFilled;
 
         const selectId = "time-select-" + index;
         const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
@@ -541,10 +548,17 @@ async function loadAssignmentSummary() {
                 <td>${item.teacher_name}</td>
                 <td>${item.teacher_id}</td>
                 <td>${item.course_name}</td>
-                <td>${item.batch_name} (${capacityVal})</td>
-                <td><select id="${selectId}">${timeOptions}</select></td>
+                <td style="font-weight:bold;">${item.batch_name}</td> <!-- Brackets removed -->
+                <td style="color: blue; font-weight:800;">${totalAllotted}</td>
+                <td style="color: ${balanceSeats <= 2 ? 'red' : 'green'}; font-weight:800;">${balanceSeats}</td>
                 <td>
-                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${capacityVal}')">SELECT</button>
+                    <!-- Rectangular Styled Dropdown -->
+                    <select id="${selectId}" style="width: 100%; height: 40px; border: 2px solid #000; border-radius: 4px; padding: 5px; font-weight: bold; background: #fff8e1;">
+                        ${timeOptions}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${totalAllotted}')">SELECT</button>
                 </td>
             </tr>`;
     });
