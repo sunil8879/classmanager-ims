@@ -527,7 +527,51 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 
 
+/* --- PRINT OPTIMIZATION --- */
+@media print {
+    /* 1. Hide everything by default */
+    header, nav, aside, footer, .button-row, .form-grid, .card:not(#report-output-area), #pwa-install-btn, #filter_div, #chart_div {
+        display: none !important;
+    }
 
+    /* 2. Reset layout for the main container */
+    body, .app-container, main.content {
+        display: block !important;
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+
+    /* 3. Make the report area perfectly visible */
+    #report-output-area {
+        display: block !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100% !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* 4. Ensure table fonts are crisp and black */
+    table {
+        width: 100% !important;
+        border: 1px solid #000 !important;
+    }
+    
+    td, th {
+        color: #000 !important;
+        border: 1px solid #000 !important;
+    }
+
+    /* 5. Force the browser to start printing from here */
+    #report-print-content {
+        margin-top: 0 !important;
+    }
+}
 
 
     </style>
@@ -9413,12 +9457,14 @@ function populateTeacherRatName() {
     document.getElementById('rep-rat-name').value = sel.options[sel.selectedIndex].dataset.name || "";
 }
 
-// 3. Helper: Calculate Category
-function getRatingCategory(avg) {
-    if (avg < 3.5) return "<span style='color:red;'>AVERAGE</span>";
-    if (avg < 4.0) return "<span style='color:orange;'>GOOD</span>";
-    if (avg < 4.7) return "<span style='color:blue;'>GREAT</span>";
-    return "<span style='color:green;'>EXCELLENT</span>";
+// 3. Helper: Calculate Category based on Count and Average
+function getRatingCategory(avg, count) {
+    if (count === 0 || isNaN(avg) || avg == 0) return "<span style='color:grey;'>Not Applicable</span>";
+    if (avg < 3.5) return "<span style='color:red;'>Below Average</span>";
+    if (avg < 4.0) return "<span style='color:orange;'>Average</span>";
+    if (avg < 4.5) return "<span style='color:#d35400;'>Good</span>";
+    if (avg < 4.7) return "<span style='color:blue;'>Great</span>";
+    return "<span style='color:green;'>Excellent</span>";
 }
 
 // 4. Generate Single Teacher Report
@@ -9431,7 +9477,7 @@ async function generateSingleTeacherReport() {
 
     const totalReviews = revs ? revs.length : 0;
     const avgScore = totalReviews > 0 ? (revs.reduce((sum, r) => sum + r.rating, 0) / totalReviews).toFixed(2) : 0;
-    const category = getRatingCategory(avgScore);
+  const category = getRatingCategory(avgScore, totalReviews);
 
     // Update Output UI
     document.getElementById('rep-title').innerText = "Teacher Appraisal Report";
@@ -9467,7 +9513,7 @@ async function generateAllTeacherReport() {
         const tRevs = allRevs ? allRevs.filter(r => r.teacher_id === t.id) : [];
         const count = tRevs.length;
         const avg = count > 0 ? (tRevs.reduce((sum, r) => sum + r.rating, 0) / count).toFixed(2) : "0.00";
-        const cat = getRatingCategory(avg);
+     const cat = getRatingCategory(avg, count);
 
         tableBody += `
             <tr>
@@ -9496,6 +9542,11 @@ async function generateAllTeacherReport() {
     document.getElementById('report-output-area').style.display = 'block';
     document.getElementById('filter_div').style.display = 'none';
     document.getElementById('chart_div').style.display = 'none';
+
+// Ensure no other sections are active during the print process
+document.querySelectorAll('.content-section').forEach(s => {
+    if(s.id !== 'admin') s.style.display = 'none';
+});
 }
 
 
