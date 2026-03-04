@@ -550,25 +550,33 @@ async function loadAssignmentSummary() {
             const selectId = "time-select-" + index;
             const timeOptions = rawTime ? rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
 
-            tbody.innerHTML += `
-                <tr>
-                    <td>${item.roll_number}</td>
-                    <td>${item.student_name}</td>
-                    <td>${item.teacher_name}</td>
-                    <td>${item.teacher_id}</td>
-                    <td>${item.course_name}</td>
-                    <td style="font-weight:bold;">${item.batch_name}</td>
-                    <td style="color: blue; font-weight:800;">${totalAllotted}</td>
-                    <td style="color: ${balanceSeats <= 0 ? 'red' : 'green'}; font-weight:800;">${balanceSeats}</td>
-                    <td>
-                        <select id="${selectId}" style="width: 100%; height: 40px; border: 2px solid #000; border-radius: 4px; font-weight: bold; background: #fff8e1;">
-                            ${timeOptions}
-                        </select>
-                    </td>
-                    <td>
-                        <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${totalAllotted}')">SELECT</button>
-                    </td>
-                </tr>`;
+         const balanceId = "bal-" + index; // Unique ID for each balance cell
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${item.roll_number}</td>
+                <td>${item.student_name}</td>
+                <td>${item.teacher_name}</td>
+                <td>${item.teacher_id}</td>
+                <td>${item.course_name}</td>
+                <td style="font-weight:bold;">${item.batch_name}</td>
+                <td style="color: blue; font-weight:800;">${totalAllotted}</td>
+                
+                <!-- 1. ADDED ID HERE -->
+                <td id="${balanceId}" style="color: ${balanceSeats <= 0 ? 'red' : 'green'}; font-weight:800;">${balanceSeats}</td>
+                
+                <td>
+                    <!-- 2. ADDED ONCHANGE HERE -->
+                    <select id="${selectId}" 
+                        onchange="updateBalanceUI(this.value, '${item.batch_name}', '${totalAllotted}', '${balanceId}')"
+                        style="width: 100%; height: 40px; border: 2px solid #000; border-radius: 4px; font-weight: bold; background: #fff8e1;">
+                        ${timeOptions}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${rawTime}', '${selectId}', '${totalAllotted}')">SELECT</button>
+                </td>
+            </tr>`;
         });
     } catch (err) {
         console.error("Table Load Error:", err);
@@ -873,6 +881,29 @@ await loadAssignmentSummary();
     function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
 
     initSession();
+
+
+async function updateBalanceUI(selectedTime, batchName, totalAllotted, cellId) {
+    const dateVal = document.getElementById('f-date').value;
+    
+    // Count how many students are booked for THIS Specific Time for THIS Batch
+    const { data } = await db.from('class_bookings')
+        .select('id')
+        .eq('booking_date', dateVal)
+        .eq('course', batchName)
+        .eq('time_slot', selectedTime)
+        .eq('institute_id', sessionInstID);
+
+    const bookedCount = data ? data.length : 0;
+    const balance = totalAllotted - bookedCount;
+    
+    const cell = document.getElementById(cellId);
+    if (cell) {
+        cell.innerText = balance;
+        cell.style.color = (balance <= 0) ? 'red' : 'green';
+    }
+}
+
 
 </script>
 </body>
