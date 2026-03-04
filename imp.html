@@ -1789,7 +1789,11 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
             <!-- 2. ATTENDANCE RECORD DETAILS -->
             <div class="card" style="margin-top: 20px; border-top: 5px solid #27ae60;">
-                <h4><i class="fas fa-calendar-check"></i> Attendance Record Details</h4>
+              <!-- UPDATED HEADER WITH DYNAMIC MONTH -->
+<h4>
+    <i class="fas fa-calendar-check"></i> 
+    Attendance Record Details for <span id="perf-current-month-label" style="color: #27ae60;"></span>
+</h4>
                 <div class="dashboard-stats" style="margin-bottom: 15px;">
                     <div class="stat-card" style="padding: 10px; border-bottom: 3px solid red;">
                         <small>Days Absent</small><h4 id="perf-absent" style="margin:0 !important; text-decoration: none !important;">0</h4>
@@ -5491,7 +5495,12 @@ async function fetchPerformanceData() {
     if (!rollInp && !mobInp) return alert("Please enter Roll Number or Mobile Number.");
 
     try {
-        // 1. Fetch Student Info
+        // 1. Set Dynamic Month Label (Format: March-2026)
+        const now = new Date();
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        document.getElementById('perf-current-month-label').innerText = `${monthNames[now.getMonth()]}-${now.getFullYear()}`;
+
+        // 2. Fetch Student Info
         let query = db.from('students').select('*').eq('institute_id', sessionInstID);
         if (rollInp) query = query.eq('roll_number', rollInp);
         else query = query.eq('mobile', mobInp);
@@ -5507,7 +5516,7 @@ async function fetchPerformanceData() {
         document.getElementById('perf-joining').value = student.admission_date;
         document.getElementById('perf-today').value = new Date().toLocaleDateString();
 
-        // 2. Fetch Detailed Attendance Log (Date and Status)
+        // 3. Fetch Detailed Attendance Log
         const { data: attHistory } = await db.from('attendance')
             .select('attendance_date, status')
             .eq('roll_number', roll)
@@ -5527,13 +5536,13 @@ async function fetchPerformanceData() {
             document.getElementById('perf-attendance-pct').innerText = attHistory.length > 0 ? (((attHistory.length - absCount) / attHistory.length) * 100).toFixed(1) + "%" : "100%";
         }
 
-        // 3. Populate Course Dropdown for Exams
+        // 4. Populate Course Dropdown (From Exam Table)
         const { data: examRecords } = await db.from('exam').select('course_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
         const courseSelect = document.getElementById('perf-course-list');
         courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
         
         if (examRecords && examRecords.length > 0) {
-            const uniqueCourses = [...new Set(examRecords.map(e => e.course_name))];
+            const uniqueCourses = [...new Set(examRecords.map(e => e.course_name.toUpperCase()))];
             uniqueCourses.forEach(c => {
                 let opt = document.createElement('option');
                 opt.value = c; opt.text = c;
@@ -5541,14 +5550,12 @@ async function fetchPerformanceData() {
             });
         }
 
-        // 4. Calculate Global Average %
+        // 5. Calculate Global Average %
         const { data: allExams } = await db.from('exam').select('marks_obtained, total_marks').eq('roll_number', roll).eq('institute_id', sessionInstID);
         if (allExams && allExams.length > 0) {
             let tObt = allExams.reduce((sum, e) => sum + (parseFloat(e.marks_obtained) || 0), 0);
             let tPoss = allExams.reduce((sum, e) => sum + (parseFloat(e.total_marks) || 0), 0);
             document.getElementById('perf-global-avg').value = ((tObt / tPoss) * 100).toFixed(2) + "%";
-        } else {
-            document.getElementById('perf-global-avg').value = "0.00%";
         }
 
         document.getElementById('performance-report-area').style.display = 'block';
@@ -5558,30 +5565,34 @@ async function fetchPerformanceData() {
 
 async function syncCoursePerformanceData() {
     const roll = document.getElementById('perf-roll').value;
-    const course = document.getElementById('perf-course-list').value;
+    const course = document.getElementById('perf-course-list').value; // This is now UpperCase
     if (!course) return;
 
     // A. Fetch Specific Course Marks
     const { data: exams } = await db.from('exam')
         .select('marks_obtained, total_marks, result')
         .eq('roll_number', roll)
-        .eq('course_name', course)
+        .ilike('course_name', course) // Case-insensitive match
         .eq('institute_id', sessionInstID);
 
     if (exams && exams.length > 0) {
         const totalPossible = exams.reduce((sum, e) => sum + parseFloat(e.total_marks), 0);
         const totalObtained = exams.reduce((sum, e) => sum + parseFloat(e.marks_obtained), 0);
-        const pct = (totalObtained / totalPossible) * 100;
-
         document.getElementById('perf-total-marks').value = totalPossible;
         document.getElementById('perf-obt-marks').value = totalObtained;
-        document.getElementById('perf-pct-val').value = pct.toFixed(2) + "%";
+        document.getElementById('perf-pct-val').value = ((totalObtained / totalPossible) * 100).toFixed(2) + "%";
         document.getElementById('perf-result-val').value = exams[exams.length - 1].result;
     }
 
-    // B. Fetch Teacher (Module 18)
-    const { data: alloc } = await db.from('student_allocations').select('teacher_name').eq('roll_number', roll).eq('subject', course).eq('institute_id', sessionInstID).maybeSingle();
-    document.getElementById('perf-teacher-name').value = alloc ? alloc.teacher_name : "Not Allotted";
+    // B. Fetch Teacher (Search both 'subject' and 'course' columns for maximum compatibility)
+    const { data: alloc } = await db.from('student_allocations')
+        .select('teacher_name')
+        .eq('roll_number', roll)
+        .ilike('subject', course) // Use ilike to prevent "Not Allotted" errors due to spacing or case
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    document.getElementById('perf-teacher-name').value = alloc ? alloc.teacher_name : "NOT ALLOTTED IN SEC 18";
 }
 // 3. Save performance to database
 async function savePerformanceData() {
