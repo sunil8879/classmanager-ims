@@ -7980,42 +7980,55 @@ async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter Roll Number first.");
 
-    // Step A: Fetch Student Name
     const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
     if(!stu) return alert("Student not found.");
     document.getElementById('rev-sname').value = stu.full_name;
 
-    // Step B: Fetch Allotted Teacher ID from Module 18's table
-    const { data: alloc } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-    
-    if(alloc) {
-        document.getElementById('rev-tid').value = alloc.teacher_id;
-        document.getElementById('rev-tname').value = alloc.teacher_name;
+    // Fetch ALL allocations for this roll number
+    const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
+
+    if(allocs && allocs.length > 0) {
+        // One-liner to join multiple IDs and Names with commas
+        document.getElementById('rev-tid').value = allocs.map(a => a.teacher_id).join(', ');
+        document.getElementById('rev-tname').value = allocs.map(a => a.teacher_name).join(', ');
     } else {
-        alert("This student is not linked to any teacher yet. Please allot a teacher in Module 18.");
+        alert("This student is not linked to any teacher yet in Module 18.");
     }
 }
 
 // 2. ADD Review
 async function addTeacherReview() {
     const score = parseFloat(document.getElementById('rev-score').value);
+    const idString = document.getElementById('rev-tid').value;
     if(score > 5) return alert("Error: Review score cannot be more than 5.");
-    
-    const data = {
-        institute_id: sessionInstID,
-        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
-        student_name: document.getElementById('rev-sname').value,
-        teacher_id: document.getElementById('rev-tid').value,
-        teacher_name: document.getElementById('rev-tname').value,
-        rating: score,
-        message: document.getElementById('rev-msg').value,
-// ADD THIS LINE inside the data object of addTeacherReview()
-review_date: document.getElementById('rev-date').value
-    };
+    if(!idString) return alert("No teachers found to review.");
 
-    const { error } = await db.from('reviews').insert([data]);
-    if(error) alert(error.message);
-    else alert("Review Added! Teacher Portal rating will update automatically.");
+    // Split the comma-separated IDs into an array
+    const teacherIds = idString.split(',').map(s => s.trim());
+    const teacherNames = document.getElementById('rev-tname').value.split(',').map(s => s.trim());
+
+    const reviewDate = document.getElementById('rev-date').value;
+    const studentRoll = document.getElementById('rev-roll').value.toUpperCase();
+    const studentName = document.getElementById('rev-sname').value;
+    const message = document.getElementById('rev-msg').value;
+
+    // Loop through each teacher and save a review for them
+    for (let i = 0; i < teacherIds.length; i++) {
+        const data = {
+            institute_id: sessionInstID,
+            student_roll: studentRoll,
+            student_name: studentName,
+            teacher_id: teacherIds[i],
+            teacher_name: teacherNames[i] || teacherIds[i],
+            rating: score,
+            message: message,
+            review_date: reviewDate
+        };
+        await db.from('reviews').insert([data]);
+    }
+
+    alert(`Success: Review added for ${teacherIds.length} teachers!`);
+    // Optional: add logic here to trigger teacher rating recalculation if needed
 }
 
 // 3. FETCH Review
