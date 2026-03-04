@@ -8847,7 +8847,7 @@ async function listTeachersOnLeave() {
 // 1. Load all teachers from the database into the dropdown
 async function loadBMTeacherDropdown() {
     const tidSelect = document.getElementById('bm-tid');
-    // Clear existing options except the first one
+    // Keep the first placeholder option
     tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
 
     const { data: teachers, error } = await db.from('teacher_details')
@@ -8860,8 +8860,8 @@ async function loadBMTeacherDropdown() {
         teachers.forEach(t => {
             let opt = document.createElement('option');
             opt.value = t.id;
-            opt.text = `${t.id} - ${t.teacher_name}`;
-            opt.dataset.name = t.teacher_name; // Store name for easy access
+            opt.text = t.id + " - " + t.teacher_name;
+            opt.dataset.name = t.teacher_name; 
             tidSelect.appendChild(opt);
         });
     }
@@ -8911,47 +8911,55 @@ async function handleBMTeacherChange() {
 // 3. Update the Auto-populate (Student Roll Search) to work with dropdowns
 async function autopopulateBatchMaster() {
     const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
-    if(!roll) return alert("Please enter a Roll Number first.");
+    if (!roll) return alert("Please enter a Roll Number first.");
 
-    // Load Teacher List first if not already loaded
-    if(document.getElementById('bm-tid').options.length <= 1) await loadBMTeacherDropdown();
-
-    // A. Fetch from STUDENTS table
-    const { data: stu } = await db.from('students')
-        .select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-
-    if (!stu) return alert("Student not found.");
-    
-    document.getElementById('bm-sname').value = stu.full_name;
-    document.getElementById('bm-course').value = stu.course || "N/A";
-
-    // B. Fetch Allocation (Which teacher is this student linked to?)
-    const { data: alloc } = await db.from('student_allocations')
-        .select('teacher_id')
+    // 1. Fetch basic student info from Master Table
+    const { data: stu, error: stuErr } = await db.from('students')
+        .select('full_name, course')
         .eq('roll_number', roll)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
-    if (alloc) {
-        // Select the teacher in dropdown
-        document.getElementById('bm-tid').value = alloc.teacher_id;
-        // Trigger the change to load that teacher's batches
-        await handleBMTeacherChange();
+    if (stuErr || !stu) return alert("Student not found in main records.");
+    
+    document.getElementById('bm-sname').value = stu.full_name;
+    document.getElementById('bm-course').value = stu.course || "N/A";
+
+    // 2. IMPORTANT: Load the full teacher dropdown first 
+    // This ensures the ID we are about to select actually exists in the HTML list
+    await loadBMTeacherDropdown();
+
+    // 3. Fetch the Allocation link created in Section 18
+    const { data: allocs, error: allocErr } = await db.from('student_allocations')
+        .select('teacher_id, teacher_name, batch_name')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
+
+    const tidSelect = document.getElementById('bm-tid');
+
+    if (allocs && allocs.length > 0) {
+        // Link Found! 
+        currentRollAllocations = allocs; // Save for batch filtering
         
-        // C. Try to auto-select the batch if it matches the student's course
-        const bSelect = document.getElementById('bm-bname');
-        for (let i = 0; i < bSelect.options.length; i++) {
-            if (bSelect.options[i].text.includes(stu.course)) {
-                bSelect.selectedIndex = i;
-                break;
-            }
-        }
+        // Select the first allocated teacher
+        const firstAlloc = allocs[0];
+        tidSelect.value = firstAlloc.teacher_id;
+        
+        // Manually trigger the batch name population logic
+        handleBMTeacherChange(); 
+        
+        // Auto-select the batch if it matches
+        setTimeout(() => {
+            const bnameSelect = document.getElementById('bm-bname');
+            bnameSelect.value = firstAlloc.batch_name;
+        }, 500);
+
+        alert(`Link Found! Allocated to Teacher: ${firstAlloc.teacher_name}`);
     } else {
-        alert("Student found, but no Teacher Allocation (Module 18) found. Please select teacher manually.");
+        // No link found in Module 18
+        alert("Notice: This student has not been linked to a teacher in Section 18 (Student Allocation). Please select a teacher manually or complete Section 18 first.");
     }
 }
-
-
 
 async function refreshStudentBatchDropdown() {
     const batchSelect = document.getElementById('stu-batch');
