@@ -2368,8 +2368,16 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                 </div>
             </div>
             <div class="input-group"><label>2. Student Name</label><input type="text" id="rev-sname" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>3. Teacher ID</label><input type="text" id="rev-tid" readonly style="background:#eee;"></div>
-            <div class="input-group"><label>4. Teacher Name</label><input type="text" id="rev-tname" readonly style="background:#eee;"></div>
+         <div class="input-group">
+    <label>3. Select Teacher to Review</label>
+    <select id="rev-tid" onchange="syncReviewTeacherName()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+        <option value="">-- Enter Roll No First --</option>
+    </select>
+</div>
+<div class="input-group">
+    <label>4. Teacher Name</label>
+    <input type="text" id="rev-tname" readonly style="background:#eee;">
+</div>
             <div class="input-group"><label>5. Review Score (Max 5)</label><input type="number" step="0.1" id="rev-score" placeholder="e.g. 4.5"></div>
             <div class="input-group" style="grid-column: 1/-1;"><label>6. Message from Student</label><textarea id="rev-msg" rows="3" placeholder="Write your feedback here..."></textarea></div>
         </div>
@@ -7975,60 +7983,75 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    26. TEACHER REVIEWS LOGIC
    ========================================== */
 
-// 1. Auto-populate based on Roll Number
+// 1. Fetch all linked teachers and fill the dropdown
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter Roll Number first.");
 
+    // Fetch Student Name
     const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
     if(!stu) return alert("Student not found.");
     document.getElementById('rev-sname').value = stu.full_name;
 
-    // Fetch ALL allocations for this roll number
+    // Fetch all allocations for this roll
     const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
+    
+    const tidSelect = document.getElementById('rev-tid');
+    tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+    document.getElementById('rev-tname').value = "";
 
     if(allocs && allocs.length > 0) {
-        // One-liner to join multiple IDs and Names with commas
-        document.getElementById('rev-tid').value = allocs.map(a => a.teacher_id).join(', ');
-        document.getElementById('rev-tname').value = allocs.map(a => a.teacher_name).join(', ');
+        // Use a Map to filter out duplicate teachers (if linked to multiple batches)
+        const uniqueTeachers = new Map();
+        allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
+
+        uniqueTeachers.forEach((name, id) => {
+            let opt = document.createElement('option');
+            opt.value = id;
+            opt.text = id;
+            opt.dataset.name = name; // Store name in dataset for quick sync
+            tidSelect.appendChild(opt);
+        });
+        alert(`Found ${uniqueTeachers.size} teachers linked to this student.`);
     } else {
-        alert("This student is not linked to any teacher yet in Module 18.");
+        alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. ADD Review
+// 2. Helper to update the Name field when an ID is selected from dropdown
+function syncReviewTeacherName() {
+    const select = document.getElementById('rev-tid');
+    const selectedOption = select.options[select.selectedIndex];
+    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
+}
+
+// 3. Save Review for the specific selected teacher
 async function addTeacherReview() {
+    const tid = document.getElementById('rev-tid').value;
     const score = parseFloat(document.getElementById('rev-score').value);
-    const idString = document.getElementById('rev-tid').value;
-    if(score > 5) return alert("Error: Review score cannot be more than 5.");
-    if(!idString) return alert("No teachers found to review.");
+    
+    if(!tid) return alert("Please select a teacher from the dropdown.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    // Split the comma-separated IDs into an array
-    const teacherIds = idString.split(',').map(s => s.trim());
-    const teacherNames = document.getElementById('rev-tname').value.split(',').map(s => s.trim());
+    const data = {
+        institute_id: sessionInstID,
+        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
+        student_name: document.getElementById('rev-sname').value,
+        teacher_id: tid,
+        teacher_name: document.getElementById('rev-tname').value,
+        rating: score,
+        message: document.getElementById('rev-msg').value,
+        review_date: document.getElementById('rev-date').value
+    };
 
-    const reviewDate = document.getElementById('rev-date').value;
-    const studentRoll = document.getElementById('rev-roll').value.toUpperCase();
-    const studentName = document.getElementById('rev-sname').value;
-    const message = document.getElementById('rev-msg').value;
-
-    // Loop through each teacher and save a review for them
-    for (let i = 0; i < teacherIds.length; i++) {
-        const data = {
-            institute_id: sessionInstID,
-            student_roll: studentRoll,
-            student_name: studentName,
-            teacher_id: teacherIds[i],
-            teacher_name: teacherNames[i] || teacherIds[i],
-            rating: score,
-            message: message,
-            review_date: reviewDate
-        };
-        await db.from('reviews').insert([data]);
+    const { error } = await db.from('reviews').insert([data]);
+    if(error) alert("Error: " + error.message);
+    else {
+        alert("Review Saved for " + data.teacher_name);
+        // Clear rating and message for next review
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
     }
-
-    alert(`Success: Review added for ${teacherIds.length} teachers!`);
-    // Optional: add logic here to trigger teacher rating recalculation if needed
 }
 
 // 3. FETCH Review
