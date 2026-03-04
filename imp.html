@@ -1240,51 +1240,6 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 <section id="admin" class="content-section">
 
 
-<!-- ADMIN STATS BLOCK (Required to stop the crash) -->
-<div class="card" style="border-top: 5px solid #27ae60; margin-bottom: 20px;">
-    <h3><i class="fas fa-chart-line"></i> Operational Overview</h3>
-    <div class="form-grid">
-        <div class="input-group">
-            <label>Filter Type</label>
-            <select id="admin-filter-type" onchange="toggleAdminCalendar()">
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
-            </select>
-        </div>
-        <div class="input-group" id="admin-month-container">
-            <label>Select Month</label>
-            <input type="month" id="admin-filter-month" onchange="loadAdminDashboard()">
-        </div>
-        <div class="input-group" id="admin-year-container" style="display:none;">
-            <label>Select Year</label>
-            <input type="number" id="admin-filter-year" value="2026" onchange="loadAdminDashboard()">
-        </div>
-        <div class="input-group" id="admin-quarter-container" style="display:none;">
-            <label>Select Quarter</label>
-            <select id="admin-filter-quarter" onchange="loadAdminDashboard()">
-                <option value="1">Q1 (Jan-Mar)</option>
-                <option value="2">Q2 (Apr-Jun)</option>
-                <option value="3">Q3 (Jul-Sep)</option>
-                <option value="4">Q4 (Oct-Dec)</option>
-            </select>
-        </div>
-    </div>
-
-    <!-- STATS LABELS -->
-    <div class="dashboard-stats" style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-        <div class="stat-card" style="background: white; padding: 15px; border: 1px solid #000; border-radius: 8px;">
-            <p style="font-weight:bold; color:#666;">NEW ADMISSIONS (<span class="filter-label">Month</span>)</p>
-            <h4 id="dash-students" style="font-size: 2rem !important; text-decoration: none !important;">0</h4>
-        </div>
-        <div class="stat-card" style="background: white; padding: 15px; border: 1px solid #000; border-radius: 8px;">
-            <p style="font-weight:bold; color:#666;">COLLECTION (<span class="filter-label">Month</span>)</p>
-            <h4 id="dash-revenue" style="font-size: 2rem !important; text-decoration: none !important;">₹ 0</h4>
-        </div>
-    </div>
-</div>
-
-
 
 
     <div class="card" style="margin-bottom: 20px; border-top: 5px solid #1877F2;">
@@ -1300,7 +1255,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                     <option value="t-attendance">4. Teachers Attendance Report</option>
 <option value="teacher-rating">5. Teacher Appraisal Report</option>
 <option value="profit-loss">6. Profit & Loss (P&L) Report</option>
-<option value="leads-conversion">7. Leads & Conversion Report</option>
+
                 </select>
             </div>
         </div>
@@ -1410,18 +1365,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     </div>
 </div>
 
-<!-- LEADS & CONVERSION REPORT INPUTS -->
-<div id="report-ui-leads" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
-    <div class="form-grid">
-        <div class="input-group">
-            <label>Select Report Month & Year</label>
-            <input type="month" id="rep-leads-month">
-        </div>
-    </div>
-    <div class="button-row">
-        <button class="btn-add" style="background:#f39c12; border: 1px solid #000;" onclick="generateLeadsReport()">GENERATE SALES REPORT</button>
-    </div>
-</div>
+
 
     <!-- REPORT DISPLAY AREA -->
     <div id="report-output-area" style="display:none;" class="card">
@@ -4276,7 +4220,7 @@ function toggleReportUI() {
 // Add this line inside your toggleReportUI function
 document.getElementById('report-ui-teacher-rating').style.display = (val === 'teacher-rating') ? 'block' : 'none';
 document.getElementById('report-ui-pl').style.display = (val === 'profit-loss') ? 'block' : 'none';
-document.getElementById('report-ui-leads').style.display = (val === 'leads-conversion') ? 'block' : 'none';
+
 
 // Also add this trigger to load the teachers into the dropdown
 if (val === 'teacher-rating') {
@@ -9732,107 +9676,6 @@ async function generatePLReport(viewType) {
 }
 
 
-
-// 1. Helper: Sales Remarks Logic
-function getSalesRemarks(pct) {
-    if (pct >= 70) return "<b style='color:green;'>OUTSTANDING</b>";
-    if (pct >= 45) return "<b style='color:green;'>EXCELLENT SYSTEM</b>";
-    if (pct >= 35) return "<b style='color:blue;'>VERY GOOD</b>";
-    if (pct >= 25) return "<b style='color:teal;'>HEALTHY</b>";
-    if (pct < 20) return `
-        <b style='color:red;'>SOMETHING IS WRONG</b><br>
-        <small style='color:#666;'>Possible issues: Pricing issue, Weak counsellor, Poor follow-up, Competition nearby, No urgency.</small>
-    `;
-    return "Normal";
-}
-
-// 2. Main Leads Engine
-// --- ROBUST LEADS & CONVERSION ENGINE ---
-async function generateLeadsReport() {
-    const monthVal = document.getElementById('rep-leads-month').value; // e.g. "2026-03"
-    if (!monthVal) return alert("Please select a month.");
-
-    // 1. FORMAT CONVERTERS (To match your specific DB styles)
-    const dateObj = new Date(monthVal + "-01");
-    const monthName = dateObj.toLocaleString('default', { month: 'long' }); // "March"
-    const yearName = dateObj.getFullYear(); // "2026"
-    
-    const stringMonthYear = `${monthName} ${yearName}`; // "March 2026" (For Inventory/Payments)
-    const sqlStartDate = `${monthVal}-01`;
-    const sqlEndDate = `${monthVal}-31`;
-
-    try {
-        // A. FETCH LEADS (Using SQL Date Range)
-        const { data: monthLeads } = await db.from('leads')
-            .select('*')
-            .eq('institute_id', sessionInstID)
-            .gte('date_of_visit', sqlStartDate)
-            .lte('date_of_visit', sqlEndDate);
-
-        // B. FETCH MARKETING COST (Using YYYY-MM format)
-        const { data: exp } = await db.from('expenses')
-            .select('marketing')
-            .eq('month_year', monthVal)
-            .eq('institute_id', sessionInstID)
-            .maybeSingle();
-        const marketCost = exp ? parseFloat(exp.marketing || 0) : 0;
-
-        // C. FETCH REVENUE (Using String Month Year format)
-        const { data: fees } = await db.from('payment_history').select('amount').eq('month_year', stringMonthYear).eq('institute_id', sessionInstID);
-        const { data: inv } = await db.from('inventory_sales').select('total_paid').eq('month_year', stringMonthYear).eq('institute_id', sessionInstID);
-        
-        const totalRevenue = (fees?.reduce((s, f) => s + parseFloat(f.amount), 0) || 0) + (inv?.reduce((s, i) => s + parseFloat(i.total_paid), 0) || 0);
-
-        // --- DATA AGGREGATION ---
-        const totalLeads = monthLeads ? monthLeads.length : 0;
-        const converted = monthLeads ? monthLeads.filter(l => l.status && l.status.toUpperCase().includes('CONVERTED')).length : 0;
-        const convPct = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(1) : 0;
-
-        // Course/Source Logic
-        const courseMap = {}; const sourceMap = {};
-        if (monthLeads) {
-            monthLeads.forEach(l => {
-                const c = (l.interested_course || "N/A").toUpperCase();
-                const s = (l.reference || "N/A").toUpperCase();
-                courseMap[c] = (courseMap[c] || 0) + 1;
-                sourceMap[s] = (sourceMap[s] || 0) + 1;
-            });
-        }
-        const bestCourse = Object.keys(courseMap).length > 0 ? Object.keys(courseMap).reduce((a, b) => courseMap[a] > courseMap[b] ? a : b) : "N/A";
-        const bestSource = Object.keys(sourceMap).length > 0 ? Object.keys(sourceMap).reduce((a, b) => sourceMap[a] > sourceMap[b] ? a : b) : "N/A";
-
-        // ROI Ratios
-        const cpl = totalLeads > 0 ? (marketCost / totalLeads).toFixed(2) : "0.00";
-        const cpa = converted > 0 ? (marketCost / converted).toFixed(2) : "0.00";
-        const revPerLead = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(2) : "0.00";
-
-        // --- RENDER OUTPUT ---
-        document.getElementById('rep-title').innerText = `Leads & Conversion Report: ${stringMonthYear}`;
-        document.getElementById('rep-summary-text').innerHTML = `Marketing Performance & Enrollment ROI Summary`;
-        
-        document.getElementById('rep-table-head').innerHTML = `<tr><th>Metric</th><th>Results</th></tr>`;
-        document.getElementById('rep-table-body').innerHTML = `
-            <tr><td>Total Enquiries & Walk-ins</td><td><b>${totalLeads}</b></td></tr>
-            <tr><td>Total Converted Admissions</td><td style="color:green;"><b>${converted}</b></td></tr>
-            <tr><td>Conversion Percentage</td><td><b>${convPct}%</b></td></tr>
-            <tr><td>Best Selling Course</td><td>${bestCourse}</td></tr>
-            <tr><td>Top Lead Source</td><td>${bestSource}</td></tr>
-            <tr style="background:#f9f9f9;"><td colspan="2" style="text-align:center;"><b>MARKETING ROI</b></td></tr>
-            <tr><td>Cost Per Lead (CPL)</td><td>₹ ${cpl}</td></tr>
-            <tr><td>Cost Per Acquisition (CPA)</td><td>₹ ${cpa}</td></tr>
-            <tr><td>Revenue Per Lead</td><td style="color:blue;">₹ ${revPerLead}</td></tr>
-            <tr><td>Sales Performance Status</td><td>${getSalesRemarks(parseFloat(convPct))}</td></tr>
-        `;
-
-        document.getElementById('report-output-area').style.display = 'block';
-        document.getElementById('filter_div').style.display = 'none';
-        document.getElementById('chart_div').style.display = 'none';
-        document.getElementById('rep-stats-boxes').innerHTML = "";
-
-    } catch (err) {
-        alert("Report Error: " + err.message);
-    }
-}
 
     </script>
 <script>
