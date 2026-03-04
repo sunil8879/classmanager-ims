@@ -719,14 +719,21 @@ async function bookThisSlot(day, time) {
     }
 
     // --- 2. VALIDATION: DAILY BOOKING LIMIT (MAX 3) ---
-   const { count: bCount } = await db.from('class_bookings')
+// Strict Cleanup of inputs to ensure exact match
+    const rollClean = roll.trim().toUpperCase();
+    
+    // 2. VALIDATION: DAILY BOOKING LIMIT (STRICT COUNT)
+    const { count, error } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
-        .eq('student_roll', roll)
-        .eq('booking_date', dateVal);
+        .eq('student_roll', rollClean)
+        .eq('booking_date', dateVal)
+        .eq('institute_id', sessionInstID);
 
-    if (Number(bCount) >= 3) {
-        alert("🛑 ACCESS DENIED: You have already booked 3 sessions for this day.");
-        return; // Stops the process
+    console.log("Current Count for " + rollClean + ":", count); // This will show in Console (F12)
+
+    if (count !== null && count >= 3) {
+        alert("🛑 ACCESS DENIED: You have already reached the daily limit of 3 classes for " + dateVal);
+        return; // This PREVENTS the WhatsApp from even opening
     }
 
     // --- 3. VALIDATION: CANCELLATION MISCHIEF CHECK (TODAY ONLY) ---
@@ -775,10 +782,11 @@ async function bookThisSlot(day, time) {
     }
 
     // --- 7. FINAL DATABASE INSERT ---
+ // Final Database Insert using the cleaned roll number
     const { error: insertError } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
-        student_roll: roll,
+        student_roll: roll.trim().toUpperCase(), // CLEANED HERE
         booking_date: dateVal,
         time_slot: time,
         course: currentBatch
