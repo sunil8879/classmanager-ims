@@ -735,6 +735,21 @@ async function bookThisSlot(day, time) {
         return; // This line is what STOPS the WhatsApp from opening
     }
 
+
+
+// --- NEW VALIDATION: NO DUPLICATE SUBJECTS PER DAY ---
+    const { data: sameSubjectCheck } = await db.from('class_bookings')
+        .select('id')
+        .eq('student_roll', rollClean)
+        .eq('booking_date', dateVal)
+        .eq('course', currentBatch)
+        .eq('institute_id', sessionInstID);
+
+    if (sameSubjectCheck && sameSubjectCheck.length > 0) {
+        alert("🛑 ACCESS DENIED: You are already enrolled in a '" + currentBatch + "' session today. You cannot attend the same subject twice on the same day.");
+        return;
+    }
+
     // --- 3. VALIDATION: CANCELLATION MISCHIEF CHECK (TODAY ONLY) ---
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0); 
