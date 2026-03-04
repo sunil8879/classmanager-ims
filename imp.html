@@ -3446,28 +3446,38 @@ async function generateUPIQR() {
    5. BATCH MANAGEMENT
    ========================================== */
 async function addBatch() {
+    const tid = document.getElementById('batch-teacher-id').value;
+    const bname = document.getElementById('batch-name').value.trim().toUpperCase();
 
-const bCheck = document.getElementById('batch-name').value.trim().toUpperCase(); const tCheck = document.getElementById('batch-teacher-id').value; if ((await db.from('batches').select('id').eq('institute_id', sessionInstID).eq('teacher_id', tCheck).eq('batch_name', bCheck).maybeSingle()).data) return alert("THE BATCH IS ALREADY CREATED");
+    // 1. DUAL VALIDATION CHECK (INSTITUTE + TEACHER + BATCH NAME)
+    const { data: existingBatches } = await db.from('batches')
+        .select('id')
+        .eq('institute_id', sessionInstID)
+        .eq('teacher_id', tid)
+        .eq('batch_name', bname);
 
-if (document.getElementById('batch-slots-display').innerText.includes("No slots found")) return alert("🛑 ERROR: Teacher-Subject Mismatch! This teacher is not registered to teach " + document.getElementById('batch-subject').value);
-    const batchName = document.getElementById('batch-name').value;
+    if (existingBatches && existingBatches.length > 0) {
+        return alert("THE BATCH IS ALREADY CREATED");
+    }
+
+    // 2. REMAINING VALIDATIONS
+    if (document.getElementById('batch-slots-display').innerText.includes("No slots found")) {
+        return alert("🛑 ERROR: Teacher-Subject Mismatch!");
+    }
+    if (!bname || !tid) {
+        return alert("Please enter Batch Name and Select a Teacher.");
+    }
+
+    // 3. PROCEED TO INSERT
     const displaySlots = document.getElementById('batch-slots-display').innerText;
     const subject = document.getElementById('batch-subject').value;
 
-
-
-    // Validation
-    if (!batchName || !subject) return alert("Please enter Batch Name and Subject.");
-    if (displaySlots.includes("Select") || displaySlots.includes("No slots") || displaySlots.includes("UNAVAILABLE")) {
-        return alert("Error: Cannot create batch. No valid timings found for this teacher/subject.");
-    }
-
     const batchData = {
         institute_id: sessionInstID,
-        batch_name: batchName,
-        teacher_id: document.getElementById('batch-teacher-id').value,
+        batch_name: bname,
+        teacher_id: tid,
         teacher_name: document.getElementById('batch-teacher-name').value,
-        batch_time: displaySlots, // Automatically takes the string we just displayed
+        batch_time: displaySlots,
         subject_name: subject,
         students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
         remarks: document.getElementById('batch-remarks').value
@@ -3478,8 +3488,7 @@ if (document.getElementById('batch-slots-display').innerText.includes("No slots 
     if (error) {
         alert("Error: " + error.message);
     } else {
-        alert("SUCCESS: Batch '" + batchName + "' created for " + subject + " at " + displaySlots);
-        // Clear form
+        alert("SUCCESS: Batch '" + bname + "' created.");
         document.getElementById('batch-name').value = "";
         handleBatchTeacherChange(); // Reset display
     }
