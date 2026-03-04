@@ -1,0 +1,499 @@
+-- ==========================================
+-- 1. EXTENSIONS & SETUP
+-- ==========================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ==========================================
+-- 2. CORE FUNCTIONS
+-- ==========================================
+
+-- Helper: Get current user's Institute ID
+CREATE OR REPLACE FUNCTION public.get_my_institute_id() 
+RETURNS text AS $$
+  SELECT institute_id FROM public.profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- Helper: Get current user's Role
+CREATE OR REPLACE FUNCTION public.get_my_role() 
+RETURNS text AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- Logic: Auto-sync payments from Student UI to Payment History
+CREATE OR REPLACE FUNCTION public.auto_sync_payment() 
+RETURNS trigger AS $$
+BEGIN
+    IF (TG_OP = 'INSERT' AND NEW.paid_amount > 0) OR 
+       (TG_OP = 'UPDATE' AND NEW.paid_amount <> OLD.paid_amount) THEN
+       DECLARE
+           new_cash DECIMAL := CASE 
+               WHEN TG_OP = 'INSERT' THEN NEW.paid_amount 
+               ELSE NEW.paid_amount - OLD.paid_amount 
+           END;
+       BEGIN
+           IF new_cash > 0 THEN
+               INSERT INTO payment_history (institute_id, student_id, roll_number, amount, payment_date, month_year)
+               VALUES (NEW.institute_id, NEW.id, NEW.roll_number, new_cash, CURRENT_DATE, trim(to_char(CURRENT_DATE, 'FMMonth YYYY')));
+           END IF;
+       END;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ==========================================
+-- 3. CORE IDENTITY TABLES
+-- ==========================================
+
+CREATE TABLE public.profiles (
+    id uuid REFERENCES auth.users ON DELETE CASCADE NOT NULL PRIMARY KEY,
+    full_name text,
+    email text,
+    role text, -- 'Owner', 'Teacher', 'Student'
+    mobile_number text,
+    address text,
+    state text,
+    institute_id text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.institute_settings (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text UNIQUE,
+    institute_name text DEFAULT 'My Coaching Institute',
+    branch_name text DEFAULT 'Main Branch',
+    authorised_signatory text DEFAULT 'Director',
+    created_at timestamptz DEFAULT now()
+);
+
+-- ==========================================
+-- 4. STUDENT & TEACHER MASTER TABLES
+-- ==========================================
+
+CREATE TABLE public.students (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text NOT NULL,
+    roll_number text UNIQUE NOT NULL,
+    full_name text,
+    email text,
+    mobile text UNIQUE,
+    father_mobile text,
+    mother_mobile text,
+    standard text,
+    batch_time time,
+    course text,
+    admission_date date DEFAULT CURRENT_DATE,
+    course_end_date date,
+    total_fees numeric DEFAULT 0,
+    paid_amount numeric DEFAULT 0,
+    pending_amount numeric DEFAULT 0,
+    due_dates text,
+    status text DEFAULT 'Active',
+    user_id uuid REFERENCES auth.users(id)
+);
+
+CREATE TABLE public.student_details (
+    student_id bigint REFERENCES public.students(id) ON DELETE CASCADE PRIMARY KEY,
+    roll_number text UNIQUE,
+    institute_id text,
+    age integer,
+    gender text CHECK (gender IN ('Male', 'Female', 'Other')),
+    residence text,
+    course_duration text,
+    course_end_date date,
+    fee_due_date date,
+    remarks text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.teacher_details (
+    id text PRIMARY KEY, -- TCH-XXXX
+    institute_id text NOT NULL,
+    teacher_name text,
+    email text UNIQUE NOT NULL,
+    mobile text,
+    age integer,
+    gender text,
+    joining_date date,
+    qualification text,
+    subject_taught text,
+    salary_offered numeric DEFAULT 0,
+    experience text,
+    rating numeric DEFAULT 5,
+    status text DEFAULT 'Active',
+    availability text DEFAULT 'No',
+    time_of_slot text DEFAULT ''
+);
+
+-- ==========================================
+-- 5. ACADEMIC & LOGISTICS TABLES
+-- ==========================================
+
+CREATE TABLE public.batches (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text NOT NULL,
+    batch_name text,
+    teacher_id text REFERENCES public.teacher_details(id),
+    teacher_name text,
+    batch_time time,
+    subject_name text,
+    students_allotted integer DEFAULT 0,
+    remarks text
+);
+
+CREATE TABLE public.attendance (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text NOT NULL,
+    student_id bigint REFERENCES public.students(id),
+    roll_number text,
+    attendance_date date NOT NULL,
+    status text CHECK (status IN ('Present', 'Absent')),
+    month_year text,
+    user_id uuid,
+    remarks text
+);
+
+CREATE TABLE public.exam (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    roll_number text NOT NULL,
+    full_name text,
+    course_name text,
+    exam_date date NOT NULL,
+    total_marks numeric,
+    marks_obtained numeric,
+    percentage numeric,
+    result text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.performance_tracking (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text NOT NULL,
+    student_id bigint REFERENCES public.students(id) ON DELETE CASCADE,
+    roll_number text,
+    total_marks_secured numeric DEFAULT 0,
+    total_exams integer DEFAULT 0,
+    teacher_name text,
+    updated_at timestamptz DEFAULT now(),
+    UNIQUE(roll_number, institute_id)
+);
+
+CREATE TABLE public.class_bookings (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    teacher_id text NOT NULL,
+    student_roll text NOT NULL,
+    booking_date date NOT NULL,
+    time_slot text NOT NULL,
+    course text,
+    status text DEFAULT 'pending',
+    created_at timestamptz DEFAULT now()
+);
+
+
+
+-- ==========================================
+-- ADD THIS TO SECTION 5 (LOGISTICS)
+-- ==========================================
+
+CREATE TABLE public.class_cancellations (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at timestamptz DEFAULT now(),
+    student_roll text NOT NULL,
+    cancelled_by text,
+    institute_id text NOT NULL
+);
+
+-- Enable RLS for this new table
+ALTER TABLE public.class_cancellations ENABLE ROW LEVEL SECURITY;
+
+-- Apply the Institute Isolation Policy
+CREATE POLICY "Institute Isolation" ON public.class_cancellations FOR ALL TO authenticated 
+USING (institute_id = (SELECT institute_id FROM profiles WHERE id = auth.uid()));
+
+CREATE TABLE public.student_allocations (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    teacher_id text NOT NULL,
+    teacher_name text,
+    roll_number text NOT NULL,
+    student_name text,
+    subject text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_cancellations_roll ON public.class_cancellations(student_roll, institute_id);
+-- ==========================================
+-- 6. FINANCIAL TABLES
+-- ==========================================
+
+CREATE TABLE public.payment_history (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text NOT NULL,
+    student_id bigint REFERENCES public.students(id) ON DELETE CASCADE,
+    roll_number text,
+    amount numeric NOT NULL,
+    payment_date date DEFAULT CURRENT_DATE,
+    month_year text,
+    status text DEFAULT 'Active',
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.expenses (
+    institute_id text NOT NULL,
+    month_year text NOT NULL,
+    rent numeric DEFAULT 0,
+    electricity numeric DEFAULT 0,
+    maintenance numeric DEFAULT 0,
+    teacher_salary numeric DEFAULT 0,
+    admin_salary numeric DEFAULT 0,
+    marketing numeric DEFAULT 0,
+    other_exp numeric DEFAULT 0,
+    total_expenses numeric DEFAULT 0,
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (institute_id, month_year)
+);
+
+CREATE TABLE public.teacher_payments (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    teacher_id text REFERENCES public.teacher_details(id) ON DELETE CASCADE,
+    full_name text NOT NULL,
+    amount_paid numeric(10,2) DEFAULT 0,
+    pending_amount numeric(10,2) DEFAULT 0,
+    payment_date date DEFAULT CURRENT_DATE,
+    month_year text NOT NULL,
+    subject_taught text,
+    created_at timestamptz DEFAULT now()
+);
+
+-- ==========================================
+-- 7. INVENTORY MANAGEMENT TABLES
+-- ==========================================
+
+CREATE TABLE public.inventory_master (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    item_name text NOT NULL,
+    current_stock integer DEFAULT 0,
+    item_price numeric(10,2) DEFAULT 0,
+    UNIQUE(institute_id, item_name)
+);
+
+CREATE TABLE public.inventory_sales (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    student_roll text NOT NULL,
+    student_name text,
+    items_bought text,
+    total_paid numeric(10,2) DEFAULT 0,
+    month_year text,
+    remarks text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.inventory_tracker (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    item_name text NOT NULL,
+    current_stock_level integer DEFAULT 0,
+    items_sold integer DEFAULT 0,
+    total_income numeric(10,2) DEFAULT 0,
+    created_at timestamptz DEFAULT now()
+);
+
+-- ==========================================
+-- 8. EXTRA UTILITY TABLES
+-- ==========================================
+
+CREATE TABLE public.leads (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text,
+    full_name text NOT NULL,
+    contact text NOT NULL,
+    email text,
+    interested_course text,
+    status text DEFAULT 'Follow up' CHECK (status IN ('Follow up', 'Converted', 'Not interested')),
+    remarks text,
+    date_of_visit date DEFAULT CURRENT_DATE
+);
+
+CREATE TABLE public.messages (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    sender_name text,
+    sender_role text,
+    message_type text, -- 'Student', 'Teacher', 'General'
+    target_subject text,
+    content text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.institute_calendar (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text,
+    event_date date,
+    event_name text,
+    event_type text, -- 'Holiday', 'Exam', 'Event'
+    description text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.alumni_tracker (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    roll_number text NOT NULL,
+    full_name text,
+    company_name text,
+    designation text,
+    salary numeric DEFAULT 0,
+    created_at timestamptz DEFAULT now(),
+    UNIQUE(roll_number, institute_id)
+);
+
+CREATE TABLE public.scholarships (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    roll_number text NOT NULL,
+    student_name text,
+    scholarship_name text,
+    scholarship_pct numeric DEFAULT 0,
+    status text DEFAULT 'Pending',
+    document_url text,
+    created_at timestamptz DEFAULT now(),
+    UNIQUE(institute_id, roll_number)
+);
+
+CREATE TABLE public.certificates (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    institute_id text,
+    student_id bigint REFERENCES public.students(id),
+    cert_number text UNIQUE NOT NULL,
+    issued_date date DEFAULT CURRENT_DATE
+);
+
+CREATE TABLE public.ptm_schedule (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    month_year text NOT NULL,
+    ptm_date date NOT NULL,
+    teacher_id text NOT NULL,
+    teacher_name text,
+    roll_number text NOT NULL,
+    student_name text,
+    slot_time time NOT NULL,
+    status text DEFAULT 'Open',
+    UNIQUE(institute_id, roll_number, month_year),
+    UNIQUE(institute_id, teacher_id, ptm_date, slot_time)
+);
+
+CREATE TABLE public.list ( -- Batch Master List
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    date_today date,
+    roll_number text NOT NULL,
+    student_name text,
+    batch_name text,
+    teacher_name text,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.teachers_attendance (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    institute_id text NOT NULL,
+    teacher_id text NOT NULL,
+    full_name text,
+    attendance_date date NOT NULL,
+    status text NOT NULL,
+    month_year text,
+    created_at timestamptz DEFAULT now()
+);
+
+-- ==========================================
+-- 9. TRIGGERS & INDEXES
+-- ==========================================
+CREATE TRIGGER sync_payment_on_update
+AFTER INSERT OR UPDATE ON public.students
+FOR EACH ROW EXECUTE FUNCTION auto_sync_payment();
+
+CREATE INDEX idx_students_inst ON public.students(institute_id);
+CREATE INDEX idx_payments_inst ON public.payment_history(institute_id);
+CREATE UNIQUE INDEX unique_student_slot ON public.class_bookings(institute_id, teacher_id, booking_date, time_slot, student_roll);
+
+-- ==========================================
+-- 10. SECURITY (RLS)
+-- ==========================================
+
+-- Enable RLS on all tables
+DO $$ 
+DECLARE 
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') 
+    LOOP
+        EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' ENABLE ROW LEVEL SECURITY;';
+    END LOOP;
+END $$;
+
+-- Example of Universal Institute Isolation Policy
+-- Apply this Logic to ALL tables using 'institute_id'
+CREATE POLICY "Institute Isolation" ON public.students FOR ALL TO authenticated 
+USING (institute_id = (SELECT institute_id FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Institute Isolation" ON public.payment_history FOR ALL TO authenticated 
+USING (institute_id = (SELECT institute_id FROM profiles WHERE id = auth.uid()));
+
+-- Profiles specific
+CREATE POLICY "Allow individual select" ON public.profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Manage own profile" ON public.profiles FOR ALL TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Allow signup inserts" ON public.profiles FOR INSERT WITH CHECK (true);
+
+
+-- ========================================================
+-- 1. CREATE THE LEAVE MANAGEMENT TABLE
+-- ========================================================
+CREATE TABLE public.leave_management (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    institute_id text NOT NULL,
+    date_today date,
+    teacher_id text,
+    teacher_name text,
+    course text,
+    no_of_days numeric,
+    start_date date,
+    end_date date,
+    status text,
+    remarks text,
+    created_at timestamp with time zone NULL DEFAULT now(),
+    CONSTRAINT leave_management_pkey PRIMARY KEY (id)
+);
+
+-- ========================================================
+-- 2. ENABLE ROW LEVEL SECURITY (RLS)
+-- ========================================================
+ALTER TABLE public.leave_management ENABLE ROW LEVEL SECURITY;
+
+-- ========================================================
+-- 3. CREATE RLS POLICIES FOR MULTI-TENANCY (By Institute ID)
+-- ========================================================
+
+-- Allow users to VIEW records only for their own institute
+CREATE POLICY "View leaves for own institute" 
+ON public.leave_management FOR SELECT 
+USING (institute_id = (SELECT institute_id FROM public.profiles WHERE id = auth.uid()));
+
+-- Allow users to INSERT records only for their own institute
+CREATE POLICY "Insert leaves for own institute" 
+ON public.leave_management FOR INSERT 
+WITH CHECK (institute_id = (SELECT institute_id FROM public.profiles WHERE id = auth.uid()));
+
+-- Allow users to UPDATE records only for their own institute
+CREATE POLICY "Update leaves for own institute" 
+ON public.leave_management FOR UPDATE 
+USING (institute_id = (SELECT institute_id FROM public.profiles WHERE id = auth.uid()));
+
+-- Allow users to DELETE records only for their own institute
+CREATE POLICY "Delete leaves for own institute" 
+ON public.leave_management FOR DELETE 
+USING (institute_id = (SELECT institute_id FROM public.profiles WHERE id = auth.uid()));
