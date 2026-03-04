@@ -3636,19 +3636,19 @@ async function fetchBatch() {
 // NEW: UPDATE BATCH FUNCTION
 async function updateBatch() {
     const batchName = document.getElementById('batch-name').value.trim();
-    if (!batchName) return alert("Please fetch a Batch first using FETCH (by Name).");
+    if (!batchName) return alert("Please fetch a Batch first using FETCH.");
 
-    // Gather updated data from UI
+    // Prepare updated data from UI
     const batchData = {
         teacher_id: document.getElementById('batch-teacher-id').value,
         teacher_name: document.getElementById('batch-teacher-name').value,
-        batch_time: document.getElementById('batch-time').value,
+        batch_time: document.getElementById('batch-slots-display').innerText, // Read from display div
         subject_name: document.getElementById('batch-subject').value,
-        students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
+        students_allotted: parseInt(document.getElementById('batch-students').value) || 0, // THIS FIELD
         remarks: document.getElementById('batch-remarks').value
     };
 
-    // Update the database matching the Batch Name and Institute ID
+    // Update database matching the Batch Name and Institute ID
     const { error } = await db.from('batches')
         .update(batchData)
         .eq('batch_name', batchName)
@@ -3657,10 +3657,9 @@ async function updateBatch() {
     if (error) {
         alert("Update Error: " + error.message);
     } else {
-        alert("Success! Batch '" + batchName + "' has been updated.");
+        alert("Success! Batch details and capacity for '" + batchName + "' have been updated.");
     }
 }
-
 
 async function fetchBatchByTeacher() {
     const tid = prompt("Enter Teacher ID (TCH-XXXX) to view their batches:");
