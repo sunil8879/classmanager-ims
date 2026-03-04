@@ -493,8 +493,9 @@ async function checkMischiefHistory(studentRoll) {
 async function loadAssignmentSummary() {
     const tbody = document.getElementById('session-table-body');
     const userNameUpper = currentUserProfile.full_name.toUpperCase();
+    const targetDate = document.getElementById('f-date').value; // Tomorrow's Date
 
-    // 1. Fetch user assignments from 'list'
+    // 1. Fetch user assignments (who this student is allowed to study with)
     let query = db.from('list').select('*').eq('institute_id', sessionInstID);
     if (currentUserProfile.role === 'Student') {
         query = query.eq('student_name', userNameUpper);
@@ -503,13 +504,16 @@ async function loadAssignmentSummary() {
     }
     const { data: listData } = await query;
 
-    // 2. Fetch Batch Metadata (Capacity & Official Timings)
+    // 2. Fetch Batch Capacity from 'batches'
     const { data: batchData } = await db.from('batches')
-        .select('teacher_id, batch_name, batch_time, subject_name, students_allotted')
+        .select('teacher_id, batch_name, subject_name, students_allotted')
         .eq('institute_id', sessionInstID);
 
-    // 3. Fetch current filling from 'list' to calculate balance globally
-    const { data: allAssignments } = await db.from('list').select('batch_name').eq('institute_id', sessionInstID);
+    // 3. CRITICAL: Fetch ALL bookings for "Tomorrow" to calculate Balance
+    const { data: currentBookings } = await db.from('class_bookings')
+        .select('course, time_slot')
+        .eq('booking_date', targetDate)
+        .eq('institute_id', sessionInstID);
 
     tbody.innerHTML = "";
     if (!listData || listData.length === 0) {
@@ -518,7 +522,6 @@ async function loadAssignmentSummary() {
     }
 
     listData.forEach((item, index) => {
-        // Find matching batch metadata
         const bRow = batchData?.find(b => 
             b.teacher_id === item.teacher_id && 
             (b.subject_name.toUpperCase() === item.batch_name.toUpperCase() || 
@@ -526,13 +529,14 @@ async function loadAssignmentSummary() {
         );
 
         const totalAllotted = bRow ? bRow.students_allotted : 0;
-        const rawTime = bRow ? bRow.batch_time : "";
         
-        // Calculate Balance: Total Allotted - Count of students currently in this specific batch name
-        const currentlyFilled = allAssignments?.filter(a => a.batch_name === item.batch_name).length || 0;
-        const balanceSeats = totalAllotted - currentlyFilled;
+        // CALCULATE BALANCE: Total Seats - Bookings for this Batch for Tomorrow
+        // We filter bookings where the 'course' matches the 'batch_name'
+        const bookedCount = currentBookings?.filter(b => b.course === item.batch_name).length || 0;
+        const balanceSeats = totalAllotted - bookedCount;
 
         const selectId = "time-select-" + index;
+        const rawTime = bRow ? bRow.batch_time : "";
         const timeOptions = rawTime.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('');
 
         tbody.innerHTML += `
@@ -542,12 +546,11 @@ async function loadAssignmentSummary() {
                 <td>${item.teacher_name}</td>
                 <td>${item.teacher_id}</td>
                 <td>${item.course_name}</td>
-                <td style="font-weight:bold;">${item.batch_name}</td> <!-- Brackets removed -->
+                <td style="font-weight:bold;">${item.batch_name}</td>
                 <td style="color: blue; font-weight:800;">${totalAllotted}</td>
-                <td style="color: ${balanceSeats <= 2 ? 'red' : 'green'}; font-weight:800;">${balanceSeats}</td>
+                <td style="color: ${balanceSeats <= 0 ? 'red' : 'green'}; font-weight:800;">${balanceSeats}</td>
                 <td>
-                    <!-- Rectangular Styled Dropdown -->
-                    <select id="${selectId}" style="width: 100%; height: 40px; border: 2px solid #000; border-radius: 4px; padding: 5px; font-weight: bold; background: #fff8e1;">
+                    <select id="${selectId}" style="width: 100%; height: 40px; border: 2px solid #000; border-radius: 4px; font-weight: bold; background: #fff8e1;">
                         ${timeOptions}
                     </select>
                 </td>
@@ -687,35 +690,29 @@ const totalCap = document.getElementById('f-capacity').value || 10;
 }
    
 async function bookThisSlot(day, time) {
-    // 1. GET ALL NECESSARY DATA FROM THE UI
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
     const officialTime = document.getElementById('f-official-slots').value;
     const currentBatch = document.getElementById('f-course').value; 
     const tid = document.getElementById('f-teacher-id').value;
-    const tname = document.getElementById('f-teacher-name').value;
     const maxAllowed = parseInt(document.getElementById('f-capacity').value || 10);
 
-    if (!roll) {
-        alert("Please select an assignment from the summary table first.");
-        return;
-    }
+    if (!roll) return alert("Please select a student from the summary table first.");
 
-    // --- NEW VALIDATION 1: DAILY BOOKING LIMIT (MAX 3) ---
-    const { count: bCount } = await db.from('class_bookings')
+    // --- 1. VALIDATION: DAILY BOOKING LIMIT (STRICT COUNT) ---
+    const { count: bCount, error: countErr } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
         .eq('student_roll', roll)
         .eq('booking_date', dateVal);
 
     if (bCount >= 3) {
-        alert("🛑 ERROR: You cannot book more than 3 sessions on a given day.");
+        alert("🛑 ERROR: You have already booked 3 sessions for " + dateVal + ". You cannot book more.");
         return;
     }
 
-    // --- NEW VALIDATION 2: CANCELLATION MISCHIEF CHECK (TODAY ONLY) ---
+    // --- 2. VALIDATION: CANCELLATION MISCHIEF ---
     const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0); // Get timestamp for the start of today
-
+    startOfToday.setHours(0, 0, 0, 0);
     const { data: cancelData } = await db.from('class_cancellations')
         .select('created_at')
         .eq('student_roll', roll)
@@ -723,59 +720,32 @@ async function bookThisSlot(day, time) {
         .gte('created_at', startOfToday.toISOString());
 
     const todayCancelsCount = cancelData ? cancelData.length : 0;
-
     if (todayCancelsCount >= 4) {
-        alert("🛑 ACCESS BLOCKED: You have reached the daily cancellation limit. Booking is suspended for today.");
+        alert("🛑 ACCESS BLOCKED: Daily cancellation limit reached.");
         return;
-    } else if (todayCancelsCount === 3) {
-        alert("⚠️ WARNING: You have already cancelled 3 slots today. One more cancellation will result in a block.");
-        // We let them continue to WhatsApp/Booking, but they are warned.
     }
 
-    // 4. VALIDATION: BATCH CAPACITY
-    const { count: currentSize } = await db.from('class_bookings')
+    // --- 3. VALIDATION: BATCH CAPACITY ---
+    const { count: currentBatchSize } = await db.from('class_bookings')
         .select('*', { count: 'exact', head: true })
         .eq('teacher_id', tid)
         .eq('booking_date', dateVal)
         .eq('time_slot', time);
 
-    if (currentSize >= maxAllowed) {
-        return alert("🛑 BATCH FULL: This batch is limited to " + maxAllowed + " students only.");
-    }
-
-    // 5. VALIDATION: BATCH NAME MATCHING
-    const { data: existingBatch } = await db.from('class_bookings')
-        .select('course')
-        .eq('teacher_id', tid)
-        .eq('booking_date', dateVal)
-        .eq('time_slot', time)
-        .limit(1);
-
-    if (existingBatch && existingBatch.length > 0) {
-        const batchInProgress = existingBatch[0].course;
-        if (batchInProgress !== currentBatch) {
-            alert(`❌ BATCH CONFLICT: This slot is reserved for "${batchInProgress}". You are in "${currentBatch}" and cannot join.`);
-            return;
-        }
-    }
-
-    // 6. VALIDATION: OFFICIAL BATCH TIME SCHEDULE
-    if (!officialTime.includes(time)) {
-        alert("❌ DENIED: This time is not within the official batch schedule.");
+    if (currentBatchSize >= maxAllowed) {
+        alert("🛑 BATCH FULL: No more seats available in this time slot.");
         return;
     }
 
-    // 7. WHATSAPP CONFIRMATION FLOW (STRICTLY PRESERVED)
+    // --- 4. WHATSAPP & INSERT ---
     const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', tid).single();
     if (tData && tData.mobile) {
-        const msg = "Booking Request: Batch " + currentBatch + " (Roll: " + roll + ") on " + dateVal + " at " + time;
+        const msg = "Booking Request: " + currentBatch + " (Roll: " + roll + ") on " + dateVal + " at " + time;
         window.open("https://wa.me/91" + tData.mobile + "?text=" + encodeURIComponent(msg), "_blank");
-        
-        const confirmSave = confirm("WhatsApp opened. Did you send the message? Click OK to save your booking.");
+        const confirmSave = confirm("Did you send the WhatsApp? Click OK to confirm booking.");
         if (!confirmSave) return;
     }
 
-    // 8. FINAL DATABASE INSERT
     const { error: insertError } = await db.from("class_bookings").insert({
         institute_id: sessionInstID,
         teacher_id: tid,
@@ -788,8 +758,12 @@ async function bookThisSlot(day, time) {
     if (insertError) {
         alert("Database Error: " + insertError.message);
     } else {
-        document.getElementById('confirmation-text').innerText = "Success! Booked for " + currentBatch + " at " + time;
-        document.getElementById('confirm-modal').style.display = 'flex';
+        alert("Success! Slot Booked.");
+        
+        // REFRESH THE SUMMARY TABLE (To update Balance Seats)
+        await loadAssignmentSummary();
+        
+        // REFRESH THE GRID
         generateTimeTable(); 
     }
 }
