@@ -9698,50 +9698,61 @@ function getSalesRemarks(pct) {
 
 // 2. Main Leads Engine
 async function generateLeadsReport() {
-    const monthVal = document.getElementById('rep-leads-month').value;
+    const monthVal = document.getElementById('rep-leads-month').value; // e.g. "2026-03"
     if (!monthVal) return alert("Please select a month.");
 
     const dateObj = new Date(monthVal + "-01");
     const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     try {
-        // A. FETCH LEADS for selected month
-        const { data: leads } = await db.from('leads').select('*').eq('institute_id', sessionInstID);
-        // Filter by date_of_visit (YYYY-MM)
-        const monthLeads = leads ? leads.filter(l => l.date_of_visit && l.date_of_visit.startsWith(monthVal)) : [];
+        // 1. FETCH ALL LEADS FOR THIS INSTITUTE
+        const { data: allLeads, error: leadErr } = await db.from('leads')
+            .select('*')
+            .eq('institute_id', sessionInstID);
 
-        // B. FETCH MARKETING COST
+        if (leadErr) throw leadErr;
+
+        // 2. ROBUST FILTERING (Handles various date formats)
+        // We look for any lead where the date string contains our YYYY-MM
+        const monthLeads = allLeads ? allLeads.filter(l => {
+            if (!l.date_of_visit) return false;
+            return l.date_of_visit.includes(monthVal); 
+        }) : [];
+
+        // 3. FETCH MARKETING COST
         const { data: exp } = await db.from('expenses').select('marketing').eq('month_year', monthVal).eq('institute_id', sessionInstID).maybeSingle();
         const marketCost = exp ? parseFloat(exp.marketing || 0) : 0;
 
-        // C. FETCH REVENUE (Fees + Inventory)
+        // 4. FETCH REVENUE
         const { data: fees } = await db.from('payment_history').select('amount').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
         const { data: inv } = await db.from('inventory_sales').select('total_paid').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
         const totalRevenue = (fees?.reduce((s, f) => s + parseFloat(f.amount), 0) || 0) + (inv?.reduce((s, i) => s + parseFloat(i.total_paid), 0) || 0);
 
-        // --- DATA AGGREGATION ---
+        // 5. CALCULATIONS (Using toUpperCase for status safety)
         const totalLeads = monthLeads.length;
-        const converted = monthLeads.filter(l => l.status === 'Converted').length;
+        const converted = monthLeads.filter(l => l.status && l.status.toUpperCase() === 'CONVERTED').length;
         const convPct = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(1) : 0;
 
-        // Find Best Selling Course & Source
+        // Best Selling Logic
         const courseMap = {}; const sourceMap = {};
         monthLeads.forEach(l => {
-            courseMap[l.interested_course] = (courseMap[l.interested_course] || 0) + 1;
-            sourceMap[l.reference] = (sourceMap[l.reference] || 0) + 1;
+            const c = (l.interested_course || "Unknown").toUpperCase();
+            const s = (l.reference || "Unknown").toUpperCase();
+            courseMap[c] = (courseMap[c] || 0) + 1;
+            sourceMap[s] = (sourceMap[s] || 0) + 1;
         });
 
-        const bestCourse = Object.keys(courseMap).reduce((a, b) => courseMap[a] > courseMap[b] ? a : b, "N/A");
-        const bestSource = Object.keys(sourceMap).reduce((a, b) => sourceMap[a] > sourceMap[b] ? a : b, "N/A");
+        const bestCourse = Object.keys(courseMap).length > 0 ? Object.keys(courseMap).reduce((a, b) => courseMap[a] > courseMap[b] ? a : b) : "N/A";
+        const bestSource = Object.keys(sourceMap).length > 0 ? Object.keys(sourceMap).reduce((a, b) => sourceMap[a] > sourceMap[b] ? a : b) : "N/A";
 
         // Financial Ratios
-        const cpl = totalLeads > 0 ? (marketCost / totalLeads).toFixed(2) : 0;
-        const cpa = converted > 0 ? (marketCost / converted).toFixed(2) : 0;
-        const revPerLead = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(2) : 0;
+        const cpl = totalLeads > 0 ? (marketCost / totalLeads).toFixed(2) : "0.00";
+        const cpa = converted > 0 ? (marketCost / converted).toFixed(2) : "0.00";
+        const revPerLead = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(2) : "0.00";
 
-        // --- RENDER OUTPUT ---
+        // 6. RENDER OUTPUT
         document.getElementById('rep-title').innerText = `Leads & Conversion Report: ${monthYearStr}`;
-        document.getElementById('rep-summary-text').innerHTML = `Marketing Performance & Enrollment ROI Summary`;
+        document.getElementById('rep-summary-text').innerHTML = `<b>Lead Data Found:</b> ${totalLeads} | <b>Institute:</b> ${sessionInstID}`;
         
         document.getElementById('rep-table-head').innerHTML = `<tr><th>Metric</th><th>Results</th></tr>`;
         document.getElementById('rep-table-body').innerHTML = `
@@ -9750,7 +9761,7 @@ async function generateLeadsReport() {
             <tr><td>Conversion Percentage</td><td><b>${convPct}%</b></td></tr>
             <tr><td>Best Selling Course</td><td>${bestCourse}</td></tr>
             <tr><td>Top Lead Source</td><td>${bestSource}</td></tr>
-            <tr style="background:#f9f9f9;"><td><b>Marketing ROI</b></td><td></td></tr>
+            <tr style="background:#f9f9f9;"><td colspan="2"><b>MARKETING ROI</b></td></tr>
             <tr><td>Cost Per Lead (CPL)</td><td>₹ ${cpl}</td></tr>
             <tr><td>Cost Per Acquisition (CPA)</td><td>₹ ${cpa}</td></tr>
             <tr><td>Revenue Per Lead</td><td style="color:blue;">₹ ${revPerLead}</td></tr>
@@ -9766,8 +9777,6 @@ async function generateLeadsReport() {
         alert("Error generating report: " + err.message);
     }
 }
-
-
 
 
     </script>
