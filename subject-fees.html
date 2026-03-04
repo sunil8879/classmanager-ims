@@ -155,122 +155,132 @@
     </p>
 
 
-    <script>
-        // --- 1. CONFIGURATION ---
-        const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-        const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-        const db = supabase.createClient(_supabaseUrl, _supabaseKey);
+<script>
+    // --- 1. CONFIGURATION ---
+    const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+    const db = supabase.createClient(_supabaseUrl, _supabaseKey);
 
-        let sessionInstID = "";
+    let sessionInstID = "";
 
-        // --- 2. AUTHENTICATION ---
-        async function checkAuth() {
-            const { data: { user } } = await db.auth.getUser();
-            if (user) {
-                const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
-                if (profile) {
-                    sessionInstID = profile.institute_id;
-                    loadPortalData(); // Initial load
-                }
-            } else {
-                alert("Please log in to access this portal.");
+    // --- 2. AUTHENTICATION ---
+    async function checkAuth() {
+        const { data: { user } } = await db.auth.getUser();
+        if (user) {
+            const { data: profile } = await db.from('profiles').select('institute_id').eq('id', user.id).single();
+            if (profile) {
+                sessionInstID = profile.institute_id;
+                loadPortalData(); // Initial load
             }
+        } else {
+            alert("Please log in to access this portal.");
         }
+    }
 
-        // --- 3. DATA ENGINE ---
-        async function loadPortalData() {
-            const filterText = document.getElementById('month-input').value.trim().toLowerCase();
-            const tbody = document.getElementById('portal-body');
-            const tfoot = document.getElementById('portal-footer');
+    // --- 3. DATA ENGINE ---
+    async function loadPortalData() {
+        const filterText = document.getElementById('month-input').value.trim().toLowerCase();
+        const tbody = document.getElementById('portal-body');
+        const tfoot = document.getElementById('portal-footer');
 
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Calculating Fees...</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Calculating Fees...</td></tr>";
 
-            try {
-                // Fetch ALL active students belonging to this institute
-                const { data: students, error } = await db.from('students')
-                    .select('course, total_fees, paid_amount, pending_amount, admission_date')
-                    .eq('institute_id', sessionInstID)
-                    .eq('status', 'Active');
+        try {
+            // Fetch ALL active students
+            const { data: students, error } = await db.from('students')
+                .select('course, total_fees, paid_amount, pending_amount, admission_date')
+                .eq('institute_id', sessionInstID)
+                .eq('status', 'Active');
 
-                if (error) throw error;
+            if (error) throw error;
 
-                // Grouping Logic
-                const grouped = {};
-                let hasData = false;
+            const grouped = {};
+            let grandF = 0, grandR = 0, grandP = 0;
+            let hasData = false;
 
-                students.forEach(s => {
-                    // Apply Month/Year Filter if provided by user
-                    if (filterText) {
-                        if (!s.admission_date) return; // Skip if no admission date
-                        
-                        const adDate = new Date(s.admission_date);
-                        const monthName = adDate.toLocaleString('default', { month: 'long' }).toLowerCase();
-                        const yearName = adDate.getFullYear().toString();
-                        const formattedMonthYear = `${monthName} ${yearName}`; // e.g., "february 2026"
-                        
-                        // Check if the typed text matches the admission month/year
-                        if (!formattedMonthYear.includes(filterText)) return;
-                    }
+            students.forEach(s => {
+                // 1. Month/Year Filter Logic
+                if (filterText) {
+                    if (!s.admission_date) return;
+                    const adDate = new Date(s.admission_date);
+                    const monthYear = `${adDate.toLocaleString('default', { month: 'long' })} ${adDate.getFullYear()}`.toLowerCase();
+                    if (!monthYear.includes(filterText)) return;
+                }
 
-                    hasData = true;
-                    // Group by Subject Name
-                    const sub = (s.course || "Unassigned").toLowerCase();
-                    
+                hasData = true;
+
+                // 2. Split subjects if they are comma separated (e.g. "Physics, Chemistry")
+                const rawSubjects = s.course ? s.course.split(',') : ["Unassigned"];
+                const subjectList = rawSubjects.map(item => item.trim().toUpperCase()).filter(item => item !== "");
+                const subjectCount = subjectList.length;
+
+                // 3. Divide student fees equally among their subjects to keep dashboard totals accurate
+                const shareFees = (parseFloat(s.total_fees) || 0) / subjectCount;
+                const sharePaid = (parseFloat(s.paid_amount) || 0) / subjectCount;
+                const sharePend = (parseFloat(s.pending_amount) || 0) / subjectCount;
+
+                subjectList.forEach(sub => {
                     if (!grouped[sub]) {
                         grouped[sub] = { fees: 0, paid: 0, pend: 0 };
                     }
-                    grouped[sub].fees += parseFloat(s.total_fees || 0);
-                    grouped[sub].paid += parseFloat(s.paid_amount || 0);
-                    grouped[sub].pend += parseFloat(s.pending_amount || 0);
+                    grouped[sub].fees += shareFees;
+                    grouped[sub].paid += sharePaid;
+                    grouped[sub].pend += sharePend;
+                    
+                    // Update Grand Totals
+                    grandF += shareFees;
+                    grandR += sharePaid;
+                    grandP += sharePend;
                 });
+            });
 
-                // Render Rows
-                tbody.innerHTML = "";
-                let grandF = 0, grandR = 0, grandP = 0;
-
-                if (!hasData) {
-                    tbody.innerHTML = `<tr><td colspan='5' style='text-align:center;'>No records found for the given selection.</td></tr>`;
-                    tfoot.innerHTML = "";
-                    return;
-                }
-
-                for (const sub in grouped) {
-                    const row = grouped[sub];
-                    grandF += row.fees;
-                    grandR += row.paid;
-                    grandP += row.pend;
-
-                    // Generate Dynamic Remarks
-                    let remarks = "Pending Dues";
-                    if (row.pend === 0 && row.fees > 0) remarks = "Fully Paid";
-                    else if (row.fees === 0) remarks = "-";
-
-                    tbody.innerHTML += `
-                        <tr>
-                            <td class="subject-col">${sub}</td>
-                            <td>₹ ${row.fees.toLocaleString('en-IN')}</td>
-                            <td class="text-recd">₹ ${row.paid.toLocaleString('en-IN')}</td>
-                            <td class="text-pend">₹ ${row.pend.toLocaleString('en-IN')}</td>
-                            <td><small style="color:#666; font-style:italic;">${remarks}</small></td>
-                        </tr>
-                    `;
-                }
-
-                // Render Grand Total Footer
-                tfoot.innerHTML = `
-                    <td>TOTAL</td>
-                    <td>₹ ${grandF.toLocaleString('en-IN')}</td>
-                    <td style="color:var(--aquamarine)">₹ ${grandR.toLocaleString('en-IN')}</td>
-                    <td style="color:#ff6b6b">₹ ${grandP.toLocaleString('en-IN')}</td>
-                    <td></td>
-                `;
-
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>Error: ${err.message}</td></tr>`;
+            // 4. Render Table Rows
+            tbody.innerHTML = "";
+            if (!hasData) {
+                tbody.innerHTML = `<tr><td colspan='5' style='text-align:center;'>No records found for the given selection.</td></tr>`;
+                tfoot.innerHTML = "";
+                return;
             }
-        }
 
-        window.onload = checkAuth;
-    </script>
+            // Sort subjects alphabetically
+            const sortedSubjects = Object.keys(grouped).sort();
+
+            sortedSubjects.forEach(sub => {
+                const row = grouped[sub];
+                
+                // Calculate % of total pending for Remarks
+                const percentageOfTotal = grandP > 0 ? ((row.pend / grandP) * 100).toFixed(1) : "0.0";
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="subject-col">${sub}</td>
+                        <td>₹ ${Math.round(row.fees).toLocaleString('en-IN')}</td>
+                        <td class="text-recd">₹ ${Math.round(row.paid).toLocaleString('en-IN')}</td>
+                        <td class="text-pend">₹ ${Math.round(row.pend).toLocaleString('en-IN')}</td>
+                        <td>
+                            <div style="background:#eee; border-radius:4px; padding:2px 8px; display:inline-block; font-size:0.8rem; font-weight:bold; color:#555;">
+                                ${percentageOfTotal}% of total dues
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // 5. Render Grand Total Footer (Matches Dashboard)
+            tfoot.innerHTML = `
+                <td>TOTAL</td>
+                <td>₹ ${Math.round(grandF).toLocaleString('en-IN')}</td>
+                <td style="color:var(--aquamarine)">₹ ${Math.round(grandR).toLocaleString('en-IN')}</td>
+                <td style="color:#ff6b6b">₹ ${Math.round(grandP).toLocaleString('en-IN')}</td>
+                <td><small>100% Total</small></td>
+            `;
+
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan='5' style='color:red;'>Error: ${err.message}</td></tr>`;
+        }
+    }
+
+    window.onload = checkAuth;
+</script>
 </body>
 </html>
