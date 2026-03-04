@@ -440,9 +440,7 @@
     let sessionInstID = "";
     let currentUserProfile = null;
 
-    /**
-     * 2. SESSION INITIALIZATION
-     */
+ 
     async function initSession() {
         const { data: { user } } = await db.auth.getUser();
         if (!user) {
@@ -476,9 +474,7 @@
         loadAssignmentSummary();
     }
 
-    /**
-     * 3. MISCHIEF WARNING LOGIC
-     */
+  
 async function checkMischiefHistory(studentRoll) {
     if (!studentRoll) return;
     const { count } = await db
@@ -493,9 +489,7 @@ async function checkMischiefHistory(studentRoll) {
         warningBox.style.display = 'none';
     }
 }
-    /**
-     * 4. LOAD SUMMARY TABLE (TIDY PRESENTATION)
-     */
+    
 async function loadAssignmentSummary() {
     const tbody = document.getElementById('session-table-body');
     const userNameUpper = currentUserProfile.full_name.toUpperCase();
@@ -590,9 +584,7 @@ async function syncSelection(roll, sname, bname, tid, tname, allSlots, selectId,
     
     alert("Selection synced for " + sname + ". Now click 'Generate Booking Grid'.");
 }
-    /**
-     * 5. GRID GENERATION (ROLE BASED)
-     */
+  
 async function generateTimeTable() {
     const tid = document.getElementById('f-teacher-id').value;
     const dateVal = document.getElementById('f-date').value;
