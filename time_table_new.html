@@ -693,9 +693,7 @@ const totalCap = document.getElementById('f-capacity').value || 10;
     });
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
-    /**
-     * 6. BOOKING VALIDATIONS
-     */
+   
 async function bookThisSlot(day, time) {
     // 1. GET ALL NECESSARY DATA FROM THE UI
     const roll = document.getElementById('f-roll').value;
@@ -803,7 +801,7 @@ async function bookThisSlot(day, time) {
         generateTimeTable(); 
     }
 }
-    /**
+    
 async function cancelBooking(id, roll) {
     if (!confirm(`Are you sure? This will be recorded as a cancellation for student roll ${roll}.`)) return;
 
