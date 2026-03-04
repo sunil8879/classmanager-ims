@@ -3451,7 +3451,7 @@ if (document.getElementById('batch-slots-display').innerText.includes("No slots 
     const displaySlots = document.getElementById('batch-slots-display').innerText;
     const subject = document.getElementById('batch-subject').value;
 
-if ((await db.from('batches').select('id').eq('institute_id', sessionInstID).eq('batch_name', batchName).maybeSingle()).data) return alert("THE BATCH IS ALREADY CREATED");
+if ((await db.from('batches').select('id').eq('institute_id', sessionInstID).eq('teacher_id', document.getElementById('batch-teacher-id').value).eq('batch_name', batchName).maybeSingle()).data) return alert("THE BATCH IS ALREADY CREATED");
 
     // Validation
     if (!batchName || !subject) return alert("Please enter Batch Name and Subject.");
