@@ -3166,7 +3166,7 @@ async function editStudentByRoll() {
 async function openBatchPicker() {
     const modal = document.getElementById('batch-picker-modal');
     const tbody = document.getElementById('batch-picker-body');
-    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>Syncing Schedule...</td></tr>";
+    tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>Syncing Schedule...</td></tr>";
     modal.style.display = 'flex';
 
     // 1. Fetch Batches and Current Enrollments
@@ -3174,7 +3174,7 @@ async function openBatchPicker() {
     const { data: listData } = await db.from('list').select('batch_name').eq('institute_id', sessionInstID);
 
     if (!batches || batches.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:20px;'>No Batches found. Create them in Section 5.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No Batches found. Create them in Section 5.</td></tr>";
         return;
     }
 
@@ -3185,6 +3185,7 @@ async function openBatchPicker() {
         times.forEach(t => {
             rows.push({
                 subject: b.subject_name.toUpperCase(),
+                teacher: b.teacher_name || "N/A", // CAPTURE TEACHER NAME
                 time: t.toUpperCase(),
                 capacity: b.students_allotted || 0,
                 batchName: b.batch_name
@@ -3192,7 +3193,7 @@ async function openBatchPicker() {
         });
     });
 
-    // 3. Alphabetical Sort by Subject
+    // 3. Sort by Subject
     rows.sort((a, b) => a.subject.localeCompare(b.subject));
 
     // 4. Render tidy table
@@ -3204,6 +3205,7 @@ async function openBatchPicker() {
         tbody.innerHTML += `
             <tr style="border-bottom: 2px solid #eee; height: 50px;">
                 <td style="padding:10px; font-weight:bold; border-right:1px solid #ddd;">${row.subject}</td>
+                <td style="padding:10px; border-right:1px solid #ddd; color: #555;">${row.teacher}</td> <!-- DISPLAY TEACHER -->
                 <td style="padding:10px; border-right:1px solid #ddd;">${row.time}</td>
                 <td style="padding:10px; text-align:center; border-right:1px solid #ddd;">${enrolled} / ${row.capacity || '∞'}</td>
                 <td style="padding:10px; text-align:center; font-weight:bold; color:${isFull ? 'red':'green'}; border-right:1px solid #ddd;">
@@ -9440,8 +9442,9 @@ document.addEventListener('blur', function(e) {
         <table style="width:100%; border-collapse:collapse; margin-top:10px;">
             <thead>
                 <tr style="background:#000; color:#fff; text-align:left;">
-                    <th style="padding:15px; border:1px solid #ddd;">SUBJECT NAME</th>
-                    <th style="padding:15px; border:1px solid #ddd;">TIME SLOT</th>
+                  <th style="padding:15px; border:1px solid #ddd;">SUBJECT NAME</th>
+<th style="padding:15px; border:1px solid #ddd;">TEACHER NAME</th> <!-- ADD THIS -->
+<th style="padding:15px; border:1px solid #ddd;">TIME SLOT</th>
                     <th style="padding:15px; border:1px solid #ddd; text-align:center;">CAPACITY</th>
                     <th style="padding:15px; border:1px solid #ddd; text-align:center;">YES/NO</th>
                     <th style="padding:15px; border:1px solid #ddd; text-align:center;">SELECT</th>
