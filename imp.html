@@ -10632,5 +10632,123 @@ window.bm2Fetch = async function() {
     }
 };
 </script>
+
+<!-- ADD THIS SCRIPT BLOCK JUST BEFORE THE CLOSING </body> TAG -->
+<script>
+/* =========================================================================
+   STRICT OVERRIDE FIX: SECTION 5 - BATCH MANAGEMENT FETCH BUG
+   ========================================================================= */
+
+// This function safely overrides the buggy fetch logic loaded earlier.
+window.bm2Fetch = async function() {
+    const input = prompt("Enter STUDENT ROLL NO (e.g. IMS-XXXX)\n- OR -\nEnter BATCH NAME directly:");
+    if (!input) return;
+
+    const val = input.trim().toUpperCase();
+
+    if (val.startsWith("IMS-")) {
+        // --- SEARCH BY ROLL NUMBER ---
+        // 1. Check Batch Master (Section 25)
+        let { data: allocs } = await db.from('list')
+            .select('batch_name, teacher_id')
+            .eq('roll_number', val)
+            .eq('institute_id', sessionInstID);
+        
+        // 2. Check Student Allocations (Section 18) if not found
+        if (!allocs || allocs.length === 0) {
+            const { data: allocs2 } = await db.from('student_allocations')
+                .select('batch_name, teacher_id')
+                .eq('roll_number', val)
+                .eq('institute_id', sessionInstID);
+            allocs = allocs2;
+        }
+
+        if (!allocs || allocs.length === 0) {
+            return alert(`No batches linked to Roll No: ${val}.\nPlease allocate them in Section 18 or 25 first.`);
+        }
+
+        // Allow selection if multiple batches exist
+        let target = allocs[0];
+        if (allocs.length > 1) {
+            let msg = "Multiple batches found for this student. Type the number to load:\n";
+            allocs.forEach((a, i) => msg += `${i+1}. ${a.batch_name}\n`);
+            let choice = prompt(msg);
+            if (choice && allocs[parseInt(choice)-1]) target = allocs[parseInt(choice)-1];
+        }
+
+        // 🟢 FIX: Removed .maybeSingle() crash vulnerability & applied .ilike for spacing errors
+        const { data: bList } = await db.from('batches')
+            .select('*')
+            .ilike('batch_name', target.batch_name.trim())
+            .ilike('teacher_id', target.teacher_id.trim())
+            .eq('institute_id', sessionInstID);
+            
+        if (bList && bList.length > 0) {
+            window.bm2PopulateUI(bList[0]);
+        } else {
+            alert("Master batch record missing or deleted.");
+        }
+
+    } else {
+        // --- SEARCH DIRECTLY BY BATCH NAME ---
+        // 🟢 FIX: Forgiving wildcard search (%val%) means "Morning" finds "Morning-Pro-A"
+        const { data: batches } = await db.from('batches')
+            .select('*')
+            .ilike('batch_name', `%${val}%`)
+            .eq('institute_id', sessionInstID);
+            
+        if (!batches || batches.length === 0) {
+            return alert(`Batch containing "${val}" not found in database. Check spelling.`);
+        }
+        
+        // Allow selection if partial match finds multiple
+        let targetBatch = batches[0];
+        if (batches.length > 1) {
+            let msg = "Multiple batches found. Type the number to load:\n";
+            batches.forEach((b, i) => msg += `${i+1}. ${b.batch_name} (Teacher ID: ${b.teacher_id})\n`);
+            let choice = prompt(msg);
+            if (choice && batches[parseInt(choice)-1]) targetBatch = batches[parseInt(choice)-1];
+        }
+        
+        window.bm2PopulateUI(targetBatch);
+    }
+};
+
+// --- DEDICATED UI POPULATOR HELPER ---
+window.bm2PopulateUI = function(b) {
+    document.getElementById('bm2-name').value = b.batch_name;
+    
+    // Let the system rebuild the teacher dropdown first based on the batch name
+    window.bm2FilterTeachers().then(() => {
+        // Small delay ensures DOM renders the dropdown before we inject values
+        setTimeout(() => {
+            const subSel = document.getElementById('bm2-sub');
+            subSel.innerHTML = `<option value="${b.subject_name}">${b.subject_name}</option>`;
+            
+            const tidSel = document.getElementById('bm2-tid');
+            // Force the teacher ID into the box even if UI filtered it out by accident
+            if (tidSel.querySelector(`option[value="${b.teacher_id}"]`)) {
+                tidSel.value = b.teacher_id;
+            } else {
+                tidSel.innerHTML += `<option value="${b.teacher_id}">${b.teacher_id} - ${b.teacher_name}</option>`;
+                tidSel.value = b.teacher_id;
+            }
+
+            document.getElementById('bm2-tname').value = b.teacher_name;
+            
+            const tSel = document.getElementById('bm2-time');
+            tSel.innerHTML = "";
+            (b.batch_time || "").split(',').forEach(tm => { 
+                if(tm.trim()) tSel.innerHTML += `<option value="${tm.trim()}">${tm.trim()}</option>`; 
+            });
+            
+            document.getElementById('bm2-stu').value = b.students_allotted;
+            document.getElementById('bm2-rem').value = b.remarks || "";
+            
+            alert("Batch details loaded successfully!");
+        }, 100);
+    });
+};
+</script>
 </body>
 </html>
