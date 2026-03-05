@@ -3762,44 +3762,58 @@ async function updateBatch() {
 }
 
 async function fetchBatchByTeacher() {
-    const tid = prompt("Enter Teacher ID (TCH-XXXX) to view their batches:");
-    if (!tid) return;
+    const tidInput = prompt("Enter Teacher ID (TCH-XXXX) to view their batches:");
+    if (!tidInput) return;
+
+    const tid = tidInput.toUpperCase().trim();
 
     const { data, error } = await db.from('batches')
         .select('*')
-        .eq('teacher_id', tid.toUpperCase().trim())
+        .eq('teacher_id', tid)
         .eq('institute_id', sessionInstID);
 
     if (error || !data || data.length === 0) return alert("No batches found for this teacher.");
 
     let selection = data[0];
+    
+    // Check if more than one batch exists
     if (data.length > 1) {
         let msg = "Multiple batches found. Enter number to load:\n";
         
-        // THE FIX: Explicitly forcing the format [SUBJECT] - [TIME SLOT] for every row
         data.forEach((b, i) => {
-            const sub = b.subject_name ? b.subject_name.toUpperCase() : "NO SUBJECT";
-            const time = b.batch_time ? b.batch_time : "NO TIME";
-            msg += `${i + 1}. ${sub} - ${time}\n`;
+            // FORCE STANDARDIZED FORMAT: [UPPERCASE SUBJECT] - [TRIMMED TIME]
+            const s = (b.subject_name || "N/A").toUpperCase().trim();
+            const t = (b.batch_time || "N/A").trim();
+            msg += `${i + 1}. ${s} - ${t}\n`;
         });
 
         let choice = prompt(msg);
-        if (choice && data[parseInt(choice) - 1]) selection = data[parseInt(choice) - 1];
-        else return; // Exit if cancel is pressed
+        let index = parseInt(choice) - 1;
+        if (choice && data[index]) {
+            selection = data[index];
+        } else {
+            return; // Cancel or invalid choice
+        }
     }
 
-    // Standard UI Population
-    document.getElementById('batch-name').value = selection.batch_name;
-    document.getElementById('batch-teacher-id').value = selection.teacher_id;
-    document.getElementById('batch-teacher-name').value = selection.teacher_name;
-    document.getElementById('batch-subject').value = selection.subject_name;
+    // 1. Populate Text Inputs
+    document.getElementById('batch-name').value = selection.batch_name || "";
+    document.getElementById('batch-teacher-id').value = selection.teacher_id || "";
+    document.getElementById('batch-teacher-name').value = selection.teacher_name || "";
     document.getElementById('batch-students').value = selection.students_allotted || 0;
     document.getElementById('batch-remarks').value = selection.remarks || "";
 
-    // Sync the dynamic dropdown
+    // 2. Set Subject Dropdown (Ensuring match via Uppercase)
+    const subDropdown = document.getElementById('batch-subject');
+    subDropdown.value = (selection.subject_name || "").toUpperCase();
+
+    // 3. Populate and Set the Dynamic Timing Dropdown
     const slotDropdown = document.getElementById('batch-slots-select');
-    slotDropdown.innerHTML = `<option value="${selection.batch_time}">${selection.batch_time}</option>`;
-    slotDropdown.value = selection.batch_time;
+    const timeVal = (selection.batch_time || "").trim();
+    
+    // We inject the specific fetched time as the only option so it displays correctly
+    slotDropdown.innerHTML = `<option value="${timeVal}">${timeVal}</option>`;
+    slotDropdown.value = timeVal;
     slotDropdown.style.background = "#7FFFD4";
 
     alert("Batch details loaded!");
