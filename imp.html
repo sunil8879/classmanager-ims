@@ -10219,5 +10219,337 @@ document.addEventListener('blur', function(e) {
         </div>
     </div>
 </div>
+
+
+
+
+
+
+
+<!-- ADD THIS SCRIPT BLOCK JUST BEFORE THE CLOSING </body> TAG -->
+<script>
+/* =========================================================================
+   OVERRIDE INJECTION: SECTION 5 - BATCH MANAGEMENT FIXES 
+   ========================================================================= */
+
+// 1. FIX: Ensure Teacher Dropdown is strictly unique (No 4-5 duplicates)
+async function loadBatchTeacherDropdown() {
+    const tidSelect = document.getElementById('batch-teacher-id');
+    tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+    
+    const { data: teachers } = await db.from('teacher_details')
+        .select('id, teacher_name')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+        
+    if (teachers) {
+        allActiveTeachers = []; 
+        const seenTeachers = new Set();
+        teachers.forEach(t => {
+            if (!seenTeachers.has(t.id)) {
+                seenTeachers.add(t.id);
+                allActiveTeachers.push(t); // Keep clean global list
+                let opt = document.createElement('option');
+                opt.value = t.id;
+                opt.text = t.id + " - " + t.teacher_name;
+                opt.dataset.name = t.teacher_name;
+                tidSelect.appendChild(opt);
+            }
+        });
+    }
+}
+
+// 2. FIX: Relevant Teachers in Dropdown & Dynamic "Students Allotted" Capacity
+async function autopopulateBatchByName() {
+    const bname = document.getElementById('batch-name').value.trim().toUpperCase();
+    const tidSelect = document.getElementById('batch-teacher-id');
+    
+    if (!bname) {
+        currentBatchesByName = [];
+        loadBatchTeacherDropdown();
+        resetBatchFields();
+        return;
+    }
+
+    const { data, error } = await db.from('batches')
+        .select('*')
+        .eq('batch_name', bname)
+        .eq('institute_id', sessionInstID);
+
+    currentBatchesByName = data || [];
+    tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+
+    const seenTeachers = new Set();
+
+    if (currentBatchesByName.length > 0) {
+        // DYNAMIC CAPACITY: Auto-fill max capacity based on existing batch rules
+        document.getElementById('batch-students').value = currentBatchesByName[0].students_allotted || "";
+
+        let optGroupExisting = document.createElement('optgroup');
+        optGroupExisting.label = "✅ Teachers Currently in this Batch";
+        
+        currentBatchesByName.forEach(b => {
+            if (!seenTeachers.has(b.teacher_id)) {
+                seenTeachers.add(b.teacher_id);
+                let opt = document.createElement('option');
+                opt.value = b.teacher_id;
+                opt.text = b.teacher_id + " - " + b.teacher_name;
+                opt.dataset.name = b.teacher_name;
+                optGroupExisting.appendChild(opt);
+            }
+        });
+        tidSelect.appendChild(optGroupExisting);
+    }
+
+    let optGroupOthers = document.createElement('optgroup');
+    optGroupOthers.label = "➕ Add Another Teacher to this Batch";
+    
+    allActiveTeachers.forEach(t => {
+        if (!seenTeachers.has(t.id)) {
+            seenTeachers.add(t.id); // Block absolute duplicates
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.id + " - " + t.teacher_name;
+            opt.dataset.name = t.teacher_name;
+            optGroupOthers.appendChild(opt);
+        }
+    });
+    tidSelect.appendChild(optGroupOthers);
+    
+    if (currentBatchesByName.length > 0 && seenTeachers.size === currentBatchesByName.length) {
+        tidSelect.value = Array.from(seenTeachers)[0];
+        handleBatchTeacherChange();
+    } else if (currentBatchesByName.length === 0) {
+        resetBatchFields();
+    }
+}
+
+// 3. FIX: Keep Students Allotted dynamic upon teacher change
+async function handleBatchTeacherChange() {
+    const tidSelect = document.getElementById('batch-teacher-id');
+    const tid = tidSelect.value;
+    const nameSelect = document.getElementById('batch-teacher-name');
+    const timeSelect = document.getElementById('batch-time');
+
+    if (!tid) { resetBatchFields(); return; }
+
+    const selectedOpt = tidSelect.options[tidSelect.selectedIndex];
+    const tName = selectedOpt.dataset.name || "";
+    nameSelect.innerHTML = `<option value="${tName}">${tName}</option>`;
+
+    const existingBatch = currentBatchesByName.find(b => b.teacher_id === tid);
+
+    if (existingBatch) {
+        document.getElementById('batch-subject').innerHTML = `<option value="${existingBatch.subject_name}" selected>${existingBatch.subject_name}</option>`;
+        timeSelect.innerHTML = ''; 
+        const splitTimes = existingBatch.batch_time.split(',').map(t => t.trim()).filter(t => t !== "");
+        splitTimes.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = existingBatch.batch_time; 
+            opt.text = "🕒 " + t; 
+            timeSelect.appendChild(opt);
+        });
+        
+        // Dynamic Allocation Override
+        document.getElementById('batch-students').value = existingBatch.students_allotted || currentBatchesByName[0].students_allotted || "";
+        document.getElementById('batch-remarks').value = existingBatch.remarks || "";
+    } else {
+        timeSelect.innerHTML = '<option value="">-- Select Subject First --</option>';
+        document.getElementById('batch-students').value = currentBatchesByName.length > 0 ? currentBatchesByName[0].students_allotted : "";
+        document.getElementById('batch-remarks').value = "";
+
+        const { data: teacher } = await db.from('teacher_details').select('subject_taught').eq('id', tid).eq('institute_id', sessionInstID).maybeSingle();
+        const subSelect = document.getElementById('batch-subject');
+        subSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+        if (teacher && teacher.subject_taught) {
+            const subjects = teacher.subject_taught.split(',').map(s => s.trim().toUpperCase());
+            subjects.forEach(sub => {
+                if (sub) subSelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+            });
+        }
+    }
+}
+
+// 4. FIX: Validation Block for combining Different Subjects into the same Batch Name
+async function addBatch() {
+    const tid = document.getElementById('batch-teacher-id').value;
+    const bname = document.getElementById('batch-name').value.trim().toUpperCase();
+    const timeVal = document.getElementById('batch-time').value;
+    const subjectVal = document.getElementById('batch-subject').value.toUpperCase();
+
+    if (!bname || !tid || !timeVal) return alert("Please complete Batch Name, Teacher, Subject, and Time Slot.");
+
+    // VALIDATION: Ensure Subject Integrity across the Batch Name
+    const { data: subjectCheck } = await db.from('batches')
+        .select('subject_name')
+        .eq('batch_name', bname)
+        .eq('institute_id', sessionInstID)
+        .limit(1).maybeSingle();
+        
+    if (subjectCheck && subjectCheck.subject_name.toUpperCase() !== subjectVal) {
+        return alert(`🛑 SUBJECT MISMATCH ERROR: The batch "${bname}" is already assigned to the subject "${subjectCheck.subject_name}". \n\nYou cannot club teachers of different subjects into the same exact Batch Name.`);
+    }
+
+    const { data: existingBatches } = await db.from('batches')
+        .select('id').eq('institute_id', sessionInstID).eq('teacher_id', tid).eq('batch_name', bname);
+
+    if (existingBatches && existingBatches.length > 0) return alert("THIS BATCH IS ALREADY CREATED FOR THIS TEACHER.");
+
+    const batchData = {
+        institute_id: sessionInstID,
+        batch_name: bname,
+        teacher_id: tid,
+        teacher_name: document.getElementById('batch-teacher-name').value,
+        batch_time: timeVal,
+        subject_name: subjectVal,
+        students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
+        remarks: document.getElementById('batch-remarks').value
+    };
+
+    const { error } = await db.from('batches').insert([batchData]);
+    if (error) alert("Error: " + error.message);
+    else {
+        alert("SUCCESS: Batch '" + bname + "' created.");
+        autopopulateBatchByName(); 
+    }
+}
+
+// 5. FIX: Removed 'Subject Name' from History & Improved Batch Times Mapping
+async function fetchBatchHistoryByStudent() {
+    let roll = prompt("Enter Student Roll Number to view their Batch Schedule:");
+    if (!roll) return;
+    roll = roll.trim().toUpperCase();
+
+    const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if (!stu) return alert("Student not found.");
+
+    // Notice we dropped 'course_name' from this query as requested
+    const { data: lists, error } = await db.from('list')
+        .select('batch_name, teacher_id, teacher_name')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
+    if (error) return alert(error.message);
+
+    let tableRows = "";
+    if (lists && lists.length > 0) {
+        for (let l of lists) {
+            const { data: b } = await db.from('batches')
+                .select('batch_time, students_allotted')
+                .eq('batch_name', l.batch_name)
+                .eq('teacher_id', l.teacher_id)
+                .eq('institute_id', sessionInstID)
+                .maybeSingle();
+            
+            let bTime = (b && b.batch_time) ? b.batch_time : "N/A (Not Assigned/Deleted)";
+            let maxStu = (b && b.students_allotted) ? b.students_allotted : "Unlimited";
+
+            tableRows += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 10px; font-weight:bold;">${l.batch_name}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; color:#007bff; font-weight:bold;">${bTime}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${l.teacher_id}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${l.teacher_name}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; text-align:center;">${maxStu}</td>
+                </tr>
+            `;
+        }
+    } else {
+        tableRows = `<tr><td colspan="5" style="padding:20px; text-align:center;">No batches allocated for this student.</td></tr>`;
+    }
+
+    const modalHtml = `
+        <div id="batch-history-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:95%; max-width:900px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h2 style="margin-top:0; color:#000; text-decoration:underline; text-align:center;">BATCH SCHEDULE HISTORY</h2>
+                <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-weight:bold; font-size:1.1rem; border-bottom:2px solid #000; padding-bottom:10px;">
+                    <span>Student Name : <span style="color:#1877F2; font-weight:normal;">${stu.full_name}</span></span>
+                    <span>Student Roll No : <span style="color:#ff0000; font-weight:normal;">${roll}</span></span>
+                </div>
+                <table style="width:100%; border-collapse:collapse; text-align:left; color:#000;">
+                    <thead style="background:#f8f9fa;">
+                        <tr>
+                            <!-- Course Name removed from table header -->
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Batch Name</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Batch Time</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Teacher ID</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Teacher Name</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-align:center; text-transform: capitalize;">Students Allotted</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+                <button onclick="document.getElementById('batch-history-overlay').remove()" style="margin-top:25px; background:#ff0000; color:white; border:2px solid #000; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; width:100%; font-size:1.1rem;">CLOSE WINDOW</button>
+            </div>
+        </div>
+    `;
+
+    const existing = document.getElementById('batch-history-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// 6. FIX: Ensure Batch Times are correctly shown in Batch Scheduler Modal
+async function openBatchPicker() {
+    const modal = document.getElementById('batch-picker-modal');
+    const tbody = document.getElementById('batch-picker-body');
+    tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>Syncing Schedule...</td></tr>";
+    modal.style.display = 'flex';
+
+    const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+    const { data: listData } = await db.from('list').select('batch_name').eq('institute_id', sessionInstID);
+
+    if (!batches || batches.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No Batches found. Create them in Section 5.</td></tr>";
+        return;
+    }
+
+    let rows = [];
+    batches.forEach(b => {
+        // Fallback added incase time is completely null/blank
+        const rawTime = b.batch_time || "TIME NOT SET"; 
+        const times = rawTime.split(',').map(t => t.trim()).filter(t => t !== "");
+        
+        times.forEach(t => {
+            rows.push({
+                subject: (b.subject_name || "N/A").toUpperCase(),
+                teacher: b.teacher_name || "N/A", 
+                time: t.toUpperCase(),
+                capacity: b.students_allotted || 0,
+                batchName: b.batch_name
+            });
+        });
+    });
+
+    rows.sort((a, b) => a.subject.localeCompare(b.subject));
+
+    tbody.innerHTML = "";
+    rows.forEach(row => {
+        const enrolled = listData ? listData.filter(l => l.batch_name === row.batchName).length : 0;
+        const isFull = row.capacity > 0 && enrolled >= row.capacity;
+
+        tbody.innerHTML += `
+            <tr style="border-bottom: 2px solid #eee; height: 50px;">
+                <td style="padding:10px; font-weight:bold; border-right:1px solid #ddd;">${row.subject}</td>
+                <td style="padding:10px; border-right:1px solid #ddd; color: #555;">${row.teacher}</td>
+                <td style="padding:10px; border-right:1px solid #ddd; color: #007bff; font-weight:bold;">${row.time}</td>
+                <td style="padding:10px; text-align:center; border-right:1px solid #ddd;">${enrolled} / ${row.capacity || '∞'}</td>
+                <td style="padding:10px; text-align:center; font-weight:bold; color:${isFull ? 'red':'green'}; border-right:1px solid #ddd;">
+                    ${isFull ? 'NO' : 'YES'}
+                </td>
+                <td style="padding:10px; text-align:center;">
+                    <input type="checkbox" class="batch-cb" 
+                           data-sub="${row.subject}" data-time="${row.time}" 
+                           ${isFull ? 'disabled' : ''} style="width:20px; height:20px;">
+                </td>
+            </tr>
+        `;
+    });
+}
+</script>
+
+
+
+
+
 </body>
 </html>
