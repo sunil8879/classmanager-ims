@@ -8453,6 +8453,7 @@ async function fetchSpecificReview() {
 }
 
 // 5. Bottom FETCH Button
+// 5. Bottom FETCH Button
 async function fetchReviewByRoll() {
     let roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     if (!roll) {
@@ -8461,7 +8462,10 @@ async function fetchReviewByRoll() {
         document.getElementById('rev-roll').value = roll.toUpperCase();
     }
 
-    // Fetch the absolute latest review for this student
+    // 1. FIRST: Load ALL teachers assigned to this student into the dropdown
+    await autopopulateReviewForm();
+
+    // 2. THEN: Fetch the absolute latest review for this student
     const { data } = await db.from('reviews')
         .select('*')
         .eq('student_roll', roll)
@@ -8474,22 +8478,18 @@ async function fetchReviewByRoll() {
         document.getElementById('rev-sname').value = data.student_name || "";
         document.getElementById('rev-date').value = data.review_date || "";
         
-        // Force dropdown to show correct teacher
-        const tidSelect = document.getElementById('rev-tid');
-        tidSelect.innerHTML = `<option value="${data.teacher_id}" data-name="${data.teacher_name}">${data.teacher_id} - ${data.teacher_name}</option>`;
-        tidSelect.value = data.teacher_id;
+        // Select the correct teacher from the newly populated dropdown list
+        document.getElementById('rev-tid').value = data.teacher_id;
         
         document.getElementById('rev-tname').value = data.teacher_name || "";
         document.getElementById('rev-score').value = data.rating || "";
         document.getElementById('rev-msg').value = data.message || "";
         
-        alert("Review loaded successfully.");
+        alert("Latest Review Loaded! You can now use the Dropdown to view the other teachers.");
     } else {
         alert("No review found for this Roll Number. Setting up form for a new entry.");
-        autopopulateReviewForm();
     }
 }
-
 // 6. Add Review
 async function addTeacherReview() {
     const roll = document.getElementById('rev-roll').value.toUpperCase();
