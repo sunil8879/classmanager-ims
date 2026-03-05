@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5675,5 +5673,4116 @@ async function fetchPerformanceData() {
         document.getElementById('perf-name').value = student.full_name;
         document.getElementById('perf-roll').value = roll;
         document.getElementById('perf-joining').value = student.admission_date;
+        document.getElementById('perf-today').value = new Date().toLocaleDateString();
+
+        // 3. Fetch Detailed Attendance Log
+        const { data: attHistory } = await db.from('attendance')
+            .select('attendance_date, status')
+            .eq('roll_number', roll)
+            .eq('institute_id', sessionInstID)
+            .order('attendance_date', { ascending: false });
+
+        const logBody = document.getElementById('perf-attendance-log');
+        logBody.innerHTML = "";
+        let absCount = 0;
+
+        if (attHistory) {
+            attHistory.forEach(row => {
+                if (row.status === 'Absent') absCount++;
+                logBody.innerHTML += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${row.attendance_date}</td><td style="padding:8px; border-bottom:1px solid #eee; color:${row.status === 'Present' ? 'green' : 'red'}; font-weight:bold;">${row.status}</td></tr>`;
+            });
+            document.getElementById('perf-absent').innerText = absCount;
+            document.getElementById('perf-attendance-pct').innerText = attHistory.length > 0 ? (((attHistory.length - absCount) / attHistory.length) * 100).toFixed(1) + "%" : "100%";
+        }
+
+        // 4. Populate Course Dropdown (From Exam Table)
+        const { data: examRecords } = await db.from('exam').select('course_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
+        const courseSelect = document.getElementById('perf-course-list');
+        courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+        
+        if (examRecords && examRecords.length > 0) {
+            const uniqueCourses = [...new Set(examRecords.map(e => e.course_name.toUpperCase()))];
+            uniqueCourses.forEach(c => {
+                let opt = document.createElement('option');
+                opt.value = c; opt.text = c;
+                courseSelect.appendChild(opt);
+            });
+        }
+
+        // 5. Calculate Global Average %
+        const { data: allExams } = await db.from('exam').select('marks_obtained, total_marks').eq('roll_number', roll).eq('institute_id', sessionInstID);
+        if (allExams && allExams.length > 0) {
+            let tObt = allExams.reduce((sum, e) => sum + (parseFloat(e.marks_obtained) || 0), 0);
+            let tPoss = allExams.reduce((sum, e) => sum + (parseFloat(e.total_marks) || 0), 0);
+            document.getElementById('perf-global-avg').value = ((tObt / tPoss) * 100).toFixed(2) + "%";
+        }
+
+        document.getElementById('performance-report-area').style.display = 'block';
+
+    } catch (err) { console.error(err); }
+}
+
+async function syncCoursePerformanceData() {
+    const roll = document.getElementById('perf-roll').value;
+    const course = document.getElementById('perf-course-list').value; // This is now UpperCase
+    if (!course) return;
+
+    // A. Fetch Specific Course Marks
+    const { data: exams } = await db.from('exam')
+        .select('marks_obtained, total_marks, result')
+        .eq('roll_number', roll)
+        .ilike('course_name', course) // Case-insensitive match
+        .eq('institute_id', sessionInstID);
+
+    if (exams && exams.length > 0) {
+        const totalPossible = exams.reduce((sum, e) => sum + parseFloat(e.total_marks), 0);
+        const totalObtained = exams.reduce((sum, e) => sum + parseFloat(e.marks_obtained), 0);
+        document.getElementById('perf-total-marks').value = totalPossible;
+        document.getElementById('perf-obt-marks').value = totalObtained;
+        document.getElementById('perf-pct-val').value = ((totalObtained / totalPossible) * 100).toFixed(2) + "%";
+        document.getElementById('perf-result-val').value = exams[exams.length - 1].result;
+    }
+
+    // B. Fetch Teacher (Search both 'subject' and 'course' columns for maximum compatibility)
+    const { data: alloc } = await db.from('student_allocations')
+        .select('teacher_name')
+        .eq('roll_number', roll)
+        .ilike('subject', course) // Use ilike to prevent "Not Allotted" errors due to spacing or case
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    document.getElementById('perf-teacher-name').value = alloc ? alloc.teacher_name : "NOT ALLOTTED IN SEC 18";
+}
+// 3. Save performance to database
+async function savePerformanceData() {
+    const roll = document.getElementById('perf-roll').value;
+    if (!roll) return alert("Please fetch a student first.");
+
+    const updateData = {
+        institute_id: sessionInstID,
+        roll_number: roll,
+        total_marks_secured: parseFloat(document.getElementById('perf-marks').value) || 0,
+        total_exams: parseInt(document.getElementById('perf-exam-count').value) || 0,
+        teacher_name: document.getElementById('perf-teacher').value,
+        updated_at: new Date().toISOString()
+    };
+
+    // This uses the 'onConflict' rule we set in SQL in Part 1
+    const { error } = await db
+        .from('performance_tracking')
+        .upsert(updateData, { onConflict: 'roll_number, institute_id' });
+
+    if (error) alert("Save Error: " + error.message);
+    else alert("Performance summary updated successfully!");
+}
+
+/* ==========================================
+   EXAM MODULE LOGIC
+   ========================================== */
+
+// 1. Fetch Student & Populate Course Dropdown
+async function fetchStudentForExam() {
+    const roll = document.getElementById('ex-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Enter Roll Number");
+
+    const { data, error } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if(data) {
+        document.getElementById('ex-name').value = data.full_name;
+        
+        // Populate Course Dropdown
+        const courseSelect = document.getElementById('ex-course');
+        courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+        
+        if (data.course) {
+            const courses = data.course.split(',').map(c => c.trim());
+            courses.forEach(c => {
+                let opt = document.createElement('option');
+                opt.value = c;
+                opt.text = c;
+                courseSelect.appendChild(opt);
+            });
+        }
+        
+        // Calculate the existing Global Average from previous exams
+        calculateGlobalAvg(roll);
+    } else {
+        alert("Student not found in your institute.");
+    }
+}
+
+// 2. Calculate Local Exam Result AND Global Average
+async function calcExamResult() {
+    const total = parseFloat(document.getElementById('ex-total').value) || 0;
+    const obt = parseFloat(document.getElementById('ex-obt').value) || 0;
+    const roll = document.getElementById('ex-roll').value.toUpperCase();
+    
+    // Calculate current exam percentage
+    if (total > 0) {
+        const pctValue = (obt / total) * 100;
+        document.getElementById('ex-pct').value = pctValue.toFixed(2);
+        document.getElementById('ex-res').value = (pctValue >= 40) ? "PASSED" : "FAILED";
+        
+        // Refresh Global Average including these new numbers
+        calculateGlobalAvg(roll, obt, total);
+    }
+}
+
+// 3. Helper to calculate Average across all saved courses + current typed input
+async function calculateGlobalAvg(roll, currentObt = 0, currentTotal = 0) {
+    // Fetch all historical exam records for this student
+    const { data: history, error } = await db.from('exam')
+        .select('marks_obtained, total_marks')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
+
+    let sumObtained = parseFloat(currentObt);
+    let sumTotal = parseFloat(currentTotal);
+
+    if (history) {
+        history.forEach(row => {
+            sumObtained += parseFloat(row.marks_obtained || 0);
+            sumTotal += parseFloat(row.total_marks || 0);
+        });
+    }
+
+    const avgDisplay = document.getElementById('ex-avg-pct');
+    if (sumTotal > 0) {
+        const globalAvg = (sumObtained / sumTotal) * 100;
+        avgDisplay.value = globalAvg.toFixed(2) + "%";
+    } else {
+        avgDisplay.value = "0.00%";
+    }
+}
+async function addExamRecord() {
+const { data: att } = await db.from('attendance').select('status').eq('roll_number', document.getElementById('ex-roll').value.toUpperCase()).eq('attendance_date', document.getElementById('ex-date').value).eq('institute_id', sessionInstID).maybeSingle(); if (att?.status === 'Absent') return alert("ENTRY BLOCKED: Student was marked ABSENT in attendance on this date!");
+    if(!sessionInstID) return alert("Login required");
+    
+    const record = {
+        institute_id: sessionInstID,
+        exam_date: document.getElementById('ex-date').value,
+        roll_number: document.getElementById('ex-roll').value.toUpperCase(),
+        full_name: document.getElementById('ex-name').value,
+        course_name: document.getElementById('ex-course').value,
+        total_marks: parseFloat(document.getElementById('ex-total').value),
+        marks_obtained: parseFloat(document.getElementById('ex-obt').value),
+        percentage: parseFloat(document.getElementById('ex-pct').value), // Numerical
+        result: document.getElementById('ex-res').value
+    };
+
+    if(!record.exam_date || !record.roll_number) return alert("Please fill Date and Roll Number");
+
+    const { error } = await db.from('exam').insert([record]);
+    if(error) alert("Error: " + error.message); 
+    else alert("Exam Result Saved Successfully!");
+}
+
+
+async function fetchExamByRoll() {
+    const roll = prompt("Enter Roll Number to see last exam:");
+    const { data, error } = await db.from('exam').select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).order('exam_date', {ascending: false}).limit(1).maybeSingle();
+    if(data) {
+        document.getElementById('ex-date').value = data.exam_date;
+        document.getElementById('ex-roll').value = data.roll_number;
+        document.getElementById('ex-name').value = data.full_name;
+        document.getElementById('ex-course').value = data.course_name;
+        document.getElementById('ex-total').value = data.total_marks;
+        document.getElementById('ex-obt').value = data.marks_obtained;
+        calcExamResult();
+    } else alert("No exam records found.");
+}
+
+/* ==========================================
+   TEACHER ATTENDANCE LOGIC
+   ========================================== */
+
+async function fetchTeacherForTAttn() {
+    const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
+    const { data } = await db.from('teacher_details').select('teacher_name').eq('id', tid).eq('institute_id', sessionInstID).maybeSingle();
+    if(data) document.getElementById('t-attn-name').value = data.teacher_name;
+    else alert("Teacher ID not found.");
+}
+
+// REPLACE your existing triggerTAttn function with this:
+function triggerTAttn(status) {
+    const name = document.getElementById('t-attn-name').value;
+    const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
+    
+    if(!name || !tid) return alert("Please Fetch a Teacher first!");
+
+    const picker = document.getElementById('t-date-picker');
+    
+    // --- NEW: Disable future dates (Local Timezone Safe) ---
+    const todayLocal = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    picker.max = todayLocal;
+
+    // Reset the picker value so 'onchange' fires every time
+    picker.value = ""; 
+
+    picker.onchange = async function() {
+        if(!this.value) return;
+        
+        const selectedDate = this.value;
+        const monthYearStr = new Date(selectedDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        // Delete any existing record for this exact date to prevent duplicates
+        await db.from('teachers_attendance')
+            .delete()
+            .eq('teacher_id', tid)
+            .eq('attendance_date', selectedDate)
+            .eq('institute_id', sessionInstID);
+
+        // Insert the fresh, accurate status
+        const { error } = await db.from('teachers_attendance').insert([{
+            institute_id: sessionInstID,
+            teacher_id: tid,
+            full_name: name,
+            attendance_date: selectedDate,
+            status: status,
+            month_year: monthYearStr
+        }]);
+
+        if(error) {
+            alert("Database Error: " + error.message);
+        } else {
+            alert(`SUCCESS: ${name} marked ${status} for ${selectedDate}`);
+            document.getElementById('t-attn-status').value = status;
+        }
+        
+        // Cleanup the listener to prevent memory leaks
+        this.onchange = null; 
+    };
+
+    // Open the calendar
+    picker.showPicker();
+}
+// REPLACE your existing fetchTeacherHistory function with this Dynamic Pop-up version:
+async function fetchTeacherHistory() {
+    const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
+    const monthView = document.getElementById('t-attn-month').value; // e.g., "2026-02"
+
+    if (!tid || !monthView) return alert("Please select a Teacher ID and Month first.");
+
+    // 1. Calculate Month Details
+    const parts = monthView.split('-');
+    const year = parseInt(parts[0]);
+    const monthNum = parseInt(parts[1], 10);
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const targetMonthYear = monthNames[monthNum - 1] + " " + year;
+    
+    // Calculate exact total days in that specific month (e.g., 28 for Feb, 31 for March)
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+
+    // 2. Fetch Data (Case-Insensitive)
+    const { data, error } = await db.from('teachers_attendance')
+        .select('attendance_date, status')
+        .ilike('teacher_id', tid)
+        .ilike('month_year', targetMonthYear)
+        .eq('institute_id', sessionInstID)
+        .order('attendance_date', { ascending: true });
+
+    if (error) return alert("Error fetching data: " + error.message);
+
+    // 3. Process Data into the Map
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let dayMap = {}; // Will store the status for each day
+    
+    if (data) {
+        data.forEach(record => {
+            const day = parseInt(record.attendance_date.split('-')[2], 10);
+            const status = record.status ? record.status.toLowerCase() : "";
+            
+            if (status === 'present') {
+                dayMap[day] = 'P';
+                totalPresent++;
+            } else if (status === 'absent') {
+                dayMap[day] = 'A';
+                totalAbsent++;
+            }
+        });
+    }
+
+    // 4. Calculate Percentage: (Total Present / Total Days in Month) * 100
+    const attendancePct = ((totalPresent / daysInMonth) * 100).toFixed(2);
+
+    // 5. Build the Table Rows
+    let tableRows = "";
+    for (let i = 1; i <= daysInMonth; i++) {
+        if (dayMap[i]) {
+            let pVal = dayMap[i] === 'P' ? 1 : 0;
+            let aVal = dayMap[i] === 'A' ? 1 : 0;
+            tableRows += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${i}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; color: green; font-weight: bold;">${pVal}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; color: red; font-weight: bold;">${aVal}</td>
+                </tr>
+            `;
+        }
+    }
+
+    if (tableRows === "") {
+        tableRows = `<tr><td colspan="3" style="padding:15px; color:#666;">No attendance marked for ${targetMonthYear}.</td></tr>`;
+    }
+
+    // 6. Build and Inject the Popup Overlay HTML
+    const modalHtml = `
+        <div id="t-attn-popup-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:90%; max-width:400px; max-height:85vh; overflow-y:auto; text-align:center; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin-top:0; color:#000; text-decoration:underline;">Staff Attendance Report</h3>
+                <p style="font-weight:bold; font-size:1.1rem; color:#007bff;">Teacher ID: ${tid}</p>
+                <p style="font-weight:bold; font-size:1rem; color:#666; margin-bottom:15px;">Month: ${targetMonthYear}</p>
+                
+                <table style="width:100%; border-collapse:collapse; margin-bottom:20px; text-align:center;">
+                    <thead style="background:#eee;">
+                        <tr>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Date</th>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Present</th>
+                            <th style="border: 1px solid #ccc; padding: 8px;">Absent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+                
+                <div style="text-align:left; background:#f8f9fa; padding:15px; border-radius:8px; border:2px solid #000; font-size:1.1rem; line-height:1.8;">
+                    <p style="margin:0; color:green;"><b>TOTAL PRESENT :</b> ${totalPresent}</p>
+                    <p style="margin:0; color:red;"><b>TOTAL ABSENT :</b> ${totalAbsent}</p>
+                    <p style="margin:0; color:#007bff; border-top:1px dashed #ccc; padding-top:10px; margin-top:10px;">
+                        <b>Attendance % :</b> ${attendancePct}%
+                    </p>
+                    <small style="color:#666; font-size:0.85rem; display:block; margin-top:5px;">(Calculated as ${totalPresent} / ${daysInMonth} days in ${targetMonthYear})</small>
+                </div>
+
+                <button onclick="document.getElementById('t-attn-popup-overlay').remove()" style="margin-top:20px; background:#ff0000; color:white; border:2px solid #000; padding:12px 20px; border-radius:8px; font-weight:bold; cursor:pointer; width:100%; font-family:'Times New Roman', serif; font-size:1.1rem;">CLOSE</button>
+            </div>
+        </div>
+    `;
+
+    // Remove old popup if it exists, then show new one
+    const existing = document.getElementById('t-attn-popup-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function fetchTeacherForAlloc() {
+    const tid = document.getElementById('alloc-tid').value.toUpperCase().trim();
+    if (!tid) return alert("Please enter a Teacher ID.");
+
+    // 1. Fetch Teacher Name
+    const { data: teacher } = await db.from('teacher_details')
+        .select('teacher_name')
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (teacher) {
+        document.getElementById('alloc-tname').value = teacher.teacher_name;
+        
+        // 2. Fetch all Batches created by this teacher in Section 5
+        const { data: batches } = await db.from('batches')
+            .select('batch_name, subject_name')
+            .eq('teacher_id', tid)
+            .eq('institute_id', sessionInstID);
+
+        const batchSelect = document.getElementById('alloc-tbatch');
+        batchSelect.innerHTML = '<option value="">-- Select Teacher Batch --</option>';
+
+        if (batches && batches.length > 0) {
+            batches.forEach(b => {
+                let opt = document.createElement('option');
+                opt.value = b.batch_name;
+                opt.text = `${b.batch_name} (${b.subject_name})`;
+                // We store the subject name in a dataset to compare later
+                opt.dataset.subject = b.subject_name; 
+                batchSelect.appendChild(opt);
+            });
+        } else {
+            alert("This teacher has no batches created in Section 5. Please create a batch first.");
+        }
+    } else {
+        alert("Teacher not found.");
+    }
+}
+
+// Helper function to show alerts if subjects don't match
+function syncAllocationSubject() {
+    const batchSelect = document.getElementById('alloc-tbatch');
+    const selectedBatch = batchSelect.options[batchSelect.selectedIndex];
+    const teacherSubject = selectedBatch.dataset.subject ? selectedBatch.dataset.subject.toUpperCase() : "";
+    
+    const studentSubSelect = document.getElementById('alloc-subject');
+    const studentSubject = studentSubSelect.value.toUpperCase();
+
+    if (studentSubject && teacherSubject && !teacherSubject.includes(studentSubject)) {
+        alert(`⚠️ Warning: You selected a ${teacherSubject} batch, but the student's selected course is ${studentSubject}. Please ensure they match.`);
+    }
+}
+// 2. Fetch Student Info
+async function fetchStudentForAlloc() {
+    const rollInput = document.getElementById('alloc-roll');
+    const sNameInput = document.getElementById('alloc-sname');
+    const subDropdown = document.getElementById('alloc-subject');
+
+    if (!rollInput || !sNameInput || !subDropdown) return console.error("Missing Student Allocation HTML IDs");
+
+    const roll = rollInput.value.toUpperCase().trim();
+    if(!roll) return alert("Enter Roll Number");
+
+    const { data } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (data) {
+        sNameInput.value = data.full_name;
+        subDropdown.innerHTML = '<option value="">-- Select a Course --</option>';
+        if (data.course) {
+            const courses = data.course.split(',').map(c => c.trim());
+            courses.forEach(c => {
+                let opt = document.createElement('option');
+                opt.value = c;
+                opt.text = c;
+                subDropdown.appendChild(opt);
+            });
+        }
+    } else {
+        alert("Student not found.");
+    }
+}
+
+// 3. Save the Relationship
+async function saveAllocation() {
+
+// Paste inside saveAllocation() at the start
+if (!document.getElementById('alloc-tbatch').selectedOptions[0].text.toUpperCase().includes(document.getElementById('alloc-subject').value.toUpperCase())) return alert("🛑 ERROR: Subject Mismatch! Link to correct teacher.");
+
+
+    const tExpertise = document.getElementById('alloc-tbatch').options[document.getElementById('alloc-tbatch').selectedIndex].text.toUpperCase();
+    const selectedCourse = document.getElementById('alloc-subject').value.toUpperCase();
+    
+    // VALIDATION: Check if the teacher's batch matches the student's selected course
+    if (!tExpertise.includes(selectedCourse)) {
+        return alert(`🛑 CROSS-SUBJECT ERROR: You cannot link a [${selectedCourse}] course to this teacher's batch [${tExpertise}]. Please choose the correct teacher.`);
+    }
+
+    // Prepare data for Supabase
+    const data = {
+        institute_id: sessionInstID,
+        teacher_id: document.getElementById('alloc-tid').value.toUpperCase(),
+        teacher_name: document.getElementById('alloc-tname').value,
+        roll_number: document.getElementById('alloc-roll').value.toUpperCase(),
+        student_name: document.getElementById('alloc-sname').value,
+        subject: document.getElementById('alloc-subject').value, 
+        batch_name: document.getElementById('alloc-tbatch').value 
+    };
+
+    const { error } = await db.from('student_allocations').insert([data]);
+    if (error) alert(error.message); else alert("Linked Successfully!");
+}
+
+
+
+// 4. View all students assigned to a specific teacher
+async function viewTeacherStudents() {
+    const tid = document.getElementById('alloc-tid').value.toUpperCase();
+    const { data, error } = await db.from('student_allocations').select('student_name, subject').eq('teacher_id', tid).eq('institute_id', sessionInstID);
+    
+    const listArea = document.getElementById('allocation-list-area');
+    const listUl = document.getElementById('alloc-list');
+    
+    if(data && data.length > 0) {
+        listUl.innerHTML = data.map(item => `<li>${item.student_name} (${item.subject})</li>`).join('');
+        listArea.style.display = 'block';
+    } else {
+        alert("No students allocated to this teacher yet.");
+        listArea.style.display = 'none';
+    }
+}
+
+
+// 1. Save Event (For Owners)
+async function saveCalendarEvent() {
+    const data = {
+        institute_id: sessionInstID,
+        event_date: document.getElementById('cal-date').value,
+        event_name: document.getElementById('cal-name').value,
+        event_type: document.getElementById('cal-type').value,
+        description: document.getElementById('cal-desc').value
+    };
+
+    if (!data.event_date || !data.event_name) return alert("Date and Name are required!");
+
+    const { error } = await db.from('institute_calendar').insert([data]);
+    if (error) alert(error.message);
+    else {
+        alert("Event Added!");
+        loadCalendar();
+        document.getElementById('cal-name').value = "";
+        document.getElementById('cal-desc').value = "";
+    }
+}
+
+// 2. Load Events (For Everyone)
+async function loadCalendar() {
+    const listDiv = document.getElementById('calendar-list');
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await db.from('institute_calendar')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .gte('event_date', today)
+        .order('event_date', { ascending: true });
+
+    if (data && data.length > 0) {
+        listDiv.innerHTML = data.map(item => `
+            <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="background: #000; color: #fff; padding: 10px; border-radius: 8px; text-align: center; min-width: 80px;">
+                        <small>${new Date(item.event_date).toLocaleString('default', { month: 'short' })}</small>
+                        <h2 style="margin:0; color: #7FFFD4 !important; text-decoration: none !important;">${new Date(item.event_date).getDate()}</h2>
+                    </div>
+                    <div>
+                        <b style="font-size: 1.1rem;">${item.event_name}</b> 
+                        <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: ${item.event_type === 'Holiday' ? '#ffcccc' : '#ccffea'}; color: #000; margin-left: 10px;">${item.event_type}</span>
+                        <p style="margin: 5px 0 0; color: #666; font-size: 0.9rem;">${item.description}</p>
+                    </div>
+                </div>
+                <!-- Delete Button (Only works/shows for Owners) -->
+                ${sessionUserName ? `<button onclick="deleteEvent('${item.id}')" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button>` : ''}
+            </div>
+        `).join('');
+    } else {
+        listDiv.innerHTML = "<p style='text-align:center; color: #999;'>No upcoming holidays or events.</p>";
+    }
+}
+
+// Function to delete an event
+async function deleteEvent(id) {
+    if (!confirm("Are you sure you want to remove this event?")) return;
+    
+    const { error } = await db.from('institute_calendar').delete().eq('id', id);
+    if (error) alert("Error: " + error.message);
+    else {
+        alert("Event Removed");
+        loadCalendar();
+    }
+}
+/* ==========================================
+   15. NAVIGATION & INIT
+   ========================================== */
+/* ==========================================
+   FINAL NAVIGATION & AUTO-POPULATION LOGIC
+   ========================================== */
+function showSection(id) {
+    // 1. UI SWITCHING: Hide all sections and show the target one
+    const sections = document.querySelectorAll('.content-section');
+    sections.forEach(s => s.classList.remove('active'));
+
+    const targetSection = document.getElementById(id);
+    if (targetSection) {
+        targetSection.classList.add('active');
+        console.log("Navigated to: " + id);
+    } else {
+        console.error("Error: Section ID '" + id + "' does not exist in HTML.");
+        return;
+    }
+
+    // 2. DATA AUTO-POPULATION: Trigger specific loaders based on the tab
+    try {
+        switch (id) {
+            case 'admin':
+                // Set default month to current month for Admin Dashboard if empty
+                const adminMonthInput = document.getElementById('admin-filter-month');
+                if (adminMonthInput && !adminMonthInput.value) {
+                    adminMonthInput.value = new Date().toISOString().substring(0, 7);
+                }
+                if (typeof loadAdminDashboard === 'function') loadAdminDashboard();
+                break;
+
+            case 'fee':
+                // Auto-load Fee Management Summary
+                if (typeof loadFeesPortal === 'function') loadFeesPortal();
+                break;
+
+            case 'reminder':
+                // Auto-load Fee Reminder Dashboard
+                if (typeof loadFeeReminders === 'function') loadFeeReminders();
+                break;
+
+            case 'student-p':
+                // Auto-load Personal Student Portal
+                if (typeof loadStudentPortal === 'function') loadStudentPortal();
+                break;
+
+case 'batch-master':
+    loadBMTeacherDropdown(); // New function
+    break;
+case 'batch':
+    loadBatchTeacherDropdown();
+    break;
+
+// Locate the switch(id) inside showSection(id) and add this:
+case 'students':
+    refreshStudentBatchDropdown();
+    break;
+				
+				// Inside your switch (id) statement in showSection(id)
+case 'calendar-mod':
+    loadCalendar();
+    break;
+
+            default:
+                // No auto-population required for other sections
+                break;
+        }
+    } catch (err) {
+        // This catch block prevents a crash in one module from killing the whole app
+        console.warn("Auto-population notice for section [" + id + "]: " + err.message);
+    }
+}
+
+
+/* --- PWA INSTALL LOGIC WRAPPED IN DOM CONTENT LOADED --- */
+document.addEventListener('DOMContentLoaded', () => {
+    let deferredPrompt;
+    const installBtn = document.getElementById('pwa-install-btn');
+
+    // 1. Listen for the browser's install signal
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Stop the browser from showing its own small bar
+        e.preventDefault();
+        // Save the event so we can use it when the user clicks our button
+        deferredPrompt = e;
+        
+        // Show our flamboyant install button
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+        }
+    });
+
+    // 2. Handle the click on our custom button
+    if (installBtn) {
+        installBtn.addEventListener('click', () => {
+            if (deferredPrompt) {
+                // Show the official prompt
+                deferredPrompt.prompt();
+                
+                // See what the user chose
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User installed IMS');
+                    }
+                    // Hide our button regardless of choice
+                    installBtn.style.display = 'none';
+                    deferredPrompt = null;
+                });
+            }
+        });
+    }
+
+    // 3. Hide button if already installed
+    window.addEventListener('appinstalled', () => {
+        if (installBtn) installBtn.style.display = 'none';
+        deferredPrompt = null;
+        console.log('IMS installed successfully');
+    });
+});
+
+
+
+let currentTarget = ""; // Global to track Teacher vs Student
+
+/* ==========================================
+   FINAL WHATSAPP BULK LOGIC
+   ========================================== */
+
+/* --- COMPLETE MESSAGING ENGINE --- */
+function msgEngine(tab) {
+    showSection('message-corner');
+refreshMessageHubDropdowns(); 
+    document.getElementById('link-group-teachers').value = localStorage.getItem('wa_teachers_group') || "";
+    document.getElementById('link-group-students').value = localStorage.getItem('wa_students_group') || "";
+}
+
+async function connectToOwner() {
+    const { data } = await db.from('profiles').select('mobile_number').eq('institute_id', sessionInstID).eq('role', 'Owner').single();
+    if (data?.mobile_number) window.open(`https://wa.me/91${data.mobile_number}`, '_blank');
+    else alert("Owner number not found.");
+}
+
+// 1. Corrected Teacher Search (Uses Partial Match)
+async function fetchTeachersBySubject() {
+    const sub = document.getElementById('wa-teacher-subject').value;
+    let query = db.from('teacher_details')
+        .select('teacher_name, mobile, subject_taught')
+        .eq('institute_id', sessionInstID);
+
+    if (sub !== "All") {
+        // Use % symbols to find the subject even if other subjects are listed in the same box
+        query = query.ilike('subject_taught', `%${sub}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) console.error("Search Error:", error.message);
+    displayWAContactList(data);
+}
+
+// 2. Corrected Student Search (Uses Partial Match)
+async function fetchStudentsByCourse() {
+    const crs = document.getElementById('wa-student-course').value;
+    let query = db.from('students')
+        .select('full_name, mobile, course')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    if (crs !== "All") {
+        // Use % symbols to find the course even if the student is taking multiple courses
+        query = query.ilike('course', `%${crs}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) console.error("Search Error:", error.message);
+    displayWAContactList(data);
+}
+
+function displayWAContactList(list) {
+    const area = document.getElementById('wa-results-area');
+    const container = document.getElementById('wa-contact-list');
+    container.innerHTML = ""; area.style.display = "block";
+    if (!list || list.length === 0) return container.innerHTML = "<p>No contacts found.</p>";
+    list.forEach(p => {
+        const name = p.teacher_name || p.full_name;
+        container.innerHTML += `<div style="background:#fff; border:1px solid #000; padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:bold;">${name}</span><a href="https://wa.me/91${p.mobile}" target="_blank" style="background:#25D366; color:white; padding:5px 10px; border-radius:5px; text-decoration:none; font-size:0.8rem;">CHAT</a></div>`;
+    });
+    area.scrollIntoView({ behavior: 'smooth' });
+}
+
+function saveGroupLinks() {
+    localStorage.setItem('wa_teachers_group', document.getElementById('link-group-teachers').value);
+    localStorage.setItem('wa_students_group', document.getElementById('link-group-students').value);
+    alert("Links Saved!");
+}
+
+function broadcastToGroup(target) {
+    const link = (target === 'Teacher') ? localStorage.getItem('wa_teachers_group') : localStorage.getItem('wa_students_group');
+    if (!link) return alert("Save link first!");
+    window.open(link, '_blank');
+}
+
+async function sendInternalNotice() {
+    const text = document.getElementById('notice-text').value.trim();
+    const sub = document.getElementById('notice-subject').value;
+    if(!text) return alert("Empty message!");
+    const { error } = await db.from('messages').insert([{ institute_id: sessionInstID, sender_name: sessionUserName, sender_role: "Owner", message_type: "Student", target_subject: sub, content: text }]);
+    if(error) alert(error.message); else { alert("Notice Published!"); document.getElementById('notice-text').value = ""; }
+}
+
+async function fetchStudentMessages(course) {
+    const noticeDiv = document.getElementById('student-notices');
+    const { data } = await db.from('messages').select('*').eq('institute_id', sessionInstID).eq('message_type', 'Student').or(`target_subject.eq.General,target_subject.eq.${course}`).order('created_at', { ascending: false });
+    if (data && data.length > 0) {
+        noticeDiv.innerHTML = data.map(m => `<div style="background:#f0fff4; padding:10px; border-bottom:1px solid #27ae60; margin-bottom:5px; border-radius:5px;"><b style="color:#27ae60;">[${m.target_subject}]</b> ${m.content}</div>`).join('');
+    } else noticeDiv.innerHTML = "No new batch notices.";
+}
+
+
+async function saveTeacherPayment() {
+    const data = {
+        institute_id: sessionInstID,
+        teacher_id: document.getElementById('tch-id').value.toUpperCase(),
+        full_name: document.getElementById('tch-name').value,
+        subject_taught: document.getElementById('tch-subject').value,
+        joining_date: document.getElementById('tch-join').value,
+        amount_paid: parseFloat(prompt("Enter Amount Paid Today:")) || 0,
+        pending_amount: parseFloat(prompt("Enter Remaining Balance (if any):")) || 0,
+        month_year: new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
+    };
+
+    if(!data.teacher_id || !data.amount_paid) return alert("Teacher ID and Amount are required!");
+
+    const { error } = await db.from('teacher_payments').insert([data]);
+    if(error) alert(error.message);
+    else alert("Payment Logged Successfully!");
+}
+
+
+async function refreshMessageHubDropdowns() {
+    if (!sessionInstID) return;
+
+    // Fetch unique subjects from your Batches table
+    const { data: batches, error } = await db.from('batches')
+        .select('subject_name')
+        .eq('institute_id', sessionInstID);
+
+    if (error) return console.error("Error fetching subjects:", error.message);
+
+    // Filter for unique, non-empty subject names
+    const uniqueSubjects = [...new Set(batches.map(b => b.subject_name.toUpperCase()))].sort();
+
+    const tSub = document.getElementById('wa-teacher-subject');
+    const sCrs = document.getElementById('wa-student-course');
+    const nSub = document.getElementById('notice-subject');
+
+    // Reset dropdowns to defaults
+    tSub.innerHTML = '<option value="All">All Staff</option>';
+    sCrs.innerHTML = '<option value="All">All Students</option>';
+    nSub.innerHTML = '<option value="General">All Batches</option>';
+
+    // Fill with dynamic data
+    uniqueSubjects.forEach(sub => {
+        const opt = `<option value="${sub}">${sub}</option>`;
+        tSub.innerHTML += opt;
+        sCrs.innerHTML += opt;
+        nSub.innerHTML += opt;
+    });
+}
+/* ==========================================
+   PDF GENERATOR LOGIC (STUDENT & TEACHER)
+   ========================================== */
+
+/* ==========================================
+   PDF GENERATOR LOGIC (STUDENT & TEACHER)
+   ========================================== */
+
+/* ==========================================
+   ADVANCED RECEIPT SYSTEM (HISTORY BASED)
+   ========================================== */
+
+// --- STUDENT HISTORY & PDF ---
+// --- SHOW HISTORY FOR STUDENTS ---
+async function showReceiptHistory() {
+    const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Fetch student details first!");
+    
+    const { data: history } = await db.from('payment_history').select('*')
+        .eq('roll_number', roll).eq('institute_id', sessionInstID).order('payment_date', { ascending: false });
+
+    if (!history || history.length === 0) return alert("No history found.");
+    
+    document.getElementById('receipt-history-list').style.display = 'block';
+    const container = document.getElementById('history-links-container');
+    container.innerHTML = history.map(row => `
+        <div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #eee; align-items:center; color:#000;">
+            <span>${row.payment_date} (₹${row.amount})</span>
+            <button onclick="runPrint('${row.payment_date}', '${row.amount}', 'Student')" style="background:green; color:white; border:none; padding:3px 8px; border-radius:3px; cursor:pointer;">PRINT</button>
+        </div>
+    `).join('');
+}
+
+// --- SHOW HISTORY FOR TEACHERS ---
+async function showPayslipHistory() {
+    // 1. Get the Teacher ID from the input field
+    const tid = document.getElementById('tch-id').value.trim().toUpperCase();
+    
+    if (!tid) {
+        return alert("Please FETCH teacher details first so I know whose payslips to look for!");
+    }
+
+    // 2. Fetch records from the TEACHER_PAYMENTS table (Not the student one)
+    const { data: history, error } = await db.from('teacher_payments')
+        .select('*')
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID)
+        .order('payment_date', { ascending: false });
+
+    // 3. Handle Errors or Empty Data
+    if (error) {
+        console.error("Fetch Error:", error.message);
+        return alert("Error loading records: " + error.message);
+    }
+
+    if (!history || history.length === 0) {
+        return alert("No salary records found for ID: " + tid + ". Did you 'LOG SALARY' yet?");
+    }
+
+    // 4. Show the list and clear old data
+    const listArea = document.getElementById('payslip-history-list');
+    const container = document.getElementById('teacher-history-links-container');
+    
+    listArea.style.display = 'block';
+    container.innerHTML = ""; // Clear old list
+
+    // 5. Generate the clickable links for the Payslips
+    history.forEach(row => {
+        container.innerHTML += `
+            <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #ddd; align-items:center; color:#000;">
+                <span><b>${row.month_year}</b>: ₹${row.amount_paid}</span>
+                <button onclick="runPrintTeacher('${row.payment_date}', '${row.amount_paid}', '${row.pending_amount}', '${row.month_year}')" 
+                        style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
+                    <i class="fas fa-print"></i> PRINT
+                </button>
+            </div>
+        `;
+    });
+}
+
+// --- FINAL PRINT COMMAND ---
+function runPrint(date, amt, type) {
+    // 1. Get Data
+    const instID = sessionInstID || "N/A";
+    const name = (type === 'Student') ? document.getElementById('fee-name').value : document.getElementById('tch-name').value;
+    const id = (type === 'Student') ? document.getElementById('fee-roll').value : document.getElementById('tch-id').value;
+    const course = (type === 'Student') ? document.getElementById('fee-course').value : document.getElementById('tch-subject').value;
+    const balance = (type === 'Student') ? document.getElementById('fee-pending').value : "Salary Logged";
+
+    // 2. Create the Receipt Content (Clean HTML)
+// 2. Create the Receipt Content (Clean HTML with Logo)
+    const receiptHtml = `
+        <html>
+        <head>
+            <title>Receipt_${id}</title>
+            <style>
+                body { font-family: 'Times New Roman', serif; padding: 40px; color: black; }
+                .container { border: 2px solid black; padding: 30px; width: 600px; margin: auto; }
+                .header { text-align: center; border-bottom: 2px solid black; margin-bottom: 20px; padding-bottom: 10px; }
+                
+                /* Logo Styling */
+                .logo { width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px; }
+                
+                .row { display: flex; justify-content: space-between; margin: 10px 0; font-size: 18px; }
+                .amount-box { border: 3px solid black; padding: 20px; text-align: center; margin: 30px 0; background: #eee; }
+                .footer { margin-top: 60px; display: flex; justify-content: space-between; }
+                .sign { border-top: 1px solid black; width: 200px; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <!-- LOGO INSERTED HERE -->
+                    <img src="icon-192x192.png" class="logo" alt="Institute Logo">
+                    
+                    <h1 style="margin:0;">FEE RECEIPT</h1>
+                    <p style="margin:5px 0;"><b>Institute ID:</b> ${instID}</p>
+                </div>
+                
+                <div class="row">
+                    <span><b>Date:</b> ${date}</span> 
+                    <span><b>No:</b> ${Math.floor(Math.random()*9000)+1000}</span>
+                </div>
+                
+                <div class="row"><span><b>Name:</b> ${name}</span></div>
+                <div class="row"><span><b>Roll/ID:</b> ${id}</span></div>
+                <div class="row"><span><b>Course:</b> ${course}</span></div>
+                
+                <div class="amount-box">
+                    <h2 style="margin:0; font-size: 32px;">AMOUNT PAID: ₹ ${amt}</h2>
+                </div>
+                
+                <div class="row"><span><b>Outstanding Balance:</b> ₹ ${balance}</span></div>
+                
+                <div class="footer">
+                    <div class="sign">Receiver Signature</div>
+                    <div class="sign">Authorized Signatory</div>
+                </div>
+                <p style="text-align:center; margin-top:30px; font-size:12px;">Computer Generated Official Document</p>
+            </div>
+        </body>
+        </html>
+    `;
+
+    // 3. Open New Window and Print
+    const printWindow = window.open('', '_blank', 'width=800,height=800');
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
+    
+    // Give it a tiny moment to load, then print
+    printWindow.setTimeout(function() {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
+}
+
+
+
+
+
+function runPrintTeacher(date, paid, pending, month) {
+    const instID = sessionInstID || "N/A";
+    const name = document.getElementById('tch-name').value;
+    const id = document.getElementById('tch-id').value;
+    const sub = document.getElementById('tch-subject').value;
+
+    const receiptHtml = `
+        <html>
+        <head>
+            <title>Payslip_${id}</title>
+            <style>
+                body { font-family: serif; padding: 40px; color: black; }
+                .container { border: 2px solid black; padding: 30px; width: 600px; margin: auto; }
+                .header { text-align: center; border-bottom: 2px solid black; margin-bottom: 20px; }
+                .logo { width: 80px; height: 80px; margin-bottom: 10px; }
+                .row { display: flex; justify-content: space-between; margin: 10px 0; font-size: 18px; }
+                .amount-box { border: 3px solid black; padding: 20px; text-align: center; margin: 30px 0; background: #eee; }
+                .sign-row { margin-top: 60px; display: flex; justify-content: space-between; }
+                .sign-box { border-top: 1px solid black; width: 200px; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <img src="icon-192x192.png" class="logo">
+                    <h1 style="margin:0;">SALARY PAYSLIP</h1>
+                    <p><b>Institute ID:</b> ${instID}</p>
+                    <p>For Month: <b>${month}</b></p>
+                </div>
+                <div class="row"><span><b>Date:</b> ${date}</span> <span><b>No:</b> ${Math.floor(Math.random()*9000)+1000}</span></div>
+                <div class="row"><b>Name:</b> ${name}</div>
+                <div class="row"><b>ID:</b> ${id}</div>
+                <div class="row"><b>Subject:</b> ${sub}</div>
+                
+                <div class="amount-box">
+                    <h2 style="margin:0;">AMOUNT PAID: ₹ ${paid}</h2>
+                </div>
+                
+                <div class="row"><b>Balance Pending:</b> ₹ ${pending}</div>
+                
+                <div class="sign-row">
+                    <div class="sign-box">Staff Signature</div>
+                    <div class="sign-box">Authorized Signatory</div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=800');
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+}
+
+
+/* --- START OF ADDED GLOBAL FUNCTION FIX --- */
+window.showHomeChartPage = function(page) {
+    var c1 = document.getElementById('home_stacked_chart');
+    var c2 = document.getElementById('home_pie_chart');
+    var c3 = document.getElementById('home_line_chart');
+
+    if (c1) c1.style.height = (page === 1) ? '400px' : '0px';
+    if (c2) c2.style.height = (page === 2) ? '400px' : '0px';
+    if (c3) {
+        c3.style.height = (page === 3) ? '400px' : '0px';
+        c3.style.overflow = 'hidden';
+    }
+};
+/* --- END OF ADDED GLOBAL FUNCTION FIX --- */
+
+
+
+/* ==========================================
+   FINANCIAL INTELLIGENCE: FORECASTING ENGINE
+   ========================================== */
+
+/* ==========================================
+   FINANCIAL INTELLIGENCE: FORECASTING ENGINE
+   ========================================== */
+
+async function generateFinancialForecast(students) {
+    const forecastData = {};
+    const chartRows = [];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    // 1. GENERATE THE FIXED 6-MONTH WINDOW (1 Past + 1 Current + 4 Future)
+    const displayMonths = [];
+    let tempDate = new Date();
+    tempDate.setDate(1); 
+    tempDate.setMonth(tempDate.getMonth() - 1); // Start from Last Month (e.g., February)
+
+    for (let i = 0; i < 6; i++) {
+        let mKey = monthNames[tempDate.getMonth()] + " " + tempDate.getFullYear();
+        displayMonths.push(mKey);
+        forecastData[mKey] = 0; 
+        tempDate.setMonth(tempDate.getMonth() + 1);
+    }
+
+    const firstMonthKey = displayMonths[0]; // The "Past Month" anchor (February 2026)
+
+    // 2. ALLOCATE PENDING FEES (DYNAMIC CATCH-ALL LOGIC)
+    students.forEach(s => {
+        const totalPendingForStudent = parseFloat(s.pending_amount) || 0;
+        if (totalPendingForStudent <= 0) return;
+
+        let rawDates = [];
+        if (s.due_dates && s.due_dates.trim() !== "") {
+            rawDates = s.due_dates.split(',').map(d => d.trim()).filter(d => d !== "");
+        }
+
+        if (rawDates.length > 0) {
+            const perInstallment = totalPendingForStudent / rawDates.length;
+            let allocatedToWindow = 0;
+
+            rawDates.forEach(dateStr => {
+                let matched = false;
+                displayMonths.forEach(mKey => {
+                    if (dateStr.toLowerCase().includes(mKey.toLowerCase())) {
+                        forecastData[mKey] += perInstallment;
+                        allocatedToWindow += perInstallment;
+                        matched = true;
+                    }
+                });
+
+                // If installment date is in the deep past (before our window), add to first card
+                if (!matched) {
+                    let dObj = new Date(dateStr.replace(/(st|nd|rd|th)/i, ''));
+                    if (!isNaN(dObj) && dObj < new Date(displayMonths[0])) {
+                        forecastData[firstMonthKey] += perInstallment;
+                        allocatedToWindow += perInstallment;
+                    }
+                }
+            });
+
+            // RESIDUAL LOGIC: If some money isn't accounted for by the string matching,
+            // or if the student joined in the past, dump the remainder into the Past Month card.
+            const remainder = totalPendingForStudent - allocatedToWindow;
+            if (remainder > 1) { // 1 rupee buffer for rounding
+                forecastData[firstMonthKey] += remainder;
+            }
+
+        } else {
+            // FALLBACK: If NO due dates are mentioned, dump the whole pending amount 
+            // into the First Card (Past Month) because it is technically "Already Due"
+            forecastData[firstMonthKey] += totalPendingForStudent;
+        }
+    });
+
+    // 3. FETCH DATA FOR GRAPHS (INSTITUTE SPECIFIC)
+    const currentYear = new Date().getFullYear();
+    const { data: yearlyPayments } = await db.from('payment_history')
+        .select('amount')
+        .eq('institute_id', sessionInstID)
+        .gte('payment_date', `${currentYear}-01-01`)
+        .lte('payment_date', `${currentYear}-12-31`);
+        
+    const totalReceived = yearlyPayments ? yearlyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) : 0;
+    const totalAdmissions = students.length;
+    const totalPendingGlobal = students.reduce((sum, s) => sum + (Number(s.pending_amount) || 0), 0);
+
+    // 4. RENDER UI CARDS
+    const cardContainer = document.getElementById('forecast-cards');
+    cardContainer.innerHTML = "";
+    
+    const todayMonthStart = new Date();
+    todayMonthStart.setDate(1);
+    todayMonthStart.setHours(0,0,0,0);
+
+    displayMonths.forEach(month => {
+        const amt = Math.round(forecastData[month]);
+        const mDate = new Date(month);
+        const isPast = mDate < todayMonthStart;
+
+        cardContainer.innerHTML += `
+            <div class="stat-card" style="padding: 15px; min-width: 140px; border-bottom: 4px solid ${isPast ? '#ff0000' : '#f39c12'}; background: ${isPast ? '#fff5f5' : 'white'};">
+                <p style="font-size: 0.7rem; margin-bottom: 5px; color: ${isPast ? '#ff0000' : '#666'}; font-weight: bold;">
+                    ${month.toUpperCase()} ${isPast ? '(PAST DUE)' : ''}
+                </p>
+                <h4 style="font-size: 1.2rem !important; color: #000;">₹${amt.toLocaleString('en-IN')}</h4>
+            </div>
+        `;
+        chartRows.push([month, totalAdmissions, totalReceived, totalPendingGlobal, amt]);
+    });
+
+    // 5. CUMULATIVE CHART DATA SYNC
+    let runningCollection = totalReceived;
+    let runningPending = totalPendingGlobal;
+
+    for (let i = 0; i < chartRows.length; i++) {
+        let monthlyIncoming = chartRows[i][4];
+        runningCollection += monthlyIncoming;
+        runningPending -= monthlyIncoming;
+        if (runningPending < 0) runningPending = 0; 
+
+        chartRows[i][2] = runningCollection; 
+        chartRows[i][3] = runningPending;    
+        chartRows[i].push(monthlyIncoming);  
+    }
+
+    // 6. DYNAMIC ADMISSIONS (END DATE) LOGIC
+    const { data: dynStudents } = await db.from('students')
+        .select('student_details(course_end_date)')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+
+    if (dynStudents) {
+        for (let i = 0; i < chartRows.length; i++) {
+            let monthName = chartRows[i][0]; 
+            let chartMonthDate = new Date(monthName + " 1"); 
+            let activeCount = 0;
+
+            dynStudents.forEach(s => {
+                let details = Array.isArray(s.student_details) ? s.student_details[0] : s.student_details;
+                let endStr = details ? details.course_end_date : null;
+                if (!endStr) { activeCount++; } 
+                else {
+                    let endDate = new Date(endStr);
+                    if (endDate >= chartMonthDate) activeCount++;
+                }
+            });
+            chartRows[i][1] = activeCount;
+        }
+    }
+
+    drawHomeForecastingChart(chartRows);
+}
+function drawHomeForecastingChart(chartRows) {
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Month');
+    data.addColumn('number', 'Admissions');
+    data.addColumn('number', 'Total Collection');
+    data.addColumn('number', 'Total Pending');
+    data.addColumn('number', 'Incoming (Forecast)');
+    data.addColumn('number', 'Monthly Revenue'); // Column Index 5
+
+    data.addRows(chartRows);
+
+    var dashboard = new google.visualization.Dashboard(document.getElementById('home_dashboard_div'));
+
+    var slicer = new google.visualization.ControlWrapper({
+        'controlType': 'CategoryFilter',
+        'containerId': 'home_filter_div',
+        'options': {
+            'filterColumnLabel': 'Month',
+            'ui': { 'label': 'Filter Specific Month:', 'allowTyping': false, 'allowMultiple': true }
+        }
+    });
+
+    var lineChart = new google.visualization.ChartWrapper({
+        'chartType': 'LineChart',
+        'containerId': 'home_line_chart',
+        'options': {
+            'title': 'INCOMING STATUS & TREND',
+            'curveType': 'function',
+            'legend': { position: 'bottom' },
+            'colors':['#27ae60', '#1877F2', '#ff0000', '#f39c12'],
+            'pointSize': 7,
+            'vAxis': { title: 'Amount / Count', minValue: 0 },
+            'hAxis': { title: 'Timeline' },
+            'chartArea': { width: '85%', height: '70%' }
+        }
+    });
+
+    lineChart.setOption('height', 400);
+
+    var stackedChart = new google.visualization.ChartWrapper({
+        'chartType': 'ColumnChart', 
+        'containerId': 'home_stacked_chart',
+        'options': {
+            'title': 'Financial Outlook (Stacked Bar)',
+            'isStacked': true,
+            'height': 400,
+            'legend': { position: 'bottom' },
+            'colors':['#27ae60', '#1877F2', '#ff0000', '#f39c12'],
+            'vAxis': { title: 'Amount / Count', minValue: 0 },
+            'hAxis': { title: 'Month & Year' },
+            'chartArea': { width: '85%', height: '70%' }
+        }
+    });
+
+    stackedChart.setOption('vAxes', {
+        0: { title: 'Amount (₹)', minValue: 0 },
+        1: { title: 'Total Admissions (Count)', minValue: 0 }
+    });
+    stackedChart.setOption('series', {
+        0: { targetAxisIndex: 1 } 
+    });
+
+var pieChart = new google.visualization.ChartWrapper({
+        'chartType': 'PieChart',
+        'containerId': 'home_pie_chart',
+        'view': { 'columns': [0, 4] }, // Index 0 is Month, Index 4 is the specific monthly forecast
+        'options': {
+            'title': 'Incoming Forecast Distribution (%)',
+            'height': 400,
+            'legend': { position: 'right' },
+            'pieSliceText': 'percentage', // Automatically calculates the % of the total pending
+            'colors': ['#f39c12', '#e67e22', '#d35400', '#c0392b', '#16a085', '#27ae60'],
+            'chartArea': { width: '90%', height: '80%' }
+        }
+    });
+
+    stackedChart.setView({ 'columns':[0, 1, 2, 3, 4] });
+    lineChart.setView({ 'columns':[0, 1, 2, 3, 4] });
+
+    stackedChart.setChartType('ComboChart');
+    stackedChart.setOption('isStacked', true);
+    stackedChart.setOption('seriesType', 'bars');
+    stackedChart.setOption('vAxes', {
+        0: { minValue: 0, viewWindow: { min: 0 } },
+        1: { minValue: 0, viewWindow: { min: 0 } }
+    });
+    stackedChart.setOption('series', {
+        0: { type: 'line', targetAxisIndex: 1, color: '#27ae60', lineWidth: 4, pointSize: 8 }
+    });
+
+    dashboard.bind(slicer, stackedChart);
+    dashboard.bind(slicer, pieChart);
+    
+    setTimeout(function() { showHomeChartPage(1); }, 100);
+
+    dashboard.bind(slicer, lineChart);
+    dashboard.draw(data);
+}
+
+
+
+/* ==========================================
+   ALUMNI & PLACEMENT TRACKER LOGIC
+   ========================================== */
+
+// 1. Fetch Student from Master Table and Check Status
+async function fetchStudentForAlumni() {
+    const roll = document.getElementById('al-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Please enter a Roll Number");
+
+    const { data: student, error } = await db.from('students')
+        .select('full_name, course, admission_date, status')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if(error || !student) return alert("Student not found in admission records.");
+
+    // CONDITION: Cannot add ACTIVE students
+    if(student.status === 'Active') {
+        alert("ERROR: This student is currently 'Active'. You can only add students to Alumni section once their course is Closed or Graduated.");
+        clearAlumniForm();
+        return;
+    }
+
+    // Autopopulate fields
+    document.getElementById('al-name').value = student.full_name;
+    document.getElementById('al-course').value = student.course;
+    
+    // Format enrollment date to Month Year
+    const enrollDate = new Date(student.admission_date).toLocaleString('default', { month: 'long', year: 'numeric' });
+    document.getElementById('al-enroll').value = enrollDate;
+    
+    alert("Record found for " + student.full_name + ". You may now fill placement details.");
+}
+
+// 2. Add Alumni Record
+async function addAlumni() {
+    const roll = document.getElementById('al-roll').value.toUpperCase();
+    const name = document.getElementById('al-name').value;
+    
+    if(!roll || !name) return alert("Please fetch student details first.");
+
+    const alumniData = {
+        institute_id: sessionInstID,
+        roll_number: roll,
+        full_name: name,
+        course_enrolled: document.getElementById('al-course').value,
+        enrollment_month_year: document.getElementById('al-enroll').value,
+        college_name: document.getElementById('al-college').value,
+        stream: document.getElementById('al-stream').value,
+        company_name: document.getElementById('al-company').value,
+        designation: document.getElementById('al-designation').value,
+        salary: parseFloat(document.getElementById('al-salary').value) || 0
+    };
+
+    const { error } = await db.from('alumni_tracker').insert([alumniData]);
+    if(error) {
+        if(error.code === "23505") alert("Error: An alumni record for this Roll Number already exists.");
+        else alert("Save Error: " + error.message);
+    } else {
+        alert("Success! Alumni record for " + name + " saved.");
+        clearAlumniForm();
+    }
+}
+
+// 3. Edit Alumni Record
+async function editAlumni() {
+    const roll = document.getElementById('al-roll').value.toUpperCase();
+    if(!roll) return alert("Enter Roll Number to edit.");
+
+    const updateData = {
+        college_name: document.getElementById('al-college').value,
+        stream: document.getElementById('al-stream').value,
+        company_name: document.getElementById('al-company').value,
+        designation: document.getElementById('al-designation').value,
+        salary: parseFloat(document.getElementById('al-salary').value) || 0
+    };
+
+    const { error } = await db.from('alumni_tracker').update(updateData).eq('roll_number', roll).eq('institute_id', sessionInstID);
+    if(error) alert("Update Error: " + error.message);
+    else alert("Success: Placement details updated for " + roll);
+}
+
+// 4. Fetch Saved Alumni Record
+async function fetchSavedAlumni() {
+    const roll = document.getElementById('al-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Enter Roll Number to fetch saved record.");
+
+    const { data, error } = await db.from('alumni_tracker').select('*').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    
+    if(error || !data) return alert("No saved alumni record found for this roll number.");
+
+    document.getElementById('al-name').value = data.full_name;
+    document.getElementById('al-course').value = data.course_enrolled;
+    document.getElementById('al-enroll').value = data.enrollment_month_year;
+    document.getElementById('al-college').value = data.college_name;
+    document.getElementById('al-stream').value = data.stream;
+    document.getElementById('al-company').value = data.company_name;
+    document.getElementById('al-designation').value = data.designation;
+    document.getElementById('al-salary').value = data.salary;
+    
+    alert("Saved record loaded!");
+}
+
+function clearAlumniForm() {
+    const ids = ['al-roll','al-name','al-course','al-enroll','al-college','al-stream','al-company','al-designation','al-salary'];
+    ids.forEach(id => document.getElementById(id).value = "");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ==========================================
+   INVENTORY & STATIONERY TRACKER LOGIC
+   ========================================== */
+
+/* ==========================================
+   INVENTORY MANAGER: GRID & VENDOR LOGIC
+   ========================================== */
+
+const INVENTORY_ITEMS = [
+    'Algebra','Geometry','Physics','Chemistry','Biology','History','Geography','Spoken English',
+    'English Grammar','Economics','Accounting','Drawing','JEE','NEET','French','Spanish','German',
+    'Uniforms','Bags','Calendars','Others'
+];
+
+// Initialize Grid on Load
+// 1. INITIALIZE GRID WITH LOCKED DEFAULTS
+function initInventoryGrid() {
+    const tbody = document.getElementById('inventory-items-body');
+    tbody.innerHTML = INVENTORY_ITEMS.map(item => {
+        const id = item.replace(/\s+/g, '-').toLowerCase();
+        
+        // SET FIXED PRICES
+        let defaultPrice = 100; 
+        if (item === 'Uniforms') defaultPrice = 150;
+        if (item === 'Bags') defaultPrice = 350;
+        if (item === 'Calendars') defaultPrice = 75;
+
+        return `
+            <tr id="row-${id}">
+                <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                    <input type="checkbox" class="inv-check" data-item="${item}" onchange="calculateInvTotal()">
+                </td>
+                <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold; color: #000;">${item}</td>
+                
+                <!-- GREYED OUT & LOCKED STOCK (STARTS AT 100) -->
+                <td style="padding: 10px; border: 1px solid #ccc;">
+                    <input type="number" class="inv-stock-val" style="width: 70px; background: #e9ecef; border: 1px solid #999; color: #333; text-align: center; font-weight: bold;" value="100" disabled>
+                </td>
+                
+                <!-- GREYED OUT & LOCKED PRICE -->
+                <td style="padding: 10px; border: 1px solid #ccc;">
+                    <input type="number" class="inv-price-val" style="width: 70px; background: #e9ecef; border: 1px solid #999; color: #333; text-align: center; font-weight: bold;" value="${defaultPrice}" disabled>
+                </td>
+                
+                <td style="padding: 10px; border: 1px solid #ccc;">
+                    <input type="number" class="inv-qty-val" style="width: 60px;" value="1" min="1" oninput="calculateInvTotal()">
+                </td>
+                <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                    ${['A','B','C','D','E'].map(v => `
+                        <a href="https://wa.me/910000000000?text=Order:${item}" target="_blank" 
+                           style="text-decoration:none; margin: 0 2px; font-size: 0.7rem; background: #25D366; color: white; padding: 3px 6px; border-radius: 3px; display: inline-block;">
+                           ${v} <i class="fab fa-whatsapp"></i>
+                        </a>
+                    `).join('')}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+
+function toggleInventoryGrid() {
+    const grid = document.getElementById('inventory-grid-container');
+    const isOpening = grid.style.display === 'none';
+    grid.style.display = isOpening ? 'block' : 'none';
+    
+    // Simply load the data from Supabase into the locked fields
+    if(isOpening) loadMasterInventory();
+}
+
+function calculateInvTotal() {
+    let total = 0;
+    document.querySelectorAll('.inv-check:checked').forEach(cb => {
+        const row = cb.closest('tr');
+        const price = parseFloat(row.querySelector('.inv-price-val').value) || 0;
+        const qty = parseInt(row.querySelector('.inv-qty-val').value) || 1;
+        total += (price * qty);
+    });
+    document.getElementById('inv-total-calc').value = total.toFixed(2);
+}
+
+// Check for stock < 10 across all rows
+function checkLowStockGlobal() {
+    let lowItems = [];
+    document.querySelectorAll('#inventory-items-body tr').forEach(row => {
+        const name = row.querySelector('.inv-check').dataset.item;
+        const stock = parseInt(row.querySelector('.inv-stock-val').value) || 0;
+        if(stock > 0 && stock < 10) lowItems.push(name);
+    });
+
+    const alertBox = document.getElementById('low-stock-alert');
+    if(lowItems.length > 0) {
+        alertBox.style.display = 'block';
+        document.getElementById('low-stock-items').innerText = lowItems.join(', ') + " are running low!";
+    } else {
+        alertBox.style.display = 'none';
+    }
+}
+
+// SAVE THE PRICES & STOCK TO SUPABASE
+async function saveInventoryMaster() {
+    const updates = [];
+    document.querySelectorAll('#inventory-items-body tr').forEach(row => {
+        const name = row.querySelector('.inv-check').dataset.item;
+        const stock = parseInt(row.querySelector('.inv-stock-val').value) || 0;
+        const price = parseFloat(row.querySelector('.inv-price-val').value) || 0;
+
+        updates.push({
+            institute_id: sessionInstID,
+            item_name: name,
+            current_stock: stock,
+            item_price: price
+        });
+    });
+
+    const { error } = await db.from('inventory_master').upsert(updates, { onConflict: 'institute_id, item_name' });
+    if(error) alert(error.message); else alert("Catalog and Master Stock updated!");
+}
+
+// 2. LOAD DB AND FIX OLD CORRUPT ZEROS AUTOMATICALLY
+// 2. LOAD DB AND FIX OLD TEST SALES AUTOMATICALLY
+async function loadMasterInventory() {
+    const { data } = await db.from('inventory_master').select('*').eq('institute_id', sessionInstID);
+    
+    let needsDatabaseFix = false;
+
+    if (data && data.length > 0) {
+        data.forEach(item => {
+            const id = item.item_name.replace(/\s+/g, '-').toLowerCase();
+            const row = document.getElementById(`row-${id}`);
+            
+            if(row) {
+                let stock = item.current_stock;
+                let price = item.item_price;
+
+                // Calculate what the exact price SHOULD be
+                let expectedPrice = 100;
+                if (item.item_name === 'Uniforms') expectedPrice = 150;
+                else if (item.item_name === 'Bags') expectedPrice = 350;
+                else if (item.item_name === 'Calendars') expectedPrice = 75;
+
+                // THE FIX: If the price doesn't match the new rules, OR if stock is suspiciously low from old tests, WIPE IT CLEAN TO 100!
+                if (price !== expectedPrice || stock <= 1 || price === 0) {
+                    stock = 100;
+                    price = expectedPrice;
+                    needsDatabaseFix = true; // Flag it to sync to the database
+                }
+
+                row.querySelector('.inv-stock-val').value = stock;
+                row.querySelector('.inv-price-val').value = price;
+            }
+        });
+        checkLowStockGlobal();
+
+        // Push the perfectly clean 100s back to the database silently
+        if (needsDatabaseFix) saveInventoryMaster();
+    } else {
+        // If DB is completely empty, save the 100s automatically.
+        saveInventoryMaster();
+    }
+}
+
+
+// PROCESS SALE
+async function processInventorySale() {
+    const roll = document.getElementById('inv-stu-roll').value;
+    const selectedRows = Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => {
+        const row = cb.closest('tr');
+        return {
+            name: cb.dataset.item,
+            qty: parseInt(row.querySelector('.inv-qty-val').value) || 1
+        };
+    });
+
+    const total = parseFloat(document.getElementById('inv-total-calc').value);
+
+    if(!roll || selectedRows.length === 0) return alert("Select student and items first!");
+
+    const itemsStr = selectedRows.map(i => `${i.name} (${i.qty})`).join(', ');
+
+    const saleData = {
+        institute_id: sessionInstID,
+        student_roll: roll,
+        student_name: document.getElementById('inv-stu-name').value,
+        course_name: document.getElementById('inv-stu-course').value,
+		month_year: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+        items_bought: itemsStr,
+        total_paid: total,
+        remarks: document.getElementById('inv-remarks').value
+};
+
     
 
+    const { error } = await db.from('inventory_sales').insert([saleData]);
+    if(error) alert(error.message);
+    else {
+        // Updated deduction loop to use correct quantity
+        for(let item of selectedRows) {
+            const { data } = await db.from('inventory_master')
+                .select('current_stock')
+                .eq('item_name', item.name)
+                .eq('institute_id', sessionInstID)
+                .single();
+            
+            if(data) {
+                await db.from('inventory_master')
+                    .update({ current_stock: data.current_stock - item.qty })
+                    .eq('item_name', item.name)
+                    .eq('institute_id', sessionInstID);
+            }
+        }
+        
+        syncToOtherIncome(total);
+        alert("Sale Recorded & " + itemsStr + " deducted from stock!");
+        clearInventoryUI();
+loadMasterInventory(); 
+    }
+}
+
+
+
+function clearInventoryUI() {
+    ['inv-stu-roll','inv-stu-name','inv-stu-course','inv-total-calc','inv-remarks'].forEach(id => document.getElementById(id).value = "");
+    document.querySelectorAll('.inv-check').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.inv-qty-val').forEach(input => input.value = 1);
+}
+
+async function deductStock(itemList) {
+    for(let item of itemList) {
+        const { data } = await db.from('inventory_master').select('current_stock').eq('item_name', item).eq('institute_id', sessionInstID).single();
+        if(data) {
+            await db.from('inventory_master').update({ current_stock: data.current_stock - 1 }).eq('item_name', item).eq('institute_id', sessionInstID);
+        }
+    }
+}
+
+// Finally, call init in your script load section
+initInventoryGrid();
+
+
+
+
+
+async function fetchStudentForInv() {
+    const roll = document.getElementById('inv-stu-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter a Roll Number first.");
+
+    const { data, error } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (error) return alert("Error: " + error.message);
+    if (data) {
+        document.getElementById('inv-stu-name').value = data.full_name;
+        document.getElementById('inv-stu-course').value = data.course;
+        alert("Student details loaded!");
+    } else {
+        alert("No student found with Roll No: " + roll);
+    }
+}
+
+
+
+
+/* --- MINIMAL FIX: FINANCIAL SYNC FOR INVENTORY --- */
+/* --- SAFE SYNC: STOPS EXPENSE SECTION CRASHES --- */
+async function syncToOtherIncome(amount) {
+    // We only log the sale to the console now.
+    // The Inventory Income is already being calculated and displayed 
+    // on the HOME PAGE card, so we don't need to force it into the Expense table.
+    console.log("Inventory Sale Recorded: ₹" + amount + ". Home Page stats will update on refresh.");
+}
+
+
+async function calculateInventoryIncome(monthYear) {
+    // monthYear is "2026-02"
+    // We need to filter records where created_at is within this month
+    const startDate = `${monthYear}-01T00:00:00Z`;
+    const endDate = `${monthYear}-31T23:59:59Z`; // SQL handles the 31st safely
+
+    const { data, error } = await db.from('inventory_sales')
+
+        .select('total_paid')
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate);
+
+    if (error) {
+        console.error("Inventory Sum Error:", error.message);
+        return 0;
+    }
+
+    // Sum up all the 'total_paid' values for that month
+    return data.reduce((sum, record) => sum + (parseFloat(record.total_paid) || 0), 0);
+}
+
+
+
+/* --- HOME PAGE: REAL-TIME INVENTORY SUM --- */
+async function loadHomeInventoryStats() {
+    if (!sessionInstID) return;
+
+    // Get the start and end of the current month
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+    const { data, error } = await db.from('inventory_sales')
+        .select('total_paid')
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startOfMonth)
+        .lte('created_at', endOfMonth);
+
+    if (error) {
+        console.error("Home Inventory Error:", error.message);
+        return;
+    }
+
+    const totalInv = data ? data.reduce((sum, item) => sum + (parseFloat(item.total_paid) || 0), 0) : 0;
+    
+    // Update the new Home Page card
+    document.getElementById('home-total-inventory').innerText = "₹ " + totalInv.toLocaleString('en-IN');
+}
+
+
+
+
+
+/* --- EXPENSE SECTION: AUTO-PULL INVENTORY SALES --- */
+async function fetchAutoInventory() {
+    const monthInput = document.getElementById('exp-month-year').value; // "2026-02"
+    if (!monthInput || !sessionInstID) return;
+
+    // CONVERT "2026-02" to "February 2026" (Exactly like Student Fees)
+    const dateObj = new Date(monthInput + "-01");
+    const formattedMonth = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    console.log("Fetching Inventory for:", formattedMonth);
+
+    const { data, error } = await db.from('inventory_sales')
+        .select('total_paid')
+        .eq('institute_id', sessionInstID)
+        .eq('month_year', formattedMonth); // THE KEY CHANGE: Match by String Name
+
+    if (error) {
+        console.error("Inventory Fetch Error:", error.message);
+        return;
+    }
+
+    const totalSales = data ? data.reduce((sum, item) => sum + (parseFloat(item.total_paid) || 0), 0) : 0;
+    
+    // Update the UI Label
+    document.getElementById('disp-auto-inv').innerText = "₹ " + totalSales.toFixed(2);
+    
+    // Refresh the master calculation
+    calculateFinancials();
+}
+
+
+
+/* --- LOGIC: FETCH INVENTORY TOTAL FOR THE SELECTED MONTH --- */
+async function fetchAutoInventory() {
+    const monthVal = document.getElementById('exp-month-year').value; // e.g. "2026-02"
+    if (!monthVal || !sessionInstID) return;
+
+    // Create date range for the selected month
+    const startDate = `${monthVal}-01T00:00:00Z`;
+    const endDate = `${monthVal}-31T23:59:59Z`;
+
+    const { data, error } = await db.from('inventory_sales')
+        .select('total_paid')
+        .eq('institute_id', sessionInstID)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate);
+
+    if (error) {
+        console.error("Inventory Fetch Error:", error.message);
+        return;
+    }
+
+    // Calculate the sum exactly like your Fee logic
+    const totalSales = data ? data.reduce((sum, item) => sum + (parseFloat(item.total_paid) || 0), 0) : 0;
+    
+    // Update the UI Label (The Purple one)
+    document.getElementById('disp-auto-inv').innerText = "₹ " + totalSales.toFixed(2);
+    
+    // Update the Math
+    calculateFinancials();
+}
+
+
+
+
+
+
+
+/* ==========================================
+   23. SCHOLARSHIP TRACKER LOGIC
+   ========================================== */
+
+// 1. Set Today's Date on Load
+document.addEventListener('DOMContentLoaded', () => {
+    const schToday = document.getElementById('sch-today');
+    if(schToday) schToday.value = new Date().toISOString().split('T')[0];
+});
+
+// 2. Fetch Base Student Details
+// 2. Fetch Base Student Details
+async function fetchStudentForScholarship() {
+    const roll = document.getElementById('sch-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter Roll Number first.");
+
+    // Step A: Fetch base data
+    const { data: student, error } = await db.from('students')
+        .select('full_name, course, total_fees')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (error || !student) return alert("Student not found. Ensure Roll No is correct.");
+
+    document.getElementById('sch-name').value = student.full_name;
+    document.getElementById('sch-course').value = student.course;
+    document.getElementById('sch-total-fee').value = student.total_fees || 0;
+
+    // Step B: Fetch course_end_date and store it temporarily
+    const { data: details } = await db.from('student_details')
+        .select('course_end_date')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (details && details.course_end_date) {
+        // Save it invisibly in the dataset to use during calculation
+        document.getElementById('sch-valid-to').dataset.autoEnd = details.course_end_date;
+    }
+
+    calculateScholarship(); // Initialize calculations
+}
+
+// 3. Dynamic Calculation Engine
+function calculateScholarship() {
+    const status = document.getElementById('sch-status').value;
+    const totalFee = parseFloat(document.getElementById('sch-total-fee').value) || 0;
+    const pctInput = document.getElementById('sch-pct');
+    const validFrom = document.getElementById('sch-valid-from');
+    const validTo = document.getElementById('sch-valid-to');
+
+    if (status === 'Approved') {
+        pctInput.readOnly = false;
+        validFrom.disabled = false;
+        validTo.disabled = false;
+        
+        // Auto-fill Valid To with course end date if it is currently empty
+        if (!validTo.value && validTo.dataset.autoEnd) {
+            validTo.value = validTo.dataset.autoEnd;
+        }
+        
+        const pct = parseFloat(pctInput.value) || 0;
+        const schAmount = (totalFee * pct) / 100;
+        const finalFee = totalFee - schAmount;
+
+        document.getElementById('sch-amt').value = schAmount.toFixed(2);
+        document.getElementById('sch-final-fee').value = finalFee.toFixed(2);
+    } else {
+        // If Pending or Rejected
+        pctInput.value = 0;
+        pctInput.readOnly = true;
+        validFrom.value = "";
+        validTo.value = "";
+        validFrom.disabled = true;
+        validTo.disabled = true;
+
+        document.getElementById('sch-amt').value = "NA";
+        document.getElementById('sch-final-fee').value = totalFee.toFixed(2);
+    }
+}
+
+// 4. File Upload (Supabase Storage)
+let uploadedDocUrl = "";
+async function uploadScholarshipDoc() {
+    const fileInput = document.getElementById('sch-upload');
+    const roll = document.getElementById('sch-roll').value.trim().toUpperCase();
+    
+    if(!roll) return alert("Enter Roll Number before uploading.");
+    if(fileInput.files.length === 0) return alert("Select a file first.");
+
+    const file = fileInput.files[0];
+    const filePath = `${sessionInstID}/${roll}_${file.name}`;
+    
+    document.getElementById('sch-upload-status').innerText = "Uploading...";
+
+    const { data, error } = await db.storage.from('scholarship_docs').upload(filePath, file, { upsert: true });
+    
+    if(error) {
+        document.getElementById('sch-upload-status').innerText = "Upload Failed!";
+        alert("Upload Error: " + error.message);
+    } else {
+        const { data: publicUrlData } = db.storage.from('scholarship_docs').getPublicUrl(filePath);
+        uploadedDocUrl = publicUrlData.publicUrl;
+        document.getElementById('sch-upload-status').innerText = "File Uploaded Successfully ✓";
+    }
+}
+
+// 5. Build Data Object
+function getScholarshipData() {
+    return {
+        institute_id: sessionInstID,
+        roll_number: document.getElementById('sch-roll').value.trim().toUpperCase(),
+        student_name: document.getElementById('sch-name').value,
+        course_name: document.getElementById('sch-course').value,
+        total_course_fee: parseFloat(document.getElementById('sch-total-fee').value) || 0,
+        scholarship_name: document.getElementById('sch-sch-name').value,
+        applied_on: document.getElementById('sch-applied-date').value,
+        docs_required: document.getElementById('sch-docs').value,
+        status: document.getElementById('sch-status').value,
+        scholarship_pct: parseFloat(document.getElementById('sch-pct').value) || 0,
+        scholarship_amount: parseFloat(document.getElementById('sch-amt').value) || 0,
+        final_fees: parseFloat(document.getElementById('sch-final-fee').value) || 0,
+        valid_from: document.getElementById('sch-valid-from').value || null,
+        valid_to: document.getElementById('sch-valid-to').value || null,
+        remarks: document.getElementById('sch-remarks').value,
+        document_url: uploadedDocUrl
+    };
+}
+
+// 6. ADD Record
+async function addScholarship() {
+    const data = getScholarshipData();
+    if (!data.roll_number || !data.scholarship_name) return alert("Roll Number and Scholarship Name are required.");
+
+    const { error } = await db.from('scholarships').insert([data]);
+    
+    if (error) {
+        if (error.code === '23505') alert("Error: A scholarship record already exists for this Roll Number. Use UPDATE instead.");
+        else alert("Save Error: " + error.message);
+    } else {
+        alert("Success: Scholarship Record Added!");
+    }
+}
+
+// 7. FETCH Record
+async function fetchScholarshipByRoll() {
+    const roll = prompt("Enter Roll Number to fetch Scholarship Record:");
+    if(!roll) return;
+
+    const { data, error } = await db.from('scholarships')
+        .select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).maybeSingle();
+
+    if(error || !data) return alert("No scholarship record found for this student.");
+
+    document.getElementById('sch-roll').value = data.roll_number;
+    document.getElementById('sch-name').value = data.student_name;
+    document.getElementById('sch-course').value = data.course_name;
+    document.getElementById('sch-total-fee').value = data.total_course_fee;
+    document.getElementById('sch-sch-name').value = data.scholarship_name;
+    document.getElementById('sch-applied-date').value = data.applied_on;
+    document.getElementById('sch-docs').value = data.docs_required;
+    document.getElementById('sch-status').value = data.status;
+    document.getElementById('sch-pct').value = data.scholarship_pct;
+    document.getElementById('sch-valid-from').value = data.valid_from || "";
+    document.getElementById('sch-valid-to').value = data.valid_to || "";
+    document.getElementById('sch-remarks').value = data.remarks;
+    
+    if(data.document_url) {
+        document.getElementById('sch-upload-status').innerHTML = `<a href="${data.document_url}" target="_blank">View Saved Document</a>`;
+    }
+    
+    calculateScholarship();
+    alert("Record Loaded Successfully.");
+}
+
+// 8. UPDATE Record
+async function updateScholarship() {
+    const data = getScholarshipData();
+    if (!data.roll_number) return alert("Fetch a record first before updating.");
+
+    const { error } = await db.from('scholarships')
+        .update(data)
+        .eq('roll_number', data.roll_number)
+        .eq('institute_id', sessionInstID);
+
+    if (error) alert("Update Error: " + error.message);
+    else alert("Success: Scholarship Record Updated!");
+}
+
+// 9. PRINT Award Letter
+function printScholarship() {
+    const status = document.getElementById('sch-status').value;
+    if(status !== 'Approved') return alert("Award letters can only be printed for 'Approved' scholarships.");
+
+    const name = document.getElementById('sch-name').value;
+    const roll = document.getElementById('sch-roll').value;
+    const schName = document.getElementById('sch-sch-name').value;
+    const schAmt = document.getElementById('sch-amt').value;
+    const course = document.getElementById('sch-course').value;
+    const date = new Date().toLocaleDateString('en-GB');
+
+    const html = `
+    <html>
+        <head>
+            <title>Scholarship Award - ${roll}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+            <style>
+                body { margin: 0; padding: 40px; display: flex; justify-content: center; background: #fff; }
+                .cert-container { width: 800px; padding: 40px; border: 10px double #f39c12; font-family: 'Poppins', sans-serif; text-align: center; position: relative; }
+                .logo { width: 80px; position: absolute; top: 30px; left: 30px; }
+                .title { color: #f39c12; font-size: 40px; font-weight: 800; margin-bottom: 5px; text-transform: uppercase; }
+                .sub-title { font-size: 20px; letter-spacing: 3px; color: #555; margin-bottom: 40px; }
+                .content { font-size: 18px; line-height: 1.8; color: #333; }
+                .highlight { font-size: 26px; color: #d35400; font-weight: bold; border-bottom: 2px solid #ccc; padding: 0 20px; display: inline-block; margin: 15px 0; }
+                .amount { font-size: 35px; color: #27ae60; font-weight: bold; margin: 20px 0; }
+                .footer { margin-top: 80px; display: flex; justify-content: space-between; padding: 0 40px; }
+                .sign-line { border-top: 2px solid #333; width: 200px; padding-top: 5px; font-weight: bold; }
+                @media print { @page { size: landscape; } body { padding: 0; } }
+            </style>
+        </head>
+        <body onload="window.print(); window.close();">
+            <div class="cert-container">
+                <img src="icon-192x192.png" class="logo" alt="Logo">
+                <div class="title">OFFICIAL AWARD LETTER</div>
+                <div class="sub-title">SCHOLARSHIP & FINANCIAL AID</div>
+                
+                <div class="content">
+                    This is to officially certify and congratulate<br>
+                    <span class="highlight">${name}</span><br>
+                    (Roll Number: <b>${roll}</b>)<br><br>
+                    For demonstrating outstanding merit and being selected for the<br>
+                    <b>${schName}</b> for the <b>${course}</b> program.<br>
+                    
+                    <div class="amount">Award Amount: ₹ ${schAmt}</div>
+                    
+                    This scholarship amount has been applied directly to your academic fees. <br>
+                    We wish you continued excellence in your academic journey!
+                </div>
+                
+                <div class="footer">
+                    <div>
+                        <p style="margin-bottom: 40px;">Date: <b>${date}</b></p>
+                        <div class="sign-line">Institute Seal</div>
+                    </div>
+                    <div>
+                        <p style="margin-bottom: 40px;"><br></p>
+                        <div class="sign-line">Authorized Signatory</div>
+                    </div>
+                </div>
+            </div>
+        </body>
+    </html>`;
+
+    const win = window.open('', '_blank', 'width=1000,height=750');
+    win.document.write(html);
+    win.document.close();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ==========================================
+   24. PTM SCHEDULER LOGIC
+   ========================================== */
+
+// Default month setup
+document.addEventListener('DOMContentLoaded', () => {
+    const ptmMonth = document.getElementById('ptm-month');
+    if (ptmMonth) ptmMonth.value = new Date().toISOString().substring(0, 7);
+});
+
+// Rule 3: Close Booking if current date > ptm_date
+function checkPTMDateValidity() {
+    const ptmDate = document.getElementById('ptm-date').value;
+    const statusSelect = document.getElementById('ptm-status');
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (ptmDate && today > ptmDate) {
+        alert("Notice: The selected PTM Date has passed. Bookings will be closed automatically.");
+        statusSelect.value = "Closed";
+    } else {
+        statusSelect.value = "Open";
+    }
+    togglePTMStatus();
+}
+
+function togglePTMStatus() {
+    const status = document.getElementById('ptm-status').value;
+    const area = document.getElementById('ptm-booking-area');
+    if (status === 'Closed') {
+        area.style.pointerEvents = 'none';
+        area.style.opacity = '0.5';
+    } else {
+        area.style.pointerEvents = 'auto';
+        area.style.opacity = '1';
+    }
+}
+
+// Helper to add minutes to time (HH:MM)
+function addMinutesToTime(timeStr, minsToAdd) {
+    const [h, m] = timeStr.split(':').map(Number);
+    let date = new Date();
+    date.setHours(h, m, 0, 0);
+    date.setMinutes(date.getMinutes() + minsToAdd);
+    return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+}
+
+// 1. Triggered by "Fetch Teachers" button - Corrected to prevent duplicates
+async function fetchPTMAllocations() {
+    const roll = document.getElementById('ptm-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter a Roll Number.");
+
+    // Fetch Student & Parent details
+    const { data: stu } = await db.from('students').select('full_name, mother_mobile, father_mobile').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if (!stu) return alert("Student not found.");
+    
+    document.getElementById('ptm-sname').value = stu.full_name;
+    document.getElementById('ptm-mmob').value = stu.mother_mobile || "";
+    document.getElementById('ptm-fmob').value = stu.father_mobile || "";
+
+    // Fetch all linked teachers from Module 18
+    const { data: allocs } = await db.from('student_allocations').select('*').eq('roll_number', roll).eq('institute_id', sessionInstID);
+    
+    const courseSelect = document.getElementById('ptm-course');
+    courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+
+    if (allocs && allocs.length > 0) {
+        // --- NEW LOGIC TO PREVENT DUPLICATES ---
+        const seenEntries = new Set(); 
+
+        for (let a of allocs) {
+            // Create a unique key using Teacher ID and Subject
+            const uniqueKey = `${a.teacher_id}-${a.subject}`.toUpperCase();
+            
+            // If we have already added this specific Teacher-Subject combo, skip it
+            if (seenEntries.has(uniqueKey)) continue; 
+            seenEntries.add(uniqueKey);
+
+            const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', a.teacher_id).maybeSingle();
+            
+            let opt = document.createElement('option');
+            opt.value = a.subject;
+            opt.text = `${a.subject} (${a.teacher_name})`;
+            opt.dataset.tid = a.teacher_id;
+            opt.dataset.tname = a.teacher_name;
+            opt.dataset.tmob = tData ? tData.mobile : "";
+            courseSelect.appendChild(opt);
+        }
+        alert(`Found ${seenEntries.size} unique courses. Now pick a Course.`);
+    } else {
+        alert("No teachers linked to this student in Section 18.");
+    }
+}
+
+// 2. Triggered when you pick a Course
+async function syncPTMTeacherDetails() {
+    const select = document.getElementById('ptm-course');
+    const opt = select.options[select.selectedIndex];
+    if (!opt.value) return;
+
+    document.getElementById('ptm-tid').value = opt.dataset.tid;
+    document.getElementById('ptm-tname').value = opt.dataset.tname;
+    document.getElementById('ptm-tmob').value = opt.dataset.tmob;
+
+    calculateAvailablePTMSlots(opt.dataset.tid);
+}
+
+// 3. Helper to find free slots
+async function calculateAvailablePTMSlots(tid) {
+    const ptmDate = document.getElementById('ptm-date').value;
+    const startTime = document.getElementById('ptm-start').value;
+    const endTime = document.getElementById('ptm-end').value;
+    const duration = parseInt(document.getElementById('ptm-duration').value);
+    const slotSelect = document.getElementById('ptm-slot-time');
+
+    if (!ptmDate || !startTime || !endTime) return alert("Configure Date/Time in Step 1 first.");
+
+    const { data: booked } = await db.from('ptm_schedule').select('slot_time').eq('teacher_id', tid).eq('ptm_date', ptmDate).eq('institute_id', sessionInstID);
+    const bookedTimes = booked ? booked.map(b => b.slot_time) : [];
+
+    slotSelect.innerHTML = '<option value="">-- Choose Slot --</option>';
+    let current = startTime;
+    while (current < endTime) {
+        if (!bookedTimes.includes(current)) {
+            let opt = document.createElement('option');
+            opt.value = current; opt.text = current;
+            slotSelect.appendChild(opt);
+        }
+        current = addMinutesToTime(current, duration);
+    }
+}
+
+// 4. Triggered when you pick a Slot (Updates WhatsApp Links)
+function updatePTMWhatsApp() {
+    const slot = document.getElementById('ptm-slot-time').value;
+    if (!slot) return;
+
+    const ptmMonth = document.getElementById('ptm-month').value;
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    // Call your existing WhatsApp function (the one you were worried about deleting)
+    generatePTMWhatsAppLinks(
+        monthYearStr, 
+        document.getElementById('ptm-date').value, 
+        document.getElementById('ptm-start').value, 
+        document.getElementById('ptm-end').value, 
+        slot, 
+        document.getElementById('ptm-tname').value, 
+        document.getElementById('ptm-tmob').value, 
+        document.getElementById('ptm-mmob').value, 
+        document.getElementById('ptm-fmob').value
+    );
+}
+
+// Generate the specific automated WhatsApp messages
+function generatePTMWhatsAppLinks(mYear, date, start, end, slot, tName, tMob, mMob, fMob) {
+    const tMsg = encodeURIComponent(`Dear ${tName}, this is to inform you that the PTM for the current month ${mYear} is going to be conducted on ${date} between ${start} and ${end}. Your presence is highly essential. Please confirm.`);
+    const mMsg = encodeURIComponent(`Dear mam, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
+    const fMsg = encodeURIComponent(`Dear sir, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
+
+    setupWALink('wa-ptm-teacher', tMob, tMsg);
+    setupWALink('wa-ptm-mother', mMob, mMsg);
+    setupWALink('wa-ptm-father', fMob, fMsg);
+}
+
+function setupWALink(btnId, mobile, msg) {
+    const btn = document.getElementById(btnId);
+    if (mobile && mobile.length === 10) {
+        btn.href = `https://wa.me/91${mobile}?text=${msg}`;
+        btn.style.pointerEvents = 'auto';
+        btn.style.opacity = '1';
+    } else {
+        btn.href = "#";
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.5';
+    }
+}
+
+// Add PTM Record to Database
+async function addPTMRecord() {
+    const ptmMonth = document.getElementById('ptm-month').value;
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const data = {
+        institute_id: sessionInstID,
+        month_year: monthYearStr,
+        ptm_date: document.getElementById('ptm-date').value,
+        start_time: document.getElementById('ptm-start').value,
+        end_time: document.getElementById('ptm-end').value,
+        slot_duration: parseInt(document.getElementById('ptm-duration').value),
+        status: document.getElementById('ptm-status').value,
+        roll_number: document.getElementById('ptm-roll').value.trim().toUpperCase(),
+        student_name: document.getElementById('ptm-sname').value,
+        course_name: document.getElementById('ptm-course').value,
+        teacher_id: document.getElementById('ptm-tid').value,
+        teacher_name: document.getElementById('ptm-tname').value,
+        slot_time: document.getElementById('ptm-slot-time').value,
+        teacher_mobile: document.getElementById('ptm-tmob').value,
+        mother_mobile: document.getElementById('ptm-mmob').value,
+        father_mobile: document.getElementById('ptm-fmob').value,
+        remarks: document.getElementById('ptm-remarks').value
+    };
+
+    if (!data.roll_number || !data.slot_time) {
+        return alert("Error: Please fetch and allocate a slot before saving.");
+    }
+
+    const { error } = await db.from('ptm_schedule').insert([data]);
+
+    if (error) {
+        if (error.code === '23505') {
+            alert("Database Error: This slot is either already taken OR the student already has a PTM booked for this month.");
+        } else {
+            alert("Save Error: " + error.message);
+        }
+    } else {
+        alert(`Success! Slot ${data.slot_time} booked for ${data.student_name}. You can now use the WhatsApp buttons to inform everyone.`);
+    }
+}
+
+
+
+
+
+async function fetchPTMRecordByRoll() {
+    const roll = prompt("Enter Student Roll Number to fetch PTM record:");
+    if (!roll) return;
+
+    const ptmMonth = document.getElementById('ptm-month').value;
+    if (!ptmMonth) return alert("Please select the Month & Year in Step 1 first.");
+    
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const { data, error } = await db.from('ptm_schedule')
+        .select('*')
+        .eq('roll_number', roll.toUpperCase())
+        .eq('month_year', monthYearStr)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (error || !data) return alert("No PTM record found for this student in " + monthYearStr + ".");
+
+    // Step 1: Populate Step 1 Config
+    document.getElementById('ptm-date').value = data.ptm_date;
+    document.getElementById('ptm-start').value = data.start_time;
+    document.getElementById('ptm-end').value = data.end_time;
+    document.getElementById('ptm-duration').value = data.slot_duration;
+    document.getElementById('ptm-status').value = data.status;
+
+    // Step 2: Populate Student Details
+    document.getElementById('ptm-roll').value = data.roll_number;
+    document.getElementById('ptm-sname').value = data.student_name;
+    document.getElementById('ptm-tid').value = data.teacher_id;
+    document.getElementById('ptm-tname').value = data.teacher_name;
+    document.getElementById('ptm-tmob').value = data.teacher_mobile || "";
+    document.getElementById('ptm-mmob').value = data.mother_mobile || "";
+    document.getElementById('ptm-fmob').value = data.father_mobile || "";
+    document.getElementById('ptm-remarks').value = data.remarks || "";
+
+    // Step 3: FIX DROPDOWNS (Crucial Step)
+    // Manually add the saved Course to the dropdown so it shows up
+    const courseSelect = document.getElementById('ptm-course');
+    courseSelect.innerHTML = `<option value="${data.course_name}">${data.course_name} (${data.teacher_name})</option>`;
+    
+    // Manually add the saved Slot to the dropdown so it shows up
+    const slotSelect = document.getElementById('ptm-slot-time');
+    slotSelect.innerHTML = `<option value="${data.slot_time}">${data.slot_time}</option>`;
+
+    // Step 4: Refresh WhatsApp Buttons
+    generatePTMWhatsAppLinks(
+        data.month_year, data.ptm_date, data.start_time, data.end_time, 
+        data.slot_time, data.teacher_name, data.teacher_mobile, 
+        data.mother_mobile, data.father_mobile
+    );
+
+    alert("PTM Record Loaded Successfully.");
+}
+
+
+
+/* ==========================================
+   25. BATCH MASTER LOGIC (TABLE: "list")
+   ========================================== */
+
+// 1. Initialize Date on Load
+document.addEventListener('DOMContentLoaded', () => {
+    const bmDate = document.getElementById('bm-date');
+    if(bmDate) bmDate.value = new Date().toISOString().split('T')[0];
+});
+
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const revDateInput = document.getElementById('rev-date');
+    if(revDateInput) revDateInput.value = new Date().toISOString().split('T')[0];
+});
+
+
+
+
+// 2. Clear Form
+function clearBatchMaster() {
+    ['bm-roll','bm-sname','bm-course','bm-tid','bm-tname','bm-bname','bm-remarks'].forEach(id => {
+        document.getElementById(id).value = "";
+    });
+    document.getElementById('bm-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('bm-list-area').style.display = 'none';
+}
+
+// 3. Auto-populate from multiple tables
+// REPLACE existing autopopulateBatchMaster function completely
+let currentRollAllocations = []; 
+
+async function autopopulateBatchMaster() {
+    const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter a Roll Number first.");
+
+    // 1. Fetch from STUDENTS table
+    const { data: stu } = await db.from('students').select('full_name, course').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if (!stu) return alert("Student not found in main records.");
+    
+    document.getElementById('bm-sname').value = stu.full_name;
+    document.getElementById('bm-course').value = stu.course || "N/A";
+
+    // 2. Fetch Allocation (Finding the link from Module 18)
+    // We check BOTH roll_number and institute_id to ensure a perfect match
+    const { data: allocs } = await db.from('student_allocations')
+        .select('teacher_id, teacher_name, batch_name')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
+
+    const tidSelect = document.getElementById('bm-tid');
+    tidSelect.innerHTML = '<option value="">-- Select Allocated Teacher --</option>';
+
+    if (allocs && allocs.length > 0) {
+        // Link found! Populate the Teacher dropdown automatically
+        currentRollAllocations = allocs; 
+        const seen = new Set();
+        allocs.forEach(a => {
+            if (!seen.has(a.teacher_id)) {
+                seen.add(a.teacher_id);
+                let opt = document.createElement('option');
+                opt.value = a.teacher_id;
+                opt.text = a.teacher_id + " - " + a.teacher_name;
+                opt.dataset.name = a.teacher_name;
+                tidSelect.appendChild(opt);
+            }
+        });
+        if (seen.size === 1) {
+            tidSelect.selectedIndex = 1;
+            handleBMTeacherChange(); 
+        }
+    } else {
+        // No link found in Module 18, so we load all active teachers as a fallback
+        alert("Notice: No direct Teacher Allocation (Module 18) found for this student. Loading full teacher list.");
+        loadBMTeacherDropdown();
+    }
+}
+// Listener to filter batches per teacher and ELIMINATE DUPLICATE BATCH NAMES
+document.getElementById('bm-tid').addEventListener('change', function() {
+    const tid = this.value;
+    const bnameSelect = document.getElementById('bm-bname');
+    const nameInput = document.getElementById('bm-tname');
+    
+    const selectedOpt = this.options[this.selectedIndex];
+    nameInput.value = selectedOpt ? (selectedOpt.dataset.name || "") : "";
+
+    bnameSelect.innerHTML = '<option value="">-- Select Linked Batch --</option>';
+    if (!tid) return;
+
+    // --- ELIMINATE DUPLICATE BATCH NAMES ---
+    const seenBatches = new Set();
+    currentRollAllocations.forEach(a => {
+        if (a.teacher_id === tid && a.batch_name && !seenBatches.has(a.batch_name)) {
+            seenBatches.add(a.batch_name);
+            let opt = document.createElement('option');
+            opt.value = a.batch_name;
+            opt.text = a.batch_name;
+            bnameSelect.appendChild(opt);
+        }
+    });
+
+    if (seenBatches.size === 1) bnameSelect.selectedIndex = 1;
+});
+// 4. ADD RECORD to "list" table
+// 4. ADD RECORD to "list" table (BUG-FREE CAPACITY CHECK)
+async function addBatchMasterRecord() {
+if (!document.getElementById('bm-course').value.toUpperCase().includes(document.getElementById('bm-bname').options[document.getElementById('bm-bname').selectedIndex].text.toUpperCase().match(/\(([^)]+)\)/)[1])) return alert("🛑 ERROR: Subject Mismatch! Student is not enrolled for the subject taught in this batch.");
+    const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
+    const batchName = document.getElementById('bm-bname').value.trim();
+    const studentName = document.getElementById('bm-sname').value;
+    const teacherId = document.getElementById('bm-tid').value;
+
+    if (!roll || !batchName || !teacherId) return alert("Please fill all details (Roll No, Teacher, and Batch).");
+
+    // --- 1. MODIFIED DUPLICATE CHECK: Check Roll + Batch Name ---
+    const { data: existingEntry } = await db.from('list')
+        .select('id')
+        .eq('roll_number', roll)
+        .eq('batch_name', batchName) // Only block if same student is added to same batch
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (existingEntry) {
+        return alert(`Error: ${studentName} is already enrolled in the batch "${batchName}".`);
+    }
+
+    // --- 2. CAPACITY CHECK (Remains same) ---
+    const { data: batchData } = await db.from('batches')
+        .select('students_allotted')
+        .eq('teacher_id', teacherId)
+        .eq('batch_name', batchName)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (batchData && batchData.students_allotted > 0) {
+        const { data: currentStudents } = await db.from('list')
+            .select('id')
+            .eq('batch_name', batchName)
+            .eq('institute_id', sessionInstID);
+        
+        if (currentStudents && currentStudents.length >= batchData.students_allotted) {
+            return alert(`🛑 BATCH FULL! Cannot add student to "${batchName}".`);
+        }
+    }
+
+    // --- 3. SAVE THE RECORD ---
+    const data = {
+        institute_id: sessionInstID,
+        date_today: document.getElementById('bm-date').value,
+        roll_number: roll,
+        student_name: studentName,
+        course_name: document.getElementById('bm-course').value,
+        teacher_id: teacherId,
+        teacher_name: document.getElementById('bm-tname').value,
+        batch_name: batchName,
+        remarks: document.getElementById('bm-remarks').value
+    };
+
+    const { error } = await db.from('list').insert([data]);
+
+    if (error) {
+        alert("Error saving record: " + error.message);
+    } else {
+        alert(`Success! ${studentName} added to ${batchName}.`);
+        // Refresh the list view if visible
+        listAllByBatch(); 
+    }
+}
+
+// 5. FETCH RECORD (By Roll Number)
+async function fetchBatchMasterRecord() {
+    const roll = prompt("Enter Student Roll Number to fetch from Batch Master:");
+    if (!roll) return;
+
+    const { data, error } = await db.from('list')
+        .select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).order('created_at', {ascending: false}).limit(1).maybeSingle();
+
+    if (error || !data) return alert("No Batch Master record found for Roll Number: " + roll);
+
+    document.getElementById('bm-date').value = data.date_today || "";
+    document.getElementById('bm-roll').value = data.roll_number;
+    document.getElementById('bm-sname').value = data.student_name || "";
+    document.getElementById('bm-course').value = data.course_name || "";
+    document.getElementById('bm-tid').value = data.teacher_id || "";
+    document.getElementById('bm-tname').value = data.teacher_name || "";
+    document.getElementById('bm-bname').value = data.batch_name || "";
+    document.getElementById('bm-remarks').value = data.remarks || "";
+    
+    alert("Record Loaded Successfully.");
+}
+
+// 6. LIST ALL STUDENTS (By Batch Name - Case Insensitive)
+// 6. LIST ALL STUDENTS (With Delete Button)
+async function listAllByBatch() {
+    const bName = prompt("Enter Batch Name to view list of students:");
+    if (!bName) return;
+
+    const { data, error } = await db.from('list')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .ilike('batch_name', `%${bName}%`)
+        .order('student_name', { ascending: true });
+
+    if (error) return alert("Error fetching list: " + error.message);
+
+    const listArea = document.getElementById('bm-list-area');
+    const tbody = document.getElementById('bm-list-body');
+    const title = document.getElementById('bm-list-title');
+
+    if (!data || data.length === 0) {
+        listArea.style.display = 'none';
+        return alert("No students found assigned to Batch matching: " + bName);
+    }
+
+    // Ensure the table header has the 'Action' column
+    const thead = document.querySelector('#bm-list-area thead tr');
+    if (thead && !thead.innerHTML.includes('Action')) {
+        thead.innerHTML += `<th style="padding:10px; border:1px solid #ccc; text-align:center;">Action</th>`;
+    }
+
+    // Render Table Rows with DELETE BUTTON
+    tbody.innerHTML = data.map(row => `
+        <tr style="border-bottom: 1px solid #ddd;" id="bm-row-${row.id}">
+            <td style="padding:10px;"><b>${row.batch_name}</b></td>
+            <td style="padding:10px;">${row.roll_number}</td>
+            <td style="padding:10px;">${row.student_name}</td>
+            <td style="padding:10px;">${row.teacher_id}</td>
+            <td style="padding:10px;">${row.teacher_name}</td>
+            <td style="padding:10px;">${row.course_name}</td>
+            <td style="padding:10px; text-align:center;">
+                <button onclick="deleteBatchMasterRecord('${row.id}', '${row.student_name}')" style="background:#ff0000; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-trash"></i> Remove
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    title.innerText = `Search Results for Batch: "${bName}" (${data.length} students)`;
+    listArea.style.display = 'block';
+    listArea.scrollIntoView({ behavior: 'smooth' });
+}
+
+
+// 7. DELETE BATCH MASTER RECORD
+async function deleteBatchMasterRecord(recordId, studentName) {
+    if (!confirm(`Are you sure you want to remove ${studentName} from this batch?`)) return;
+
+    const { error } = await db.from('list')
+        .delete()
+        .eq('id', recordId)
+        .eq('institute_id', sessionInstID);
+
+    if (error) {
+        alert("Error deleting record: " + error.message);
+    } else {
+        alert(`${studentName} removed from the batch successfully.`);
+        
+        // Visually remove the row from the table
+        const row = document.getElementById(`bm-row-${recordId}`);
+        if (row) row.remove();
+        
+        // Update the student count in the title
+        const title = document.getElementById('bm-list-title');
+        let currentCount = parseInt(title.innerText.match(/\d+/)[0]);
+        if (currentCount > 0) {
+            title.innerText = title.innerText.replace(currentCount, currentCount - 1);
+        }
+    }
+}
+
+
+
+/* ==========================================
+   26. TEACHER REVIEWS LOGIC
+   ========================================== */
+
+// 1. Fetch all linked teachers and fill the dropdown
+async function autopopulateReviewForm() {
+    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Please enter Roll Number first.");
+
+    // Fetch Student Name
+    const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
+    if(!stu) return alert("Student not found.");
+    document.getElementById('rev-sname').value = stu.full_name;
+
+    // Fetch all allocations for this roll
+    const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
+    
+    const tidSelect = document.getElementById('rev-tid');
+    tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+    document.getElementById('rev-tname').value = "";
+
+    if(allocs && allocs.length > 0) {
+        // Use a Map to filter out duplicate teachers (if linked to multiple batches)
+        const uniqueTeachers = new Map();
+        allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
+
+        uniqueTeachers.forEach((name, id) => {
+            let opt = document.createElement('option');
+            opt.value = id;
+            opt.text = id;
+            opt.dataset.name = name; // Store name in dataset for quick sync
+            tidSelect.appendChild(opt);
+        });
+        alert(`Found ${uniqueTeachers.size} teachers linked to this student.`);
+    } else {
+        alert("No teachers linked to this student in Section 18.");
+    }
+}
+
+// 2. Helper to update the Name field when an ID is selected from dropdown
+function syncReviewTeacherName() {
+    const select = document.getElementById('rev-tid');
+    const selectedOption = select.options[select.selectedIndex];
+    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
+}
+
+// 3. Save Review for the specific selected teacher
+async function addTeacherReview() {
+    const tid = document.getElementById('rev-tid').value;
+    const score = parseFloat(document.getElementById('rev-score').value);
+    
+    if(!tid) return alert("Please select a teacher from the dropdown.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
+
+    const data = {
+        institute_id: sessionInstID,
+        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
+        student_name: document.getElementById('rev-sname').value,
+        teacher_id: tid,
+        teacher_name: document.getElementById('rev-tname').value,
+        rating: score,
+        message: document.getElementById('rev-msg').value,
+        review_date: document.getElementById('rev-date').value
+    };
+
+    const { error } = await db.from('reviews').insert([data]);
+    if(error) alert("Error: " + error.message);
+    else {
+        alert("Review Saved for " + data.teacher_name);
+        // Clear rating and message for next review
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
+    }
+}
+
+// 3. FETCH Review
+async function fetchReviewByRoll() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const { data, error } = await db.from('reviews').select('*').eq('student_roll', roll).eq('institute_id', sessionInstID).maybeSingle();
+    
+    if(data) {
+        document.getElementById('rev-sname').value = data.student_name;
+        document.getElementById('rev-tid').value = data.teacher_id;
+        document.getElementById('rev-tname').value = data.teacher_name;
+        document.getElementById('rev-score').value = data.rating;
+        document.getElementById('rev-msg').value = data.message;
+        alert("Review loaded.");
+// ADD THIS LINE inside the success block of fetchReviewByRoll()
+document.getElementById('rev-date').value = data.review_date;
+    } else alert("No review found for this roll number.");
+}
+
+// 4. UPDATE Review
+async function editTeacherReview() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const score = parseFloat(document.getElementById('rev-score').value);
+    if(score > 5) return alert("Error: Score cannot exceed 5.");
+
+    const { error } = await db.from('reviews').update({
+        rating: score,
+        message: document.getElementById('rev-msg').value
+    }).eq('student_roll', roll).eq('institute_id', sessionInstID);
+
+    if(error) alert(error.message);
+    else alert("Review Updated successfully!");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* --- FORGOT PASSWORD & EMAIL RECOVERY LOGIC --- */
+
+// 1. Send Reset Email
+async function handleForgotPassword() {
+    const email = prompt("Enter your registered Email ID to receive a reset link:");
+    if (!email) return;
+
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+        // This will bring them back to your GoDaddy/GitHub site
+        redirectTo: window.location.href, 
+    });
+
+    if (error) alert("Error: " + error.message);
+    else alert("Success! A password reset link has been sent to " + email);
+}
+
+// 2. Recover Email using Mobile Number from Profiles
+async function handleRecoverEmail() {
+    const mobile = prompt("Enter your registered 10-digit Mobile Number:");
+    if (!mobile) return;
+
+    const { data, error } = await db
+        .from('profiles')
+        .select('email')
+        .eq('mobile_number', mobile) // In your signup code, you saved it as mobile_number
+        .maybeSingle();
+
+    if (error) {
+        alert("Database Error: " + error.message);
+    } else if (!data) {
+        alert("Account Not Found: No email is linked to this mobile number.");
+    } else {
+        alert("FOUND! Your registered Email ID is: " + data.email);
+    }
+}
+
+
+
+
+
+// --- ADD THIS AT THE BOTTOM OF YOUR SCRIPT ---
+if (window.location.hash.includes("type=recovery")) {
+    alert("NOTICE: This is your active Password Reset tab. You can safely close the previous tab you were using.");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/* ==========================================
+   ROLE-BASED TAB VISIBILITY (ADD-ON)
+   ========================================== */
+async function applyRoleVisibility() {
+    // 1. Identify the user
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return; 
+
+    const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
+    if (!profile) return;
+
+    const role = profile.role;
+    
+    // 2. Hide Dashboard Stats for non-owners
+    if (role !== 'Owner') {
+        document.getElementById('home-user-view').style.display = 'none';
+        document.getElementById('home-visitor-view').style.display = 'block';
+    }
+
+    // 3. Setup Teacher Portal Restrictions
+    const adminButtons = [
+        'button[onclick="addTeacherDetails()"]',
+        'button[onclick="fetchTeacher()"]',
+        'button[onclick="editTeacher()"]',
+        'button[onclick="saveTeacherPayment()"]'
+    ];
+    const salaryField = document.getElementById('tch-salary');
+
+    // Reset visibility (Clean Slate)
+    adminButtons.forEach(sel => { 
+        const btn = document.querySelector(sel);
+        if(btn) btn.style.display = ''; 
+    });
+    if (salaryField && salaryField.parentElement) salaryField.parentElement.style.display = '';
+
+    // Apply specific Teacher restrictions
+    if (role === 'Teacher') {
+        adminButtons.forEach(sel => { 
+            const btn = document.querySelector(sel);
+            if(btn) btn.style.display = 'none'; 
+        });
+        if (salaryField && salaryField.parentElement) salaryField.parentElement.style.display = 'none';
+    }
+
+    // 4. Filter Sidebar Tabs
+    const tabs = document.querySelectorAll('aside.sidebar .nav-tab');
+    const studentAllowed = ['home', 'login', 'student-p', 'message-corner', 'calendar-mod', 'reviews-mod'];
+    const teacherBlocked = ['fee', 'expense', 'reminder', 'admin', 'reviews-mod', 'leave-mod'];
+
+    tabs.forEach(tab => {
+        const clickAttr = tab.getAttribute('onclick') || "";
+        const match = clickAttr.match(/showSection\('([^']+)'\)/);
+        
+        if (match) {
+            const sectionId = match[1];
+            if (role === 'Owner') {
+                tab.style.display = ''; 
+            } else if (role === 'Teacher') {
+                tab.style.display = teacherBlocked.includes(sectionId) ? 'none' : '';
+
+
+// --- ADD THIS TO RESTORE BUTTONS FOR TEACHERS ---
+        // Show Fetch and Update, but keep 'Add' and 'Pay' hidden
+        const teacherButtons = [
+            'button[onclick="fetchTeacher()"]',
+            'button[onclick="editTeacher()"]'
+        ];
+        teacherButtons.forEach(sel => { if(document.querySelector(sel)) document.querySelector(sel).style.display = ''; });
+
+        // Make Salary Visible but Greyed Out (Read-Only)
+        const salField = document.getElementById('tch-salary');
+        if (salField && salField.parentElement) {
+            salField.parentElement.style.display = ''; 
+            salField.readOnly = true; 
+            salField.style.background = '#f0f0f0'; // Grey look
+            salField.placeholder = "Locked by Admin";
+        }
+
+
+
+
+
+            } else if (role === 'Student') {
+                tab.style.display = studentAllowed.includes(sectionId) ? '' : 'none';
+            }
+        }
+    });
+} // <--- THIS WAS THE MISSING BRACKET THAT CAUSED YOUR ERROR
+
+
+
+// Observe changes to the Auth Status Bar to trigger visibility rules securely on login/page load
+const authObserver = new MutationObserver((mutations) => {
+    mutations.forEach(mutation => {
+        if (mutation.attributeName === 'style') {
+            const displayStyle = document.getElementById('auth-status-bar').style.display;
+            if (displayStyle === 'flex') {
+                applyRoleVisibility();
+            } else {
+                // Restore all tabs when logged out
+                document.querySelectorAll('aside.sidebar .nav-tab').forEach(tab => tab.style.display = '');
+            }
+        }
+    });
+});
+
+// Initialize the observer
+const authBar = document.getElementById('auth-status-bar');
+if (authBar) {
+    authObserver.observe(authBar, { attributes: true });
+    // Safety check in case the session loaded faster than the observer
+    if (authBar.style.display === 'flex') applyRoleVisibility();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* --- STABLE RECOVERY LOGIC (NO POPUPS) --- */
+window.addEventListener('DOMContentLoaded', () => {
+    if (window.location.hash.includes("type=recovery")) {
+        // 1. Show the recovery box inside the page (No popup blocker can stop this)
+        document.getElementById('recovery-overlay').style.display = 'flex';
+    }
+});
+
+async function saveNewPassword() {
+    const pass = document.getElementById('new-password-field').value;
+    if (pass.length < 6) return alert("Password must be 6+ characters.");
+
+    const { error } = await db.auth.updateUser({ password: pass });
+    
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("SUCCESS! Password updated. This tab will now close.");
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // 2. THE ULTIMATE FIX: Redirect back to the original page if possible 
+        // OR just open the login section on this page.
+        showSection('login');
+        document.getElementById('recovery-overlay').style.display = 'none';
+        
+        // (Optional) Tell them to go back to the other tab
+        alert("You can now go back to your original tab and log in, or use this one!");
+    }
+}
+
+
+
+
+
+/* ==========================================
+   AUTO-POPULATE EMAIL/MOBILE FROM PROFILES
+   ========================================== */
+
+// 1. Logic for Student Management (Updated to fetch Mobile too)
+document.getElementById('stu-name').addEventListener('blur', async function() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return; 
+
+    const enteredName = this.value.trim();
+    if (!enteredName || !sessionInstID) return;
+
+    const { data } = await db.from('profiles').select('email, mobile_number')
+        .ilike('full_name', enteredName).eq('role', 'Student').eq('institute_id', sessionInstID).limit(1).maybeSingle();
+
+    if (data) {
+        if (data.email) document.getElementById('stu-email').value = data.email;
+        if (data.mobile_number) document.getElementById('stu-mobile').value = data.mobile_number;
+    }
+});
+
+// 2. Logic for Teacher Portal
+document.getElementById('tch-name').addEventListener('blur', async function() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return; // 🛡️ Safety: Don't fetch if not logged in!
+
+    const enteredName = this.value.trim();
+    if (!enteredName || !sessionInstID) return;
+
+    const { data } = await db.from('profiles').select('email, mobile_number')
+        .ilike('full_name', enteredName).eq('role', 'Teacher').eq('institute_id', sessionInstID).maybeSingle();
+
+    if (data) {
+        document.getElementById('tch-email').value = data.email;
+        document.getElementById('tch-mobile').value = data.mobile_number;
+    }
+});
+
+
+
+
+
+
+/* ==========================================
+   AUTO-POPULATE BATCH TIME & CHECK CAPACITY
+   ========================================== */
+document.getElementById('stu-course').addEventListener('blur', async function() {
+    const courseName = this.value.trim();
+    const batchTimeInput = document.getElementById('stu-batch');
+
+    // If course is empty, clear the time
+    if (!courseName || !sessionInstID) {
+        batchTimeInput.value = "";
+        return;
+    }
+
+    // 1. Look up the batch details (including capacity) from Section 5
+    const { data: batchData, error } = await db.from('batches')
+        .select('batch_name, batch_time, students_allotted')
+        .ilike('subject_name', courseName) // Matches the course name
+        .eq('institute_id', sessionInstID)
+        .limit(1)
+        .maybeSingle();
+
+    if (batchData) {
+        const maxCapacity = parseInt(batchData.students_allotted) || 0;
+        const batchName = batchData.batch_name;
+
+        // 2. CHECK CAPACITY (If a limit was set)
+        if (maxCapacity > 0 && batchName) {
+            
+            // Count how many students are currently in this batch in the Batch Master (list table)
+            const { data: currentStudents } = await db.from('list')
+                .select('id')
+                .ilike('batch_name', batchName)
+                .eq('institute_id', sessionInstID);
+
+            const currentCount = currentStudents ? currentStudents.length : 0;
+
+            // 3. IF FULL -> Block it and show error
+            if (currentCount >= maxCapacity) {
+                batchTimeInput.value = ""; // Keep time empty
+                this.value = ""; // Clear the course box so they can't proceed
+                return alert(`🛑 BATCH ALREADY FULL!\n\nThe batch for "${courseName}" (${batchName}) has reached its maximum capacity of ${maxCapacity} students.\n\nYou cannot admit any more students to this course right now.`);
+            }
+        }
+
+        // 4. IF NOT FULL -> Success: Fill the time automatically
+        batchTimeInput.value = batchData.batch_time;
+        
+    } else {
+        // Warning: No batch exists for this course yet
+        batchTimeInput.value = "";
+        console.log(`No batch found for course "${courseName}". Create it in Section 5 first.`);
+    }
+});
+
+
+
+
+/* --- FEATURE HIGHLIGHTER FADE LOGIC --- */
+const imsFeatures = [
+    "1. ClassManager : Automated Fee Collection & Pending Dues Tracking",
+    "2. ClassManager :  Comprehensive Student Profile Management",
+    "3. ClassManager : Smart Batch & Time-Slot Organization",
+    "4. ClassManager : One-Click Daily Attendance with WhatsApp Alerts",
+    "5. ClassManager : Advanced Admin Dashboard & Financial Reports",
+    "6. ClassManager :  Automated Fee Reminder System via WhatsApp",
+    "7. ClassManager : Integrated Lead & Enquiry Management",
+    "8. ClassManager : Monthly Expense & Profitability Tracker",
+    "9. ClassManager : Dedicated Teacher Portal & Salary Management",
+    "10. ClassManager : Personalized Dashboards for Student Performance",
+    "11. ClassManager : Instant ID Card Generator with Photo Support",
+    "12. ClassManager : Professional Course Completion Certificate Generator",
+    "13. ClassManager : Real-Time Student Exam & Grade Tracking",
+    "14. ClassManager :  Secure Role-Based Access (Owner, Teacher, Student)",
+    "15. ClassManager :  Staff Attendance & Leave Management",
+    "16. ClassManager : Smart Student-to-Teacher Allocation System",
+    "17. ClassManager : Global Message Hub for Instant Bulk Broadcasts",
+    "18. ClassManager : Digital Academic Calendar & Holiday Manager",
+    "19. ClassManager : Alumni & Placement Tracking System",
+    "20. ClassManager : Institute Inventory & Stationery Sales Manager",
+    "21. ClassManager : Dynamic Scholarship Calculator & Award Generator",
+    "22. ClassManager : Automated Parent-Teacher Meeting (PTM) Scheduler",
+    "23. ClassManager : Centralized Batch Master List for Quick Overviews",
+    "24. ClassManager : Transparent Student Feedback & Teacher Reviews",
+    "25. ClassManager : Beautiful Data Visualization with Google Charts",
+    "26. ClassManager : Subject-Wise Analytics & Revenue Forecasting"
+];
+
+let featureIndex = 0;
+const featureBox = document.getElementById('feature-highlighter');
+const featureText = document.getElementById('feature-text');
+
+function triggerBlastEffect() {
+    if (!featureBox || !featureText) return;
+
+    // 1. Hide the text quickly
+    featureText.style.opacity = '0';
+
+    // 2. Generate the "Glass Blast" pieces
+    for (let i = 0; i < 35; i++) {
+        const shard = document.createElement('div');
+        shard.className = 'shard';
+        
+        // Randomize size of shards
+        const size = Math.random() * 6 + 4; 
+        shard.style.width = size + 'px';
+        shard.style.height = size + 'px';
+        
+        // Start in the center
+        shard.style.left = '50%';
+        shard.style.top = '50%';
+        featureBox.appendChild(shard);
+
+        // Calculate explosive trajectory
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = 60 + Math.random() * 120; // How far they fly
+        const tx = Math.cos(angle) * velocity;
+        const ty = Math.sin(angle) * velocity;
+        const rot = Math.random() * 720; // Spin effect
+
+        // Animate the shards flying outwards and fading
+        shard.animate([
+            { transform: 'translate(-50%, -50%) rotate(0deg) scale(1)', opacity: 1 },
+            { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rot}deg) scale(0)`, opacity: 0 }
+        ], {
+            duration: 600 + Math.random() * 400, // 0.6s to 1s
+            easing: 'cubic-bezier(.25, .8, .25, 1)',
+            fill: 'forwards'
+        });
+
+        // Clean up DOM after animation finishes
+        setTimeout(() => shard.remove(), 1100);
+    }
+
+    // 3. Show the next text after the explosion clears
+    setTimeout(() => {
+        featureIndex = (featureIndex + 1) % imsFeatures.length;
+        featureText.innerText = imsFeatures[featureIndex];
+        featureText.style.opacity = '1';
+    }, 600); // 0.6 seconds wait
+}
+
+// Start the 5-second loop
+if (featureBox) {
+    setInterval(triggerBlastEffect, 5000);
+}
+
+
+
+
+
+/* --- GIANT CLOCK & DATE LOGIC --- */
+function updateGiantClock() {
+    const timeDisplay = document.getElementById('time-display');
+    const dateDisplay = document.getElementById('date-display');
+    if (!timeDisplay || !dateDisplay) return;
+
+    const now = new Date();
+    
+    // 1. Format Time (HH:MM:SS AM/PM)
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    let seconds = now.getSeconds();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // Convert hour '0' to '12'
+    minutes = minutes < 10 ? '0' + minutes : minutes;
+    seconds = seconds < 10 ? '0' + seconds : seconds;
+    
+    timeDisplay.innerText = `${hours}:${minutes}:${seconds} ${ampm}`;
+
+    // 2. Format Date (e.g., Wednesday, October 25, 2026)
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    dateDisplay.innerText = now.toLocaleDateString('en-US', options);
+}
+
+// Start the clock instantly, then update it every second
+if (document.getElementById('giant-clock-container')) {
+    updateGiantClock();
+    setInterval(updateGiantClock, 1000);
+}
+
+
+
+
+/* ==========================================
+   27. LEAVE MANAGEMENT LOGIC (80% Rule & Carry Forward)
+   ========================================== */
+
+// 1. Initialize Dates
+document.addEventListener('DOMContentLoaded', () => {
+    const lvToday = document.getElementById('lv-today');
+    if(lvToday) lvToday.value = new Date().toISOString().split('T')[0];
+});
+
+// 2. Fetch Teacher & Calculate Available Balance
+// 2. Fetch Teacher & Calculate Available Balance
+async function fetchTeacherForLeave() {
+    const tid = document.getElementById('lv-tid').value.trim().toUpperCase();
+    if (!tid) return alert("Please enter a Teacher ID first.");
+
+    // A. Fetch Teacher Details
+    const { data: teacher, error: tErr } = await db.from('teacher_details')
+        .select('teacher_name, subject_taught, joining_date')
+        .eq('id', tid)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (tErr || !teacher) return alert("Teacher not found!");
+
+    document.getElementById('lv-tname').value = teacher.teacher_name;
+    document.getElementById('lv-course').value = teacher.subject_taught || "N/A";
+
+    // B. Calculate Leave Balance (2 per month from joining date)
+    const joinDate = new Date(teacher.joining_date);
+    const today = new Date();
+    
+    // Calculate total months worked (minimum 1)
+    let monthsWorked = (today.getFullYear() - joinDate.getFullYear()) * 12 + (today.getMonth() - joinDate.getMonth()) + 1;
+    if (monthsWorked < 1) monthsWorked = 1;
+    const totalEarnedLeaves = monthsWorked * 2;
+
+    // C. Fetch all historically 'Approved' leaves for this teacher
+    const { data: pastLeaves } = await db.from('leave_management')
+        .select('no_of_days')
+        .eq('teacher_id', tid)
+        .eq('status', 'Approved')
+        .eq('institute_id', sessionInstID);
+
+    const totalTaken = pastLeaves ? pastLeaves.reduce((sum, lv) => sum + Number(lv.no_of_days), 0) : 0;
+    const balance = totalEarnedLeaves - totalTaken;
+
+    // Update UI Indicator (Fixed Text)
+    const indicator = document.getElementById('leave-balance-indicator');
+    const analysisText = document.getElementById('lv-analysis-text');
+    indicator.style.display = 'block';
+    
+    analysisText.innerHTML = `
+        <br>• Joined on: ${teacher.joining_date}
+        <br>• Total Leaves Earned (2/month): ${totalEarnedLeaves}
+        <br>• Leaves Taken: ${totalTaken}
+        <br>• <b>Current Available Balance: <span style="color:${balance > 0 ? 'green' : 'red'};">${balance} Days</span></b>
+    `;
+    
+    // Store balance in element dataset for validation later
+    document.getElementById('lv-days').dataset.balance = balance;
+}
+
+
+// 3. Auto-Calculate Days
+function calculateLeaveDays() {
+    const start = document.getElementById('lv-start').value;
+    const end = document.getElementById('lv-end').value;
+    if (start && end) {
+        const d1 = new Date(start);
+        const d2 = new Date(end);
+        const diffTime = Math.abs(d2 - d1);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive of both days
+        
+        if (d2 < d1) {
+            alert("End date cannot be before Start date.");
+            document.getElementById('lv-days').value = "";
+            return;
+        }
+        document.getElementById('lv-days').value = diffDays;
+    }
+}
+
+// 4. Validate Rules & Save Record
+// 4. Validate Rules & Save Record (With Rounding Math)
+async function validateAndAddLeave() {
+    const tid = document.getElementById('lv-tid').value.toUpperCase();
+    const tname = document.getElementById('lv-tname').value;
+    const start = document.getElementById('lv-start').value;
+    const end = document.getElementById('lv-end').value;
+    const daysReq = Number(document.getElementById('lv-days').value);
+    let status = document.getElementById('lv-status').value;
+    let remarks = document.getElementById('lv-remarks').value;
+
+    if (!tid || !tname || !start || !end || !daysReq) return alert("Please fill all required fields and calculate days.");
+
+    // --- RULE 2: Leave Balance Check ---
+    const balance = Number(document.getElementById('lv-days').dataset.balance || 0);
+    if (status === 'Approved' && daysReq > balance) {
+        const proceed = confirm(`WARNING: ${tname} only has ${balance} paid leaves left, but requested ${daysReq}. Approve anyway as unpaid leave?`);
+        if (!proceed) {
+            document.getElementById('lv-status').value = 'Rejected';
+            return;
+        } else {
+            remarks = "(Unpaid Over-Limit) " + remarks;
+        }
+    }
+
+    // --- RULE 1: 80% Minimum Presence Check (With .5 Rounding) ---
+    if (status === 'Approved') {
+        const { data: allTeachers } = await db.from('teacher_details').select('id').eq('status', 'Active').eq('institute_id', sessionInstID);
+        const totalActive = allTeachers ? allTeachers.length : 0;
+        
+        // NEW MATH: Standard rounding (0.6 becomes 1, 1.4 becomes 1)
+        const maxAllowedOnLeave = Math.round(totalActive * 0.2);
+        
+        const { data: approvedLeaves } = await db.from('leave_management').select('start_date, end_date').eq('status', 'Approved').eq('institute_id', sessionInstID);
+
+        let dt = new Date(start + "T00:00:00");
+        let endDt = new Date(end + "T00:00:00");
+        let rejectReason = "";
+
+        while (dt <= endDt) {
+            let yyyy = dt.getFullYear();
+            let mm = String(dt.getMonth() + 1).padStart(2, '0');
+            let dd = String(dt.getDate()).padStart(2, '0');
+            let checkDate = `${yyyy}-${mm}-${dd}`;
+            
+            let onLeaveToday = 0;
+            if (approvedLeaves) {
+                approvedLeaves.forEach(lv => {
+                    if (checkDate >= lv.start_date && checkDate <= lv.end_date) onLeaveToday++;
+                });
+            }
+
+            // Check against our rounded max allowed number
+            if ((onLeaveToday + 1) > maxAllowedOnLeave) {
+                rejectReason = `On ${checkDate}, approving this puts ${onLeaveToday + 1} teachers on leave out of ${totalActive}. Maximum allowed by the rounded 80% rule is ${maxAllowedOnLeave}.`;
+                break;
+            }
+            dt.setDate(dt.getDate() + 1);
+        }
+
+        if (rejectReason !== "") {
+            alert(`🛑 LEAVE REJECTED BY 80% PRESENCE RULE!\n\n${rejectReason}\n\nStatus automatically set to Rejected.`);
+            document.getElementById('lv-status').value = 'Rejected';
+            status = 'Rejected';
+            remarks = "System Rejected: " + rejectReason + " | " + remarks;
+        }
+    }
+
+    // --- EXECUTE SAVE ---
+    const dataObj = {
+        institute_id: sessionInstID,
+        date_today: document.getElementById('lv-today').value,
+        teacher_id: tid,
+        teacher_name: tname,
+        course: document.getElementById('lv-course').value,
+        no_of_days: daysReq,
+        start_date: start,
+        end_date: end,
+        status: status,
+        remarks: remarks
+    };
+
+    const { error } = await db.from('leave_management').insert([dataObj]);
+    if (error) {
+        alert("Database Error: " + error.message);
+    } else {
+        alert(`Success! Leave Record for ${tname} processed as [${status}].`);
+        fetchTeacherForLeave(); // Refresh balance
+    }
+}
+
+
+// 5. Fetch Latest Record
+async function fetchLeaveRecord() {
+    const tid = prompt("Enter Teacher ID to fetch last leave record:");
+    if (!tid) return;
+
+    const { data, error } = await db.from('leave_management')
+        .select('*')
+        .eq('teacher_id', tid.toUpperCase())
+        .eq('institute_id', sessionInstID)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error || !data) return alert("No leave records found for this Teacher ID.");
+
+    document.getElementById('lv-today').value = data.date_today;
+    document.getElementById('lv-tid').value = data.teacher_id;
+    document.getElementById('lv-tname').value = data.teacher_name;
+    document.getElementById('lv-course').value = data.course;
+    document.getElementById('lv-start').value = data.start_date;
+    document.getElementById('lv-end').value = data.end_date;
+    document.getElementById('lv-days').value = data.no_of_days;
+    document.getElementById('lv-status').value = data.status;
+    document.getElementById('lv-remarks').value = data.remarks || "";
+    
+    alert("Latest Leave Record Loaded.");
+}
+
+// 6. Update Record (With Rounding Math)
+async function updateLeaveRecord() {
+    const tid = document.getElementById('lv-tid').value.toUpperCase();
+    const start = document.getElementById('lv-start').value;
+    const end = document.getElementById('lv-end').value;
+    let status = document.getElementById('lv-status').value;
+    let remarks = document.getElementById('lv-remarks').value;
+
+    if (!tid || !start) return alert("Please fetch a record first.");
+
+    const { data: currentRecord } = await db.from('leave_management').select('id').eq('teacher_id', tid).eq('start_date', start).eq('institute_id', sessionInstID).maybeSingle();
+
+    // --- RULE 1: 80% Minimum Presence Check (For Updates) ---
+    if (status === 'Approved') {
+        const { data: allTeachers } = await db.from('teacher_details').select('id').eq('status', 'Active').eq('institute_id', sessionInstID);
+        const totalActive = allTeachers ? allTeachers.length : 0;
+        
+        // NEW MATH: Standard rounding (0.6 becomes 1, 1.4 becomes 1)
+        const maxAllowedOnLeave = Math.round(totalActive * 0.2);
+        
+        const { data: approvedLeaves } = await db.from('leave_management').select('id, start_date, end_date').eq('status', 'Approved').eq('institute_id', sessionInstID);
+
+        let dt = new Date(start + "T00:00:00");
+        let endDt = new Date(end + "T00:00:00");
+        let rejectReason = "";
+
+        while (dt <= endDt) {
+            let yyyy = dt.getFullYear();
+            let mm = String(dt.getMonth() + 1).padStart(2, '0');
+            let dd = String(dt.getDate()).padStart(2, '0');
+            let checkDate = `${yyyy}-${mm}-${dd}`;
+            
+            let onLeaveToday = 0;
+            if (approvedLeaves) {
+                approvedLeaves.forEach(lv => {
+                    if (currentRecord && lv.id === currentRecord.id) return;
+                    if (checkDate >= lv.start_date && checkDate <= lv.end_date) onLeaveToday++;
+                });
+            }
+
+            // Check against our rounded max allowed number
+            if ((onLeaveToday + 1) > maxAllowedOnLeave) {
+                rejectReason = `On ${checkDate}, approving this puts ${onLeaveToday + 1} teachers on leave out of ${totalActive}. Maximum allowed by the rounded 80% rule is ${maxAllowedOnLeave}.`;
+                break;
+            }
+            dt.setDate(dt.getDate() + 1);
+        }
+
+        if (rejectReason !== "") {
+            alert(`🛑 UPDATE REJECTED BY 80% RULE!\n\n${rejectReason}\n\nStatus automatically reverted to Pending.`);
+            document.getElementById('lv-status').value = 'Pending';
+            status = 'Pending';
+            remarks = "Update Blocked: " + rejectReason + " | " + remarks;
+        }
+    }
+
+    const updateData = {
+        no_of_days: document.getElementById('lv-days').value,
+        end_date: end,
+        status: status,
+        remarks: remarks
+    };
+
+    const { error } = await db.from('leave_management')
+        .update(updateData)
+        .eq('teacher_id', tid)
+        .eq('start_date', start)
+        .eq('institute_id', sessionInstID);
+
+    if (error) alert("Update Error: " + error.message);
+    else alert(`Record Updated Successfully as [${status}]!`);
+}
+// 7. List of All Teachers on Leave (Popup)
+async function listTeachersOnLeave() {
+    const monthYearStr = prompt("Enter Month & Year (e.g., 2026-03 for March 2026):");
+    if (!monthYearStr) return;
+
+    // Build Date bounds
+    const startDate = `${monthYearStr}-01`;
+    const endDate = `${monthYearStr}-31`;
+
+    const { data, error } = await db.from('leave_management')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .gte('start_date', startDate)
+        .lte('start_date', endDate)
+        .order('start_date', { ascending: true });
+
+    if (error) return alert("Database Error: " + error.message);
+    
+    let tableRows = "";
+    if (data && data.length > 0) {
+        data.forEach(lv => {
+            const color = lv.status === 'Approved' ? 'green' : (lv.status === 'Rejected' ? 'red' : 'orange');
+            tableRows += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${lv.teacher_id}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${lv.teacher_name}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${lv.start_date} to ${lv.end_date}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; font-weight:bold;">${lv.no_of_days}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; color:${color}; font-weight:bold;">${lv.status}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; font-size:0.85rem;">${lv.remarks || '-'}</td>
+                </tr>
+            `;
+        });
+    } else {
+        tableRows = `<tr><td colspan="6" style="padding:20px;">No leave records found for this month.</td></tr>`;
+    }
+
+    const modalHtml = `
+        <div id="leave-popup-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:95%; max-width:850px; max-height:85vh; overflow-y:auto; text-align:center; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin-top:0; color:#e67e22; text-decoration:underline;">Staff Leave Register</h3>
+                <p style="font-weight:bold; font-size:1.1rem; margin-bottom: 20px;">Period: ${monthYearStr}</p>
+                
+                <table style="width:100%; border-collapse:collapse; text-align:left;">
+                    <thead style="background:#f8f9fa;">
+                        <tr>
+                            <th style="border: 1px solid #ccc; padding: 10px;">ID</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Name</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Dates</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Days</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Status</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+
+                <button onclick="document.getElementById('leave-popup-overlay').remove()" style="margin-top:25px; background:#e67e22; color:white; border:2px solid #000; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; font-family:'Times New Roman', serif;">CLOSE WINDOW</button>
+            </div>
+        </div>
+    `;
+
+    const existing = document.getElementById('leave-popup-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+
+
+
+
+// 1. Load all teachers from the database into the dropdown
+async function loadBMTeacherDropdown() {
+    const tidSelect = document.getElementById('bm-tid');
+    // Keep the first placeholder option
+    tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+
+    const { data: teachers, error } = await db.from('teacher_details')
+        .select('id, teacher_name')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active')
+        .order('teacher_name', { ascending: true });
+
+    if (teachers) {
+        teachers.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.id + " - " + t.teacher_name;
+            opt.dataset.name = t.teacher_name; 
+            tidSelect.appendChild(opt);
+        });
+    }
+}
+
+// 2. When a teacher is selected, update name and load their specific batches
+async function handleBMTeacherChange() {
+    const tidSelect = document.getElementById('bm-tid');
+    const tnameInput = document.getElementById('bm-tname');
+    const bnameSelect = document.getElementById('bm-bname');
+    
+    const selectedOption = tidSelect.options[tidSelect.selectedIndex];
+    const tid = tidSelect.value;
+
+    // Clear batch dropdown
+    bnameSelect.innerHTML = '<option value="">-- Select Batch --</option>';
+
+    if (!tid) {
+        tnameInput.value = "";
+        return;
+    }
+
+    // Auto-set the name
+    tnameInput.value = selectedOption.dataset.name;
+
+    // Fetch all batches/subjects this specific teacher is assigned to
+    const { data: batches, error } = await db.from('batches')
+        .select('batch_name, subject_name')
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID);
+
+    if (batches && batches.length > 0) {
+        batches.forEach(b => {
+            let opt = document.createElement('option');
+            opt.value = b.batch_name;
+            opt.text = `${b.batch_name} (${b.subject_name})`;
+            bnameSelect.appendChild(opt);
+        });
+    } else {
+        let opt = document.createElement('option');
+        opt.value = "General";
+        opt.text = "No Specific Batch Found";
+        bnameSelect.appendChild(opt);
+    }
+}
+
+// 3. Update the Auto-populate (Student Roll Search) to work with dropdowns
+async function autopopulateBatchMaster() {
+    const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter a Roll Number first.");
+
+    // 1. Fetch basic student info from Master Table
+    const { data: stu, error: stuErr } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (stuErr || !stu) return alert("Student not found in main records.");
+    
+    document.getElementById('bm-sname').value = stu.full_name;
+    document.getElementById('bm-course').value = stu.course || "N/A";
+
+    // 2. IMPORTANT: Load the full teacher dropdown first 
+    // This ensures the ID we are about to select actually exists in the HTML list
+    await loadBMTeacherDropdown();
+
+    // 3. Fetch the Allocation link created in Section 18
+    const { data: allocs, error: allocErr } = await db.from('student_allocations')
+        .select('teacher_id, teacher_name, batch_name')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID);
+
+    const tidSelect = document.getElementById('bm-tid');
+
+    if (allocs && allocs.length > 0) {
+        // Link Found! 
+        currentRollAllocations = allocs; // Save for batch filtering
+        
+        // Select the first allocated teacher
+        const firstAlloc = allocs[0];
+        tidSelect.value = firstAlloc.teacher_id;
+        
+        // Manually trigger the batch name population logic
+        handleBMTeacherChange(); 
+        
+        // Auto-select the batch if it matches
+        setTimeout(() => {
+            const bnameSelect = document.getElementById('bm-bname');
+            bnameSelect.value = firstAlloc.batch_name;
+        }, 500);
+
+        alert(`Link Found! Allocated to Teacher: ${firstAlloc.teacher_name}`);
+    } else {
+        // No link found in Module 18
+        alert("Notice: This student has not been linked to a teacher in Section 18 (Student Allocation). Please select a teacher manually or complete Section 18 first.");
+    }
+}
+
+async function refreshStudentBatchDropdown() {
+    const batchSelect = document.getElementById('stu-batch');
+    if (!batchSelect) return;
+
+    // Clear existing
+    batchSelect.innerHTML = '<option value="">-- Select Batches --</option>';
+
+    // Fetch all batches for this institute
+    const { data: batches, error } = await db.from('batches')
+        .select('batch_name, batch_time, subject_name')
+        .eq('institute_id', sessionInstID);
+
+    if (batches) {
+        batches.forEach(b => {
+            let opt = document.createElement('option');
+            // Value is the time, Text is Subject + Time
+            opt.value = b.batch_time;
+            opt.text = `${b.subject_name} (${b.batch_time})`;
+            batchSelect.appendChild(opt);
+        });
+    }
+}
+
+
+
+
+
+// Paste at the bottom of <script>
+document.getElementById('tch-time-checkboxes').addEventListener('change', function(e) {
+    if (e.target.checked) {
+        const val = e.target.value;
+        const conflict = Object.entries(availabilityMap).find(([sub, slots]) => 
+            sub !== subjectPages[currentSubjectIndex] && slots.includes(val)
+        );
+        if (conflict) {
+            e.target.checked = false;
+            alert("🛑 Slot Conflict: [" + val + "] is already taken for " + conflict[0]);
+        }
+    }
+});
+
+
+
+
+
+// 1. Load Teachers into the Dropdown
+async function loadTeacherReportDropdown() {
+    const select = document.getElementById('rep-rat-tid');
+    const { data } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID).eq('status', 'Active');
+    
+    select.innerHTML = '<option value="">-- Select Teacher --</option>';
+    if (data) {
+        data.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.id;
+            opt.dataset.name = t.teacher_name;
+            select.appendChild(opt);
+        });
+    }
+}
+
+// 2. Auto-populate Name
+function populateTeacherRatName() {
+    const sel = document.getElementById('rep-rat-tid');
+    document.getElementById('rep-rat-name').value = sel.options[sel.selectedIndex].dataset.name || "";
+}
+
+// 3. Helper: Calculate Category based on Count and Average
+function getRatingCategory(avg, count) {
+    if (count === 0 || isNaN(avg) || avg == 0) return "<span style='color:grey;'>Not Applicable</span>";
+    if (avg < 3.5) return "<span style='color:red;'>Below Average</span>";
+    if (avg < 4.0) return "<span style='color:orange;'>Average</span>";
+    if (avg < 4.5) return "<span style='color:#d35400;'>Good</span>";
+    if (avg < 4.7) return "<span style='color:blue;'>Great</span>";
+    return "<span style='color:green;'>Excellent</span>";
+}
+
+// 4. Generate Single Teacher Report
+async function generateSingleTeacherReport() {
+    const tid = document.getElementById('rep-rat-tid').value;
+    const name = document.getElementById('rep-rat-name').value;
+    if (!tid) return alert("Select a teacher first.");
+
+    const { data: revs } = await db.from('reviews').select('rating').eq('teacher_id', tid).eq('institute_id', sessionInstID);
+
+    const totalReviews = revs ? revs.length : 0;
+    const avgScore = totalReviews > 0 ? (revs.reduce((sum, r) => sum + r.rating, 0) / totalReviews).toFixed(2) : 0;
+  const category = getRatingCategory(avgScore, totalReviews);
+
+    // Update Output UI
+    document.getElementById('rep-title').innerText = "Teacher Appraisal Report";
+    document.getElementById('rep-summary-text').innerHTML = `<b>Teacher:</b> ${name} (${tid}) | <b>Date:</b> ${document.getElementById('rep-rat-date').value}`;
+    
+    document.getElementById('rep-table-head').innerHTML = `<tr><th>Metric</th><th>Details</th></tr>`;
+    document.getElementById('rep-table-body').innerHTML = `
+        <tr><td>Total Reviews Received</td><td>${totalReviews}</td></tr>
+        <tr><td>Average Score</td><td>${avgScore} / 5.0</td></tr>
+        <tr><td>Performance Category</td><td><b>${category}</b></td></tr>
+    `;
+
+    document.getElementById('rep-stats-boxes').innerHTML = ""; // Clear stats for single view
+    document.getElementById('report-output-area').style.display = 'block';
+    document.getElementById('filter_div').style.display = 'none';
+    document.getElementById('chart_div').style.display = 'none';
+}
+
+// 5. Generate All Teachers Report (Table Format)
+async function generateAllTeacherReport() {
+    const monthVal = document.getElementById('rep-rat-month').value;
+    if (!monthVal) return alert("Select Report Month first.");
+
+    const dateObj = new Date(monthVal + "-01");
+    const monthYearLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const { data: teachers } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID);
+    const { data: allRevs } = await db.from('reviews').select('*').eq('institute_id', sessionInstID);
+
+    let tableBody = "";
+    
+    teachers.forEach(t => {
+        const tRevs = allRevs ? allRevs.filter(r => r.teacher_id === t.id) : [];
+        const count = tRevs.length;
+        const avg = count > 0 ? (tRevs.reduce((sum, r) => sum + r.rating, 0) / count).toFixed(2) : "0.00";
+     const cat = getRatingCategory(avg, count);
+
+        tableBody += `
+            <tr>
+                <td>${t.id}</td>
+                <td>${t.teacher_name}</td>
+                <td>${count}</td>
+                <td>${avg}</td>
+                <td><b>${cat}</b></td>
+            </tr>
+        `;
+    });
+
+    document.getElementById('rep-title').innerText = `Consolidated Appraisal: ${monthYearLabel}`;
+    document.getElementById('rep-summary-text').innerHTML = `* Note: Ratings are calculated based on lifetime student feedback submitted through Section 26.`;
+    document.getElementById('rep-table-head').innerHTML = `
+        <tr>
+            <th>Teacher ID</th>
+            <th>Teacher Name</th>
+            <th>Total Reviews</th>
+            <th>Avg Score</th>
+            <th>Category</th>
+        </tr>`;
+    document.getElementById('rep-table-body').innerHTML = tableBody;
+
+    document.getElementById('rep-stats-boxes').innerHTML = "";
+    document.getElementById('report-output-area').style.display = 'block';
+    document.getElementById('filter_div').style.display = 'none';
+    document.getElementById('chart_div').style.display = 'none';
+
+// Ensure no other sections are active during the print process
+document.querySelectorAll('.content-section').forEach(s => {
+    if(s.id !== 'admin') s.style.display = 'none';
+});
+}
+
+
+
+
+
+// 1. Helper: Cost to Income Ratio Label
+function getRatioLabel(ratio) {
+    if (ratio <= 40) return `<span style="color:green;">${ratio}% (Very Good)</span>`;
+    if (ratio <= 60) return `<span style="color:orange;">${ratio}% (Acceptable)</span>`;
+    if (ratio > 100) return `<span style="color:purple; font-weight:900;">${ratio}% (Loss)</span>`;
+    if (ratio > 70) return `<span style="color:red; font-weight:bold;">${ratio}% (Dangerous)</span>`;
+    return `${ratio}%`;
+}
+
+// 2. Main P&L Engine
+async function generatePLReport(viewType) {
+    const monthVal = document.getElementById('rep-pl-month').value;
+    if (!monthVal) return alert("Please select a month first.");
+
+    // Convert YYYY-MM to "Month YYYY" (e.g. February 2026)
+    const dateObj = new Date(monthVal + "-01");
+    const monthYearStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    try {
+        // A. FETCH EXPENSES
+        const { data: expData } = await db.from('expenses').select('*').eq('month_year', monthVal).eq('institute_id', sessionInstID).maybeSingle();
+        
+        // B. FETCH COLLECTION (Fees + Inventory)
+        const { data: fees } = await db.from('payment_history').select('amount').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
+        const { data: inv } = await db.from('inventory_sales').select('total_paid').eq('month_year', monthYearStr).eq('institute_id', sessionInstID);
+        
+        // C. FETCH GLOBAL PENDING
+        const { data: students } = await db.from('students').select('pending_amount').eq('status', 'Active').eq('institute_id', sessionInstID);
+
+        // --- MATH CALCULATIONS ---
+        const totalExp = expData ? parseFloat(expData.total_expenses || 0) : 0;
+        const totalFees = fees ? fees.reduce((sum, f) => sum + parseFloat(f.amount), 0) : 0;
+        const totalInv = inv ? inv.reduce((sum, i) => sum + parseFloat(i.total_paid), 0) : 0;
+        const totalColl = totalFees + totalInv;
+        const totalPend = students ? students.reduce((sum, s) => sum + parseFloat(s.pending_amount), 0) : 0;
+        const grossProfit = totalColl - totalExp;
+        const ratio = totalColl > 0 ? Math.round((totalExp / totalColl) * 100) : (totalExp > 0 ? 101 : 0);
+
+        // --- DYNAMIC REMARKS (Major vs Minor Expense) ---
+        let remarks = "No expense data recorded.";
+        if (expData && totalExp > 0) {
+            const items = [
+                { n: "Rent", v: expData.rent },
+                { n: "Electricity", v: expData.electricity },
+                { n: "Maintenance", v: expData.maintenance },
+                { n: "Teacher Sal", v: expData.teacher_salary },
+                { n: "Admin Sal", v: expData.admin_salary },
+                { n: "Marketing", v: expData.marketing },
+                { n: "Others", v: expData.other_exp }
+            ].sort((a, b) => b.v - a.v);
+
+            const major = items[0];
+            const minor = items.filter(i => i.v > 0).pop() || major;
+            const majorPct = Math.round((major.v / totalExp) * 100);
+            const minorPct = Math.round((minor.v / totalExp) * 100);
+            remarks = `Major Expense: ${major.n} (${majorPct}% of total) | Minor Expense: ${minor.n} (${minorPct}% of total)`;
+        }
+
+        // --- RENDER OUTPUT ---
+        document.getElementById('rep-title').innerText = `Profit & Loss Statement: ${monthYearStr}`;
+        document.getElementById('rep-summary-text').innerHTML = `<b>Report Type:</b> ${viewType.toUpperCase()} | <b>Generated on:</b> ${new Date().toLocaleDateString()}`;
+        
+        // Detailed View table construction
+        let detailedHtml = "";
+        if (viewType === 'detailed' && expData) {
+            detailedHtml = `
+                <tr style="background:#f0f0f0;"><td colspan="2"><b>EXPENSE BREAKDOWN</b></td></tr>
+                <tr><td>Rent</td><td>₹${expData.rent}</td></tr>
+                <tr><td>Electricity</td><td>₹${expData.electricity}</td></tr>
+                <tr><td>Maintenance</td><td>₹${expData.maintenance}</td></tr>
+                <tr><td>Teacher Salaries</td><td>₹${expData.teacher_salary}</td></tr>
+                <tr><td>Admin Salaries</td><td>₹${expData.admin_salary}</td></tr>
+                <tr><td>Sales & Marketing</td><td>₹${expData.marketing}</td></tr>
+                <tr><td>Other (Internet/Bills)</td><td>₹${expData.other_exp}</td></tr>
+                <tr style="background:#f0f0f0;"><td colspan="2"><b>TOTAL SUMMARY</b></td></tr>
+            `;
+        }
+
+        document.getElementById('rep-table-head').innerHTML = `<tr><th>Financial Metric</th><th>Amount / Value</th></tr>`;
+        document.getElementById('rep-table-body').innerHTML = `
+            ${detailedHtml}
+            <tr><td>Total Monthly Expenses</td><td style="color:red;">₹ ${totalExp.toLocaleString()}</td></tr>
+            <tr><td>Total Collection (Fees + Inventory)</td><td style="color:green;">₹ ${totalColl.toLocaleString()}</td></tr>
+            <tr><td>Total Global Pending</td><td style="color:orange;">₹ ${totalPend.toLocaleString()}</td></tr>
+            <tr style="background:#e0f2f1; font-weight:bold;"><td>GROSS PROFIT / LOSS</td><td>₹ ${grossProfit.toLocaleString()}</td></tr>
+            <tr><td>Cost-to-Income Ratio</td><td>${getRatioLabel(ratio)}</td></tr>
+            <tr><td>Financial Remarks</td><td><small>${remarks}</small></td></tr>
+        `;
+
+        document.getElementById('report-output-area').style.display = 'block';
+        document.getElementById('filter_div').style.display = 'none';
+        document.getElementById('chart_div').style.display = 'none';
+        document.getElementById('rep-stats-boxes').innerHTML = "";
+
+    } catch (err) {
+        alert("Error generating report: " + err.message);
+    }
+}
+
+
+
+    </script>
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+    .then(() => console.log("IMS Service Worker Registered"))
+    .catch(err => console.log("Service Worker Failed", err));
+}
+
+
+
+
+
+/* ==========================================
+   FEE SECTION: EDIT STUDENT RECORD
+   ========================================== */
+async function editFeeRecordByRoll() {
+    const roll = document.getElementById('fee-roll').value.trim().toUpperCase();
+    if (!roll) return alert("Please enter and FETCH a Roll Number first.");
+
+
+
+// ADDED VALIDATION: Maximum 3 installments allowed
+    const checkDueDates = document.getElementById('fee-due-dates').value.trim();
+    if (checkDueDates) {
+        const dateArr = checkDueDates.split(',').filter(d => d.trim() !== "");
+        if (dateArr.length > 3) {
+            return alert("Error: Payment Due Dates cannot exceed 3 installments.");
+        }
+    }
+
+
+
+
+
+    // Step 1: Find the internal Student ID
+    const { data: detail, error: fetchErr } = await db.from('student_details')
+        .select('student_id')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (fetchErr || !detail) return alert("Roll number not found. Fetch the details first.");
+
+    // Step 2: Prepare updated data from the UI
+    const updatedData = {
+        full_name: document.getElementById('fee-name').value,
+        course: document.getElementById('fee-course').value,
+        total_fees: parseFloat(document.getElementById('fee-total').value) || 0,
+        status: document.getElementById('fee-status').value, // This is key for Alumni testing
+        due_dates: document.getElementById('fee-due-dates').value
+    };
+
+    // Step 3: Update the Master Students table
+    const { error: updateErr } = await db.from('students')
+        .update(updatedData)
+        .eq('id', detail.student_id);
+
+    if (updateErr) {
+        alert("Update Failed: " + updateErr.message);
+    } else {
+        alert("Success: Record for " + roll + " has been updated in the database.");
+    }
+}
+</script>
+<!-- PWA Install Button -->
+<button id="pwa-install-btn" style="display: none;">
+    <i class="fas fa-download"></i> INSTALL APP
+</button>
+
+
+<script>
+/* GLOBAL CASE-INSENSITIVE STANDARDIZER */
+document.addEventListener('blur', function(e) {
+    // Only target text boxes and text areas (Safely ignores passwords, emails, and dates)
+    if (e.target && (e.target.type === 'text' || e.target.tagName === 'TEXTAREA')) {
+        e.target.value = e.target.value.toUpperCase();
+    }
+}, true);
+</script>
+
+
+<div id="batch-picker-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:100000; justify-content:center; align-items:center; padding:20px;">
+    <div style="background:white; padding:30px; border-radius:15px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; font-family:'Times New Roman', serif; border: 5px solid #7FFFD4;">
+        <h2 style="text-align:center; text-decoration:underline; margin-bottom:20px;">STUDENT BATCH SCHEDULER</h2>
+        
+        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+            <thead>
+                <tr style="background:#000; color:#fff; text-align:left;">
+                  <th style="padding:15px; border:1px solid #ddd;">SUBJECT NAME</th>
+<th style="padding:15px; border:1px solid #ddd;">TEACHER NAME</th> <!-- ADD THIS -->
+<th style="padding:15px; border:1px solid #ddd;">TIME SLOT</th>
+                    <th style="padding:15px; border:1px solid #ddd; text-align:center;">CAPACITY</th>
+                    <th style="padding:15px; border:1px solid #ddd; text-align:center;">YES/NO</th>
+                    <th style="padding:15px; border:1px solid #ddd; text-align:center;">SELECT</th>
+                </tr>
+            </thead>
+            <tbody id="batch-picker-body">
+                <!-- Data rows injected here. -->
+            </tbody>
+        </table>
+
+        <div style="display:flex; gap:20px; margin-top:30px;">
+            <button onclick="saveBatchSelection()" style="flex:1; background:#27ae60; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1.1rem;">CONFIRM SELECTION</button>
+            <button onclick="document.getElementById('batch-picker-modal').style.display='none'" style="flex:1; background:#666; color:white; padding:15px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1.1rem;">CANCEL</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>
