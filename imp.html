@@ -1968,7 +1968,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
    <div class="card">
     <h3><i class="fas fa-file-alt"></i> Exam Record Entry</h3>
     <div class="form-grid">
-        <div class="input-group"><label>Exam Date</label><input type="date" id="ex-date" onchange="fetchSpecificExamRecord()"></div>
+        <div class="input-group"><label>Exam Date</label><input type="date" id="ex-date"></div>
         <div class="input-group">
             <label>Roll Number</label>
             <div style="display: flex; gap: 5px;">
@@ -1981,7 +1981,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
         <!-- DYNAMIC COURSE DROPDOWN -->
         <div class="input-group">
             <label>Select Course</label>
-          <select id="ex-course" onchange="fetchSpecificExamRecord()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+            <select id="ex-course" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
                 <option value="">-- Fetch Roll No First --</option>
             </select>
         </div>
@@ -2003,7 +2003,6 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
     </div>
 </div>
 </section>
-
 
 <!-- TEACHER ATTENDANCE SECTION -->
 <section id="t-attn-mod" class="content-section">
@@ -2409,12 +2408,12 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
         <div class="input-group"><label>Student Name</label><input type="text" id="ptm-sname" readonly style="background:#eee;"></div>
 
         <!-- DYNAMIC DROPDOWN FOR COURSE/TEACHER -->
-       <div class="input-group">
-    <label>Select Course (Teacher)</label>
-    <select id="ptm-course" onchange="syncPTMTeacherDetails(); fetchSpecificPTMRecord()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
-        <option value="">-- Fetch Roll No First --</option>
-    </select>
-</div>
+        <div class="input-group">
+            <label>Select Course (Teacher)</label>
+            <select id="ptm-course" onchange="syncPTMTeacherDetails()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+                <option value="">-- Fetch Roll No First --</option>
+            </select>
+        </div>
         
         <div class="input-group"><label>Teacher ID</label><input type="text" id="ptm-tid" readonly style="background:#eee;"></div>
         <div class="input-group"><label>Teacher Name</label><input type="text" id="ptm-tname" readonly style="background:#eee;"></div>
@@ -2446,13 +2445,11 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             
             <div class="button-row" style="margin-top: 20px;">
                 <button class="btn-add" style="background:#e84393; border-color:#d63031;" onclick="addPTMRecord()">ADD PTM RECORD</button>
-<button class="btn-fetch" onclick="fetchPTMRecordByRoll()">FETCH PTM RECORD (by Roll No)</button>
+<button class="btn-fetch" onclick="fetchPTMRecordByRoll()">FETCH PTM RECORD</button>
             </div>
         </div>
     </div>
 </section>
-
-
 
 
 
@@ -2542,59 +2539,43 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 
 <!-- 26. REVIEWS MODULE -->
-<!-- 26. REVIEWS MODULE -->
 <section id="reviews-mod" class="content-section">
     <div class="card" style="border-top: 5px solid #f1c40f;">
         <h3><i class="fas fa-star-half-alt"></i> Student Feedback & Reviews</h3>
         <div class="form-grid">
 
-            <div class="input-group">
-                <label>Today's Date</label>
-                <!-- DYNAMIC TRIGGER 1 -->
-                <input type="date" id="rev-date" onchange="fetchSpecificReview()">
-            </div>
+<!-- ADD AS THE FIRST ITEM IN THE REVIEWS FORM GRID -->
+<div class="input-group">
+    <label>Today's Date</label>
+    <input type="date" id="rev-date">
+</div>
+
+
 
             <div class="input-group">
                 <label>1. Student Roll Number</label>
                 <div style="display: flex; gap: 5px;">
                     <input type="text" id="rev-roll" placeholder="IMS-XXXX">
-                    <!-- CONNECTED TO AUTOPOPULATE -->
                     <button class="btn-fetch" onclick="autopopulateReviewForm()" style="padding: 5px 10px;"><i class="fas fa-magic"></i> Auto-Fill</button>
                 </div>
             </div>
-
-            <div class="input-group">
-                <label>2. Student Name</label>
-                <input type="text" id="rev-sname" readonly style="background:#eee;">
-            </div>
-
-            <div class="input-group">
-                <label>3. Select Teacher to Review</label>
-                <!-- DYNAMIC TRIGGER 2 -->
-                <select id="rev-tid" onchange="syncReviewTeacherName(); fetchSpecificReview()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
-                    <option value="">-- Enter Roll No First --</option>
-                </select>
-            </div>
-
-            <div class="input-group">
-                <label>4. Teacher Name</label>
-                <input type="text" id="rev-tname" readonly style="background:#eee;">
-            </div>
-
-            <div class="input-group">
-                <label>5. Review Score (Max 5)</label>
-                <input type="number" step="0.1" id="rev-score" placeholder="e.g. 4.5">
-            </div>
-
-            <div class="input-group" style="grid-column: 1 / -1;">
-                <label>6. Message from Student</label>
-                <textarea id="rev-msg" rows="3" placeholder="Write your feedback here..."></textarea>
-            </div>
+            <div class="input-group"><label>2. Student Name</label><input type="text" id="rev-sname" readonly style="background:#eee;"></div>
+         <div class="input-group">
+    <label>3. Select Teacher to Review</label>
+    <select id="rev-tid" onchange="syncReviewTeacherName()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+        <option value="">-- Enter Roll No First --</option>
+    </select>
+</div>
+<div class="input-group">
+    <label>4. Teacher Name</label>
+    <input type="text" id="rev-tname" readonly style="background:#eee;">
+</div>
+            <div class="input-group"><label>5. Review Score (Max 5)</label><input type="number" step="0.1" id="rev-score" placeholder="e.g. 4.5"></div>
+            <div class="input-group" style="grid-column: 1/-1;"><label>6. Message from Student</label><textarea id="rev-msg" rows="3" placeholder="Write your feedback here..."></textarea></div>
         </div>
 
         <div class="button-row">
             <button class="btn-add" onclick="addTeacherReview()">ADD REVIEW</button>
-            <!-- CONNECTED TO MANUAL FETCH -->
             <button class="btn-fetch" onclick="fetchReviewByRoll()">FETCH (by Roll No)</button>
             <button class="btn-edit" onclick="editTeacherReview()">UPDATE (by Roll No)</button>
         </div>
@@ -5802,7 +5783,7 @@ async function savePerformanceData() {
 // 1. Fetch Student & Populate Course Dropdown
 async function fetchStudentForExam() {
     const roll = document.getElementById('ex-roll').value.trim().toUpperCase();
-    if(!roll) return alert("Enter Roll Number first");
+    if(!roll) return alert("Enter Roll Number");
 
     const { data, error } = await db.from('students')
         .select('full_name, course')
@@ -5827,12 +5808,13 @@ async function fetchStudentForExam() {
             });
         }
         
-        // After finding student, check if a record exists for the current date/first subject
-        fetchSpecificExamRecord();
+        // Calculate the existing Global Average from previous exams
+        calculateGlobalAvg(roll);
     } else {
-        alert("Student not found in your records.");
+        alert("Student not found in your institute.");
     }
 }
+
 // 2. Calculate Local Exam Result AND Global Average
 async function calcExamResult() {
     const total = parseFloat(document.getElementById('ex-total').value) || 0;
@@ -5849,52 +5831,6 @@ async function calcExamResult() {
         calculateGlobalAvg(roll, obt, total);
     }
 }
-
-
-// 2. THE DYNAMIC FETCH: Triggered when Date OR Subject changes
-async function fetchSpecificExamRecord() {
-    const roll = document.getElementById('ex-roll').value.trim().toUpperCase();
-    const date = document.getElementById('ex-date').value;
-    const course = document.getElementById('ex-course').value;
-
-    // We only fetch if all three primary keys are present
-    if (!roll || !date || !course) return;
-
-    console.log(`Checking for record: ${roll} | ${date} | ${course}`);
-
-    const { data, error } = await db.from('exam')
-        .select('*')
-        .eq('roll_number', roll)
-        .eq('exam_date', date)
-        .eq('course_name', course)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    if (error) {
-        console.error("Fetch Error:", error.message);
-        return;
-    }
-
-    if (data) {
-        // RECORD FOUND: Fill the marks
-        document.getElementById('ex-total').value = data.total_marks;
-        document.getElementById('ex-obt').value = data.marks_obtained;
-        document.getElementById('ex-pct').value = data.percentage;
-        document.getElementById('ex-res').value = data.result;
-        console.log("Existing record loaded.");
-    } else {
-        // NO RECORD: Clear marks to allow for new entry
-        document.getElementById('ex-total').value = "";
-        document.getElementById('ex-obt').value = "";
-        document.getElementById('ex-pct').value = "";
-        document.getElementById('ex-res').value = "";
-        console.log("No record for this date/subject. Ready for new entry.");
-    }
-    
-    // Always update Global Average UI
-    calculateGlobalAvg(roll);
-}
-
 
 // 3. Helper to calculate Average across all saved courses + current typed input
 async function calculateGlobalAvg(roll, currentObt = 0, currentTotal = 0) {
@@ -5946,17 +5882,18 @@ const { data: att } = await db.from('attendance').select('status').eq('roll_numb
 }
 
 
-/* ==========================================
-   FIXED: EXAM MANAGEMENT FETCH FUNCTION
-   ========================================== */
 async function fetchExamByRoll() {
-    const roll = document.getElementById('ex-roll').value;
-    if(!roll) {
-        const r = prompt("Enter Roll Number:");
-        if(!r) return;
-        document.getElementById('ex-roll').value = r.toUpperCase();
-    }
-    fetchStudentForExam();
+    const roll = prompt("Enter Roll Number to see last exam:");
+    const { data, error } = await db.from('exam').select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).order('exam_date', {ascending: false}).limit(1).maybeSingle();
+    if(data) {
+        document.getElementById('ex-date').value = data.exam_date;
+        document.getElementById('ex-roll').value = data.roll_number;
+        document.getElementById('ex-name').value = data.full_name;
+        document.getElementById('ex-course').value = data.course_name;
+        document.getElementById('ex-total').value = data.total_marks;
+        document.getElementById('ex-obt').value = data.marks_obtained;
+        calcExamResult();
+    } else alert("No exam records found.");
 }
 
 /* ==========================================
@@ -7895,7 +7832,49 @@ function printScholarship() {
    24. PTM SCHEDULER LOGIC
    ========================================== */
 
-// 1. INITIAL LOAD: Triggered by the search icon next to Roll Number
+// Default month setup
+document.addEventListener('DOMContentLoaded', () => {
+    const ptmMonth = document.getElementById('ptm-month');
+    if (ptmMonth) ptmMonth.value = new Date().toISOString().substring(0, 7);
+});
+
+// Rule 3: Close Booking if current date > ptm_date
+function checkPTMDateValidity() {
+    const ptmDate = document.getElementById('ptm-date').value;
+    const statusSelect = document.getElementById('ptm-status');
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (ptmDate && today > ptmDate) {
+        alert("Notice: The selected PTM Date has passed. Bookings will be closed automatically.");
+        statusSelect.value = "Closed";
+    } else {
+        statusSelect.value = "Open";
+    }
+    togglePTMStatus();
+}
+
+function togglePTMStatus() {
+    const status = document.getElementById('ptm-status').value;
+    const area = document.getElementById('ptm-booking-area');
+    if (status === 'Closed') {
+        area.style.pointerEvents = 'none';
+        area.style.opacity = '0.5';
+    } else {
+        area.style.pointerEvents = 'auto';
+        area.style.opacity = '1';
+    }
+}
+
+// Helper to add minutes to time (HH:MM)
+function addMinutesToTime(timeStr, minsToAdd) {
+    const [h, m] = timeStr.split(':').map(Number);
+    let date = new Date();
+    date.setHours(h, m, 0, 0);
+    date.setMinutes(date.getMinutes() + minsToAdd);
+    return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+}
+
+// 1. Triggered by "Fetch Teachers" button - Corrected to prevent duplicates
 async function fetchPTMAllocations() {
     const roll = document.getElementById('ptm-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter a Roll Number.");
@@ -7915,9 +7894,14 @@ async function fetchPTMAllocations() {
     courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
 
     if (allocs && allocs.length > 0) {
+        // --- NEW LOGIC TO PREVENT DUPLICATES ---
         const seenEntries = new Set(); 
+
         for (let a of allocs) {
+            // Create a unique key using Teacher ID and Subject
             const uniqueKey = `${a.teacher_id}-${a.subject}`.toUpperCase();
+            
+            // If we have already added this specific Teacher-Subject combo, skip it
             if (seenEntries.has(uniqueKey)) continue; 
             seenEntries.add(uniqueKey);
 
@@ -7931,44 +7915,51 @@ async function fetchPTMAllocations() {
             opt.dataset.tmob = tData ? tData.mobile : "";
             courseSelect.appendChild(opt);
         }
-        alert("Teachers linked to this student are now in the dropdown.");
+        alert(`Found ${seenEntries.size} unique courses. Now pick a Course.`);
+    } else {
+        alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. THE DYNAMIC FETCH: Pulls existing PTM record when you switch teachers in the dropdown
-async function fetchSpecificPTMRecord() {
-    const roll = document.getElementById('ptm-roll').value.trim().toUpperCase();
-    const ptmMonth = document.getElementById('ptm-month').value;
-    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
-
+// 2. Triggered when you pick a Course
+async function syncPTMTeacherDetails() {
     const select = document.getElementById('ptm-course');
     const opt = select.options[select.selectedIndex];
-    if (!opt || !opt.dataset.tid) return;
+    if (!opt.value) return;
 
-    const tid = opt.dataset.tid;
+    document.getElementById('ptm-tid').value = opt.dataset.tid;
+    document.getElementById('ptm-tname').value = opt.dataset.tname;
+    document.getElementById('ptm-tmob').value = opt.dataset.tmob;
 
-    const { data: record } = await db.from('ptm_schedule')
-        .select('*')
-        .match({ roll_number: roll, teacher_id: tid, month_year: monthYearStr, institute_id: sessionInstID })
-        .maybeSingle();
+    calculateAvailablePTMSlots(opt.dataset.tid);
+}
 
-    if (record) {
-        // Record Exists: Populate UI and trigger WhatsApp Refresh
-        document.getElementById('ptm-date').value = record.ptm_date;
-        document.getElementById('ptm-remarks').value = record.remarks || "";
-        
-        const slotSelect = document.getElementById('ptm-slot-time');
-        slotSelect.innerHTML = `<option value="${record.slot_time}">${record.slot_time}</option>`;
-        
-        updatePTMWhatsApp(); // This refreshes the WhatsApp buttons for the saved record
-    } else {
-        // No Record: Clear for new booking
-        document.getElementById('ptm-remarks').value = "";
-        calculateAvailablePTMSlots(tid); 
+// 3. Helper to find free slots
+async function calculateAvailablePTMSlots(tid) {
+    const ptmDate = document.getElementById('ptm-date').value;
+    const startTime = document.getElementById('ptm-start').value;
+    const endTime = document.getElementById('ptm-end').value;
+    const duration = parseInt(document.getElementById('ptm-duration').value);
+    const slotSelect = document.getElementById('ptm-slot-time');
+
+    if (!ptmDate || !startTime || !endTime) return alert("Configure Date/Time in Step 1 first.");
+
+    const { data: booked } = await db.from('ptm_schedule').select('slot_time').eq('teacher_id', tid).eq('ptm_date', ptmDate).eq('institute_id', sessionInstID);
+    const bookedTimes = booked ? booked.map(b => b.slot_time) : [];
+
+    slotSelect.innerHTML = '<option value="">-- Choose Slot --</option>';
+    let current = startTime;
+    while (current < endTime) {
+        if (!bookedTimes.includes(current)) {
+            let opt = document.createElement('option');
+            opt.value = current; opt.text = current;
+            slotSelect.appendChild(opt);
+        }
+        current = addMinutesToTime(current, duration);
     }
 }
 
-// 3. WHATSAPP LOGIC: Generates the specific PTM messages
+// 4. Triggered when you pick a Slot (Updates WhatsApp Links)
 function updatePTMWhatsApp() {
     const slot = document.getElementById('ptm-slot-time').value;
     if (!slot) return;
@@ -7976,6 +7967,7 @@ function updatePTMWhatsApp() {
     const ptmMonth = document.getElementById('ptm-month').value;
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
     
+    // Call your existing WhatsApp function (the one you were worried about deleting)
     generatePTMWhatsAppLinks(
         monthYearStr, 
         document.getElementById('ptm-date').value, 
@@ -7989,13 +7981,15 @@ function updatePTMWhatsApp() {
     );
 }
 
+// Generate the specific automated WhatsApp messages
 function generatePTMWhatsAppLinks(mYear, date, start, end, slot, tName, tMob, mMob, fMob) {
-    const tMsg = encodeURIComponent(`Dear ${tName}, PTM for ${mYear} is on ${date} between ${start}-${end}. Your presence is essential.`);
-    const pMsg = encodeURIComponent(`Dear Parent, PTM for ${mYear} is on ${date}. Your slot is ${slot}. Please ensure you are present.`);
+    const tMsg = encodeURIComponent(`Dear ${tName}, this is to inform you that the PTM for the current month ${mYear} is going to be conducted on ${date} between ${start} and ${end}. Your presence is highly essential. Please confirm.`);
+    const mMsg = encodeURIComponent(`Dear mam, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
+    const fMsg = encodeURIComponent(`Dear sir, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
 
     setupWALink('wa-ptm-teacher', tMob, tMsg);
-    setupWALink('wa-ptm-mother', mMob, pMsg);
-    setupWALink('wa-ptm-father', fMob, pMsg);
+    setupWALink('wa-ptm-mother', mMob, mMsg);
+    setupWALink('wa-ptm-father', fMob, fMsg);
 }
 
 function setupWALink(btnId, mobile, msg) {
@@ -8005,12 +7999,13 @@ function setupWALink(btnId, mobile, msg) {
         btn.style.pointerEvents = 'auto';
         btn.style.opacity = '1';
     } else {
+        btn.href = "#";
         btn.style.pointerEvents = 'none';
         btn.style.opacity = '0.5';
     }
 }
 
-// 4. SAVE RECORD: Uses UPSERT to handle multiple teachers per student
+// Add PTM Record to Database
 async function addPTMRecord() {
     const ptmMonth = document.getElementById('ptm-month').value;
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -8035,52 +8030,83 @@ async function addPTMRecord() {
         remarks: document.getElementById('ptm-remarks').value
     };
 
-    if (!data.roll_number || !data.slot_time || !data.teacher_id) return alert("Select Teacher and Slot first.");
+    if (!data.roll_number || !data.slot_time) {
+        return alert("Error: Please fetch and allocate a slot before saving.");
+    }
 
-    const { error } = await db.from('ptm_schedule').upsert(data, { onConflict: 'institute_id, roll_number, teacher_id, month_year' });
+    const { error } = await db.from('ptm_schedule').insert([data]);
 
-    if (error) alert("Save Error: " + error.message);
-    else alert(`PTM Slot ${data.slot_time} Saved for ${data.teacher_name}`);
-}
-
-// 5. OTHER UTILITIES (Slots & Teacher Sync)
-function syncPTMTeacherDetails() {
-    const select = document.getElementById('ptm-course');
-    const opt = select.options[select.selectedIndex];
-    if (!opt.value) return;
-    document.getElementById('ptm-tid').value = opt.dataset.tid;
-    document.getElementById('ptm-tname').value = opt.dataset.tname;
-    document.getElementById('ptm-tmob').value = opt.dataset.tmob;
-}
-
-async function calculateAvailablePTMSlots(tid) {
-    const ptmDate = document.getElementById('ptm-date').value;
-    const startTime = document.getElementById('ptm-start').value;
-    const endTime = document.getElementById('ptm-end').value;
-    const duration = parseInt(document.getElementById('ptm-duration').value);
-    const slotSelect = document.getElementById('ptm-slot-time');
-
-    const { data: booked } = await db.from('ptm_schedule').select('slot_time').eq('teacher_id', tid).eq('ptm_date', ptmDate).eq('institute_id', sessionInstID);
-    const bookedTimes = booked ? booked.map(b => b.slot_time) : [];
-
-    slotSelect.innerHTML = '<option value="">-- Choose Slot --</option>';
-    let current = startTime;
-    while (current < endTime) {
-        if (!bookedTimes.includes(current)) {
-            let opt = document.createElement('option');
-            opt.value = current; opt.text = current;
-            slotSelect.appendChild(opt);
+    if (error) {
+        if (error.code === '23505') {
+            alert("Database Error: This slot is either already taken OR the student already has a PTM booked for this month.");
+        } else {
+            alert("Save Error: " + error.message);
         }
-        const [h, m] = current.split(':').map(Number);
-        let d = new Date(); d.setHours(h, m + duration);
-        current = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    } else {
+        alert(`Success! Slot ${data.slot_time} booked for ${data.student_name}. You can now use the WhatsApp buttons to inform everyone.`);
     }
 }
 
-// Bottom FETCH Button Wrapper
-function fetchPTMRecordByRoll() {
-    fetchPTMAllocations();
+
+
+
+
+async function fetchPTMRecordByRoll() {
+    const roll = prompt("Enter Student Roll Number to fetch PTM record:");
+    if (!roll) return;
+
+    const ptmMonth = document.getElementById('ptm-month').value;
+    if (!ptmMonth) return alert("Please select the Month & Year in Step 1 first.");
+    
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const { data, error } = await db.from('ptm_schedule')
+        .select('*')
+        .eq('roll_number', roll.toUpperCase())
+        .eq('month_year', monthYearStr)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (error || !data) return alert("No PTM record found for this student in " + monthYearStr + ".");
+
+    // Step 1: Populate Step 1 Config
+    document.getElementById('ptm-date').value = data.ptm_date;
+    document.getElementById('ptm-start').value = data.start_time;
+    document.getElementById('ptm-end').value = data.end_time;
+    document.getElementById('ptm-duration').value = data.slot_duration;
+    document.getElementById('ptm-status').value = data.status;
+
+    // Step 2: Populate Student Details
+    document.getElementById('ptm-roll').value = data.roll_number;
+    document.getElementById('ptm-sname').value = data.student_name;
+    document.getElementById('ptm-tid').value = data.teacher_id;
+    document.getElementById('ptm-tname').value = data.teacher_name;
+    document.getElementById('ptm-tmob').value = data.teacher_mobile || "";
+    document.getElementById('ptm-mmob').value = data.mother_mobile || "";
+    document.getElementById('ptm-fmob').value = data.father_mobile || "";
+    document.getElementById('ptm-remarks').value = data.remarks || "";
+
+    // Step 3: FIX DROPDOWNS (Crucial Step)
+    // Manually add the saved Course to the dropdown so it shows up
+    const courseSelect = document.getElementById('ptm-course');
+    courseSelect.innerHTML = `<option value="${data.course_name}">${data.course_name} (${data.teacher_name})</option>`;
+    
+    // Manually add the saved Slot to the dropdown so it shows up
+    const slotSelect = document.getElementById('ptm-slot-time');
+    slotSelect.innerHTML = `<option value="${data.slot_time}">${data.slot_time}</option>`;
+
+    // Step 4: Refresh WhatsApp Buttons
+    generatePTMWhatsAppLinks(
+        data.month_year, data.ptm_date, data.start_time, data.end_time, 
+        data.slot_time, data.teacher_name, data.teacher_mobile, 
+        data.mother_mobile, data.father_mobile
+    );
+
+    alert("PTM Record Loaded Successfully.");
 }
+
+
+
 /* ==========================================
    25. BATCH MASTER LOGIC (TABLE: "list")
    ========================================== */
@@ -8358,7 +8384,7 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    26. TEACHER REVIEWS LOGIC
    ========================================== */
 
-// 1. THIS CONNECTS THE ROLL NUMBER TO THE TEACHER LIST
+// 1. Fetch all linked teachers and fill the dropdown
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter Roll Number first.");
@@ -8368,7 +8394,7 @@ async function autopopulateReviewForm() {
     if(!stu) return alert("Student not found.");
     document.getElementById('rev-sname').value = stu.full_name;
 
-    // Fetch teachers linked to student from Section 18
+    // Fetch all allocations for this roll
     const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
     
     const tidSelect = document.getElementById('rev-tid');
@@ -8376,130 +8402,90 @@ async function autopopulateReviewForm() {
     document.getElementById('rev-tname').value = "";
 
     if(allocs && allocs.length > 0) {
+        // Use a Map to filter out duplicate teachers (if linked to multiple batches)
         const uniqueTeachers = new Map();
         allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
 
         uniqueTeachers.forEach((name, id) => {
             let opt = document.createElement('option');
             opt.value = id;
-            opt.text = `${id} - ${name}`;
-            opt.dataset.name = name; 
+            opt.text = id;
+            opt.dataset.name = name; // Store name in dataset for quick sync
             tidSelect.appendChild(opt);
         });
-        
-        // After loading the list, check if a review exists for currently selected date/teacher
-        fetchSpecificReview();
+        alert(`Found ${uniqueTeachers.size} teachers linked to this student.`);
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. THE DYNAMIC FETCH: Triggered by Date or Teacher selection
-async function fetchSpecificReview() {
-    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    const tid = document.getElementById('rev-tid').value;
-    const date = document.getElementById('rev-date').value;
-
-    // Only run fetch if we have all 3 parameters
-    if (!roll || !tid || !date) return;
-
-    console.log(`Dynamic Fetch Triggered for: ${roll}, ${tid}, ${date}`);
-
-    const { data, error } = await db.from('reviews')
-        .select('*')
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid)
-        .eq('review_date', date)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    if (data) {
-        // Record found: Populate fields
-        document.getElementById('rev-score').value = data.rating;
-        document.getElementById('rev-msg').value = data.message;
-    } else {
-        // No record: Clear fields for new entry
-        document.getElementById('rev-score').value = "";
-        document.getElementById('rev-msg').value = "";
-    }
+// 2. Helper to update the Name field when an ID is selected from dropdown
+function syncReviewTeacherName() {
+    const select = document.getElementById('rev-tid');
+    const selectedOption = select.options[select.selectedIndex];
+    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
 }
 
-// 3. THIS CONNECTS THE BOTTOM "FETCH" BUTTON
-async function fetchReviewByRoll() {
-    const rollInBox = document.getElementById('rev-roll').value.trim();
-    if(!rollInBox) {
-        const r = prompt("Enter Student Roll Number:");
-        if(!r) return;
-        document.getElementById('rev-roll').value = r.toUpperCase();
-    }
-    // Logic is the same as autopopulate: load the student context
-    autopopulateReviewForm();
-}
-
-// 4. ADD NEW REVIEW
+// 3. Save Review for the specific selected teacher
 async function addTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
     const tid = document.getElementById('rev-tid').value;
-    const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
-
-    if(!roll || !tid || !date) return alert("Fill Roll No, Teacher, and Date.");
-    if(isNaN(score) || score > 5) return alert("Invalid Score.");
+    
+    if(!tid) return alert("Please select a teacher from the dropdown.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
     const data = {
         institute_id: sessionInstID,
-        student_roll: roll,
+        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
         student_name: document.getElementById('rev-sname').value,
         teacher_id: tid,
         teacher_name: document.getElementById('rev-tname').value,
         rating: score,
         message: document.getElementById('rev-msg').value,
-        review_date: date
+        review_date: document.getElementById('rev-date').value
     };
 
     const { error } = await db.from('reviews').insert([data]);
-    if(error) {
-        if(error.code === '23505') alert("Review already exists. Use UPDATE.");
-        else alert("Save Error: " + error.message);
-    } else {
-        alert("Review Saved!");
+    if(error) alert("Error: " + error.message);
+    else {
+        alert("Review Saved for " + data.teacher_name);
+        // Clear rating and message for next review
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
     }
 }
 
-// 5. UPDATE EXISTING REVIEW (MATCHING ROLL + TEACHER + DATE)
+// 3. FETCH Review
+async function fetchReviewByRoll() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const { data, error } = await db.from('reviews').select('*').eq('student_roll', roll).eq('institute_id', sessionInstID).maybeSingle();
+    
+    if(data) {
+        document.getElementById('rev-sname').value = data.student_name;
+        document.getElementById('rev-tid').value = data.teacher_id;
+        document.getElementById('rev-tname').value = data.teacher_name;
+        document.getElementById('rev-score').value = data.rating;
+        document.getElementById('rev-msg').value = data.message;
+        alert("Review loaded.");
+// ADD THIS LINE inside the success block of fetchReviewByRoll()
+document.getElementById('rev-date').value = data.review_date;
+    } else alert("No review found for this roll number.");
+}
+
+// 4. UPDATE Review
 async function editTeacherReview() {
     const roll = document.getElementById('rev-roll').value.toUpperCase();
-    const tid = document.getElementById('rev-tid').value;
-    const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
+    if(score > 5) return alert("Error: Score cannot exceed 5.");
 
-    if(!roll || !tid || !date) return alert("Fetch the record first.");
+    const { error } = await db.from('reviews').update({
+        rating: score,
+        message: document.getElementById('rev-msg').value
+    }).eq('student_roll', roll).eq('institute_id', sessionInstID);
 
-    const { error } = await db.from('reviews')
-        .update({
-            rating: score,
-            message: document.getElementById('rev-msg').value
-        })
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid)
-        .eq('review_date', date)
-        .eq('institute_id', sessionInstID);
-
-    if(error) alert("Update Error: " + error.message);
+    if(error) alert(error.message);
     else alert("Review Updated successfully!");
 }
-
-// 6. SYNC TEACHER NAME
-function syncReviewTeacherName() {
-    const select = document.getElementById('rev-tid');
-    const opt = select.options[select.selectedIndex];
-    document.getElementById('rev-tname').value = opt ? (opt.dataset.name || "") : "";
-}
-
-
-
-
-
 
 
 
