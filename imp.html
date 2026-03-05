@@ -3643,8 +3643,9 @@ async function generateUPIQR() {
    ========================================== */
 
 let currentBatchesByName = []; // Global array to store fetched batches for the typed name
+let allActiveTeachers = [];    // Global array to hold all teachers
 
-// 0. Loads all teachers into the ID dropdown initially (Used for brand new batches)
+// 0. Loads all unique teachers into memory and dropdown
 async function loadBatchTeacherDropdown() {
     const tidSelect = document.getElementById('batch-teacher-id');
     tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
@@ -3655,7 +3656,8 @@ async function loadBatchTeacherDropdown() {
         .eq('status', 'Active');
         
     if (teachers) {
-        const seenTeachers = new Set(); // FIX: Prevent duplicates
+        allActiveTeachers = teachers; // Store globally
+        const seenTeachers = new Set();
         teachers.forEach(t => {
             if (!seenTeachers.has(t.id)) {
                 seenTeachers.add(t.id);
@@ -3668,6 +3670,7 @@ async function loadBatchTeacherDropdown() {
         });
     }
 }
+
 // 1. Auto-Populate ALL fields dynamically when Batch Name is written
 async function autopopulateBatchByName() {
     const bname = document.getElementById('batch-name').value.trim().toUpperCase();
@@ -3687,11 +3690,14 @@ async function autopopulateBatchByName() {
         .eq('institute_id', sessionInstID);
 
     currentBatchesByName = data || [];
+    tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
 
     if (currentBatchesByName.length > 0) {
-        // DYNAMICALLY populate Teacher Dropdown with ONLY unique teachers assigned to this batch
-        tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
-        const seenTeachers = new Set(); // FIX: Prevent duplicate teachers in the same batch
+        
+        // GROUP 1: Show all teachers already relevant to this specific batch
+        let optGroupExisting = document.createElement('optgroup');
+        optGroupExisting.label = "✅ Teachers Currently in this Batch";
+        const seenTeachers = new Set(); 
         
         currentBatchesByName.forEach(b => {
             if (!seenTeachers.has(b.teacher_id)) {
@@ -3700,23 +3706,42 @@ async function autopopulateBatchByName() {
                 opt.value = b.teacher_id;
                 opt.text = b.teacher_id + " - " + b.teacher_name;
                 opt.dataset.name = b.teacher_name;
-                tidSelect.appendChild(opt);
+                optGroupExisting.appendChild(opt);
             }
         });
+        tidSelect.appendChild(optGroupExisting);
+
+        // GROUP 2: Show all other teachers (in case owner wants to add a new teacher to this batch)
+        let optGroupOthers = document.createElement('optgroup');
+        optGroupOthers.label = "➕ Add Another Teacher to this Batch";
         
-        // If there's only one teacher for this batch, auto-select them
+        allActiveTeachers.forEach(t => {
+            if (!seenTeachers.has(t.id)) {
+                let opt = document.createElement('option');
+                opt.value = t.id;
+                opt.text = t.id + " - " + t.teacher_name;
+                opt.dataset.name = t.teacher_name;
+                optGroupOthers.appendChild(opt);
+            }
+        });
+        tidSelect.appendChild(optGroupOthers);
+        
+        // If there's only one teacher currently in this batch, auto-select them
         if (seenTeachers.size === 1) {
             tidSelect.value = Array.from(seenTeachers)[0];
             handleBatchTeacherChange();
         } else {
-            // Multiple relevant teachers found, wait for user to select which one
             resetBatchFields();
         }
     } else {
-        // NEW BATCH NAME: Load full active teacher list if not already loaded
-        if (tidSelect.options.length <= 1 || !tidSelect.options[1].value) {
-            loadBatchTeacherDropdown();
-        }
+        // NEW BATCH NAME: Load full active teacher list
+        allActiveTeachers.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.id + " - " + t.teacher_name;
+            opt.dataset.name = t.teacher_name;
+            tidSelect.appendChild(opt);
+        });
         resetBatchFields();
     }
 }
@@ -3735,6 +3760,7 @@ async function handleBatchTeacherChange() {
     const tidSelect = document.getElementById('batch-teacher-id');
     const tid = tidSelect.value;
     const nameSelect = document.getElementById('batch-teacher-name');
+    const timeSelect = document.getElementById('batch-time');
 
     if (!tid) {
         resetBatchFields();
@@ -3742,7 +3768,8 @@ async function handleBatchTeacherChange() {
     }
 
     // Auto-fill Teacher Name Dropdown
-    const tName = tidSelect.options[tidSelect.selectedIndex].dataset.name || "";
+    const selectedOpt = tidSelect.options[tidSelect.selectedIndex];
+    const tName = selectedOpt.dataset.name || "";
     nameSelect.innerHTML = `<option value="${tName}">${tName}</option>`;
 
     // Check if we are viewing an EXISTING batch record for this specific teacher
@@ -3751,12 +3778,23 @@ async function handleBatchTeacherChange() {
     if (existingBatch) {
         // EXACT MATCH FOUND: Lock fields to the exact saved batch details
         document.getElementById('batch-subject').innerHTML = `<option value="${existingBatch.subject_name}" selected>${existingBatch.subject_name}</option>`;
-        document.getElementById('batch-time').innerHTML = `<option value="${existingBatch.batch_time}" selected>${existingBatch.batch_time}</option>`;
+        
+        // FIX: Display batch timings neatly broken down in the dropdown box
+        timeSelect.innerHTML = ''; 
+        const splitTimes = existingBatch.batch_time.split(',').map(t => t.trim()).filter(t => t !== "");
+        
+        splitTimes.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = existingBatch.batch_time; // Keep full string as value so update doesn't erase data
+            opt.text = "🕒 " + t; // Add an icon for neatness
+            timeSelect.appendChild(opt);
+        });
+
         document.getElementById('batch-students').value = existingBatch.students_allotted || "";
         document.getElementById('batch-remarks').value = existingBatch.remarks || "";
     } else {
         // NEW BATCH FOR THIS TEACHER: Fetch their subjects and let user build it
-        document.getElementById('batch-time').innerHTML = '<option value="">-- Select Subject First --</option>';
+        timeSelect.innerHTML = '<option value="">-- Select Subject First --</option>';
         document.getElementById('batch-students').value = "";
         document.getElementById('batch-remarks').value = "";
 
