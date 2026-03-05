@@ -3638,6 +3638,13 @@ async function generateUPIQR() {
 // ==========================================
 
 // 0. MISSING FUNCTION ADDED: Loads all teachers into the ID dropdown initially
+/* ==========================================
+   5. BATCH MANAGEMENT LOGIC
+   ========================================== */
+
+let currentBatchesByName = []; // Global array to store fetched batches for the typed name
+
+// 0. Loads all teachers into the ID dropdown initially (Used for brand new batches)
 async function loadBatchTeacherDropdown() {
     const tidSelect = document.getElementById('batch-teacher-id');
     tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
@@ -3661,97 +3668,108 @@ async function loadBatchTeacherDropdown() {
 // 1. Auto-Populate ALL fields dynamically when Batch Name is written
 async function autopopulateBatchByName() {
     const bname = document.getElementById('batch-name').value.trim().toUpperCase();
+    const tidSelect = document.getElementById('batch-teacher-id');
     
     if (!bname) {
-        // Reset to default if input is cleared
+        currentBatchesByName = [];
         loadBatchTeacherDropdown();
-        document.getElementById('batch-teacher-name').innerHTML = '<option value="">-- Auto-filled --</option>';
-        document.getElementById('batch-subject').innerHTML = '<option value="">-- Select Teacher First --</option>';
-        document.getElementById('batch-time').innerHTML = '<option value="">-- Select Subject First --</option>';
-        document.getElementById('batch-students').value = "";
-        document.getElementById('batch-remarks').value = "";
+        resetBatchFields();
         return;
     }
 
+    // Fetch ALL batches that share this exact name (No .maybeSingle() limit)
     const { data, error } = await db.from('batches')
         .select('*')
         .eq('batch_name', bname)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
+        .eq('institute_id', sessionInstID);
 
-    if (data) {
-        // LOCK DROPDOWNS to ONLY the relevant teacher ID and Name
-        document.getElementById('batch-teacher-id').innerHTML = `<option value="${data.teacher_id}">${data.teacher_id}</option>`;
-        document.getElementById('batch-teacher-name').innerHTML = `<option value="${data.teacher_name}">${data.teacher_name}</option>`;
+    currentBatchesByName = data || [];
+
+    if (currentBatchesByName.length > 0) {
+        // DYNAMICALLY populate Teacher Dropdown with ONLY teachers assigned to this batch
+        tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+        currentBatchesByName.forEach(b => {
+            let opt = document.createElement('option');
+            opt.value = b.teacher_id;
+            opt.text = b.teacher_id + " - " + b.teacher_name;
+            opt.dataset.name = b.teacher_name;
+            tidSelect.appendChild(opt);
+        });
         
-        // Fetch THIS specific teacher's subjects to populate the Subject dropdown
-        const { data: teacher } = await db.from('teacher_details')
-            .select('subject_taught')
-            .eq('id', data.teacher_id)
-            .eq('institute_id', sessionInstID)
-            .maybeSingle();
-        
-        const subSelect = document.getElementById('batch-subject');
-        subSelect.innerHTML = '';
-        if(teacher && teacher.subject_taught) {
-            const subjects = teacher.subject_taught.split(',').map(s => s.trim().toUpperCase());
-            subjects.forEach(sub => {
-                let selected = (sub === data.subject_name.toUpperCase()) ? 'selected' : '';
-                subSelect.innerHTML += `<option value="${sub}" ${selected}>${sub}</option>`;
-            });
+        // If there's only one teacher, auto-select them and trigger population
+        if (currentBatchesByName.length === 1) {
+            tidSelect.value = currentBatchesByName[0].teacher_id;
+            handleBatchTeacherChange();
         } else {
-            subSelect.innerHTML = `<option value="${data.subject_name}" selected>${data.subject_name}</option>`;
+            // Multiple teachers found, wait for user to select which one
+            resetBatchFields();
         }
-
-        // Populate Batch Time dropdown with the current batch's time
-        document.getElementById('batch-time').innerHTML = `<option value="${data.batch_time}" selected>${data.batch_time}</option>`;
-        
-        // Populate Max Students and Remarks dynamically
-        document.getElementById('batch-students').value = data.students_allotted || "";
-        document.getElementById('batch-remarks').value = data.remarks || "";
     } else {
-        // If it's a NEW batch name being typed, ensure the full teacher list is ready
-        if(document.getElementById('batch-teacher-id').options.length <= 1) {
+        // NEW BATCH NAME: Load full active teacher list if not already loaded
+        if (tidSelect.options.length <= 1 || !tidSelect.options[1].value) {
             loadBatchTeacherDropdown();
         }
+        resetBatchFields();
     }
 }
 
-// 2. Fetch Teacher & Populate Subjects Dropdown dynamically
+// Helper to clear dependent fields
+function resetBatchFields() {
+    document.getElementById('batch-teacher-name').innerHTML = '<option value="">-- Auto-filled --</option>';
+    document.getElementById('batch-subject').innerHTML = '<option value="">-- Select Teacher First --</option>';
+    document.getElementById('batch-time').innerHTML = '<option value="">-- Select Subject First --</option>';
+    document.getElementById('batch-students').value = "";
+    document.getElementById('batch-remarks').value = "";
+}
+
+// 2. Fetch Teacher & Populate Dropdowns dynamically
 async function handleBatchTeacherChange() {
     const tidSelect = document.getElementById('batch-teacher-id');
     const tid = tidSelect.value;
     const nameSelect = document.getElementById('batch-teacher-name');
-    const subSelect = document.getElementById('batch-subject');
-    const timeSelect = document.getElementById('batch-time');
 
-    // Reset dependents
-    subSelect.innerHTML = '<option value="">-- Select Subject --</option>';
-    timeSelect.innerHTML = '<option value="">-- Select Subject First --</option>';
-    nameSelect.innerHTML = '<option value="">-- Auto-filled --</option>';
-
-    if (!tid) return;
+    if (!tid) {
+        resetBatchFields();
+        return;
+    }
 
     // Auto-fill Teacher Name Dropdown
-    const selectedOption = tidSelect.options[tidSelect.selectedIndex];
-    const tName = selectedOption.dataset.name || "";
+    const tName = tidSelect.options[tidSelect.selectedIndex].dataset.name || "";
     nameSelect.innerHTML = `<option value="${tName}">${tName}</option>`;
 
-    const { data: teacher } = await db.from('teacher_details')
-        .select('subject_taught')
-        .eq('id', tid)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-    
-    if (teacher && teacher.subject_taught) {
-        const subjects = teacher.subject_taught.split(',').map(s => s.trim().toUpperCase());
-        subjects.forEach(sub => {
-            if (sub) subSelect.innerHTML += `<option value="${sub}">${sub}</option>`;
-        });
+    // Check if we are viewing an EXISTING batch record for this specific teacher
+    const existingBatch = currentBatchesByName.find(b => b.teacher_id === tid);
+
+    if (existingBatch) {
+        // EXACT MATCH FOUND: Lock fields to the exact saved batch details
+        document.getElementById('batch-subject').innerHTML = `<option value="${existingBatch.subject_name}" selected>${existingBatch.subject_name}</option>`;
+        document.getElementById('batch-time').innerHTML = `<option value="${existingBatch.batch_time}" selected>${existingBatch.batch_time}</option>`;
+        document.getElementById('batch-students').value = existingBatch.students_allotted || "";
+        document.getElementById('batch-remarks').value = existingBatch.remarks || "";
+    } else {
+        // NEW BATCH FOR THIS TEACHER: Fetch their subjects and let user build it
+        document.getElementById('batch-time').innerHTML = '<option value="">-- Select Subject First --</option>';
+        document.getElementById('batch-students').value = "";
+        document.getElementById('batch-remarks').value = "";
+
+        const { data: teacher } = await db.from('teacher_details')
+            .select('subject_taught')
+            .eq('id', tid)
+            .eq('institute_id', sessionInstID)
+            .maybeSingle();
+        
+        const subSelect = document.getElementById('batch-subject');
+        subSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+        if (teacher && teacher.subject_taught) {
+            const subjects = teacher.subject_taught.split(',').map(s => s.trim().toUpperCase());
+            subjects.forEach(sub => {
+                if (sub) subSelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+            });
+        }
     }
 }
 
-// 3. Fetch Times based on Subject Selection (Dropdown formatting)
+// 3. Fetch Times based on Subject Selection (For New Batches)
 async function handleBatchSubjectChange() {
     const tid = document.getElementById('batch-teacher-id').value;
     const subject = document.getElementById('batch-subject').value;
@@ -3792,14 +3810,16 @@ async function addBatch() {
     const bname = document.getElementById('batch-name').value.trim().toUpperCase();
     const timeVal = document.getElementById('batch-time').value;
 
+    if (!bname || !tid || !timeVal) return alert("Please complete Batch Name, Teacher, Subject, and Time Slot.");
+
+    // Check if this exact teacher already has this exact batch name created
     const { data: existingBatches } = await db.from('batches')
         .select('id')
         .eq('institute_id', sessionInstID)
         .eq('teacher_id', tid)
         .eq('batch_name', bname);
 
-    if (existingBatches && existingBatches.length > 0) return alert("THE BATCH IS ALREADY CREATED");
-    if (!bname || !tid || !timeVal) return alert("Please complete Batch Name, Teacher, Subject, and Time Slot.");
+    if (existingBatches && existingBatches.length > 0) return alert("THIS BATCH IS ALREADY CREATED FOR THIS TEACHER.");
 
     const batchData = {
         institute_id: sessionInstID,
@@ -3817,19 +3837,19 @@ async function addBatch() {
     if (error) alert("Error: " + error.message);
     else {
         alert("SUCCESS: Batch '" + bname + "' created.");
-        document.getElementById('batch-name').value = "";
-        autopopulateBatchByName(); // reset fields
+        autopopulateBatchByName(); // Refresh memory to instantly lock the newly created batch
     }
 }
 
-// 5. UPDATE BATCH (Works normally)
+// 5. UPDATE BATCH (Uses Teacher ID + Batch Name safely)
 async function updateBatch() {
     const batchName = document.getElementById('batch-name').value.trim().toUpperCase();
+    const tid = document.getElementById('batch-teacher-id').value;
     const timeVal = document.getElementById('batch-time').value;
-    if (!batchName) return alert("Please type a Batch Name first.");
+    
+    if (!batchName || !tid) return alert("Please type a Batch Name and select a Teacher first.");
 
     const batchData = {
-        teacher_id: document.getElementById('batch-teacher-id').value,
         teacher_name: document.getElementById('batch-teacher-name').value,
         batch_time: timeVal,
         subject_name: document.getElementById('batch-subject').value,
@@ -3837,13 +3857,20 @@ async function updateBatch() {
         remarks: document.getElementById('batch-remarks').value
     };
 
-    const { error } = await db.from('batches').update(batchData).eq('batch_name', batchName).eq('institute_id', sessionInstID);
+    const { error } = await db.from('batches')
+        .update(batchData)
+        .eq('batch_name', batchName)
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID);
 
     if (error) alert("Update Error: " + error.message);
-    else alert("Success! Batch details and capacity for '" + batchName + "' have been updated.");
+    else {
+        alert("Success! Batch details and capacity for '" + batchName + "' have been updated.");
+        autopopulateBatchByName(); // Refresh UI
+    }
 }
 
-// 6. HISTORY BUTTON - Formatted exactly as requested
+// 6. HISTORY BUTTON (Now completely dynamic with No N/A values)
 async function fetchBatchHistoryByStudent() {
     let roll = prompt("Enter Student Roll Number to view their Batch Schedule:");
     if (!roll) return;
@@ -3853,21 +3880,29 @@ async function fetchBatchHistoryByStudent() {
     const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
     if (!stu) return alert("Student not found.");
 
-    // Fetch List
-    const { data: lists, error } = await db.from('list').select('batch_name, teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
+    // Fetch allocations from List table
+    const { data: lists, error } = await db.from('list').select('batch_name, teacher_id, teacher_name, course_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
     if (error) return alert(error.message);
 
     let tableRows = "";
     if (lists && lists.length > 0) {
         for (let l of lists) {
-            const { data: b } = await db.from('batches').select('batch_time, students_allotted').eq('batch_name', l.batch_name).eq('institute_id', sessionInstID).maybeSingle();
+            // CRITICAL FIX: Match using both batch_name AND teacher_id to prevent overlaps
+            const { data: b } = await db.from('batches')
+                .select('batch_time, students_allotted, subject_name')
+                .eq('batch_name', l.batch_name)
+                .eq('teacher_id', l.teacher_id)
+                .eq('institute_id', sessionInstID)
+                .maybeSingle();
             
-            let bTime = b ? b.batch_time : "N/A";
-            let maxStu = b ? b.students_allotted : "N/A";
+            let bTime = b ? b.batch_time : "N/A (Batch Modified/Deleted)";
+            let maxStu = b ? b.students_allotted : "Unlimited";
+            let subject = b ? b.subject_name : (l.course_name || "N/A");
 
             tableRows += `
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px;">${l.batch_name}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; font-weight:bold;">${l.batch_name}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${subject}</td>
                     <td style="border: 1px solid #ccc; padding: 10px;">${bTime}</td>
                     <td style="border: 1px solid #ccc; padding: 10px;">${l.teacher_id}</td>
                     <td style="border: 1px solid #ccc; padding: 10px;">${l.teacher_name}</td>
@@ -3876,7 +3911,7 @@ async function fetchBatchHistoryByStudent() {
             `;
         }
     } else {
-        tableRows = `<tr><td colspan="5" style="padding:20px; text-align:center;">No batches allocated for this student.</td></tr>`;
+        tableRows = `<tr><td colspan="6" style="padding:20px; text-align:center;">No batches allocated for this student.</td></tr>`;
     }
 
     const modalHtml = `
@@ -3885,18 +3920,19 @@ async function fetchBatchHistoryByStudent() {
                 <h2 style="margin-top:0; color:#000; text-decoration:underline; text-align:center;">BATCH SCHEDULE HISTORY</h2>
                 
                 <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-weight:bold; font-size:1.1rem; border-bottom:2px solid #000; padding-bottom:10px;">
-                    <span>student name : <span style="color:#1877F2; font-weight:normal;">${stu.full_name}</span></span>
-                    <span>student roll no : <span style="color:#ff0000; font-weight:normal;">${roll}</span></span>
+                    <span>Student Name : <span style="color:#1877F2; font-weight:normal;">${stu.full_name}</span></span>
+                    <span>Student Roll No : <span style="color:#ff0000; font-weight:normal;">${roll}</span></span>
                 </div>
                 
                 <table style="width:100%; border-collapse:collapse; text-align:left; color:#000;">
                     <thead style="background:#f8f9fa;">
                         <tr>
-                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Batch name</th>
-                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">batch time</th>
-                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">teacher id</th>
-                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">teacher name</th>
-                            <th style="border: 1px solid #000; padding: 10px; text-align:center; text-transform: capitalize;">students allotted</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Batch Name</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Subject</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Batch Time</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Teacher ID</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-transform: capitalize;">Teacher Name</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-align:center; text-transform: capitalize;">Students Allotted</th>
                         </tr>
                     </thead>
                     <tbody>${tableRows}</tbody>
