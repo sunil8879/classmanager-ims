@@ -8384,67 +8384,58 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    26. TEACHER REVIEWS LOGIC
    ========================================== */
 
-// 1. Fetch all linked teachers and fill the dropdown
 /* ==========================================
-   26. TEACHER REVIEWS LOGIC (FIXED)
+   26. TEACHER REVIEWS LOGIC
    ========================================== */
 
-// 1. THIS CONNECTS THE ROLL NUMBER TO THE TEACHER LIST
+// 1. Auto-Fill Button (Next to Roll Number) - Loads Student Name & Linked Teachers
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    if(!roll) return alert("Please enter Roll Number first.");
+    if (!roll) return alert("Please enter Roll Number first.");
 
-    // Fetch Student Name
     const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-    if(!stu) return alert("Student not found.");
-    document.getElementById('rev-sname').value = stu.full_name;
+    if (stu) document.getElementById('rev-sname').value = stu.full_name;
 
-    // Fetch teachers linked to student from Section 18
     const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
     
     const tidSelect = document.getElementById('rev-tid');
     tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
     document.getElementById('rev-tname').value = "";
 
-    if(allocs && allocs.length > 0) {
+    if (allocs && allocs.length > 0) {
         const uniqueTeachers = new Map();
         allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
-
-        uniqueTeachers.forEach((name, id) => {
-            let opt = document.createElement('option');
-            opt.value = id;
-            opt.text = `${id} - ${name}`;
-            opt.dataset.name = name; 
-            tidSelect.appendChild(opt);
-        });
         
-        // Check if a review exists for currently selected date/teacher
-        fetchSpecificReview();
-    } else {
-        alert("No teachers linked to this student in Section 18.");
+        uniqueTeachers.forEach((name, id) => {
+            tidSelect.innerHTML += `<option value="${id}" data-name="${name}">${id} - ${name}</option>`;
+        });
     }
 }
 
-// 2. Helper to update the Name field AND trigger the data fetch
+// 2. Triggered when Teacher Dropdown Changes
 function syncReviewTeacherName() {
     const select = document.getElementById('rev-tid');
-    const selectedOption = select.options[select.selectedIndex];
-    document.getElementById('rev-tname').value = selectedOption ? (selectedOption.dataset.name || "") : "";
+    const opt = select.options[select.selectedIndex];
+    document.getElementById('rev-tname').value = opt ? (opt.getAttribute('data-name') || "") : "";
     
-    // Auto-fetch the score when teacher is selected!
-    fetchSpecificReview();
+    fetchSpecificReview(); // Auto-pull data immediately
 }
 
-// 3. THE DYNAMIC FETCH (Pulls the Score and Message)
+// 3. Connect Date Box automatically
+document.addEventListener('DOMContentLoaded', () => {
+    const dateBox = document.getElementById('rev-date');
+    if (dateBox) dateBox.addEventListener('change', fetchSpecificReview);
+});
+
+// 4. Core Fetch Logic (Triggers when Date or Teacher changes)
 async function fetchSpecificReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const date = document.getElementById('rev-date').value;
 
-    // Must have all 3 parameters to find a specific review
     if (!roll || !tid || !date) return;
 
-    const { data, error } = await db.from('reviews')
+    const { data } = await db.from('reviews')
         .select('*')
         .eq('student_roll', roll)
         .eq('teacher_id', tid)
@@ -8461,42 +8452,63 @@ async function fetchSpecificReview() {
     }
 }
 
-// 4. Safely attach event listener to Date box so changing date auto-fetches without touching HTML
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const dateInput = document.getElementById('rev-date');
-        if(dateInput) dateInput.addEventListener('change', fetchSpecificReview);
-    }, 1000);
-});
-
-// 5. THIS CONNECTS THE BOTTOM "FETCH" BUTTON
+// 5. Bottom FETCH Button
 async function fetchReviewByRoll() {
-    const roll = prompt("Enter Student Roll Number to fetch review data:");
-    if(!roll) return;
-    
-    document.getElementById('rev-roll').value = roll.toUpperCase();
-    await autopopulateReviewForm();
-    
-    alert("Student loaded! Now select the Teacher and Date to view their specific review score and message.");
+    let roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    if (!roll) {
+        roll = prompt("Enter Student Roll Number:");
+        if (!roll) return;
+        document.getElementById('rev-roll').value = roll.toUpperCase();
+    }
+
+    // Fetch the absolute latest review for this student
+    const { data } = await db.from('reviews')
+        .select('*')
+        .eq('student_roll', roll)
+        .eq('institute_id', sessionInstID)
+        .order('review_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (data) {
+        document.getElementById('rev-sname').value = data.student_name || "";
+        document.getElementById('rev-date').value = data.review_date || "";
+        
+        // Force dropdown to show correct teacher
+        const tidSelect = document.getElementById('rev-tid');
+        tidSelect.innerHTML = `<option value="${data.teacher_id}" data-name="${data.teacher_name}">${data.teacher_id} - ${data.teacher_name}</option>`;
+        tidSelect.value = data.teacher_id;
+        
+        document.getElementById('rev-tname').value = data.teacher_name || "";
+        document.getElementById('rev-score').value = data.rating || "";
+        document.getElementById('rev-msg').value = data.message || "";
+        
+        alert("Review loaded successfully.");
+    } else {
+        alert("No review found for this Roll Number. Setting up form for a new entry.");
+        autopopulateReviewForm();
+    }
 }
 
-// 6. ADD NEW REVIEW
+// 6. Add Review
 async function addTeacherReview() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
     const tid = document.getElementById('rev-tid').value;
+    const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
     
-    if(!tid) return alert("Please select a teacher from the dropdown.");
+    if(!roll || !tid || !date) return alert("Fill Roll No, Teacher, and Date.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
     const data = {
         institute_id: sessionInstID,
-        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
+        student_roll: roll,
         student_name: document.getElementById('rev-sname').value,
         teacher_id: tid,
         teacher_name: document.getElementById('rev-tname').value,
         rating: score,
         message: document.getElementById('rev-msg').value,
-        review_date: document.getElementById('rev-date').value
+        review_date: date
     };
 
     const { error } = await db.from('reviews').insert([data]);
@@ -8504,21 +8516,19 @@ async function addTeacherReview() {
         if(error.code === '23505') alert("Review already exists for this date. Use UPDATE.");
         else alert("Save Error: " + error.message);
     } else {
-        alert("Review Saved for " + data.teacher_name);
-        document.getElementById('rev-score').value = "";
-        document.getElementById('rev-msg').value = "";
+        alert("Review Saved!");
     }
 }
 
-// 7. UPDATE EXISTING REVIEW
+// 7. Update Review
 async function editTeacherReview() {
     const roll = document.getElementById('rev-roll').value.toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
 
-    if(!roll || !tid || !date) return alert("Please fetch the student, teacher, and date first.");
-    if(score > 5 || score < 0) return alert("Error: Score must be between 0 and 5.");
+    if(!roll || !tid || !date) return alert("Please fetch the record first.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
     const { error } = await db.from('reviews')
         .update({
@@ -8530,7 +8540,7 @@ async function editTeacherReview() {
         .eq('review_date', date)
         .eq('institute_id', sessionInstID);
 
-    if(error) alert(error.message);
+    if(error) alert("Update Error: " + error.message);
     else alert("Review Updated successfully!");
 }
 
