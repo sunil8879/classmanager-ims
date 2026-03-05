@@ -3775,7 +3775,10 @@ async function fetchBatchByTeacher() {
     let selection = data[0];
     if (data.length > 1) {
         let msg = "Multiple batches found. Enter number to load:\n";
-        data.forEach((b, i) => msg += `${i+1}. ${b.batch_name} (${b.subject_name})\n`);
+        // THE FIX: Format prompt as SUBJECT - TIME SLOT
+        data.forEach((b, i) => {
+            msg += `${i+1}. ${b.subject_name} - ${b.batch_time}\n`;
+        });
         let choice = prompt(msg);
         if (choice && data[parseInt(choice)-1]) selection = data[parseInt(choice)-1];
     }
@@ -3785,19 +3788,17 @@ async function fetchBatchByTeacher() {
     document.getElementById('batch-teacher-id').value = selection.teacher_id;
     document.getElementById('batch-teacher-name').value = selection.teacher_name;
     document.getElementById('batch-subject').value = selection.subject_name;
-    
-    // THE FIX: Autopopulate Max Students and Remarks
     document.getElementById('batch-students').value = selection.students_allotted || 0;
     document.getElementById('batch-remarks').value = selection.remarks || "";
 
-    // IMPORTANT: Update the 3D Display Box for Timings
-const slotDropdown = document.getElementById('batch-slots-select');
-slotDropdown.innerHTML = `<option value="${selection.batch_time}">${selection.batch_time}</option>`;
-slotDropdown.value = selection.batch_time;
+    // THE FIX: Ensure it populates the new DROPDOWN instead of the old box
+    const slotDropdown = document.getElementById('batch-slots-select');
+    slotDropdown.innerHTML = `<option value="${selection.batch_time}">${selection.batch_time}</option>`;
+    slotDropdown.value = selection.batch_time;
+    slotDropdown.style.background = "#7FFFD4";
 
     alert("Batch details loaded!");
 }
-
 async function editBatch() {
     const tID = val('#batch', 'input[placeholder="Teacher ID"]');
     const updateData = {
