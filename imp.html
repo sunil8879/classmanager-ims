@@ -2547,7 +2547,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 <!-- ADD AS THE FIRST ITEM IN THE REVIEWS FORM GRID -->
 <div class="input-group">
     <label>Today's Date</label>
-   <input type="date" id="rev-date" onchange="fetchSpecificReview()">
+    <input type="date" id="rev-date">
 </div>
 
 
@@ -2562,7 +2562,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <div class="input-group"><label>2. Student Name</label><input type="text" id="rev-sname" readonly style="background:#eee;"></div>
          <div class="input-group">
     <label>3. Select Teacher to Review</label>
-<select id="rev-tid" onchange="syncReviewTeacherName(); fetchSpecificReview()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+    <select id="rev-tid" onchange="syncReviewTeacherName()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
         <option value="">-- Enter Roll No First --</option>
     </select>
 </div>
@@ -8427,135 +8427,154 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    26. TEACHER REVIEWS LOGIC
    ========================================== */
 
-/* ==========================================
-   26. TEACHER REVIEWS LOGIC (DYNAMIC & FIXED)
-   ========================================== */
-
 // 1. Fetch all linked teachers and fill the dropdown
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter Roll Number first.");
 
     // Fetch Student Name
-    const { data: stu } = await db.from('students')
-        .select('full_name')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
+    const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
     if(!stu) return alert("Student not found.");
     document.getElementById('rev-sname').value = stu.full_name;
 
-    // Fetch teachers linked to this student from Module 18
-    const { data: allocs } = await db.from('student_allocations')
-        .select('teacher_id, teacher_name')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID);
+    // Fetch all allocations for this roll
+    const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
     
     const tidSelect = document.getElementById('rev-tid');
     tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
     document.getElementById('rev-tname').value = "";
 
     if(allocs && allocs.length > 0) {
+        // Use a Map to filter out duplicate teachers (if linked to multiple batches)
         const uniqueTeachers = new Map();
         allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
 
         uniqueTeachers.forEach((name, id) => {
             let opt = document.createElement('option');
             opt.value = id;
-            opt.text = `${id} - ${name}`;
-            opt.dataset.name = name; 
+            opt.text = id;
+            opt.dataset.name = name; // Store name in dataset for quick sync
             tidSelect.appendChild(opt);
         });
-        
-        // Auto-run fetch after populating teachers
-        fetchSpecificReview();
+        alert(`Found ${uniqueTeachers.size} teachers linked to this student.`);
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. THE DYNAMIC FETCH: Triggered when Teacher or Date changes
-async function fetchSpecificReview() {
-    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    const tid = document.getElementById('rev-tid').value;
-    const date = document.getElementById('rev-date').value;
-
-    // We only fetch if all three primary keys are present
-    if (!roll || !tid || !date) return;
-
-    console.log(`Searching: ${roll} | ${tid} | ${date}`);
-
-    const { data, error } = await db.from('reviews')
-        .select('*')
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid)
-        .eq('review_date', date)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    if (error) {
-        console.error("Review Fetch Error:", error.message);
-        return;
-    }
-
-    if (data) {
-        // RECORD FOUND: Populate the UI
-        document.getElementById('rev-score').value = data.rating;
-        document.getElementById('rev-msg').value = data.message;
-    } else {
-        // NO RECORD: Clear fields so you don't see the wrong teacher's review
-        document.getElementById('rev-score').value = "";
-        document.getElementById('rev-msg').value = "";
-    }
-}
-
-// 3. Update Teacher Name field
+// 2. Helper to update the Name field when an ID is selected from dropdown
 function syncReviewTeacherName() {
     const select = document.getElementById('rev-tid');
     const selectedOption = select.options[select.selectedIndex];
-    document.getElementById('rev-tname').value = selectedOption ? (selectedOption.dataset.name || "") : "";
+    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
 }
 
-// 4. Save/Update Review (Upsert prevents duplicates)
+// 3. Save Review for the specific selected teacher
 async function addTeacherReview() {
     const tid = document.getElementById('rev-tid').value;
     const score = parseFloat(document.getElementById('rev-score').value);
-    const date = document.getElementById('rev-date').value;
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
     
-    if(!tid || !date || !roll) return alert("Select Roll No, Teacher, and Date.");
-    if(isNaN(score) || score > 5 || score < 0) return alert("Enter rating 0 to 5.");
+    if(!tid) return alert("Please select a teacher from the dropdown.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
     const data = {
         institute_id: sessionInstID,
-        student_roll: roll,
+        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
         student_name: document.getElementById('rev-sname').value,
         teacher_id: tid,
         teacher_name: document.getElementById('rev-tname').value,
         rating: score,
         message: document.getElementById('rev-msg').value,
-        review_date: date
+        review_date: document.getElementById('rev-date').value
     };
 
-    // Use upsert so that selecting the same teacher/date updates the record
-    const { error } = await db.from('reviews').upsert(data, { onConflict: 'student_roll, teacher_id, review_date' });
-    
+    const { error } = await db.from('reviews').insert([data]);
     if(error) alert("Error: " + error.message);
-    else alert("Success! Review Saved/Updated.");
+    else {
+        alert("Review Saved for " + data.teacher_name);
+        // Clear rating and message for next review
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
+    }
 }
 
-// 5. Manual Fetch Button
+// 3. FETCH Review
+/* ==========================================
+   FIXED: TEACHER REVIEWS FETCH FUNCTION
+   ========================================== */
 async function fetchReviewByRoll() {
+    // 1. Get the Roll Number, trim spaces, and convert to UpperCase
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    if(!roll) return alert("Enter Roll Number.");
-    autopopulateReviewForm();
+    
+    if (!roll) {
+        return alert("Please enter a Student Roll Number first.");
+    }
+
+    // 2. Query the database
+    // We sort by 'created_at' descending and limit to 1 
+    // to get the MOST RECENT review this student has written.
+    const { data, error } = await db.from('reviews')
+        .select('*')
+        .eq('student_roll', roll)
+        .eq('institute_id', sessionInstID)
+        .order('created_at', { ascending: false }) 
+        .limit(1)
+        .maybeSingle();
+    
+    if (error) {
+        console.error("Review Fetch Error:", error.message);
+        return alert("Database Error: " + error.message);
+    }
+
+    if (data) {
+        // 3. Populate Student Info
+        document.getElementById('rev-sname').value = data.student_name || "";
+        document.getElementById('rev-date').value = data.review_date || "";
+
+        // 4. Handle the Teacher Dropdown
+        // We must ensure the Teacher ID exists in the dropdown before selecting it
+        const tidSelect = document.getElementById('rev-tid');
+        
+        // If the dropdown is empty, we trigger the autopopulate logic first
+        if (tidSelect.options.length <= 1) {
+            await autopopulateReviewForm();
+        }
+        
+        // Set the Teacher ID and Name
+        tidSelect.value = data.teacher_id;
+        document.getElementById('rev-tname').value = data.teacher_name || "";
+
+        // 5. Populate Score and Message
+        document.getElementById('rev-score').value = data.rating;
+        document.getElementById('rev-msg').value = data.message;
+
+        alert("Latest Review Loaded for: " + data.teacher_name);
+    } else {
+        alert("No review records found for Roll Number: " + roll);
+    }
 }
 
-// 6. UPDATE Review
+// 4. UPDATE Review
 async function editTeacherReview() {
-    // We can just call addTeacherReview because upsert handles both adding and editing
-    addTeacherReview();
+    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    const tid = document.getElementById('rev-tid').value;
+    const score = parseFloat(document.getElementById('rev-score').value);
+    
+    if(!roll || !tid) return alert("Please fetch a review record first.");
+    if(score > 5) return alert("Error: Score cannot exceed 5.");
+
+    const { error } = await db.from('reviews')
+        .update({
+            rating: score,
+            message: document.getElementById('rev-msg').value,
+            review_date: document.getElementById('rev-date').value
+        })
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid) // Crucial: ensure we update the review for the correct teacher
+        .eq('institute_id', sessionInstID);
+
+    if(error) alert("Update Failed: " + error.message);
+    else alert("Review updated successfully!");
 }
 
 
