@@ -10172,173 +10172,179 @@ document.addEventListener('blur', function(e) {
 <!-- ADD THIS SCRIPT BLOCK JUST BEFORE THE CLOSING </body> TAG -->
 <script>
 /* =========================================================================
-   OVERRIDE INJECTION: SECTION 5 - COMPLETE BATCH MANAGEMENT OVERHAUL
+   STRICT OVERRIDE: SECTION 5 - BATCH MANAGEMENT (BLANK DROPDOWN FIX)
    ========================================================================= */
 
+// 1. DYNAMICALLY REWRITE THE UI TO MATCH EXACT REQUIREMENTS
 document.addEventListener('DOMContentLoaded', () => {
-    // Wait for the DOM to load, then dynamically reconstruct the Batch Section UI
-    setTimeout(() => {
-        const batchCard = document.querySelector('#batch .card');
-        if (batchCard) {
-            batchCard.innerHTML = `
-                <h3><i class="fas fa-layer-group"></i> Batch Management</h3>
-                <div class="form-grid">
-                    <div class="input-group">
-                        <label>1. Batch Name</label>
-                        <input type="text" id="b-name" placeholder="Enter Batch Name" onblur="filterTeachersByBatch()">
-                    </div>
-                    <div class="input-group">
-                        <label>2. Subject Name</label>
-                        <select id="b-sub" onchange="syncBatchTime()">
-                            <option value="">-- Select Subject --</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label>3. Teacher ID</label>
-                        <select id="b-tid" onchange="syncBatchTeacher()">
-                            <option value="">-- Select Teacher --</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label>4. Teacher Name</label>
-                        <input type="text" id="b-tname" readonly style="background:#eee;">
-                    </div>
-                    <div class="input-group">
-                        <label>5. Maximum Students Allotted</label>
-                        <input type="number" id="b-stu" max="15" placeholder="Max 15 allowed">
-                    </div>
-                    <div class="input-group">
-                        <label>6. Time Slots</label>
-                        <select id="b-time" style="font-weight:bold; color:#007bff; background:#f0faff;">
-                            <option value="">-- Auto-filled --</option>
-                        </select>
-                    </div>
-                    <div class="input-group" style="grid-column: 1 / -1;">
-                        <label>7. Remarks</label>
-                        <input type="text" id="b-rem" placeholder="Add remarks here...">
-                    </div>
+    // We rewrite the HTML of Section 5 safely so old buggy inputs are ignored.
+    const batchCard = document.querySelector('#batch .card');
+    if (batchCard) {
+        batchCard.innerHTML = `
+            <h3><i class="fas fa-layer-group"></i> 5. Batch Management</h3>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>1. Batch Name</label>
+                    <input type="text" id="bm2-name" placeholder="Enter Batch Name" onblur="bm2FilterTeachers()">
                 </div>
-                
-                <div class="button-row" style="flex-wrap: wrap; margin-top:30px;">
-                    <button class="btn-add" onclick="processAddBatch()">ADD BATCH</button>
-                    <button class="btn-fetch" onclick="processFetchBatch()">FETCH BATCH (Roll No)</button>
-                    <button class="btn-edit" onclick="processUpdateBatch()">UPDATE BATCH</button>
-                    <button class="btn-fetch" style="background:#8e44ad;" onclick="processBatchHistory()">HISTORY</button>
-                    <button class="btn-edit" style="background:#e74c3c;" onclick="processDeleteBatch()"><i class="fas fa-trash"></i> DELETE BATCH</button>
+                <div class="input-group">
+                    <label>2. Subject Name</label>
+                    <select id="bm2-sub" onchange="bm2SyncTime()">
+                        <option value="">-- Select Subject --</option>
+                    </select>
                 </div>
-            `;
-            // Pre-load all teachers on init
-            loadAllActiveTeachers();
-        }
-    }, 1000);
+                <div class="input-group">
+                    <label>3. Teacher ID</label>
+                    <select id="bm2-tid" onchange="bm2SyncTeacher()">
+                        <option value="">-- Select Teacher --</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>4. Teacher Name</label>
+                    <input type="text" id="bm2-tname" readonly style="background:#eee;">
+                </div>
+                <div class="input-group">
+                    <label>5. Max Students Allotted</label>
+                    <input type="number" id="bm2-stu" placeholder="Max 15 allowed">
+                </div>
+                <div class="input-group">
+                    <label>6. Time Slots</label>
+                    <select id="bm2-time" style="font-weight:bold; color:#007bff; background:#f0faff;">
+                        <option value="">-- Auto-filled --</option>
+                    </select>
+                </div>
+                <div class="input-group" style="grid-column: 1 / -1;">
+                    <label>7. Remarks</label>
+                    <input type="text" id="bm2-rem" placeholder="Add remarks here...">
+                </div>
+            </div>
+            <div class="button-row" style="flex-wrap: wrap; margin-top:30px;">
+                <button class="btn-add" onclick="bm2Add()">ADD BATCH</button>
+                <button class="btn-fetch" onclick="bm2Fetch()">FETCH BATCH (Roll No)</button>
+                <button class="btn-edit" onclick="bm2Update()">UPDATE BATCH</button>
+                <button class="btn-fetch" style="background:#8e44ad;" onclick="bm2History()">HISTORY</button>
+                <button class="btn-edit" style="background:#e74c3c;" onclick="bm2Delete()"><i class="fas fa-trash"></i> DELETE BATCH</button>
+            </div>
+        `;
+    }
 });
 
-window.globalActiveTeachers = [];
+// GLOBAL STATE
+window.bm2AllTeachers = [];
 
-// 1. Fetch Master List of Teachers (Guaranteed Unique)
-window.loadAllActiveTeachers = async function() {
-    const { data } = await db.from('teacher_details').select('id, teacher_name, subject_taught, time_of_slot').eq('institute_id', sessionInstID).eq('status', 'Active');
-    window.globalActiveTeachers = data || [];
-    renderTeacherDropdown(window.globalActiveTeachers);
+// 2. THIS HOOKS INTO YOUR TAB CLICK. IT WILL NOT FIRE UNTIL YOU ARE LOGGED IN.
+window.loadBatchTeacherDropdown = async function() {
+    if (!sessionInstID) return; // Failsafe
+    
+    const { data } = await db.from('teacher_details')
+        .select('id, teacher_name, subject_taught, time_of_slot')
+        .eq('institute_id', sessionInstID)
+        .eq('status', 'Active');
+        
+    window.bm2AllTeachers = data || [];
+    bm2RenderTeachers(window.bm2AllTeachers);
 };
 
-// Helper: Renders dropdown without duplicates
-window.renderTeacherDropdown = function(teacherList) {
-    const sel = document.getElementById('b-tid');
+// 3. RENDER UNIQUE TEACHERS ONLY
+window.bm2RenderTeachers = function(teacherList) {
+    const sel = document.getElementById('bm2-tid');
     sel.innerHTML = '<option value="">-- Select Teacher --</option>';
     const seen = new Set();
     
     teacherList.forEach(t => {
         if (!seen.has(t.id)) {
             seen.add(t.id);
-            sel.innerHTML += `<option value="${t.id}" data-name="${t.teacher_name}">${t.id} - ${t.teacher_name}</option>`;
+            sel.innerHTML += `<option value="${t.id}">${t.id} - ${t.teacher_name}</option>`;
         }
     });
 };
 
-// 2. Filter Teachers dynamically if Batch Name exists
-window.filterTeachersByBatch = async function() {
-    const bname = document.getElementById('b-name').value.trim().toUpperCase();
+// 4. VALIDATION: FILTER TEACHERS WHEN BATCH NAME IS WRITTEN
+window.bm2FilterTeachers = async function() {
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
     if (!bname) {
-        renderTeacherDropdown(window.globalActiveTeachers);
-        document.getElementById('b-tname').value = "";
+        bm2RenderTeachers(window.bm2AllTeachers);
+        document.getElementById('bm2-stu').value = "";
         return;
     }
 
-    const { data } = await db.from('batches').select('teacher_id').eq('batch_name', bname).eq('institute_id', sessionInstID);
+    const { data } = await db.from('batches').select('teacher_id, students_allotted').eq('batch_name', bname).eq('institute_id', sessionInstID);
     
     if (data && data.length > 0) {
-        // Batch exists, show ONLY relevant teachers
+        // Batch Name exists -> Show ONLY relevant teachers
         const validIds = data.map(d => d.teacher_id);
-        const filtered = window.globalActiveTeachers.filter(t => validIds.includes(t.id));
-        renderTeacherDropdown(filtered);
+        const filtered = window.bm2AllTeachers.filter(t => validIds.includes(t.id));
+        bm2RenderTeachers(filtered);
         
-        // Auto-select if only 1 teacher is in this batch
+        // Dynamically set max students
+        document.getElementById('bm2-stu').value = data[0].students_allotted || "";
+        
+        // Auto select if only 1 teacher is found
         if (filtered.length === 1) {
-            document.getElementById('b-tid').value = filtered[0].id;
-            syncBatchTeacher();
+            document.getElementById('bm2-tid').value = filtered[0].id;
+            bm2SyncTeacher();
         }
     } else {
-        // New Batch Name, show ALL teachers
-        renderTeacherDropdown(window.globalActiveTeachers);
+        // Brand new Batch Name -> Show ALL active teachers
+        bm2RenderTeachers(window.bm2AllTeachers);
+        document.getElementById('bm2-stu').value = "";
     }
 };
 
-// 3. Auto-populate Subject, Name, and previously saved logic when Teacher is selected
-window.syncBatchTeacher = async function() {
-    const tid = document.getElementById('b-tid').value;
-    const bname = document.getElementById('b-name').value.trim().toUpperCase();
-    const tnameEl = document.getElementById('b-tname');
-    const subSel = document.getElementById('b-sub');
-    const timeSel = document.getElementById('b-time');
+// 5. AUTOPOPULATE TEACHER NAME & SUBJECT
+window.bm2SyncTeacher = async function() {
+    const tid = document.getElementById('bm2-tid').value;
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
+    if (!tid) return;
 
-    if (!tid) { tnameEl.value = ""; subSel.innerHTML = ""; timeSel.innerHTML = ""; return; }
+    const teacher = window.bm2AllTeachers.find(t => t.id === tid);
+    if (!teacher) return;
 
-    const teacher = window.globalActiveTeachers.find(t => t.id === tid);
-    if (teacher) {
-        tnameEl.value = teacher.teacher_name;
-        
-        subSel.innerHTML = '<option value="">-- Select Subject --</option>';
-        if (teacher.subject_taught) {
-            teacher.subject_taught.split(',').forEach(s => {
-                subSel.innerHTML += `<option value="${s.trim().toUpperCase()}">${s.trim().toUpperCase()}</option>`;
-            });
-        }
+    document.getElementById('bm2-tname').value = teacher.teacher_name;
 
-        // If this teacher is ALREADY saved under this Batch Name, lock details & dynamic capacity
-        if (bname) {
-            const { data: exist } = await db.from('batches').select('*').eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID).maybeSingle();
+    const subSel = document.getElementById('bm2-sub');
+    subSel.innerHTML = '<option value="">-- Select Subject --</option>';
+    if (teacher.subject_taught) {
+        teacher.subject_taught.split(',').forEach(s => {
+            subSel.innerHTML += `<option value="${s.trim().toUpperCase()}">${s.trim().toUpperCase()}</option>`;
+        });
+    }
+
+    // Lock details if this specific teacher is already saved to this batch
+    if (bname) {
+        const { data } = await db.from('batches').select('*').eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID).maybeSingle();
+        if (data) {
+            subSel.innerHTML = `<option value="${data.subject_name}">${data.subject_name}</option>`;
             
-            if (exist) {
-                subSel.innerHTML = `<option value="${exist.subject_name}">${exist.subject_name}</option>`;
-                
-                timeSel.innerHTML = "";
-                (exist.batch_time || "").split(',').forEach(tm => {
-                    if (tm.trim()) timeSel.innerHTML += `<option value="${tm.trim()}">${tm.trim()}</option>`;
-                });
+            const timeSel = document.getElementById('bm2-time');
+            timeSel.innerHTML = "";
+            (data.batch_time || "").split(',').forEach(tm => {
+                if (tm.trim()) timeSel.innerHTML += `<option value="${tm.trim()}">${tm.trim()}</option>`;
+            });
 
-                document.getElementById('b-stu').value = exist.students_allotted || "";
-                document.getElementById('b-rem').value = exist.remarks || "";
-            }
+            document.getElementById('bm2-stu').value = data.students_allotted || "";
+            document.getElementById('bm2-rem').value = data.remarks || "";
+        } else {
+            document.getElementById('bm2-time').innerHTML = '<option value="">-- Select Subject First --</option>';
         }
     }
 };
 
-// 4. Fetch specific Time Slots cleanly in dropdown (One slot per row)
-window.syncBatchTime = function() {
-    const tid = document.getElementById('b-tid').value;
-    const sub = document.getElementById('b-sub').value;
-    const timeSel = document.getElementById('b-time');
+// 6. NEATLY POPULATE TIME DROPDOWN (1 SLOT PER ROW)
+window.bm2SyncTime = function() {
+    const tid = document.getElementById('bm2-tid').value;
+    const sub = document.getElementById('bm2-sub').value.trim().toUpperCase();
+    const timeSel = document.getElementById('bm2-time');
     
     timeSel.innerHTML = '<option value="">-- Select Time --</option>';
-    
-    const teacher = window.globalActiveTeachers.find(t => t.id === tid);
-    if (teacher && sub && teacher.time_of_slot) {
-        let slotsObj = typeof teacher.time_of_slot === 'string' ? JSON.parse(teacher.time_of_slot) : teacher.time_of_slot;
-        
+
+    const teacher = window.bm2AllTeachers.find(t => t.id === tid);
+    if (teacher && teacher.time_of_slot) {
+        let slotObj = typeof teacher.time_of_slot === 'string' ? JSON.parse(teacher.time_of_slot) : teacher.time_of_slot;
         let foundSlots = "";
-        Object.keys(slotsObj).forEach(k => {
-            if (k.toUpperCase() === sub.toUpperCase()) foundSlots = slotsObj[k];
+        
+        Object.keys(slotObj).forEach(k => {
+            if (k.toUpperCase() === sub) foundSlots = slotObj[k];
         });
 
         if (foundSlots) {
@@ -10351,103 +10357,100 @@ window.syncBatchTime = function() {
     }
 };
 
-// 5. ADD BATCH WITH VALIDATIONS
-window.processAddBatch = async function() {
-    const bname = document.getElementById('b-name').value.trim().toUpperCase();
-    const sub = document.getElementById('b-sub').value;
-    const tid = document.getElementById('b-tid').value;
-    const tname = document.getElementById('b-tname').value;
-    const maxStu = parseInt(document.getElementById('b-stu').value) || 0;
-    const timeVal = Array.from(document.getElementById('b-time').options).map(o => o.value).filter(v => v).join(', ');
-    const rem = document.getElementById('b-rem').value;
-
-    if (!bname || !sub || !tid || !timeVal) return alert("Fill Batch Name, Subject, Teacher ID, and ensure Time is loaded.");
+// 7. ADD BATCH & VALIDATIONS
+window.bm2Add = async function() {
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
+    const sub = document.getElementById('bm2-sub').value;
+    const tid = document.getElementById('bm2-tid').value;
+    const tname = document.getElementById('bm2-tname').value;
+    const stu = parseInt(document.getElementById('bm2-stu').value) || 0;
+    const rem = document.getElementById('bm2-rem').value;
     
-    // Validation: Max students limit
-    if (maxStu > 15) return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
+    const timeOpts = Array.from(document.getElementById('bm2-time').options).map(o => o.value).filter(v => v);
+    const timeVal = timeOpts.join(', ');
 
-    // Validation: Cross matching of subjects (A batch name can only have 1 designated subject)
-    const { data: existSubCheck } = await db.from('batches').select('subject_name').eq('batch_name', bname).eq('institute_id', sessionInstID).limit(1).maybeSingle();
+    if (!bname || !sub || !tid || timeOpts.length === 0) return alert("Please fill Batch Name, Subject, Teacher ID, and ensure Time is loaded.");
     
-    if (existSubCheck && existSubCheck.subject_name.toUpperCase() !== sub.toUpperCase()) {
-        return alert(`🛑 ERROR: Cross matching not allowed!\n\nThe batch name "${bname}" is already locked to the subject "${existSubCheck.subject_name}". You cannot add "${sub}" to this batch.`);
+    // Validation 1: Max 15 students
+    if (stu > 15) return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
+
+    // Validation 2: Cross matching
+    const { data: existSub } = await db.from('batches').select('subject_name').eq('batch_name', bname).eq('institute_id', sessionInstID).limit(1).maybeSingle();
+    if (existSub && existSub.subject_name.toUpperCase() !== sub.toUpperCase()) {
+        return alert(`🛑 CROSS-MATCH ERROR:\nBatch "${bname}" is already locked to Subject "${existSub.subject_name}". You cannot add a teacher teaching ${sub} to this batch.`);
     }
 
-    // Validation: Duplicate Teacher entry
-    const { data: existTchCheck } = await db.from('batches').select('id').eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID).maybeSingle();
-    if (existTchCheck) return alert("This Teacher is already added to this Batch.");
+    // Validation 3: Duplicate entry
+    const { data: existTch } = await db.from('batches').select('id').eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID).maybeSingle();
+    if (existTch) return alert("🛑 ERROR: This Teacher is already added to this Batch.");
 
-    const payload = {
-        institute_id: sessionInstID,
-        batch_name: bname,
-        teacher_id: tid,
-        teacher_name: tname,
-        subject_name: sub,
-        batch_time: timeVal,
-        students_allotted: maxStu,
-        remarks: rem
-    };
-
+    const payload = { institute_id: sessionInstID, batch_name: bname, teacher_id: tid, teacher_name: tname, subject_name: sub, batch_time: timeVal, students_allotted: stu, remarks: rem };
+    
     const { error } = await db.from('batches').insert([payload]);
-    if (error) alert(error.message); else { alert("Batch Added Successfully!"); filterTeachersByBatch(); }
+    if (error) alert("Database Error: " + error.message); 
+    else { 
+        alert("Batch Added Successfully!"); 
+        bm2FilterTeachers(); // Refresh UI dynamically 
+    }
 };
 
-// 6. FETCH BATCH BY ROLL NUMBER
-window.processFetchBatch = async function() {
-    const roll = prompt("Enter Student Roll Number to Fetch Batch:");
+// 8. FETCH BATCH (AUTOPOPULATE ALL 7 FIELDS)
+window.bm2Fetch = async function() {
+    const roll = prompt("Enter Student Roll No to Fetch Batch:");
     if (!roll) return;
 
-    const { data, error } = await db.from('list').select('batch_name, teacher_id').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID);
-    if (error || !data || data.length === 0) return alert("No batch found for this roll number.");
+    const { data: allocs } = await db.from('list').select('batch_name, teacher_id').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID);
+    if (!allocs || allocs.length === 0) return alert("No batch allocations found for this student.");
 
-    let selection = data[0];
-    if (data.length > 1) {
+    let target = allocs[0];
+    if (allocs.length > 1) {
         let msg = "Multiple batches found for this student. Type the number to load:\n";
-        data.forEach((d, i) => msg += `${i+1}. ${d.batch_name}\n`);
+        allocs.forEach((a, i) => msg += `${i+1}. ${a.batch_name}\n`);
         let choice = prompt(msg);
-        if (choice && data[parseInt(choice)-1]) selection = data[parseInt(choice)-1];
+        if (choice && allocs[parseInt(choice)-1]) target = allocs[parseInt(choice)-1];
     }
 
-    const { data: b } = await db.from('batches').select('*').eq('batch_name', selection.batch_name).eq('teacher_id', selection.teacher_id).eq('institute_id', sessionInstID).maybeSingle();
-
+    const { data: b } = await db.from('batches').select('*').eq('batch_name', target.batch_name).eq('teacher_id', target.teacher_id).eq('institute_id', sessionInstID).maybeSingle();
+    
     if (b) {
-        document.getElementById('b-name').value = b.batch_name;
-        document.getElementById('b-sub').innerHTML = `<option value="${b.subject_name}">${b.subject_name}</option>`;
-        document.getElementById('b-tid').innerHTML = `<option value="${b.teacher_id}">${b.teacher_id} - ${b.teacher_name}</option>`;
-        document.getElementById('b-tname').value = b.teacher_name;
+        document.getElementById('bm2-name').value = b.batch_name;
+        document.getElementById('bm2-sub').innerHTML = `<option value="${b.subject_name}">${b.subject_name}</option>`;
+        document.getElementById('bm2-tid').innerHTML = `<option value="${b.teacher_id}">${b.teacher_id} - ${b.teacher_name}</option>`;
+        document.getElementById('bm2-tname').value = b.teacher_name;
         
-        const tSel = document.getElementById('b-time');
+        const tSel = document.getElementById('bm2-time');
         tSel.innerHTML = "";
-        b.batch_time.split(',').forEach(tm => { if(tm.trim()) tSel.innerHTML += `<option value="${tm.trim()}">${tm.trim()}</option>`; });
+        (b.batch_time || "").split(',').forEach(tm => { 
+            if(tm.trim()) tSel.innerHTML += `<option value="${tm.trim()}">${tm.trim()}</option>`; 
+        });
         
-        document.getElementById('b-stu').value = b.students_allotted;
-        document.getElementById('b-rem').value = b.remarks || "";
-        alert("Batch fields auto-populated.");
-    } else {
-        alert("Master batch record missing.");
+        document.getElementById('bm2-stu').value = b.students_allotted;
+        document.getElementById('bm2-rem').value = b.remarks || "";
+        alert("All fields auto-populated.");
     }
 };
 
-// 7. UPDATE BATCH (Allows change of Students & Remarks)
-window.processUpdateBatch = async function() {
-    const bname = document.getElementById('b-name').value.trim().toUpperCase();
-    const tid = document.getElementById('b-tid').value;
-    const maxStu = parseInt(document.getElementById('b-stu').value) || 0;
-    const rem = document.getElementById('b-rem').value;
+// 9. UPDATE BATCH (Allows Update of Max Students and Remarks)
+window.bm2Update = async function() {
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
+    const tid = document.getElementById('bm2-tid').value;
+    const stu = parseInt(document.getElementById('bm2-stu').value) || 0;
+    const rem = document.getElementById('bm2-rem').value;
 
-    if (!bname || !tid) return alert("Type Batch Name and select Teacher ID first.");
-    if (maxStu > 15) return alert("🛑 ERROR: Maximum students cannot be more than 15.");
+    if (!bname || !tid) return alert("Please type a Batch Name and select a Teacher ID first.");
+    if (stu > 15) return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
 
-    const { error } = await db.from('batches').update({
-        students_allotted: maxStu,
-        remarks: rem
+    const { error } = await db.from('batches').update({ 
+        students_allotted: stu, 
+        remarks: rem 
     }).eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID);
 
-    if (error) alert("Update Error: " + error.message); else alert("Batch Updated Successfully!");
+    if (error) alert("Update Error: " + error.message); 
+    else alert("Batch Updated Successfully!");
 };
 
-// 8. EXACT SPECIFIED HISTORY POPUP
-window.processBatchHistory = async function() {
+// 10. STRICTLY FORMATTED HISTORY POPUP
+window.bm2History = async function() {
     const roll = prompt("Enter Student Roll No for History:");
     if (!roll) return;
 
@@ -10463,58 +10466,58 @@ window.processBatchHistory = async function() {
             let btime = b ? b.batch_time : "N/A";
             let allot = b ? b.students_allotted : "N/A";
             
-            rows += `
-                <tr>
-                    <td style="border:1px solid #ccc; padding:10px;">${l.batch_name}</td>
-                    <td style="border:1px solid #ccc; padding:10px;">${btime}</td>
-                    <td style="border:1px solid #ccc; padding:10px;">${l.teacher_id}</td>
-                    <td style="border:1px solid #ccc; padding:10px;">${l.teacher_name}</td>
-                    <td style="border:1px solid #ccc; padding:10px; text-align:center;">${allot}</td>
-                </tr>
-            `;
+            rows += `<tr>
+                <td style="border:1px solid #000; padding:10px;">${l.batch_name}</td>
+                <td style="border:1px solid #000; padding:10px; color:#007bff; font-weight:bold;">${btime}</td>
+                <td style="border:1px solid #000; padding:10px;">${l.teacher_id}</td>
+                <td style="border:1px solid #000; padding:10px;">${l.teacher_name}</td>
+                <td style="border:1px solid #000; padding:10px; text-align:center;">${allot}</td>
+            </tr>`;
         }
     } else {
         rows = `<tr><td colspan="5" style="text-align:center; padding:20px;">No records found.</td></tr>`;
     }
 
-    const popupHtml = `
-        <div id="custom-history-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:100000;display:flex;justify-content:center;align-items:center;">
-            <div style="background:#fff; padding:30px; border-radius:15px; width:95%; max-width:900px; color:#000; font-family:'Times New Roman', serif;">
-                <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.2rem; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:20px;">
-                    <span>student name : <span style="color:#007bff; font-weight:normal;">${stu.full_name}</span></span>
-                    <span>student roll no : <span style="color:#ff0000; font-weight:normal;">${roll.toUpperCase()}</span></span>
-                </div>
-                <table style="width:100%; border-collapse:collapse; text-align:left;">
-                    <thead style="background:#eee; text-transform:capitalize;">
-                        <tr>
-                            <th style="border:1px solid #000; padding:10px;">Batch name</th>
-                            <th style="border:1px solid #000; padding:10px;">batch time</th>
-                            <th style="border:1px solid #000; padding:10px;">teacher id</th>
-                            <th style="border:1px solid #000; padding:10px;">teacher name</th>
-                            <th style="border:1px solid #000; padding:10px; text-align:center;">total students allotted</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
-                <button onclick="document.getElementById('custom-history-modal').remove()" style="margin-top:25px; width:100%; padding:15px; background:#ff0000; color:#fff; border:2px solid #000; border-radius:8px; font-weight:bold; cursor:pointer;">CLOSE WINDOW</button>
+    const html = `
+    <div id="bm2-hist-mod" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;justify-content:center;align-items:center;">
+        <div style="background:#fff; padding:30px; border-radius:15px; width:95%; max-width:900px; color:#000; font-family: 'Times New Roman', serif;">
+            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.2rem; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:20px; text-transform: lowercase;">
+                <span>student name : <span style="color:#007bff; text-transform: capitalize;">${stu.full_name}</span></span>
+                <span>student roll no : <span style="color:#ff0000; text-transform: uppercase;">${roll.toUpperCase()}</span></span>
             </div>
+            <table style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead style="background:#eee; text-transform:capitalize;">
+                    <tr>
+                        <th style="border:1px solid #000; padding:10px;">Batch name</th>
+                        <th style="border:1px solid #000; padding:10px;">batch time</th>
+                        <th style="border:1px solid #000; padding:10px;">teacher id</th>
+                        <th style="border:1px solid #000; padding:10px;">teacher name</th>
+                        <th style="border:1px solid #000; padding:10px; text-align:center;">total students allotted</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <button onclick="document.getElementById('bm2-hist-mod').remove()" style="margin-top:25px; width:100%; padding:15px; background:#ff0000; color:#fff; border:2px solid #000; border-radius:8px; font-weight:bold; cursor:pointer; font-family:'Times New Roman', serif; font-size:1.1rem;">CLOSE WINDOW</button>
         </div>
-    `;
+    </div>`;
     
-    const existing = document.getElementById('custom-history-modal');
-    if (existing) existing.remove();
-    document.body.insertAdjacentHTML('beforeend', popupHtml);
+    const existing = document.getElementById('bm2-hist-mod'); if(existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
 };
 
-// 9. DELETE BATCH BY NAME
-window.processDeleteBatch = async function() {
-    const bname = prompt("Enter EXACT Batch Name to delete all associated records:");
+// 11. DELETE BATCH UTILITY
+window.bm2Delete = async function() {
+    const bname = prompt("Enter exactly the Batch Name to delete all its records:");
     if (!bname) return;
-
     if (!confirm(`Are you sure you want to completely delete Batch: ${bname.toUpperCase()}?`)) return;
 
     const { error } = await db.from('batches').delete().eq('batch_name', bname.toUpperCase()).eq('institute_id', sessionInstID);
-    if (error) alert(error.message); else alert("Batch Deleted!");
+    if (error) alert(error.message); 
+    else { 
+        alert("Batch Deleted Successfully!"); 
+        document.getElementById('bm2-name').value = ""; 
+        bm2FilterTeachers(); 
+    }
 };
 </script>
 </body>
