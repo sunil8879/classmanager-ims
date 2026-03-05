@@ -2443,9 +2443,10 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
             <div class="input-group" style="margin-top: 15px;"><label>Remarks</label><input type="text" id="ptm-remarks" placeholder="e.g. Parents informed, Confirmed present"></div>
             
-            <div class="button-row" style="margin-top: 20px;">
+          <div class="button-row" style="margin-top: 20px;">
                 <button class="btn-add" style="background:#e84393; border-color:#d63031;" onclick="addPTMRecord()">ADD PTM RECORD</button>
-<button class="btn-fetch" onclick="fetchPTMRecordByRoll()">FETCH PTM RECORD</button>
+                <button class="btn-fetch" onclick="fetchPTMRecordByRoll()">FETCH PTM RECORD</button>
+                <button class="btn-edit" style="background:#ff0000;" onclick="deletePTMRecord()"><i class="fas fa-trash"></i> DELETE SLOT</button>
             </div>
         </div>
     </div>
@@ -7832,7 +7833,11 @@ function printScholarship() {
    24. PTM SCHEDULER LOGIC
    ========================================== */
 
-// Default month & 60-Day Window setup
+/* ==========================================
+   24. PTM SCHEDULER LOGIC (MASTER VERSION)
+   ========================================== */
+
+// 1. Setup 60-Day Window on Load
 document.addEventListener('DOMContentLoaded', () => {
     const ptmMonth = document.getElementById('ptm-month');
     if (ptmMonth) ptmMonth.value = new Date().toISOString().substring(0, 7);
@@ -7842,17 +7847,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const today = new Date();
         const todayLocal = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         
-        // Calculate exactly 60 days into the future
         const maxDate = new Date(today);
-        maxDate.setDate(maxDate.getDate() + 60);
+        maxDate.setDate(maxDate.getDate() + 60); // 60 Days Max
         const maxLocal = new Date(maxDate.getTime() - maxDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
-        ptmDateInput.min = todayLocal; // Prevent past booking
-        ptmDateInput.max = maxLocal;   // Max 60 days window
+        ptmDateInput.min = todayLocal; 
+        ptmDateInput.max = maxLocal;   
     }
 });
 
-// Rule 3: Close Booking if current date > ptm_date
 function checkPTMDateValidity() {
     const ptmDate = document.getElementById('ptm-date').value;
     const statusSelect = document.getElementById('ptm-status');
@@ -7879,7 +7882,6 @@ function togglePTMStatus() {
     }
 }
 
-// Helper to add minutes to time (HH:MM)
 function addMinutesToTime(timeStr, minsToAdd) {
     const [h, m] = timeStr.split(':').map(Number);
     let date = new Date();
@@ -7888,12 +7890,11 @@ function addMinutesToTime(timeStr, minsToAdd) {
     return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
 }
 
-// 1. Triggered by "Fetch Teachers" button - Corrected to prevent duplicates
+// 2. Fetch Allocations (Prevents duplicates & attaches mobile no)
 async function fetchPTMAllocations() {
     const roll = document.getElementById('ptm-roll').value.trim().toUpperCase();
     if (!roll) return alert("Please enter a Roll Number.");
 
-    // Fetch Student & Parent details
     const { data: stu } = await db.from('students').select('full_name, mother_mobile, father_mobile').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
     if (!stu) return alert("Student not found.");
     
@@ -7901,21 +7902,15 @@ async function fetchPTMAllocations() {
     document.getElementById('ptm-mmob').value = stu.mother_mobile || "";
     document.getElementById('ptm-fmob').value = stu.father_mobile || "";
 
-    // Fetch all linked teachers from Module 18
     const { data: allocs } = await db.from('student_allocations').select('*').eq('roll_number', roll).eq('institute_id', sessionInstID);
     
     const courseSelect = document.getElementById('ptm-course');
     courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
 
     if (allocs && allocs.length > 0) {
-        // --- NEW LOGIC TO PREVENT DUPLICATES ---
         const seenEntries = new Set(); 
-
         for (let a of allocs) {
-            // Create a unique key using Teacher ID and Subject
             const uniqueKey = `${a.teacher_id}-${a.subject}`.toUpperCase();
-            
-            // If we have already added this specific Teacher-Subject combo, skip it
             if (seenEntries.has(uniqueKey)) continue; 
             seenEntries.add(uniqueKey);
 
@@ -7929,19 +7924,19 @@ async function fetchPTMAllocations() {
             opt.dataset.tmob = tData ? tData.mobile : "";
             courseSelect.appendChild(opt);
         }
-        alert(`Found ${seenEntries.size} unique courses. Now pick a Course.`);
+        alert(`Found ${seenEntries.size} assigned courses. Please select a course to check timings.`);
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 1. Triggered when you pick a Course
+// 3. Dropdown Change Logic: Checks DB dynamically for booked slots
 async function syncPTMTeacherDetails() {
     const select = document.getElementById('ptm-course');
+    if (!select || select.selectedIndex < 0) return;
     const opt = select.options[select.selectedIndex];
-    if (!opt || !opt.value) return;
+    if (!opt.value) return;
 
-    // Update UI with dataset values
     document.getElementById('ptm-tid').value = opt.dataset.tid;
     document.getElementById('ptm-tname').value = opt.dataset.tname;
     document.getElementById('ptm-tmob').value = opt.dataset.tmob || "";
@@ -7950,7 +7945,7 @@ async function syncPTMTeacherDetails() {
     const ptmMonth = document.getElementById('ptm-month').value;
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // FIX: Check if THIS newly selected subject is already booked
+    // Check if THIS subject is already booked
     const { data: existingBooking } = await db.from('ptm_schedule')
         .select('slot_time, ptm_date')
         .eq('roll_number', roll)
@@ -7962,65 +7957,74 @@ async function syncPTMTeacherDetails() {
     const slotSelect = document.getElementById('ptm-slot-time');
     
     if (existingBooking) {
-        // Show the existing booked time
         document.getElementById('ptm-date').value = existingBooking.ptm_date;
-        slotSelect.innerHTML = `<option value="${existingBooking.slot_time}">${existingBooking.slot_time} (Already Booked)</option>`;
+        slotSelect.innerHTML = `<option value="${existingBooking.slot_time}">${existingBooking.slot_time}</option>`;
         updatePTMWhatsApp();
     } else {
-        // Calculate fresh available slots
         await calculateAvailablePTMSlots(opt.dataset.tid);
     }
 }
 
+// 4. Calculate Available Slots
+async function calculateAvailablePTMSlots(tid) {
+    const ptmDate = document.getElementById('ptm-date').value;
+    const startTime = document.getElementById('ptm-start').value;
+    const endTime = document.getElementById('ptm-end').value;
+    const duration = parseInt(document.getElementById('ptm-duration').value);
+    const slotSelect = document.getElementById('ptm-slot-time');
 
-// 4. Triggered when you pick a Slot (Updates WhatsApp Links)
+    if (!ptmDate || !startTime || !endTime) return alert("Configure Date/Time in Step 1 first.");
+
+    const { data: booked } = await db.from('ptm_schedule').select('slot_time').eq('teacher_id', tid).eq('ptm_date', ptmDate).eq('institute_id', sessionInstID);
+    const bookedTimes = booked ? booked.map(b => b.slot_time) : [];
+
+    slotSelect.innerHTML = '<option value="">-- Choose Slot --</option>';
+    let current = startTime;
+    while (current < endTime) {
+        if (!bookedTimes.includes(current)) {
+            let opt = document.createElement('option');
+            opt.value = current; opt.text = current;
+            slotSelect.appendChild(opt);
+        }
+        current = addMinutesToTime(current, duration);
+    }
+}
+
+// 5. WhatsApp Integration
 function updatePTMWhatsApp() {
     const slot = document.getElementById('ptm-slot-time').value;
     if (!slot) return;
-
     const ptmMonth = document.getElementById('ptm-month').value;
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
     
-    // Call your existing WhatsApp function (the one you were worried about deleting)
     generatePTMWhatsAppLinks(
-        monthYearStr, 
-        document.getElementById('ptm-date').value, 
-        document.getElementById('ptm-start').value, 
-        document.getElementById('ptm-end').value, 
-        slot, 
-        document.getElementById('ptm-tname').value, 
-        document.getElementById('ptm-tmob').value, 
-        document.getElementById('ptm-mmob').value, 
-        document.getElementById('ptm-fmob').value
+        monthYearStr, document.getElementById('ptm-date').value, document.getElementById('ptm-start').value, 
+        document.getElementById('ptm-end').value, slot, document.getElementById('ptm-tname').value, 
+        document.getElementById('ptm-tmob').value, document.getElementById('ptm-mmob').value, document.getElementById('ptm-fmob').value
     );
 }
 
-// Generate the specific automated WhatsApp messages
 function generatePTMWhatsAppLinks(mYear, date, start, end, slot, tName, tMob, mMob, fMob) {
-    const tMsg = encodeURIComponent(`Dear ${tName}, this is to inform you that the PTM for the current month ${mYear} is going to be conducted on ${date} between ${start} and ${end}. Your presence is highly essential. Please confirm.`);
-    const mMsg = encodeURIComponent(`Dear mam, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
-    const fMsg = encodeURIComponent(`Dear sir, this is to inform you that the PTM for ${mYear} is going to be conducted on ${date} between ${start} to ${end} and the slot allotted to you is from ${slot} so, kindly ensure that you are present for the PTM.`);
+    const tMsg = encodeURIComponent(`Dear ${tName}, PTM for ${mYear} will be conducted on ${date}. Your presence is required.`);
+    const pMsg = encodeURIComponent(`Dear Parent, PTM for ${mYear} is on ${date}. The slot allotted to you is ${slot}. Kindly ensure your presence.`);
 
     setupWALink('wa-ptm-teacher', tMob, tMsg);
-    setupWALink('wa-ptm-mother', mMob, mMsg);
-    setupWALink('wa-ptm-father', fMob, fMsg);
+    setupWALink('wa-ptm-mother', mMob, pMsg);
+    setupWALink('wa-ptm-father', fMob, pMsg);
 }
 
 function setupWALink(btnId, mobile, msg) {
     const btn = document.getElementById(btnId);
     if (mobile && mobile.length === 10) {
         btn.href = `https://wa.me/91${mobile}?text=${msg}`;
-        btn.style.pointerEvents = 'auto';
-        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto'; btn.style.opacity = '1';
     } else {
         btn.href = "#";
-        btn.style.pointerEvents = 'none';
-        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none'; btn.style.opacity = '0.5';
     }
 }
 
-// Add PTM Record to Database
-// Add PTM Record to Database (With Dynamic Clash Validations)
+// 6. ADD RECORD WITH ALL 3 VALIDATIONS
 async function addPTMRecord() {
     const ptmMonth = document.getElementById('ptm-month').value;
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -8045,74 +8049,35 @@ async function addPTMRecord() {
         remarks: document.getElementById('ptm-remarks').value
     };
 
-    if (!data.roll_number || !data.slot_time || data.slot_time.includes("Booked")) {
-        return alert("Error: Please fetch and allocate a valid open slot before saving.");
-    }
+    if (!data.roll_number || !data.slot_time) return alert("Error: Please allocate a valid open slot.");
 
-    // --- RULE 1: Teacher cannot be booked by two different students at the exact same time ---
-    const { data: teacherClash } = await db.from('ptm_schedule')
-        .select('id')
-        .eq('teacher_id', data.teacher_id)
-        .eq('ptm_date', data.ptm_date)
-        .eq('slot_time', data.slot_time)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
+    // Validation 1: Teacher Clash
+    const { data: teacherClash } = await db.from('ptm_schedule').select('id').eq('teacher_id', data.teacher_id).eq('ptm_date', data.ptm_date).eq('slot_time', data.slot_time).eq('institute_id', sessionInstID).maybeSingle();
+    if (teacherClash) return alert("Error: This teacher is already booked for this time slot.");
 
-    if (teacherClash) return alert("Error: This teacher is already booked for this specific time slot. Please choose a different time.");
+    // Validation 2: Student Time Clash
+    const { data: studentClash } = await db.from('ptm_schedule').select('course_name').eq('roll_number', data.roll_number).eq('ptm_date', data.ptm_date).eq('slot_time', data.slot_time).eq('institute_id', sessionInstID).maybeSingle();
+    if (studentClash) return alert(`Error: Student is already scheduled for [${studentClash.course_name}] at this exact time. Pick a different time.`);
 
-    // --- RULE 2: Student cannot attend two PTMs at the exact same time ---
-    const { data: studentClash } = await db.from('ptm_schedule')
-        .select('course_name')
-        .eq('roll_number', data.roll_number)
-        .eq('ptm_date', data.ptm_date)
-        .eq('slot_time', data.slot_time)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
+    // Validation 3: Duplicate Subject Block
+    const { data: duplicateSubject } = await db.from('ptm_schedule').select('id').eq('roll_number', data.roll_number).eq('course_name', data.course_name).eq('month_year', data.month_year).eq('institute_id', sessionInstID).maybeSingle();
+    if (duplicateSubject) return alert(`Error: A PTM is already scheduled for ${data.course_name} this month. DELETE the old slot if you want to change it.`);
 
-    if (studentClash) return alert(`Error: Student is already scheduled for a PTM at ${data.slot_time} for [${studentClash.course_name}]. Please select a different slot.`);
-
-    // --- RULE 3: Handling the Same-Teacher/Multiple-Subjects DB Constraint Gracefully ---
-    const { data: sameTeacherClash } = await db.from('ptm_schedule')
-        .select('course_name, slot_time')
-        .eq('roll_number', data.roll_number)
-        .eq('teacher_id', data.teacher_id)
-        .eq('month_year', data.month_year)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-
-    if (sameTeacherClash) {
-        return alert(`Note: This student is already booked with this teacher at ${sameTeacherClash.slot_time} for ${sameTeacherClash.course_name}.\n\nSince the teacher is the same, please discuss BOTH subjects during that single allotted slot.`);
-    }
-
-    // Execute Save
     const { error } = await db.from('ptm_schedule').insert([data]);
-
-    if (error) alert("Save Error: " + error.message);
-    else alert(`Success! Slot ${data.slot_time} booked for ${data.student_name} (${data.course_name}).`);
+    if (error) alert("Save Error (Ensure you dropped the SQL constraint as instructed): " + error.message);
+    else alert(`Success! Slot ${data.slot_time} booked for ${data.course_name}.`);
 }
 
-
-
-
-
-
+// 7. FETCH RECORD (Now triggers Sync correctly)
 async function fetchPTMRecordByRoll() {
     const roll = prompt("Enter Student Roll Number to fetch PTM record:");
     if (!roll) return;
 
     const ptmMonth = document.getElementById('ptm-month').value;
-    if (!ptmMonth) return alert("Please select the Month & Year in Step 1 first.");
-    
+    if (!ptmMonth) return alert("Please select Month & Year in Step 1.");
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    const { data, error } = await db.from('ptm_schedule')
-        .select('*')
-        .eq('roll_number', roll.toUpperCase())
-        .eq('month_year', monthYearStr)
-        .eq('institute_id', sessionInstID)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    const { data, error } = await db.from('ptm_schedule').select('*').eq('roll_number', roll.toUpperCase()).eq('month_year', monthYearStr).eq('institute_id', sessionInstID).order('created_at', { ascending: false }).limit(1).maybeSingle();
 
     if (error || !data) return alert("No PTM record found for this student in " + monthYearStr + ".");
 
@@ -8124,18 +8089,12 @@ async function fetchPTMRecordByRoll() {
 
     document.getElementById('ptm-roll').value = data.roll_number;
     document.getElementById('ptm-sname').value = data.student_name;
-    document.getElementById('ptm-tid').value = data.teacher_id;
-    document.getElementById('ptm-tname').value = data.teacher_name;
-    document.getElementById('ptm-tmob').value = data.teacher_mobile || "";
     document.getElementById('ptm-mmob').value = data.mother_mobile || "";
     document.getElementById('ptm-fmob').value = data.father_mobile || "";
     document.getElementById('ptm-remarks').value = data.remarks || "";
 
-    // Dynamically populate all allocated subjects
-    const { data: allocs } = await db.from('student_allocations')
-        .select('teacher_id, teacher_name, subject')
-        .eq('roll_number', data.roll_number)
-        .eq('institute_id', sessionInstID);
+    // Fetch allocations to fully populate dropdown
+    const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name, subject').eq('roll_number', data.roll_number).eq('institute_id', sessionInstID);
         
     const courseSelect = document.getElementById('ptm-course');
     courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
@@ -8147,7 +8106,6 @@ async function fetchPTMRecordByRoll() {
             if (seenEntries.has(uniqueKey)) continue; 
             seenEntries.add(uniqueKey);
 
-            // FIX: Fetch and bind Teacher Mobile to the option dataset
             const { data: tData } = await db.from('teacher_details').select('mobile').eq('id', a.teacher_id).maybeSingle();
 
             let opt = document.createElement('option');
@@ -8159,23 +8117,41 @@ async function fetchPTMRecordByRoll() {
             courseSelect.appendChild(opt);
         }
     } else {
-        courseSelect.innerHTML = `<option value="${data.course_name}" data-tmob="${data.teacher_mobile || ""}">${data.course_name} (${data.teacher_name})</option>`;
+        courseSelect.innerHTML = `<option value="${data.course_name}" data-tid="${data.teacher_id}" data-tname="${data.teacher_name}" data-tmob="${data.teacher_mobile || ""}">${data.course_name} (${data.teacher_name})</option>`;
     }
     
     courseSelect.value = data.course_name;
-    
-    const slotSelect = document.getElementById('ptm-slot-time');
-    slotSelect.innerHTML = `<option value="${data.slot_time}">${data.slot_time}</option>`;
-
-    generatePTMWhatsAppLinks(
-        data.month_year, data.ptm_date, data.start_time, data.end_time, 
-        data.slot_time, data.teacher_name, data.teacher_mobile, 
-        data.mother_mobile, data.father_mobile
-    );
-
-    alert(`Latest PTM Record Loaded: ${data.course_name}. (Change the dropdown to view other booked subjects).`);
+    await syncPTMTeacherDetails(); // Automatically fetches slot & mobile numbers
+    alert(`Loaded successfully. Change the Course dropdown to view other subjects.`);
 }
 
+// 8. DELETE RECORD
+async function deletePTMRecord() {
+    const roll = document.getElementById('ptm-roll').value.trim().toUpperCase();
+    const course = document.getElementById('ptm-course').value;
+    const ptmMonth = document.getElementById('ptm-month').value;
+    
+    if (!roll || !course || !ptmMonth) return alert("Please fetch a valid PTM record and select the course to delete.");
+
+    const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    if (!confirm(`Are you sure you want to CANCEL the PTM slot for ${course}?`)) return;
+
+    const { error } = await db.from('ptm_schedule')
+        .delete()
+        .eq('roll_number', roll)
+        .eq('course_name', course)
+        .eq('month_year', monthYearStr)
+        .eq('institute_id', sessionInstID);
+
+    if (error) {
+        alert("Delete Error: " + error.message);
+    } else {
+        alert("PTM Slot Cancelled Successfully.");
+        document.getElementById('ptm-slot-time').innerHTML = '<option value="">-- Choose Slot --</option>';
+        document.getElementById('ptm-remarks').value = "";
+    }
+}
 /* ==========================================
    25. BATCH MASTER LOGIC (TABLE: "list")
    ========================================== */
