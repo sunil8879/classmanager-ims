@@ -8427,6 +8427,10 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    26. TEACHER REVIEWS LOGIC
    ========================================== */
 
+/* ==========================================
+   26. TEACHER REVIEWS LOGIC (DYNAMIC & FIXED)
+   ========================================== */
+
 // 1. Fetch all linked teachers and fill the dropdown
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
@@ -8464,14 +8468,14 @@ async function autopopulateReviewForm() {
             tidSelect.appendChild(opt);
         });
         
-        // After loading the list, check if a review already exists for current date/first teacher
+        // Auto-run fetch after populating teachers
         fetchSpecificReview();
     } else {
-        alert("No teachers linked to this student. Please link them in Section 18 first.");
+        alert("No teachers linked to this student in Section 18.");
     }
 }
 
-
+// 2. THE DYNAMIC FETCH: Triggered when Teacher or Date changes
 async function fetchSpecificReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
@@ -8480,7 +8484,7 @@ async function fetchSpecificReview() {
     // We only fetch if all three primary keys are present
     if (!roll || !tid || !date) return;
 
-    console.log(`Checking Review: ${roll} | Teacher: ${tid} | Date: ${date}`);
+    console.log(`Searching: ${roll} | ${tid} | ${date}`);
 
     const { data, error } = await db.from('reviews')
         .select('*')
@@ -8499,86 +8503,59 @@ async function fetchSpecificReview() {
         // RECORD FOUND: Populate the UI
         document.getElementById('rev-score').value = data.rating;
         document.getElementById('rev-msg').value = data.message;
-        console.log("Existing review loaded.");
     } else {
-        // NO RECORD: Clear fields for new feedback
+        // NO RECORD: Clear fields so you don't see the wrong teacher's review
         document.getElementById('rev-score').value = "";
         document.getElementById('rev-msg').value = "";
-        console.log("No review for this date/teacher. Ready for new feedback.");
     }
 }
 
-// 2. Helper to update the Name field when an ID is selected from dropdown
+// 3. Update Teacher Name field
 function syncReviewTeacherName() {
     const select = document.getElementById('rev-tid');
     const selectedOption = select.options[select.selectedIndex];
-    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
+    document.getElementById('rev-tname').value = selectedOption ? (selectedOption.dataset.name || "") : "";
 }
 
-// 3. Save Review for the specific selected teacher
+// 4. Save/Update Review (Upsert prevents duplicates)
 async function addTeacherReview() {
     const tid = document.getElementById('rev-tid').value;
     const score = parseFloat(document.getElementById('rev-score').value);
+    const date = document.getElementById('rev-date').value;
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
     
-    if(!tid) return alert("Please select a teacher from the dropdown.");
-    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
+    if(!tid || !date || !roll) return alert("Select Roll No, Teacher, and Date.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter rating 0 to 5.");
 
     const data = {
         institute_id: sessionInstID,
-        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
+        student_roll: roll,
         student_name: document.getElementById('rev-sname').value,
         teacher_id: tid,
         teacher_name: document.getElementById('rev-tname').value,
         rating: score,
         message: document.getElementById('rev-msg').value,
-        review_date: document.getElementById('rev-date').value
+        review_date: date
     };
 
-    const { error } = await db.from('reviews').insert([data]);
+    // Use upsert so that selecting the same teacher/date updates the record
+    const { error } = await db.from('reviews').upsert(data, { onConflict: 'student_roll, teacher_id, review_date' });
+    
     if(error) alert("Error: " + error.message);
-    else {
-        alert("Review Saved for " + data.teacher_name);
-        // Clear rating and message for next review
-        document.getElementById('rev-score').value = "";
-        document.getElementById('rev-msg').value = "";
-    }
+    else alert("Success! Review Saved/Updated.");
 }
 
-// 3. FETCH Review
-/* ==========================================
-   FIXED: TEACHER REVIEWS FETCH FUNCTION
-   ========================================== */
+// 5. Manual Fetch Button
 async function fetchReviewByRoll() {
-    const roll = document.getElementById('rev-roll').value;
-    if(!roll) {
-        const r = prompt("Enter Student Roll Number:");
-        if(!r) return;
-        document.getElementById('rev-roll').value = r.toUpperCase();
-    }
+    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    if(!roll) return alert("Enter Roll Number.");
     autopopulateReviewForm();
 }
 
-// 4. UPDATE Review
+// 6. UPDATE Review
 async function editTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    const tid = document.getElementById('rev-tid').value;
-    const score = parseFloat(document.getElementById('rev-score').value);
-    
-    if(!roll || !tid) return alert("Please fetch a review record first.");
-    if(score > 5) return alert("Error: Score cannot exceed 5.");
-
-    const { error } = await db.from('reviews')
-        .update({
-            rating: score,
-            message: document.getElementById('rev-msg').value,
-            review_date: document.getElementById('rev-date').value
-        })
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid) // Crucial: ensure we update the review for the correct teacher
-        .eq('institute_id', sessionInstID);
-
-    if(error) alert("Update Failed: " + error.message);
-    else alert("Review updated successfully!");
+    // We can just call addTeacherReview because upsert handles both adding and editing
+    addTeacherReview();
 }
 
 
