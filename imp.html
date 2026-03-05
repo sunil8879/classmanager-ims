@@ -8520,6 +8520,7 @@ async function showTeacherReviewHistoryPopup(tid, tname) {
 
 // 5. Add Review
 // 5. Add Review (With 1-Review-Per-Teacher Limit)
+// 5. Add Review (Strict 1-Review Limit)
 async function addTeacherReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
@@ -8529,18 +8530,19 @@ async function addTeacherReview() {
     if(!roll || !tid || !date) return alert("Fill Roll No, Teacher, and Date.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    // NEW LOGIC: Check if they already reviewed this teacher
+    // CHECK: Does a review already exist for this teacher by this student?
     const { data: existingReview } = await db.from('reviews')
         .select('id')
         .eq('student_roll', roll)
         .eq('teacher_id', tid)
         .eq('institute_id', sessionInstID)
-        .maybeSingle();
+        .limit(1); // Safely checks even if there are old duplicates
 
-    if (existingReview) {
-        return alert("STOP: You have already submitted a review for this teacher!\n\nA student can only write one review per teacher. Please use the UPDATE button instead to modify your existing review.");
+    if (existingReview && existingReview.length > 0) {
+        return alert("ERROR: You have already submitted a review for this teacher!\n\nA student can only write ONE review per teacher. If you want to change your feedback, please use the 'UPDATE' button instead.");
     }
 
+    // If no review exists, proceed to insert
     const data = {
         institute_id: sessionInstID,
         student_roll: roll,
@@ -8557,7 +8559,7 @@ async function addTeacherReview() {
     else alert("Review Saved Successfully!");
 }
 
-// 6. Update Review (Overwrites old date automatically)
+// 6. Update Review (TARGETS ONLY THE LAST RECORD)
 async function editTeacherReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
@@ -8567,21 +8569,32 @@ async function editTeacherReview() {
     if(!roll || !tid || !date) return alert("Please fill Roll No, Teacher, and Date first.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    // Update based on Student & Teacher, ignoring the old date so they don't get stuck
+    // STEP 1: Find the exact ID of the LATEST record for this student & teacher
+    const { data: latestRecord, error: fetchErr } = await db.from('reviews')
+        .select('id')
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID)
+        .order('review_date', { ascending: false }) // Gets the newest one
+        .limit(1)
+        .maybeSingle();
+
+    if (fetchErr || !latestRecord) {
+        return alert("No existing review found to update. Please use the ADD REVIEW button first.");
+    }
+
+    // STEP 2: Update ONLY that specific ID
     const { error } = await db.from('reviews')
         .update({
             rating: score,
             message: document.getElementById('rev-msg').value,
             review_date: date // Updates to the new date!
         })
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid)
-        .eq('institute_id', sessionInstID);
+        .eq('id', latestRecord.id); // Targets ONLY the 1 last record!
 
     if(error) alert("Update Error: " + error.message);
-    else alert("Success! Review Updated in database.");
+    else alert("Success! Your latest review has been updated.");
 }
-
 
 /* --- FORGOT PASSWORD & EMAIL RECOVERY LOGIC --- */
 
