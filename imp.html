@@ -2574,10 +2574,10 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <div class="input-group" style="grid-column: 1/-1;"><label>6. Message from Student</label><textarea id="rev-msg" rows="3" placeholder="Write your feedback here..."></textarea></div>
         </div>
 
-        <div class="button-row">
+       <div class="button-row">
             <button class="btn-add" onclick="addTeacherReview()">ADD REVIEW</button>
-            <button class="btn-fetch" onclick="fetchReviewByRoll()">FETCH (by Roll No)</button>
-            <button class="btn-edit" onclick="editTeacherReview()">UPDATE (by Roll No)</button>
+            <button class="btn-fetch" style="background:#007bff;" onclick="handleHistoryBtn()">HISTORY</button>
+            <button class="btn-edit" onclick="editTeacherReview()">UPDATE</button>
         </div>
     </div>
 </section>
@@ -8383,6 +8383,204 @@ async function deleteBatchMasterRecord(recordId, studentName) {
 /* ==========================================
    26. TEACHER REVIEWS LOGIC
    ========================================== */
+// --- 26. TEACHER REVIEWS LOGIC ---
+
+let historyModeActive = false;
+
+// 1. History Button Clicked
+async function handleHistoryBtn() {
+    const roll = document.getElementById('rev-roll').value.trim();
+    if(!roll) return alert("Please enter a Roll Number first.");
+    
+    historyModeActive = true;
+    
+    // 2. Details are filled up in the UI
+    await autopopulateReviewForm();
+    alert("Details filled. Please select a Teacher from the dropdown to view their review history.");
+}
+
+// 3. On selecting the teacher (Triggers popup if History was clicked)
+async function syncReviewTeacherName() {
+    const select = document.getElementById('rev-tid');
+    const selectedOption = select.options[select.selectedIndex];
+    if(!selectedOption) return;
+    
+    const tname = selectedOption.dataset.name || "";
+    document.getElementById('rev-tname').value = tname;
+
+    // Trigger Popup if History sequence is active
+    if (historyModeActive && select.value) {
+        await openTeacherReviewHistoryPopup(select.value, tname);
+        historyModeActive = false; // Reset the flow
+    }
+}
+
+// 4. Generate & Show Popup Window
+async function openTeacherReviewHistoryPopup(tid, tname) {
+    // Fetch reviews for this teacher
+    const { data: reviews } = await db.from('reviews')
+        .select('review_date, rating, message')
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID)
+        .order('review_date', { ascending: false });
+        
+    // Fetch batch name from batches table
+    const { data: batchData } = await db.from('batches')
+        .select('batch_name')
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID)
+        .limit(1)
+        .maybeSingle();
+        
+    const bName = batchData ? batchData.batch_name : "N/A";
+    
+    let tableRows = "";
+    if (reviews && reviews.length > 0) {
+        reviews.forEach(r => {
+            // Formatting Date to '1st march', '2nd april'
+            const d = new Date(r.review_date);
+            const dateParts = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }).split(' ');
+            const day = parseInt(dateParts[0]);
+            const suffix = (day % 10 === 1 && day !== 11) ? 'st' : (day % 10 === 2 && day !== 12) ? 'nd' : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+            const dateStr = `${day}${suffix} ${dateParts[1].toLowerCase()}`;
+            
+            // Clean the message (Removes invisible update counter)
+            const cleanMsg = r.message ? r.message.replace(/<!--U:\d+-->$/, '') : '';
+
+            tableRows += `
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${dateStr}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${bName}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; font-weight:bold; color:#f39c12;">${r.rating}</td>
+                    <td style="border: 1px solid #ccc; padding: 10px;">${cleanMsg}</td>
+                </tr>
+            `;
+        });
+    } else {
+        tableRows = `<tr><td colspan="4" style="padding:20px; text-align:center;">No reviews found for this teacher.</td></tr>`;
+    }
+    
+    const modalHtml = `
+        <div id="review-history-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:95%; max-width:850px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h2 style="margin-top:0; color:#000; text-decoration:underline;">TEACHER NAME : ${tname}</h2>
+                
+                <table style="width:100%; border-collapse:collapse; text-align:left; margin-top:20px;">
+                    <thead style="background:#f8f9fa;">
+                        <tr>
+                            <th style="border: 1px solid #ccc; padding: 10px;">date of message</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">batch name</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">review score</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+
+                <button onclick="document.getElementById('review-history-overlay').remove()" style="margin-top:25px; background:#ff0000; color:white; border:2px solid #000; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; width:100%; font-size:1.1rem;">CLOSE</button>
+            </div>
+        </div>
+    `;
+    
+    const existing = document.getElementById('review-history-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// 5. ADD REVIEW (With Rule 1 Validation)
+async function addTeacherReview() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const tid = document.getElementById('rev-tid').value;
+    const revDate = document.getElementById('rev-date').value;
+    const score = parseFloat(document.getElementById('rev-score').value);
+    
+    if(!tid) return alert("Please select a teacher from the dropdown.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
+
+    // Validation 1: Only one review per teacher per day
+    const { data: existing } = await db.from('reviews')
+        .select('id')
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid)
+        .eq('review_date', revDate)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (existing) {
+        return alert("Error: You can give only one review per teacher in one day. Use the UPDATE button to modify your existing review.");
+    }
+
+    const data = {
+        institute_id: sessionInstID,
+        student_roll: roll,
+        student_name: document.getElementById('rev-sname').value,
+        teacher_id: tid,
+        teacher_name: document.getElementById('rev-tname').value,
+        rating: score,
+        message: document.getElementById('rev-msg').value,
+        review_date: revDate
+    };
+
+    const { error } = await db.from('reviews').insert([data]);
+    if(error) alert("Error: " + error.message);
+    else {
+        alert("Review Saved for " + data.teacher_name);
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
+    }
+}
+
+// 6. UPDATE REVIEW (With Rule 2 Validation using an invisible tracker)
+async function editTeacherReview() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const tid = document.getElementById('rev-tid').value;
+    const revDate = document.getElementById('rev-date').value;
+    const score = parseFloat(document.getElementById('rev-score').value);
+    
+    if(!tid) return alert("Please select a teacher from the dropdown to update.");
+    if(score > 5) return alert("Error: Score cannot exceed 5.");
+
+    // Fetch today's review
+    const { data: currentReview } = await db.from('reviews')
+        .select('id, message')
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid)
+        .eq('review_date', revDate)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (!currentReview) {
+        return alert("Error: No review found for this teacher today. You can only update today's reviews.");
+    }
+
+    // Validation 2: Max 2 updates per day (Safely tracks in the message string so DB schema stays untouched)
+    let baseMsg = currentReview.message || "";
+    let updateCount = 0;
+    const match = baseMsg.match(/<!--U:(\d+)-->$/);
+    if (match) updateCount = parseInt(match[1]);
+
+    if (updateCount >= 2) {
+        return alert("Error: Updation can happen twice max per teacher in one day. You have reached the limit.");
+    }
+
+    // Append invisible counter so the DB doesn't crash from a missing column
+    const newMsg = document.getElementById('rev-msg').value + `<!--U:${updateCount + 1}-->`;
+
+    const { error } = await db.from('reviews').update({
+        rating: score,
+        message: newMsg
+    }).eq('id', currentReview.id);
+
+    if(error) alert(error.message);
+    else {
+        alert("Review Updated successfully!");
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
+    }
+}
+
 
 // 1. Fetch all linked teachers and fill the dropdown
 async function autopopulateReviewForm() {
@@ -8419,73 +8617,8 @@ async function autopopulateReviewForm() {
     }
 }
 
-// 2. Helper to update the Name field when an ID is selected from dropdown
-function syncReviewTeacherName() {
-    const select = document.getElementById('rev-tid');
-    const selectedOption = select.options[select.selectedIndex];
-    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
-}
 
-// 3. Save Review for the specific selected teacher
-async function addTeacherReview() {
-    const tid = document.getElementById('rev-tid').value;
-    const score = parseFloat(document.getElementById('rev-score').value);
-    
-    if(!tid) return alert("Please select a teacher from the dropdown.");
-    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    const data = {
-        institute_id: sessionInstID,
-        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
-        student_name: document.getElementById('rev-sname').value,
-        teacher_id: tid,
-        teacher_name: document.getElementById('rev-tname').value,
-        rating: score,
-        message: document.getElementById('rev-msg').value,
-        review_date: document.getElementById('rev-date').value
-    };
-
-    const { error } = await db.from('reviews').insert([data]);
-    if(error) alert("Error: " + error.message);
-    else {
-        alert("Review Saved for " + data.teacher_name);
-        // Clear rating and message for next review
-        document.getElementById('rev-score').value = "";
-        document.getElementById('rev-msg').value = "";
-    }
-}
-
-// 3. FETCH Review
-async function fetchReviewByRoll() {
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
-    const { data, error } = await db.from('reviews').select('*').eq('student_roll', roll).eq('institute_id', sessionInstID).maybeSingle();
-    
-    if(data) {
-        document.getElementById('rev-sname').value = data.student_name;
-        document.getElementById('rev-tid').value = data.teacher_id;
-        document.getElementById('rev-tname').value = data.teacher_name;
-        document.getElementById('rev-score').value = data.rating;
-        document.getElementById('rev-msg').value = data.message;
-        alert("Review loaded.");
-// ADD THIS LINE inside the success block of fetchReviewByRoll()
-document.getElementById('rev-date').value = data.review_date;
-    } else alert("No review found for this roll number.");
-}
-
-// 4. UPDATE Review
-async function editTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
-    const score = parseFloat(document.getElementById('rev-score').value);
-    if(score > 5) return alert("Error: Score cannot exceed 5.");
-
-    const { error } = await db.from('reviews').update({
-        rating: score,
-        message: document.getElementById('rev-msg').value
-    }).eq('student_roll', roll).eq('institute_id', sessionInstID);
-
-    if(error) alert(error.message);
-    else alert("Review Updated successfully!");
-}
 
 
 
