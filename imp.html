@@ -8433,6 +8433,10 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    26. TEACHER REVIEWS LOGIC (COMPLETE & REPAIRED)
    ========================================== */
 
+/* ==========================================
+   26. TEACHER REVIEWS LOGIC (REPAIRED & DYNAMIC)
+   ========================================== */
+
 // 1. AUTO-FILL: Gets Student name and Teacher list based on Roll No
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
@@ -8468,20 +8472,23 @@ async function autopopulateReviewForm() {
             tidSelect.appendChild(opt);
         });
         
-        // Trigger fetch in case date is already selected
+        // After loading teachers, try to fetch if a date is already picked
         fetchSpecificReview();
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. DYNAMIC FETCH: Triggered automatically when Teacher or Date changes
+// 2. THE DYNAMIC FETCH: Pulls data instantly when Teacher or Date is changed
 async function fetchSpecificReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const date = document.getElementById('rev-date').value;
 
+    // Only run if we have all 3 keys
     if (!roll || !tid || !date) return;
+
+    console.log(`Checking DB for: ${roll} | ${tid} | ${date}`);
 
     const { data, error } = await db.from('reviews')
         .select('*')
@@ -8491,25 +8498,31 @@ async function fetchSpecificReview() {
         .eq('institute_id', sessionInstID)
         .maybeSingle();
 
+    if (error) {
+        console.error("Fetch Error:", error.message);
+        return;
+    }
+
     if (data) {
+        // Record found for this specific teacher on this specific date
         document.getElementById('rev-score').value = data.rating;
         document.getElementById('rev-msg').value = data.message;
     } else {
-        // Clear fields if no record exists for this specific combination
+        // No record found: Clear fields so user can write a NEW review
         document.getElementById('rev-score').value = "";
         document.getElementById('rev-msg').value = "";
     }
 }
 
-// 3. ADD NEW REVIEW
+// 3. ADD NEW REVIEW (Kept as requested)
 async function addTeacherReview() {
     const tid = document.getElementById('rev-tid').value;
     const score = parseFloat(document.getElementById('rev-score').value);
     const date = document.getElementById('rev-date').value;
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     
-    if(!tid || !date || !roll) return alert("Select Roll No, Teacher, and Date.");
-    if(isNaN(score) || score > 5 || score < 0) return alert("Enter valid rating (0-5).");
+    if(!tid || !date || !roll) return alert("Ensure Roll No, Teacher, and Date are selected.");
+    if(isNaN(score) || score > 5) return alert("Enter valid rating (0-5).");
 
     const data = {
         institute_id: sessionInstID,
@@ -8524,21 +8537,21 @@ async function addTeacherReview() {
 
     const { error } = await db.from('reviews').insert([data]);
     if(error) {
-        if(error.code === '23505') alert("A review already exists for this teacher on this date. Use UPDATE instead.");
+        if(error.code === '23505') alert("This review already exists. Use UPDATE instead.");
         else alert("Error: " + error.message);
     } else {
-        alert("Success! Review Saved for " + data.teacher_name);
+        alert("Success! Review Saved.");
     }
 }
 
-// 4. UPDATE EXISTING REVIEW
+// 4. UPDATE REVIEW (Targeted at specific teacher/date)
 async function editTeacherReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
 
-    if(!roll || !tid || !date) return alert("Fetch/Select a record first.");
+    if(!roll || !tid || !date) return alert("Please fetch/select the specific review first.");
 
     const { error } = await db.from('reviews')
         .update({
@@ -8551,13 +8564,17 @@ async function editTeacherReview() {
         .eq('institute_id', sessionInstID);
 
     if(error) alert("Update Failed: " + error.message);
-    else alert("Success! Review updated.");
+    else alert("Success! Review updated for " + document.getElementById('rev-tname').value);
 }
 
-// 5. MANUAL FETCH BUTTON WRAPPER
+// 5. FETCH BUTTON (Manual Trigger)
 async function fetchReviewByRoll() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    if(!roll) return alert("Enter Roll Number.");
+    if(!roll) {
+        const r = prompt("Enter Roll Number:");
+        if(!r) return;
+        document.getElementById('rev-roll').value = r.toUpperCase();
+    }
     autopopulateReviewForm();
 }
 
@@ -8567,10 +8584,6 @@ function syncReviewTeacherName() {
     const selectedOption = select.options[select.selectedIndex];
     document.getElementById('rev-tname').value = selectedOption ? (selectedOption.dataset.name || "") : "";
 }
-
-
-
-
 
 
 
