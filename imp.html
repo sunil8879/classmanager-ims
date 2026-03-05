@@ -2546,8 +2546,8 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 <!-- ADD AS THE FIRST ITEM IN THE REVIEWS FORM GRID -->
 <div class="input-group">
-    <label>Today's Date</label>
-    <input type="date" id="rev-date">
+    <label>Review Date</label>
+    <input type="date" id="rev-date" onchange="fetchSpecificReview()">
 </div>
 
 
@@ -2560,9 +2560,9 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                 </div>
             </div>
             <div class="input-group"><label>2. Student Name</label><input type="text" id="rev-sname" readonly style="background:#eee;"></div>
-         <div class="input-group">
+        <div class="input-group">
     <label>3. Select Teacher to Review</label>
-    <select id="rev-tid" onchange="syncReviewTeacherName()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+    <select id="rev-tid" onchange="syncReviewTeacherName(); fetchSpecificReview();" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
         <option value="">-- Enter Roll No First --</option>
     </select>
 </div>
@@ -8456,20 +8456,17 @@ async function addTeacherReview() {
 }
 
 // 3. FETCH Review
+// 3. FETCH Review (Fixed Flow)
 async function fetchReviewByRoll() {
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
-    const { data, error } = await db.from('reviews').select('*').eq('student_roll', roll).eq('institute_id', sessionInstID).maybeSingle();
-    
-    if(data) {
-        document.getElementById('rev-sname').value = data.student_name;
-        document.getElementById('rev-tid').value = data.teacher_id;
-        document.getElementById('rev-tname').value = data.teacher_name;
-        document.getElementById('rev-score').value = data.rating;
-        document.getElementById('rev-msg').value = data.message;
-        alert("Review loaded.");
-// ADD THIS LINE inside the success block of fetchReviewByRoll()
-document.getElementById('rev-date').value = data.review_date;
-    } else alert("No review found for this roll number.");
+    const rollInBox = document.getElementById('rev-roll').value.trim();
+    if(!rollInBox) {
+        const r = prompt("Enter Student Roll Number to Fetch:");
+        if(!r) return;
+        document.getElementById('rev-roll').value = r.toUpperCase();
+    }
+    // Load the student name and teacher list
+    autopopulateReviewForm();
+    alert("Student loaded! Now select the Teacher and Date to view their specific review.");
 }
 
 // 4. UPDATE Review
