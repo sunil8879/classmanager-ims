@@ -1997,9 +1997,10 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <input type="text" id="ex-avg-pct" readonly style="background: #f0fdfa; border: 2px solid #007bff; font-size: 1.2rem; text-align: center; color: #007bff; font-weight: 800;" placeholder="0.00%">
         </div>
     </div>
-    <div class="button-row">
+ <div class="button-row">
         <button class="btn-add" onclick="addExamRecord()">ADD Result</button>
         <button class="btn-fetch" onclick="fetchExamByRoll()">FETCH Last Entry</button>
+        <button class="btn-fetch" style="background:#8e44ad;" onclick="fetchExamHistory()">HISTORY</button>
     </div>
 </div>
 </section>
@@ -5883,18 +5884,195 @@ const { data: att } = await db.from('attendance').select('status').eq('roll_numb
 }
 
 
+// 1. Fetch Latest Exam Record & Dynamically Build Dropdown
 async function fetchExamByRoll() {
-    const roll = prompt("Enter Roll Number to see last exam:");
-    const { data, error } = await db.from('exam').select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).order('exam_date', {ascending: false}).limit(1).maybeSingle();
+    let roll = document.getElementById('ex-roll').value.trim().toUpperCase();
+    
+    // Prompt if not filled
+    if (!roll) {
+        roll = prompt("Enter Roll Number to see last exam:");
+        if (!roll) return;
+    }
+
+    // Step A: Fetch student's course list to populate dropdown dynamically
+    const { data: stu } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', roll.toUpperCase())
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (!stu) return alert("Student not found.");
+    
+    // Autofill base info
+    document.getElementById('ex-roll').value = roll.toUpperCase();
+    document.getElementById('ex-name').value = stu.full_name;
+
+    // Step B: Build dynamic dropdown
+    const courseSelect = document.getElementById('ex-course');
+    courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+    
+    if (stu.course) {
+        const courses = stu.course.split(',').map(c => c.trim());
+        courses.forEach(c => {
+            let opt = document.createElement('option');
+            opt.value = c; opt.text = c;
+            courseSelect.appendChild(opt);
+        });
+    }
+
+    // Step C: Fetch the last actual exam entry and set the fields
+    const { data, error } = await db.from('exam')
+        .select('*')
+        .eq('roll_number', roll.toUpperCase())
+        .eq('institute_id', sessionInstID)
+        .order('exam_date', {ascending: false})
+        .limit(1)
+        .maybeSingle();
+        
     if(data) {
         document.getElementById('ex-date').value = data.exam_date;
-        document.getElementById('ex-roll').value = data.roll_number;
-        document.getElementById('ex-name').value = data.full_name;
-        document.getElementById('ex-course').value = data.course_name;
+        
+        // If the old course isn't in current list, force it in so it displays correctly
+        if(!Array.from(courseSelect.options).some(opt => opt.value === data.course_name)) {
+             let opt = document.createElement('option');
+             opt.value = data.course_name; opt.text = data.course_name;
+             courseSelect.appendChild(opt);
+        }
+        
+        courseSelect.value = data.course_name;
         document.getElementById('ex-total').value = data.total_marks;
         document.getElementById('ex-obt').value = data.marks_obtained;
-        calcExamResult();
-    } else alert("No exam records found.");
+        calcExamResult(); // Calculates % and Result
+        alert("Latest exam loaded successfully.");
+    } else {
+        alert("Student data loaded, but no previous exam results found for this student.");
+        calculateGlobalAvg(roll.toUpperCase()); // Resets Global Average to 0%
+    }
+}
+
+// 2. EXAM HISTORY POPUP WINDOW
+async function fetchExamHistory() {
+    let roll = document.getElementById('ex-roll').value.trim().toUpperCase();
+    
+    if (!roll) {
+        roll = prompt("Enter Roll Number to view exam history:");
+        if (!roll) return;
+        document.getElementById('ex-roll').value = roll.toUpperCase(); // Sync UI
+    }
+
+    // Step A: Fetch all exams for this student
+    const { data: exams, error } = await db.from('exam')
+        .select('*')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .order('exam_date', { ascending: true });
+
+    if (error) return alert("Error fetching exams: " + error.message);
+    if (!exams || exams.length === 0) return alert("No exam records found for " + roll);
+
+    const stuName = exams[0].full_name; // Grab name from the first record
+
+    // Step B: Fetch batches to match Course Name -> Teacher Name
+    const { data: batches } = await db.from('batches')
+        .select('subject_name, teacher_name')
+        .eq('institute_id', sessionInstID);
+        
+    const teacherMap = {};
+    if (batches) {
+        batches.forEach(b => {
+            // Map by lowercase to ensure it matches regardless of how they typed it
+            teacherMap[b.subject_name.trim().toLowerCase()] = b.teacher_name;
+        });
+    }
+
+    // Date formatting helper
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        const day = d.getDate();
+        const suffix = (day % 10 === 1 && day !== 11) ? 'st' : (day % 10 === 2 && day !== 12) ? 'nd' : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+        const month = d.toLocaleString('default', { month: 'long' });
+        const year = d.getFullYear();
+        return `${day}${suffix} ${month} ${year}`;
+    }
+
+    // Step C: Build the Table Rows & Math
+    let tableRows = "";
+    let grandTotal = 0;
+    let grandObtained = 0;
+
+    exams.forEach(ex => {
+        let cName = ex.course_name || "";
+        // Match teacher name from the batches map
+        let tName = teacherMap[cName.trim().toLowerCase()] || "N/A";
+        
+        let tot = parseFloat(ex.total_marks) || 0;
+        let obt = parseFloat(ex.marks_obtained) || 0;
+        let pct = tot > 0 ? ((obt / tot) * 100).toFixed(0) : 0; // Removing decimals for cleanliness
+        
+        grandTotal += tot;
+        grandObtained += obt;
+
+        tableRows += `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="border: 1px solid #ccc; padding: 10px;">${formatDate(ex.exam_date)}</td>
+                <td style="border: 1px solid #ccc; padding: 10px;">${cName}</td>
+                <td style="border: 1px solid #ccc; padding: 10px;">${tName}</td>
+                <td style="border: 1px solid #ccc; padding: 10px; text-align:center;">${tot}</td>
+                <td style="border: 1px solid #ccc; padding: 10px; text-align:center;">${obt}</td>
+                <td style="border: 1px solid #ccc; padding: 10px; text-align:center; font-weight:bold; color:#007bff;">${pct}%</td>
+            </tr>
+        `;
+    });
+
+    let finalPct = grandTotal > 0 ? ((grandObtained / grandTotal) * 100).toFixed(0) : 0;
+
+    // The Final Bold TOTAL Row
+    tableRows += `
+        <tr style="background:#e0f2f1; font-weight:900; font-size:1.1rem; border: 2px solid #000;">
+            <td colspan="3" style="border: 1px solid #000; padding: 10px; text-align:right;">TOTAL SCORE:</td>
+            <td style="border: 1px solid #000; padding: 10px; text-align:center; color:#ff0000;">${grandTotal}</td>
+            <td style="border: 1px solid #000; padding: 10px; text-align:center; color:#27ae60;">${grandObtained}</td>
+            <td style="border: 1px solid #000; padding: 10px; text-align:center; color:#000;">${finalPct}%</td>
+        </tr>
+    `;
+
+    // Step D: Construct & Render the Popup Overlay
+    const modalHtml = `
+        <div id="exam-history-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:95%; max-width:900px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                
+                <h2 style="margin-top:0; color:#000; text-decoration:underline; text-align:center;">STUDENT EXAM HISTORY</h2>
+                
+                <div style="display:flex; justify-content:space-between; margin-top:20px; margin-bottom:20px; font-size:1.1rem; font-weight:bold; border-bottom:2px solid #000; padding-bottom:10px;">
+                    <span>STUDENT NAME: <span style="color:#1877F2;">${stuName}</span></span>
+                    <span>ROLL NUMBER: <span style="color:#ff0000;">${roll}</span></span>
+                </div>
+
+                <table style="width:100%; border-collapse:collapse; text-align:left; color:#000;">
+                    <thead style="background:#f8f9fa;">
+                        <tr>
+                            <th style="border: 1px solid #000; padding: 10px;">Date of Exam</th>
+                            <th style="border: 1px solid #000; padding: 10px;">Course Name</th>
+                            <th style="border: 1px solid #000; padding: 10px;">Teacher Name</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-align:center;">Total Marks</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-align:center;">Marks Obtained</th>
+                            <th style="border: 1px solid #000; padding: 10px; text-align:center;">% Marks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+
+                <button onclick="document.getElementById('exam-history-overlay').remove()" style="margin-top:25px; background:#ff0000; color:white; border:2px solid #000; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; width:100%; font-size:1.1rem;">CLOSE WINDOW</button>
+            </div>
+        </div>
+    `;
+
+    // Remove old popup if it exists, then append new one
+    const existing = document.getElementById('exam-history-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 /* ==========================================
