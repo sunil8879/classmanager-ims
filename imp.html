@@ -1095,7 +1095,8 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
         <div class="form-grid">
             <div class="input-group">
                 <label>Batch Name (Unique)</label>
-                <input type="text" id="batch-name" placeholder="e.g. Morning-Pro-A">
+             <!-- 1. Update the Batch Name field -->
+<input type="text" id="batch-name" oninput="syncBatchNameWithSubject()" placeholder="e.g. Morning-Physics-A">
             </div>
 
           <div class="input-group">
@@ -1132,19 +1133,10 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
           <div class="input-group" style="grid-column: 1 / -1; margin-top: 10px;">
     <label style="font-weight:bold; color: #00796b;">Select Batch Timing (Available slots from Teacher Portal):</label>
     <!-- REPLACED DIV WITH SELECT -->
-    <select id="batch-slots-select" style="
-        padding: 15px; 
-        background: #e0f2f1; 
-        border: 2px solid #00796b; 
-        border-radius: 12px; 
-        font-size: 1.1rem; 
-        font-weight: 900; 
-        color: #004d40;
-        width: 100%;
-        cursor: pointer;
-    ">
-        <option value="">-- Select Teacher & Subject First --</option>
-    </select>
+   <!-- 2. Update the Slots Dropdown -->
+<select id="batch-slots-select" onchange="handleBatchTimingChange()" style="...">
+    <option value="">-- Select Teacher & Subject First --</option>
+</select>
 </div>
             <div class="input-group">
                 <label>Max Students Allotted</label>
@@ -3874,75 +3866,110 @@ async function handleBatchTeacherChange() {
     const nameInput = document.getElementById('batch-teacher-name');
     const slotDropdown = document.getElementById('batch-slots-select');
 
-    if (!tid) {
-        nameInput.value = "";
-        slotDropdown.innerHTML = '<option value="">-- Select Teacher First --</option>';
-        return;
-    }
+    if (!tid) return;
 
-    // 1. Fetch Teacher Timings
-    const { data: teacher, error } = await db.from('teacher_details')
-        .select('teacher_name, time_of_slot, availability')
-        .eq('id', tid)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
+    const { data: teacher } = await db.from('teacher_details')
+        .select('teacher_name, time_of_slot, subject_taught')
+        .eq('id', tid).eq('institute_id', sessionInstID).maybeSingle();
 
-    if (error || !teacher) {
-        slotDropdown.innerHTML = '<option value="">Error: Teacher not found</option>';
-        return;
-    }
-
+    if (!teacher) return;
     nameInput.value = teacher.teacher_name;
 
-    // 2. Parse the timing map
-    let slotMap = {};
-    try {
-        const rawData = teacher.time_of_slot;
-        slotMap = (typeof rawData === 'string') ? JSON.parse(rawData) : rawData;
-    } catch (e) {
-        slotMap = {};
+    // VALIDATION: Does the teacher teach this?
+    const expertise = teacher.subject_taught.toUpperCase();
+    if (selectedSubject && !expertise.includes(selectedSubject)) {
+        alert(`🛑 ERROR: ${teacher.teacher_name} is NOT registered to teach ${selectedSubject}. They only teach: ${teacher.subject_taught}`);
+        document.getElementById('batch-subject').value = ""; // Reset dropdown
+        slotDropdown.innerHTML = '<option value="">Teacher Subject Mismatch</option>';
+        return;
     }
 
-    // 3. Logic to populate the Dropdown
-    slotDropdown.innerHTML = ""; // Clear existing
+    // Populate Timings (As per your dynamic dropdown requirement)
+    let slotMap = {};
+    try { slotMap = (typeof teacher.time_of_slot === 'string') ? JSON.parse(teacher.time_of_slot) : teacher.time_of_slot; } catch (e) {}
 
-    if (teacher.availability === "No") {
-        let opt = document.createElement('option');
-        opt.text = "TEACHER UNAVAILABLE";
-        slotDropdown.appendChild(opt);
-        slotDropdown.style.background = "#ffebee";
-    } else {
-        const searchSubject = selectedSubject.trim().toUpperCase();
-        let foundTimingString = "";
+    slotDropdown.innerHTML = '<option value="">-- Select Slot --</option>';
+    let foundTimingString = "";
+    if (slotMap) {
+        Object.keys(slotMap).forEach(key => {
+            if (key.trim().toUpperCase() === selectedSubject) foundTimingString = slotMap[key];
+        });
+    }
 
-        // Find match in the map
-        if (slotMap) {
-            Object.keys(slotMap).forEach(key => {
-                if (key.trim().toUpperCase() === searchSubject) {
-                    foundTimingString = slotMap[key];
-                }
-            });
-        }
-
-        if (foundTimingString) {
-            // THE DYNAMIC PART: Split the string "09:00 AM to 10:00 AM, 11:00 AM to 12:00 PM"
-            const slotsArray = foundTimingString.split(',').map(s => s.trim());
-            
-            slotsArray.forEach(slot => {
-                let opt = document.createElement('option');
-                opt.value = slot;
-                opt.text = slot;
-                slotDropdown.appendChild(opt);
-            });
-            slotDropdown.style.background = "#7FFFD4";
-        } else {
+    if (foundTimingString) {
+        const slotsArray = foundTimingString.split(',').map(s => s.trim());
+        slotsArray.forEach(slot => {
             let opt = document.createElement('option');
-            opt.text = "No slots found for this subject in Teacher Profile";
+            opt.value = slot; opt.text = slot;
             slotDropdown.appendChild(opt);
-            slotDropdown.style.background = "#fff3e0";
+        });
+        slotDropdown.style.background = "#7FFFD4";
+    } else {
+        slotDropdown.innerHTML = '<option value="">No slots in Teacher Profile</option>';
+    }
+}
+
+function syncBatchNameWithSubject() {
+    const name = document.getElementById('batch-name').value.toUpperCase();
+    const subDropdown = document.getElementById('batch-subject');
+
+    // Define keywords to look for in the Batch Name
+    const subjectMap = {
+        'ALGEBRA': 'ALGEBRA',
+        'GEOMETRY': 'GEOMETRY',
+        'MATHS': 'MATHS',
+        'PHYSICS': 'PHYSICS',
+        'CHEMISTRY': 'CHEMISTRY',
+        'BIOLOGY': 'BIOLOGY',
+        'SCIENCE': 'SCIENCE',
+        'HISTORY': 'HISTORY',
+        'GEOGRAPHY': 'GEOGRAPHY',
+        'ENGLISH': 'ENGLISH',
+        'COMPUTER': 'COMPUTER SCIENCE'
+    };
+
+    // Check if any keyword exists in the name
+    for (let key in subjectMap) {
+        if (name.includes(key)) {
+            subDropdown.value = subjectMap[key];
+            // Trigger teacher check to see if they teach this subject
+            handleBatchTeacherChange();
+            break; 
         }
     }
 }
+
+// 2. LINK: Timing -> Max Students Allotted (Fetches existing records)
+async function handleBatchTimingChange() {
+    const tid = document.getElementById('batch-teacher-id').value;
+    const subject = document.getElementById('batch-subject').value;
+    const timing = document.getElementById('batch-slots-select').value;
+
+    if (!tid || !subject || !timing) return;
+
+    // Check if a record already exists for this Teacher + Subject + Slot
+    const { data, error } = await db.from('batches')
+        .select('students_allotted, remarks')
+        .match({ 
+            teacher_id: tid, 
+            subject_name: subject, 
+            batch_time: timing, 
+            institute_id: sessionInstID 
+        })
+        .maybeSingle();
+
+    if (data) {
+        // If record exists, show the saved capacity
+        document.getElementById('batch-students').value = data.students_allotted || 0;
+        document.getElementById('batch-remarks').value = data.remarks || "";
+        console.log("Capacity synced for selected timing.");
+    } else {
+        // If new slot, clear the fields for fresh entry
+        document.getElementById('batch-students').value = "";
+        document.getElementById('batch-remarks').value = "";
+    }
+}
+
 /* ==========================================
    6. ATTENDANCE (Mark & Fetch)
    ========================================== */
