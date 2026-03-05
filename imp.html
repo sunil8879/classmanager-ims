@@ -8387,6 +8387,15 @@ async function deleteBatchMasterRecord(recordId, studentName) {
 
 let historyModeActive = false;
 
+document.addEventListener('DOMContentLoaded', () => {
+    const revDateInput = document.getElementById('rev-date');
+    if(revDateInput) {
+        const todayLocal = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        revDateInput.value = todayLocal; 
+        revDateInput.max = todayLocal;   
+    }
+});
+
 // 1. History Button Clicked
 async function handleHistoryBtn() {
     const roll = document.getElementById('rev-roll').value.trim();
