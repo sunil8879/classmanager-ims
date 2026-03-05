@@ -3715,31 +3715,33 @@ async function fetchBatch() {
     let name = prompt("Enter Batch Name to search:");
     if (!name) return;
 
-    name = name.trim(); // Removes accidental spaces before or after the name
-
-    // Use 'ilike' for case-insensitive search and 'limit(1).maybeSingle()' to prevent crashes
     const { data, error } = await db.from('batches')
         .select('*')
-        .ilike('batch_name', name) 
+        .ilike('batch_name', name.trim()) 
         .eq('institute_id', sessionInstID)
         .limit(1)
         .maybeSingle();
 
-    if (error || !data) {
-        return alert(`Batch "${name}" not found. Please check the spelling.`);
-    }
+    if (error || !data) return alert(`Batch "${name}" not found.`);
 
-    // Populate UI
+    // POPULATE UI
     document.getElementById('batch-name').value = data.batch_name;
     document.getElementById('batch-teacher-id').value = data.teacher_id;
     document.getElementById('batch-teacher-name').value = data.teacher_name;
-    document.getElementById('batch-time').value = data.batch_time;
     document.getElementById('batch-subject').value = data.subject_name;
-    document.getElementById('batch-students').value = data.students_allotted;
+    
+    // THE FIX: Autopopulate Max Students and Remarks
+    document.getElementById('batch-students').value = data.students_allotted || 0;
     document.getElementById('batch-remarks').value = data.remarks || "";
+
+    // IMPORTANT: Update the 3D Display Box for Timings
+    const displayArea = document.getElementById('batch-slots-display');
+    displayArea.innerText = data.batch_time || "No timings saved";
+    displayArea.style.background = "#7FFFD4"; 
     
     alert("Batch details loaded!");
 }
+
 
 // NEW: UPDATE BATCH FUNCTION
 async function updateBatch() {
@@ -3775,36 +3777,36 @@ async function fetchBatchByTeacher() {
 
     const { data, error } = await db.from('batches')
         .select('*')
-        .eq('teacher_id', tid.toUpperCase())
+        .eq('teacher_id', tid.toUpperCase().trim())
         .eq('institute_id', sessionInstID);
 
-    if (error || !data || data.length === 0) {
-        return alert("No batches found for this teacher.");
-    }
+    if (error || !data || data.length === 0) return alert("No batches found for this teacher.");
 
-    // If teacher has multiple batches, let user pick which one to load into the form
     let selection = data[0];
     if (data.length > 1) {
-        let msg = "This teacher has multiple batches. Enter the Number to load:\n";
-        data.forEach((b, i) => msg += `${i+1}. ${b.batch_name} (${b.subject_name} at ${b.batch_time})\n`);
+        let msg = "Multiple batches found. Enter number to load:\n";
+        data.forEach((b, i) => msg += `${i+1}. ${b.batch_name} (${b.subject_name})\n`);
         let choice = prompt(msg);
-        if (choice && data[parseInt(choice)-1]) {
-            selection = data[parseInt(choice)-1];
-        }
+        if (choice && data[parseInt(choice)-1]) selection = data[parseInt(choice)-1];
     }
 
-    // Populate UI
+    // POPULATE UI
     document.getElementById('batch-name').value = selection.batch_name;
     document.getElementById('batch-teacher-id').value = selection.teacher_id;
     document.getElementById('batch-teacher-name').value = selection.teacher_name;
-    document.getElementById('batch-time').value = selection.batch_time;
     document.getElementById('batch-subject').value = selection.subject_name;
-    document.getElementById('batch-students').value = selection.students_allotted;
-    document.getElementById('batch-remarks').value = selection.remarks || "";
     
+    // THE FIX: Autopopulate Max Students and Remarks
+    document.getElementById('batch-students').value = selection.students_allotted || 0;
+    document.getElementById('batch-remarks').value = selection.remarks || "";
+
+    // IMPORTANT: Update the 3D Display Box for Timings
+    const displayArea = document.getElementById('batch-slots-display');
+    displayArea.innerText = selection.batch_time || "No timings saved";
+    displayArea.style.background = "#7FFFD4";
+
     alert("Batch details loaded!");
 }
-
 
 async function editBatch() {
     const tID = val('#batch', 'input[placeholder="Teacher ID"]');
