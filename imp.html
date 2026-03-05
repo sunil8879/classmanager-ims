@@ -8520,7 +8520,7 @@ async function showTeacherReviewHistoryPopup(tid, tname) {
 
 // 5. Add Review
 // 5. Add Review (With 1-Review-Per-Teacher Limit)
-// 5. Add Review (Strict 1-Review Limit)
+// 5. Add Review (Strict 1-Review per Student per Teacher)
 async function addTeacherReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
@@ -8530,20 +8530,22 @@ async function addTeacherReview() {
     if(!roll || !tid || !date) return alert("Fill Roll No, Teacher, and Date.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    // CHECK: Does a review already exist for this teacher by this student?
-    const { data: existingReview } = await db.from('reviews')
+    // STRICT CHECK: Does THIS student already have a review for THIS teacher?
+    const { data: existing } = await db.from('reviews')
         .select('id')
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid)
-        .eq('institute_id', sessionInstID)
-        .limit(1); // Safely checks even if there are old duplicates
+        .match({ 
+            student_roll: roll, 
+            teacher_id: tid, 
+            institute_id: sessionInstID 
+        })
+        .maybeSingle();
 
-    if (existingReview && existingReview.length > 0) {
-        return alert("ERROR: You have already submitted a review for this teacher!\n\nA student can only write ONE review per teacher. If you want to change your feedback, please use the 'UPDATE' button instead.");
+    if (existing) {
+        return alert("ERROR: You have already submitted a review for this teacher!\n\nUse the 'UPDATE' button to modify your existing feedback.");
     }
 
-    // If no review exists, proceed to insert
-    const data = {
+    // If clean, insert the review
+    const { error } = await db.from('reviews').insert([{
         institute_id: sessionInstID,
         student_roll: roll,
         student_name: document.getElementById('rev-sname').value,
@@ -8552,13 +8554,11 @@ async function addTeacherReview() {
         rating: score,
         message: document.getElementById('rev-msg').value,
         review_date: date
-    };
+    }]);
 
-    const { error } = await db.from('reviews').insert([data]);
     if(error) alert("Save Error: " + error.message);
     else alert("Review Saved Successfully!");
 }
-
 // 6. Update Review (TARGETS ONLY THE LAST RECORD)
 async function editTeacherReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
