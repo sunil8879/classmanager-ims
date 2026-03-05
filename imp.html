@@ -3703,17 +3703,22 @@ async function addBatch() {
 
 
 // NEW: UPDATE BATCH FUNCTION
+// NEW: UPDATE BATCH FUNCTION
 async function updateBatch() {
     const batchName = document.getElementById('batch-name').value.trim();
-    if (!batchName) return alert("Please fetch a Batch first using FETCH.");
+    
+    // Updated error message to reflect the new workflow
+    if (!batchName) {
+        return alert("Please select an existing Teacher, Subject, and Time Slot first to load the batch details.");
+    }
 
     // Prepare updated data from UI
     const batchData = {
         teacher_id: document.getElementById('batch-teacher-id').value,
         teacher_name: document.getElementById('batch-teacher-name').value,
-     batch_time: document.getElementById('batch-slots-select').value,
+        batch_time: document.getElementById('batch-slots-select').value,
         subject_name: document.getElementById('batch-subject').value,
-        students_allotted: parseInt(document.getElementById('batch-students').value) || 0, // THIS FIELD
+        students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
         remarks: document.getElementById('batch-remarks').value
     };
 
@@ -3729,12 +3734,6 @@ async function updateBatch() {
         alert("Success! Batch details and capacity for '" + batchName + "' have been updated.");
     }
 }
-
-
-
-
-
-
 
 
 
