@@ -8385,6 +8385,11 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    ========================================== */
 
 // 1. Fetch all linked teachers and fill the dropdown
+/* ==========================================
+   26. TEACHER REVIEWS LOGIC (FIXED)
+   ========================================== */
+
+// 1. THIS CONNECTS THE ROLL NUMBER TO THE TEACHER LIST
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter Roll Number first.");
@@ -8394,7 +8399,7 @@ async function autopopulateReviewForm() {
     if(!stu) return alert("Student not found.");
     document.getElementById('rev-sname').value = stu.full_name;
 
-    // Fetch all allocations for this roll
+    // Fetch teachers linked to student from Section 18
     const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
     
     const tidSelect = document.getElementById('rev-tid');
@@ -8402,31 +8407,80 @@ async function autopopulateReviewForm() {
     document.getElementById('rev-tname').value = "";
 
     if(allocs && allocs.length > 0) {
-        // Use a Map to filter out duplicate teachers (if linked to multiple batches)
         const uniqueTeachers = new Map();
         allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
 
         uniqueTeachers.forEach((name, id) => {
             let opt = document.createElement('option');
             opt.value = id;
-            opt.text = id;
-            opt.dataset.name = name; // Store name in dataset for quick sync
+            opt.text = `${id} - ${name}`;
+            opt.dataset.name = name; 
             tidSelect.appendChild(opt);
         });
-        alert(`Found ${uniqueTeachers.size} teachers linked to this student.`);
+        
+        // Check if a review exists for currently selected date/teacher
+        fetchSpecificReview();
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. Helper to update the Name field when an ID is selected from dropdown
+// 2. Helper to update the Name field AND trigger the data fetch
 function syncReviewTeacherName() {
     const select = document.getElementById('rev-tid');
     const selectedOption = select.options[select.selectedIndex];
-    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
+    document.getElementById('rev-tname').value = selectedOption ? (selectedOption.dataset.name || "") : "";
+    
+    // Auto-fetch the score when teacher is selected!
+    fetchSpecificReview();
 }
 
-// 3. Save Review for the specific selected teacher
+// 3. THE DYNAMIC FETCH (Pulls the Score and Message)
+async function fetchSpecificReview() {
+    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    const tid = document.getElementById('rev-tid').value;
+    const date = document.getElementById('rev-date').value;
+
+    // Must have all 3 parameters to find a specific review
+    if (!roll || !tid || !date) return;
+
+    const { data, error } = await db.from('reviews')
+        .select('*')
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid)
+        .eq('review_date', date)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (data) {
+        document.getElementById('rev-score').value = data.rating;
+        document.getElementById('rev-msg').value = data.message;
+    } else {
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
+    }
+}
+
+// 4. Safely attach event listener to Date box so changing date auto-fetches without touching HTML
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const dateInput = document.getElementById('rev-date');
+        if(dateInput) dateInput.addEventListener('change', fetchSpecificReview);
+    }, 1000);
+});
+
+// 5. THIS CONNECTS THE BOTTOM "FETCH" BUTTON
+async function fetchReviewByRoll() {
+    const roll = prompt("Enter Student Roll Number to fetch review data:");
+    if(!roll) return;
+    
+    document.getElementById('rev-roll').value = roll.toUpperCase();
+    await autopopulateReviewForm();
+    
+    alert("Student loaded! Now select the Teacher and Date to view their specific review score and message.");
+}
+
+// 6. ADD NEW REVIEW
 async function addTeacherReview() {
     const tid = document.getElementById('rev-tid').value;
     const score = parseFloat(document.getElementById('rev-score').value);
@@ -8446,46 +8500,39 @@ async function addTeacherReview() {
     };
 
     const { error } = await db.from('reviews').insert([data]);
-    if(error) alert("Error: " + error.message);
-    else {
+    if(error) {
+        if(error.code === '23505') alert("Review already exists for this date. Use UPDATE.");
+        else alert("Save Error: " + error.message);
+    } else {
         alert("Review Saved for " + data.teacher_name);
-        // Clear rating and message for next review
         document.getElementById('rev-score').value = "";
         document.getElementById('rev-msg').value = "";
     }
 }
 
-// 3. FETCH Review
-// 3. FETCH Review (Fixed Flow)
-async function fetchReviewByRoll() {
-    const rollInBox = document.getElementById('rev-roll').value.trim();
-    if(!rollInBox) {
-        const r = prompt("Enter Student Roll Number to Fetch:");
-        if(!r) return;
-        document.getElementById('rev-roll').value = r.toUpperCase();
-    }
-    // Load the student name and teacher list
-    autopopulateReviewForm();
-    alert("Student loaded! Now select the Teacher and Date to view their specific review.");
-}
-
-// 4. UPDATE Review
+// 7. UPDATE EXISTING REVIEW
 async function editTeacherReview() {
     const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const tid = document.getElementById('rev-tid').value;
+    const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
-    if(score > 5) return alert("Error: Score cannot exceed 5.");
 
-    const { error } = await db.from('reviews').update({
-        rating: score,
-        message: document.getElementById('rev-msg').value
-    }).eq('student_roll', roll).eq('institute_id', sessionInstID);
+    if(!roll || !tid || !date) return alert("Please fetch the student, teacher, and date first.");
+    if(score > 5 || score < 0) return alert("Error: Score must be between 0 and 5.");
+
+    const { error } = await db.from('reviews')
+        .update({
+            rating: score,
+            message: document.getElementById('rev-msg').value
+        })
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid)
+        .eq('review_date', date)
+        .eq('institute_id', sessionInstID);
 
     if(error) alert(error.message);
     else alert("Review Updated successfully!");
 }
-
-
-
 
 
 
