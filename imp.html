@@ -8006,6 +8006,7 @@ function setupWALink(btnId, mobile, msg) {
 }
 
 // Add PTM Record to Database
+// Add PTM Record to Database (With Dynamic Clash Validations)
 async function addPTMRecord() {
     const ptmMonth = document.getElementById('ptm-month').value;
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -8034,16 +8035,52 @@ async function addPTMRecord() {
         return alert("Error: Please fetch and allocate a slot before saving.");
     }
 
+    // --- RULE 3: One teacher can have 1 student only in one slot ---
+    const { data: teacherClash } = await db.from('ptm_schedule')
+        .select('id')
+        .eq('teacher_id', data.teacher_id)
+        .eq('ptm_date', data.ptm_date)
+        .eq('slot_time', data.slot_time)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (teacherClash) {
+        return alert("Error: This teacher is already booked for this specific time slot. Please choose a different time.");
+    }
+
+    // --- RULE 1 & 2: Student cannot attend two PTMs at the exact same time (across any teacher/subject) ---
+    const { data: studentClash } = await db.from('ptm_schedule')
+        .select('course_name')
+        .eq('roll_number', data.roll_number)
+        .eq('ptm_date', data.ptm_date)
+        .eq('slot_time', data.slot_time)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (studentClash) {
+        return alert(`Error: Student is already scheduled for a PTM at ${data.slot_time} for [${studentClash.course_name}]. Students cannot attend two PTMs at the same time. Please select a different slot.`);
+    }
+
+    // Check if this specific Subject is already booked this month (prevents double booking same subject)
+    const { data: duplicateSubject } = await db.from('ptm_schedule')
+        .select('id')
+        .eq('roll_number', data.roll_number)
+        .eq('course_name', data.course_name)
+        .eq('month_year', data.month_year)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (duplicateSubject) {
+        return alert(`Error: A PTM is already scheduled for ${data.student_name} in ${data.course_name} for this month.`);
+    }
+
+    // Execute Save
     const { error } = await db.from('ptm_schedule').insert([data]);
 
     if (error) {
-        if (error.code === '23505') {
-            alert("Database Error: This slot is either already taken OR the student already has a PTM booked for this month.");
-        } else {
-            alert("Save Error: " + error.message);
-        }
+        alert("Save Error: " + error.message);
     } else {
-        alert(`Success! Slot ${data.slot_time} booked for ${data.student_name}. You can now use the WhatsApp buttons to inform everyone.`);
+        alert(`Success! Slot ${data.slot_time} booked for ${data.student_name} (${data.course_name}). You can now use the WhatsApp buttons.`);
     }
 }
 
@@ -8060,11 +8097,14 @@ async function fetchPTMRecordByRoll() {
     
     const monthYearStr = new Date(ptmMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' });
 
+    // Using .order and .limit allows it to safely fetch the latest booking if the student has multiple subjects booked.
     const { data, error } = await db.from('ptm_schedule')
         .select('*')
         .eq('roll_number', roll.toUpperCase())
         .eq('month_year', monthYearStr)
         .eq('institute_id', sessionInstID)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
     if (error || !data) return alert("No PTM record found for this student in " + monthYearStr + ".");
@@ -8086,25 +8126,50 @@ async function fetchPTMRecordByRoll() {
     document.getElementById('ptm-fmob').value = data.father_mobile || "";
     document.getElementById('ptm-remarks').value = data.remarks || "";
 
-    // Step 3: FIX DROPDOWNS (Crucial Step)
-    // Manually add the saved Course to the dropdown so it shows up
+    // --- RULE 4: Dynamically populate all allocated subjects in the Course Dropdown ---
+    const { data: allocs } = await db.from('student_allocations')
+        .select('teacher_id, teacher_name, subject')
+        .eq('roll_number', data.roll_number)
+        .eq('institute_id', sessionInstID);
+        
     const courseSelect = document.getElementById('ptm-course');
-    courseSelect.innerHTML = `<option value="${data.course_name}">${data.course_name} (${data.teacher_name})</option>`;
+    courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
     
-    // Manually add the saved Slot to the dropdown so it shows up
+    if (allocs && allocs.length > 0) {
+        const seenEntries = new Set(); 
+        for (let a of allocs) {
+            const uniqueKey = `${a.teacher_id}-${a.subject}`.toUpperCase();
+            if (seenEntries.has(uniqueKey)) continue; 
+            seenEntries.add(uniqueKey);
+
+            let opt = document.createElement('option');
+            opt.value = a.subject;
+            opt.text = `${a.subject} (${a.teacher_name})`;
+            opt.dataset.tid = a.teacher_id;
+            opt.dataset.tname = a.teacher_name;
+            courseSelect.appendChild(opt);
+        }
+    } else {
+        // Fallback if the record is old and allocation doesn't exist
+        courseSelect.innerHTML = `<option value="${data.course_name}">${data.course_name} (${data.teacher_name})</option>`;
+    }
+    
+    // Auto-select the course that was fetched
+    courseSelect.value = data.course_name;
+    
+    // Manually display the saved Slot
     const slotSelect = document.getElementById('ptm-slot-time');
     slotSelect.innerHTML = `<option value="${data.slot_time}">${data.slot_time}</option>`;
 
-    // Step 4: Refresh WhatsApp Buttons
+    // Refresh WhatsApp Buttons
     generatePTMWhatsAppLinks(
         data.month_year, data.ptm_date, data.start_time, data.end_time, 
         data.slot_time, data.teacher_name, data.teacher_mobile, 
         data.mother_mobile, data.father_mobile
     );
 
-    alert("PTM Record Loaded Successfully.");
+    alert(`Latest PTM Record Loaded: ${data.course_name}. (If the student is booked for multiple subjects, they are scheduled at different times).`);
 }
-
 
 
 /* ==========================================
