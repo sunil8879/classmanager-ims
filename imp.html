@@ -2539,66 +2539,64 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 
 <!-- 26. REVIEWS MODULE -->
+<!-- 26. REVIEWS MODULE -->
 <section id="reviews-mod" class="content-section">
     <div class="card" style="border-top: 5px solid #f1c40f;">
         <h3><i class="fas fa-star-half-alt"></i> Student Feedback & Reviews</h3>
-  <div class="form-grid">
-    <!-- 1. Today's Date -->
-    <div class="input-group">
-        <label>Today's Date</label>
-        <input type="date" id="rev-date" onchange="fetchSpecificReview()">
-    </div>
+        <div class="form-grid">
 
-    <!-- 2. Student Roll -->
-    <div class="input-group">
-        <label>1. Student Roll Number</label>
-        <div style="display: flex; gap: 5px;">
-            <input type="text" id="rev-roll" placeholder="IMS-XXXX">
-            <button class="btn-fetch" onclick="autopopulateReviewForm()" style="padding: 5px 10px;"><i class="fas fa-magic"></i> Auto-Fill</button>
+            <div class="input-group">
+                <label>Today's Date</label>
+                <!-- DYNAMIC TRIGGER 1 -->
+                <input type="date" id="rev-date" onchange="fetchSpecificReview()">
+            </div>
+
+            <div class="input-group">
+                <label>1. Student Roll Number</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="rev-roll" placeholder="IMS-XXXX">
+                    <!-- CONNECTED TO AUTOPOPULATE -->
+                    <button class="btn-fetch" onclick="autopopulateReviewForm()" style="padding: 5px 10px;"><i class="fas fa-magic"></i> Auto-Fill</button>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>2. Student Name</label>
+                <input type="text" id="rev-sname" readonly style="background:#eee;">
+            </div>
+
+            <div class="input-group">
+                <label>3. Select Teacher to Review</label>
+                <!-- DYNAMIC TRIGGER 2 -->
+                <select id="rev-tid" onchange="syncReviewTeacherName(); fetchSpecificReview()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+                    <option value="">-- Enter Roll No First --</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>4. Teacher Name</label>
+                <input type="text" id="rev-tname" readonly style="background:#eee;">
+            </div>
+
+            <div class="input-group">
+                <label>5. Review Score (Max 5)</label>
+                <input type="number" step="0.1" id="rev-score" placeholder="e.g. 4.5">
+            </div>
+
+            <div class="input-group" style="grid-column: 1 / -1;">
+                <label>6. Message from Student</label>
+                <textarea id="rev-msg" rows="3" placeholder="Write your feedback here..."></textarea>
+            </div>
         </div>
-    </div>
 
-    <!-- 3. Student Name -->
-    <div class="input-group">
-        <label>2. Student Name</label>
-        <input type="text" id="rev-sname" readonly style="background:#eee;">
-    </div>
-
-    <!-- 4. Teacher Select (DYNAMIC TRIGGER) -->
-    <div class="input-group">
-        <label>3. Select Teacher to Review</label>
-        <select id="rev-tid" onchange="syncReviewTeacherName(); fetchSpecificReview()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
-            <option value="">-- Enter Roll No First --</option>
-        </select>
-    </div>
-
-    <!-- 5. Teacher Name Display -->
-    <div class="input-group">
-        <label>4. Teacher Name</label>
-        <input type="text" id="rev-tname" readonly style="background:#eee;">
-    </div>
-
-    <!-- 6. Score -->
-    <div class="input-group">
-        <label>5. Review Score (Max 5)</label>
-        <input type="number" step="0.1" id="rev-score" placeholder="e.g. 4.5">
-    </div>
-
-    <!-- 7. Message -->
-    <div class="input-group" style="grid-column: 1 / -1;">
-        <label>6. Message from Student</label>
-        <textarea id="rev-msg" rows="3" placeholder="Write your feedback here..."></textarea>
-    </div>
-</div>
         <div class="button-row">
             <button class="btn-add" onclick="addTeacherReview()">ADD REVIEW</button>
+            <!-- CONNECTED TO MANUAL FETCH -->
             <button class="btn-fetch" onclick="fetchReviewByRoll()">FETCH (by Roll No)</button>
             <button class="btn-edit" onclick="editTeacherReview()">UPDATE (by Roll No)</button>
         </div>
     </div>
 </section>
-
-
 
 
 
@@ -8448,13 +8446,10 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    ========================================== */
 
 /* ==========================================
-   26. TEACHER REVIEWS LOGIC (REPAIRED & DYNAMIC)
-   ========================================== */
-/* ==========================================
-   26. TEACHER REVIEWS LOGIC (100% DYNAMIC)
+   26. TEACHER REVIEWS LOGIC (REPAIRED & SYNCED)
    ========================================== */
 
-// 1. Initial Load: Get Student Name and Teacher Dropdown
+// 1. THIS CONNECTS THE ROLL NUMBER TO THE TEACHER LIST
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     if(!roll) return alert("Please enter Roll Number first.");
@@ -8464,15 +8459,17 @@ async function autopopulateReviewForm() {
     if(!stu) return alert("Student not found.");
     document.getElementById('rev-sname').value = stu.full_name;
 
-    // Fetch Teachers linked to this student from Section 18
+    // Fetch teachers linked to student from Section 18
     const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
     
     const tidSelect = document.getElementById('rev-tid');
     tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
+    document.getElementById('rev-tname').value = "";
 
     if(allocs && allocs.length > 0) {
         const uniqueTeachers = new Map();
         allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
+
         uniqueTeachers.forEach((name, id) => {
             let opt = document.createElement('option');
             opt.value = id;
@@ -8480,20 +8477,24 @@ async function autopopulateReviewForm() {
             opt.dataset.name = name; 
             tidSelect.appendChild(opt);
         });
-        alert("Teachers loaded. Now pick a Teacher and Date to see/write a review.");
+        
+        // After loading the list, check if a review exists for currently selected date/teacher
+        fetchSpecificReview();
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. THE DYNAMIC WORKHORSE: Instantly pulls the review when Teacher or Date changes
+// 2. THE DYNAMIC FETCH: Triggered by Date or Teacher selection
 async function fetchSpecificReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const date = document.getElementById('rev-date').value;
 
-    // Only run if we have the three "keys" (Who, To Whom, When)
+    // Only run fetch if we have all 3 parameters
     if (!roll || !tid || !date) return;
+
+    console.log(`Dynamic Fetch Triggered for: ${roll}, ${tid}, ${date}`);
 
     const { data, error } = await db.from('reviews')
         .select('*')
@@ -8504,25 +8505,37 @@ async function fetchSpecificReview() {
         .maybeSingle();
 
     if (data) {
-        // Record exists: Show the score and message
+        // Record found: Populate fields
         document.getElementById('rev-score').value = data.rating;
         document.getElementById('rev-msg').value = data.message;
     } else {
-        // No record exists for this specific combination: Clear the boxes for a new entry
+        // No record: Clear fields for new entry
         document.getElementById('rev-score').value = "";
         document.getElementById('rev-msg').value = "";
     }
 }
 
-// 3. ADD NEW REVIEW
+// 3. THIS CONNECTS THE BOTTOM "FETCH" BUTTON
+async function fetchReviewByRoll() {
+    const rollInBox = document.getElementById('rev-roll').value.trim();
+    if(!rollInBox) {
+        const r = prompt("Enter Student Roll Number:");
+        if(!r) return;
+        document.getElementById('rev-roll').value = r.toUpperCase();
+    }
+    // Logic is the same as autopopulate: load the student context
+    autopopulateReviewForm();
+}
+
+// 4. ADD NEW REVIEW
 async function addTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
 
-    if(!roll || !tid || !date) return alert("Select Roll No, Teacher, and Date first.");
-    if(isNaN(score) || score > 5) return alert("Rating must be between 0 and 5.");
+    if(!roll || !tid || !date) return alert("Fill Roll No, Teacher, and Date.");
+    if(isNaN(score) || score > 5) return alert("Invalid Score.");
 
     const data = {
         institute_id: sessionInstID,
@@ -8537,49 +8550,47 @@ async function addTeacherReview() {
 
     const { error } = await db.from('reviews').insert([data]);
     if(error) {
-        if(error.code === '23505') alert("Error: Review already exists for this date. Use UPDATE.");
+        if(error.code === '23505') alert("Review already exists. Use UPDATE.");
         else alert("Save Error: " + error.message);
     } else {
-        alert("Review saved successfully!");
+        alert("Review Saved!");
     }
 }
 
-// 4. UPDATE EXISTING REVIEW (Targeted precisely)
+// 5. UPDATE EXISTING REVIEW (MATCHING ROLL + TEACHER + DATE)
 async function editTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
 
-    if(!roll || !tid || !date) return alert("Nothing to update. Please select a record first.");
+    if(!roll || !tid || !date) return alert("Fetch the record first.");
 
     const { error } = await db.from('reviews')
         .update({
             rating: score,
             message: document.getElementById('rev-msg').value
         })
-        .match({ 
-            student_roll: roll, 
-            teacher_id: tid, 
-            review_date: date, 
-            institute_id: sessionInstID 
-        });
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid)
+        .eq('review_date', date)
+        .eq('institute_id', sessionInstID);
 
-    if(error) alert("Update Failed: " + error.message);
-    else alert("Review updated successfully!");
+    if(error) alert("Update Error: " + error.message);
+    else alert("Review Updated successfully!");
 }
 
-// 5. Helper: Sync Name input
+// 6. SYNC TEACHER NAME
 function syncReviewTeacherName() {
     const select = document.getElementById('rev-tid');
     const opt = select.options[select.selectedIndex];
     document.getElementById('rev-tname').value = opt ? (opt.dataset.name || "") : "";
 }
 
-// 6. Keep Fetch Button working as a fallback
-async function fetchReviewByRoll() {
-    autopopulateReviewForm();
-}
+
+
+
+
 
 
 /* --- FORGOT PASSWORD & EMAIL RECOVERY LOGIC --- */
