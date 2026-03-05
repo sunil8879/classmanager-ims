@@ -8490,8 +8490,9 @@ async function openTeacherReviewHistoryPopup(tid, tname) {
 }
 
 // 5. ADD REVIEW (With Rule 1 Validation)
+// 5. ADD REVIEW (With Rule 1 Validation)
 async function addTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const revDate = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
@@ -8499,17 +8500,17 @@ async function addTeacherReview() {
     if(!tid) return alert("Please select a teacher from the dropdown.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    // Validation 1: Only one review per teacher per day
+    // Validation 1: Only one review per teacher per day (using limit(1) to prevent crashes)
     const { data: existing } = await db.from('reviews')
         .select('id')
         .eq('student_roll', roll)
         .eq('teacher_id', tid)
         .eq('review_date', revDate)
         .eq('institute_id', sessionInstID)
-        .maybeSingle();
+        .limit(1);
 
-    if (existing) {
-        return alert("Error: You can give only one review per teacher in one day. Use the UPDATE button to modify your existing review.");
+    if (existing && existing.length > 0) {
+        return alert("Error: One student can give only one review per teacher in one day. Please use the UPDATE button.");
     }
 
     const data = {
@@ -8532,30 +8533,32 @@ async function addTeacherReview() {
     }
 }
 
-// 6. UPDATE REVIEW (With Rule 2 Validation using an invisible tracker)
+// 6. UPDATE REVIEW (With Rule 2 Validation)
 async function editTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
     const revDate = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
     
     if(!tid) return alert("Please select a teacher from the dropdown to update.");
-    if(score > 5) return alert("Error: Score cannot exceed 5.");
+    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    // Fetch today's review
-    const { data: currentReview } = await db.from('reviews')
+    // Fetch today's review (using limit(1) to ensure it finds it even if old bugs caused duplicates)
+    const { data: currentReviews } = await db.from('reviews')
         .select('id, message')
         .eq('student_roll', roll)
         .eq('teacher_id', tid)
         .eq('review_date', revDate)
         .eq('institute_id', sessionInstID)
-        .maybeSingle();
+        .limit(1);
 
-    if (!currentReview) {
+    if (!currentReviews || currentReviews.length === 0) {
         return alert("Error: No review found for this teacher today. You can only update today's reviews.");
     }
 
-    // Validation 2: Max 2 updates per day (Safely tracks in the message string so DB schema stays untouched)
+    const currentReview = currentReviews[0];
+
+    // Validation 2: Max 2 updates per day 
     let baseMsg = currentReview.message || "";
     let updateCount = 0;
     const match = baseMsg.match(/<!--U:(\d+)-->$/);
@@ -8565,8 +8568,9 @@ async function editTeacherReview() {
         return alert("Error: Updation can happen twice max per teacher in one day. You have reached the limit.");
     }
 
-    // Append invisible counter so the DB doesn't crash from a missing column
-    const newMsg = document.getElementById('rev-msg').value + `<!--U:${updateCount + 1}-->`;
+    // Append invisible counter safely 
+    const cleanInputMsg = document.getElementById('rev-msg').value.replace(/<!--U:\d+-->$/, '');
+    const newMsg = cleanInputMsg + `<!--U:${updateCount + 1}-->`;
 
     const { error } = await db.from('reviews').update({
         rating: score,
@@ -8580,8 +8584,6 @@ async function editTeacherReview() {
         document.getElementById('rev-msg').value = "";
     }
 }
-
-
 // 1. Fetch all linked teachers and fill the dropdown
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
