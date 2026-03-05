@@ -7965,7 +7965,7 @@ async function syncPTMTeacherDetails() {
     }
 }
 
-// 4. Calculate Available Slots
+// 4. Calculate Available Slots (Shows booked slots in grey)
 async function calculateAvailablePTMSlots(tid) {
     const ptmDate = document.getElementById('ptm-date').value;
     const startTime = document.getElementById('ptm-start').value;
@@ -7975,21 +7975,32 @@ async function calculateAvailablePTMSlots(tid) {
 
     if (!ptmDate || !startTime || !endTime) return alert("Configure Date/Time in Step 1 first.");
 
+    // Get slots already booked with this teacher on this date
     const { data: booked } = await db.from('ptm_schedule').select('slot_time').eq('teacher_id', tid).eq('ptm_date', ptmDate).eq('institute_id', sessionInstID);
     const bookedTimes = booked ? booked.map(b => b.slot_time) : [];
 
     slotSelect.innerHTML = '<option value="">-- Choose Slot --</option>';
     let current = startTime;
+    
     while (current < endTime) {
-        if (!bookedTimes.includes(current)) {
-            let opt = document.createElement('option');
-            opt.value = current; opt.text = current;
-            slotSelect.appendChild(opt);
+        let opt = document.createElement('option');
+        opt.value = current; 
+        
+        // MINIMAL ADDITION: Check if booked, disable it, and make it grey
+        if (bookedTimes.includes(current)) {
+            opt.text = current + " (Booked)";
+            opt.disabled = true;             // Prevents user from selecting it
+            opt.style.color = "grey";        // Changes text color to grey
+            opt.style.background = "#f0f0f0"; // Optional: Light grey background
+        } else {
+            opt.text = current;
+            opt.style.color = "black";
         }
+        
+        slotSelect.appendChild(opt);
         current = addMinutesToTime(current, duration);
     }
 }
-
 // 5. WhatsApp Integration
 function updatePTMWhatsApp() {
     const slot = document.getElementById('ptm-slot-time').value;
