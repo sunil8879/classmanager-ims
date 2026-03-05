@@ -7982,22 +7982,19 @@ async function calculateAvailablePTMSlots(tid) {
     slotSelect.innerHTML = '<option value="">-- Choose Slot --</option>';
     let current = startTime;
     
-    while (current < endTime) {
-        let opt = document.createElement('option');
-        opt.value = current; 
-        
-        // MINIMAL ADDITION: Check if booked, disable it, and make it grey
-        if (bookedTimes.includes(current)) {
-            opt.text = current + " (Booked)";
-            opt.disabled = true;             // Prevents user from selecting it
-            opt.style.color = "grey";        // Changes text color to grey
-            opt.style.background = "#f0f0f0"; // Optional: Light grey background
-        } else {
+ while (current < endTime) {
+        if (!bookedTimes.includes(current)) {
+            let opt = document.createElement('option');
+            opt.value = current; 
             opt.text = current;
-            opt.style.color = "black";
+            slotSelect.appendChild(opt);
+        } else {
+            let opt = document.createElement('option');
+            opt.value = current;
+            opt.text = current + " (Booked)";
+            opt.disabled = true; // This natively forces the browser to grey it out and block clicks
+            slotSelect.appendChild(opt);
         }
-        
-        slotSelect.appendChild(opt);
         current = addMinutesToTime(current, duration);
     }
 }
