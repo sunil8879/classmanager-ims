@@ -8449,18 +8449,18 @@ async function activateReviewHistoryMode() {
 }
 
 // 4. The Popup Window
+// 4. The Popup Window
 async function showTeacherReviewHistoryPopup(tid, tname) {
     const roll = document.getElementById('rev-roll').value.toUpperCase();
 
-    // Fetch subject from student allocations
-    const { data: alloc } = await db.from('student_allocations')
-        .select('subject')
+    // FIXED: Fetch subject directly from STUDENTS table
+    const { data: stuData } = await db.from('students')
+        .select('course')
         .eq('roll_number', roll)
-        .eq('teacher_id', tid)
         .eq('institute_id', sessionInstID)
         .maybeSingle();
     
-    const subjectName = alloc ? alloc.subject : "N/A";
+    const subjectName = stuData && stuData.course ? stuData.course : "N/A";
 
     // Fetch all reviews for this student & teacher
     const { data: revs } = await db.from('reviews')
@@ -8495,7 +8495,7 @@ async function showTeacherReviewHistoryPopup(tid, tname) {
                     <thead style="background:#eee; border:2px solid #000;">
                         <tr>
                             <th style="padding:10px; border:1px solid #000;">Date of Message</th>
-                            <th style="padding:10px; border:1px solid #000;">Subject Name</th>
+                            <th style="padding:10px; border:1px solid #000;">Course / Subject</th>
                             <th style="padding:10px; border:1px solid #000;">Review Score</th>
                             <th style="padding:10px; border:1px solid #000;">Message</th>
                         </tr>
@@ -8519,6 +8519,7 @@ async function showTeacherReviewHistoryPopup(tid, tname) {
 }
 
 // 5. Add Review
+// 5. Add Review (With 1-Review-Per-Teacher Limit)
 async function addTeacherReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
@@ -8527,6 +8528,18 @@ async function addTeacherReview() {
     
     if(!roll || !tid || !date) return alert("Fill Roll No, Teacher, and Date.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
+
+    // NEW LOGIC: Check if they already reviewed this teacher
+    const { data: existingReview } = await db.from('reviews')
+        .select('id')
+        .eq('student_roll', roll)
+        .eq('teacher_id', tid)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (existingReview) {
+        return alert("STOP: You have already submitted a review for this teacher!\n\nA student can only write one review per teacher. Please use the UPDATE button instead to modify your existing review.");
+    }
 
     const data = {
         institute_id: sessionInstID,
@@ -8540,15 +8553,11 @@ async function addTeacherReview() {
     };
 
     const { error } = await db.from('reviews').insert([data]);
-    if(error) {
-        if(error.code === '23505') alert("Review already exists for this date. Use UPDATE.");
-        else alert("Save Error: " + error.message);
-    } else {
-        alert("Review Saved Successfully!");
-    }
+    if(error) alert("Save Error: " + error.message);
+    else alert("Review Saved Successfully!");
 }
 
-// 6. Update Review
+// 6. Update Review (Overwrites old date automatically)
 async function editTeacherReview() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
@@ -8558,20 +8567,20 @@ async function editTeacherReview() {
     if(!roll || !tid || !date) return alert("Please fill Roll No, Teacher, and Date first.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
+    // Update based on Student & Teacher, ignoring the old date so they don't get stuck
     const { error } = await db.from('reviews')
         .update({
             rating: score,
-            message: document.getElementById('rev-msg').value
+            message: document.getElementById('rev-msg').value,
+            review_date: date // Updates to the new date!
         })
         .eq('student_roll', roll)
         .eq('teacher_id', tid)
-        .eq('review_date', date)
         .eq('institute_id', sessionInstID);
 
     if(error) alert("Update Error: " + error.message);
     else alert("Success! Review Updated in database.");
 }
-
 
 
 /* --- FORGOT PASSWORD & EMAIL RECOVERY LOGIC --- */
