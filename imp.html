@@ -5882,18 +5882,66 @@ const { data: att } = await db.from('attendance').select('status').eq('roll_numb
 }
 
 
+/* ==========================================
+   FIXED: EXAM MANAGEMENT FETCH FUNCTION
+   ========================================== */
 async function fetchExamByRoll() {
-    const roll = prompt("Enter Roll Number to see last exam:");
-    const { data, error } = await db.from('exam').select('*').eq('roll_number', roll.toUpperCase()).eq('institute_id', sessionInstID).order('exam_date', {ascending: false}).limit(1).maybeSingle();
-    if(data) {
-        document.getElementById('ex-date').value = data.exam_date;
-        document.getElementById('ex-roll').value = data.roll_number;
-        document.getElementById('ex-name').value = data.full_name;
-        document.getElementById('ex-course').value = data.course_name;
-        document.getElementById('ex-total').value = data.total_marks;
-        document.getElementById('ex-obt').value = data.marks_obtained;
-        calcExamResult();
-    } else alert("No exam records found.");
+    const roll = prompt("Enter Student Roll Number to fetch latest exam:");
+    if (!roll) return;
+
+    const cleanRoll = roll.trim().toUpperCase();
+
+    // 1. Fetch the latest Exam Record for this student
+    const { data: examData, error: examErr } = await db.from('exam')
+        .select('*')
+        .eq('roll_number', cleanRoll)
+        .eq('institute_id', sessionInstID)
+        .order('exam_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (examErr) return alert("Database Error: " + examErr.message);
+    if (!examData) return alert("No exam records found for Roll Number: " + cleanRoll);
+
+    // 2. CRITICAL STEP: Fetch Student Master Data to populate the Course Dropdown options
+    // Without this, the dropdown is empty and cannot "show" the saved course name.
+    const { data: stuData } = await db.from('students')
+        .select('full_name, course')
+        .eq('roll_number', cleanRoll)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (stuData) {
+        document.getElementById('ex-name').value = stuData.full_name;
+        
+        // Re-populate the dynamic dropdown options
+        const courseSelect = document.getElementById('ex-course');
+        courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+        
+        if (stuData.course) {
+            const courses = stuData.course.split(',').map(c => c.trim());
+            courses.forEach(c => {
+                let opt = document.createElement('option');
+                opt.value = c;
+                opt.text = c;
+                courseSelect.appendChild(opt);
+            });
+        }
+    }
+
+    // 3. Now that the options exist, populate the UI with Exam Data
+    document.getElementById('ex-date').value = examData.exam_date;
+    document.getElementById('ex-roll').value = examData.roll_number;
+    document.getElementById('ex-total').value = examData.total_marks;
+    document.getElementById('ex-obt').value = examData.marks_obtained;
+    
+    // 4. Set the dropdown to the specific course found in the exam record
+    document.getElementById('ex-course').value = examData.course_name;
+
+    // 5. Trigger the calculation logic to update Percent and Result UI
+    calcExamResult();
+
+    alert("Latest exam record for [" + examData.course_name + "] loaded successfully.");
 }
 
 /* ==========================================
