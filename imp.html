@@ -2546,8 +2546,8 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
 <!-- ADD AS THE FIRST ITEM IN THE REVIEWS FORM GRID -->
 <div class="input-group">
-    <label>Review Date</label>
-    <input type="date" id="rev-date" onchange="fetchSpecificReview()">
+    <label>Today's Date</label>
+    <input type="date" id="rev-date">
 </div>
 
 
@@ -2560,9 +2560,9 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                 </div>
             </div>
             <div class="input-group"><label>2. Student Name</label><input type="text" id="rev-sname" readonly style="background:#eee;"></div>
-        <div class="input-group">
+         <div class="input-group">
     <label>3. Select Teacher to Review</label>
-    <select id="rev-tid" onchange="syncReviewTeacherName(); fetchSpecificReview();" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
+    <select id="rev-tid" onchange="syncReviewTeacherName()" style="padding: 12px; border: 1px solid #000; border-radius: 8px;">
         <option value="">-- Enter Roll No First --</option>
     </select>
 </div>
@@ -2576,7 +2576,7 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 
         <div class="button-row">
             <button class="btn-add" onclick="addTeacherReview()">ADD REVIEW</button>
-         <button class="btn-fetch" style="background:#8e44ad;" onclick="activateReviewHistoryMode()">HISTORY</button>
+            <button class="btn-fetch" onclick="fetchReviewByRoll()">FETCH (by Roll No)</button>
             <button class="btn-edit" onclick="editTeacherReview()">UPDATE (by Roll No)</button>
         </div>
     </div>
@@ -8384,217 +8384,121 @@ async function deleteBatchMasterRecord(recordId, studentName) {
    26. TEACHER REVIEWS LOGIC
    ========================================== */
 
-/* ==========================================
-   26. TEACHER REVIEWS LOGIC
-   ========================================== */
-
-/* ==========================================
-   26. TEACHER REVIEWS LOGIC (FINAL & BULLETPROOF)
-   ========================================== */
-
-/* ==========================================
-   26. TEACHER REVIEWS LOGIC (HISTORY POPUP VERSION)
-   ========================================== */
-
-let isReviewHistoryMode = false;
-
-// 1. Auto-Fill (Magic Wand)
+// 1. Fetch all linked teachers and fill the dropdown
 async function autopopulateReviewForm() {
     const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    if (!roll) return alert("Please enter Roll Number first.");
+    if(!roll) return alert("Please enter Roll Number first.");
 
+    // Fetch Student Name
     const { data: stu } = await db.from('students').select('full_name').eq('roll_number', roll).eq('institute_id', sessionInstID).maybeSingle();
-    if (stu) document.getElementById('rev-sname').value = stu.full_name;
+    if(!stu) return alert("Student not found.");
+    document.getElementById('rev-sname').value = stu.full_name;
 
+    // Fetch all allocations for this roll
     const { data: allocs } = await db.from('student_allocations').select('teacher_id, teacher_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
     
     const tidSelect = document.getElementById('rev-tid');
     tidSelect.innerHTML = '<option value="">-- Select Teacher --</option>';
     document.getElementById('rev-tname').value = "";
 
-    if (allocs && allocs.length > 0) {
+    if(allocs && allocs.length > 0) {
+        // Use a Map to filter out duplicate teachers (if linked to multiple batches)
         const uniqueTeachers = new Map();
         allocs.forEach(a => uniqueTeachers.set(a.teacher_id, a.teacher_name));
-        
+
         uniqueTeachers.forEach((name, id) => {
-            tidSelect.innerHTML += `<option value="${id}" data-name="${name}">${id} - ${name}</option>`;
+            let opt = document.createElement('option');
+            opt.value = id;
+            opt.text = id;
+            opt.dataset.name = name; // Store name in dataset for quick sync
+            tidSelect.appendChild(opt);
         });
+        alert(`Found ${uniqueTeachers.size} teachers linked to this student.`);
     } else {
         alert("No teachers linked to this student in Section 18.");
     }
 }
 
-// 2. Triggered by Teacher Dropdown
+// 2. Helper to update the Name field when an ID is selected from dropdown
 function syncReviewTeacherName() {
     const select = document.getElementById('rev-tid');
-    const opt = select.options[select.selectedIndex];
-    document.getElementById('rev-tname').value = opt ? (opt.getAttribute('data-name') || "") : "";
-    
-    // If History Button was clicked, open the popup!
-    if (isReviewHistoryMode && opt && opt.value) {
-        showTeacherReviewHistoryPopup(opt.value, opt.getAttribute('data-name'));
-    }
+    const selectedOption = select.options[select.selectedIndex];
+    document.getElementById('rev-tname').value = selectedOption.dataset.name || "";
 }
 
-// 3. HISTORY Button Flow
-async function activateReviewHistoryMode() {
-    const roll = prompt("Enter Student Roll Number for History:");
-    if (!roll) return;
-    
-    document.getElementById('rev-roll').value = roll.toUpperCase();
-    await autopopulateReviewForm(); // Loads the teachers
-    
-    isReviewHistoryMode = true; // Activate popup mode
-    alert("Student loaded! Now select a Teacher from the dropdown to view their review history.");
-}
-
-// 4. The Popup Window
-// 4. The Popup Window
-async function showTeacherReviewHistoryPopup(tid, tname) {
-    const roll = document.getElementById('rev-roll').value.toUpperCase();
-
-    // FIXED: Fetch subject directly from STUDENTS table
-    const { data: stuData } = await db.from('students')
-        .select('course')
-        .eq('roll_number', roll)
-        .eq('institute_id', sessionInstID)
-        .maybeSingle();
-    
-    const subjectName = stuData && stuData.course ? stuData.course : "N/A";
-
-    // Fetch all reviews for this student & teacher
-    const { data: revs } = await db.from('reviews')
-        .select('*')
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid)
-        .eq('institute_id', sessionInstID)
-        .order('review_date', { ascending: false });
-
-    let rows = "";
-    if (revs && revs.length > 0) {
-        revs.forEach(r => {
-            rows += `
-                <tr>
-                    <td style="padding:10px; border:1px solid #000;">${r.review_date}</td>
-                    <td style="padding:10px; border:1px solid #000;">${subjectName}</td>
-                    <td style="padding:10px; border:1px solid #000; font-weight:bold; color:#d35400;">${r.rating}</td>
-                    <td style="padding:10px; border:1px solid #000;">${r.message}</td>
-                </tr>
-            `;
-        });
-    } else {
-        rows = `<tr><td colspan="4" style="padding:20px; text-align:center; font-style:italic;">No reviews found for this teacher.</td></tr>`;
-    }
-
-    const modalHtml = `
-        <div id="review-history-popup" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; display:flex; justify-content:center; align-items:center;">
-            <div style="background:white; padding:30px; border-radius:15px; width:90%; max-width:700px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif; border: 5px solid #f1c40f;">
-                <h2 style="margin-top:0; color:#000; border-bottom:2px solid #ccc; padding-bottom:10px;">TEACHER NAME : <span style="color:#2980b9;">${tname}</span></h2>
-                
-                <table style="width:100%; border-collapse:collapse; text-align:left; margin-top:20px;">
-                    <thead style="background:#eee; border:2px solid #000;">
-                        <tr>
-                            <th style="padding:10px; border:1px solid #000;">Date of Message</th>
-                            <th style="padding:10px; border:1px solid #000;">Course / Subject</th>
-                            <th style="padding:10px; border:1px solid #000;">Review Score</th>
-                            <th style="padding:10px; border:1px solid #000;">Message</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows}
-                    </tbody>
-                </table>
-                
-                <div style="text-align:center; margin-top:30px;">
-                    <button onclick="document.getElementById('review-history-popup').remove(); isReviewHistoryMode = false; document.getElementById('rev-tid').selectedIndex = 0; document.getElementById('rev-tname').value = '';" style="background:#ff0000; color:white; border:2px solid #000; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1.1rem; box-shadow: 0 4px 0px #990000;">CLOSE WINDOW</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const existing = document.getElementById('review-history-popup');
-    if (existing) existing.remove();
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-// 5. Add Review
-// 5. Add Review (With 1-Review-Per-Teacher Limit)
-// 5. Add Review (Strict 1-Review per Student per Teacher)
+// 3. Save Review for the specific selected teacher
 async function addTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
     const tid = document.getElementById('rev-tid').value;
-    const date = document.getElementById('rev-date').value;
     const score = parseFloat(document.getElementById('rev-score').value);
     
-    if(!roll || !tid || !date) return alert("Fill Roll No, Teacher, and Date.");
+    if(!tid) return alert("Please select a teacher from the dropdown.");
     if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
 
-    // STRICT CHECK: Does THIS student already have a review for THIS teacher?
-    const { data: existing } = await db.from('reviews')
-        .select('id')
-        .match({ 
-            student_roll: roll, 
-            teacher_id: tid, 
-            institute_id: sessionInstID 
-        })
-        .maybeSingle();
-
-    if (existing) {
-        return alert("ERROR: You have already submitted a review for this teacher!\n\nUse the 'UPDATE' button to modify your existing feedback.");
-    }
-
-    // If clean, insert the review
-    const { error } = await db.from('reviews').insert([{
+    const data = {
         institute_id: sessionInstID,
-        student_roll: roll,
+        student_roll: document.getElementById('rev-roll').value.toUpperCase(),
         student_name: document.getElementById('rev-sname').value,
         teacher_id: tid,
         teacher_name: document.getElementById('rev-tname').value,
         rating: score,
         message: document.getElementById('rev-msg').value,
-        review_date: date
-    }]);
+        review_date: document.getElementById('rev-date').value
+    };
 
-    if(error) alert("Save Error: " + error.message);
-    else alert("Review Saved Successfully!");
-}
-// 6. Update Review (TARGETS ONLY THE LAST RECORD)
-async function editTeacherReview() {
-    const roll = document.getElementById('rev-roll').value.trim().toUpperCase();
-    const tid = document.getElementById('rev-tid').value;
-    const date = document.getElementById('rev-date').value;
-    const score = parseFloat(document.getElementById('rev-score').value);
-
-    if(!roll || !tid || !date) return alert("Please fill Roll No, Teacher, and Date first.");
-    if(isNaN(score) || score > 5 || score < 0) return alert("Enter a valid rating between 0 and 5.");
-
-    // STEP 1: Find the exact ID of the LATEST record for this student & teacher
-    const { data: latestRecord, error: fetchErr } = await db.from('reviews')
-        .select('id')
-        .eq('student_roll', roll)
-        .eq('teacher_id', tid)
-        .eq('institute_id', sessionInstID)
-        .order('review_date', { ascending: false }) // Gets the newest one
-        .limit(1)
-        .maybeSingle();
-
-    if (fetchErr || !latestRecord) {
-        return alert("No existing review found to update. Please use the ADD REVIEW button first.");
+    const { error } = await db.from('reviews').insert([data]);
+    if(error) alert("Error: " + error.message);
+    else {
+        alert("Review Saved for " + data.teacher_name);
+        // Clear rating and message for next review
+        document.getElementById('rev-score').value = "";
+        document.getElementById('rev-msg').value = "";
     }
-
-    // STEP 2: Update ONLY that specific ID
-    const { error } = await db.from('reviews')
-        .update({
-            rating: score,
-            message: document.getElementById('rev-msg').value,
-            review_date: date // Updates to the new date!
-        })
-        .eq('id', latestRecord.id); // Targets ONLY the 1 last record!
-
-    if(error) alert("Update Error: " + error.message);
-    else alert("Success! Your latest review has been updated.");
 }
+
+// 3. FETCH Review
+async function fetchReviewByRoll() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const { data, error } = await db.from('reviews').select('*').eq('student_roll', roll).eq('institute_id', sessionInstID).maybeSingle();
+    
+    if(data) {
+        document.getElementById('rev-sname').value = data.student_name;
+        document.getElementById('rev-tid').value = data.teacher_id;
+        document.getElementById('rev-tname').value = data.teacher_name;
+        document.getElementById('rev-score').value = data.rating;
+        document.getElementById('rev-msg').value = data.message;
+        alert("Review loaded.");
+// ADD THIS LINE inside the success block of fetchReviewByRoll()
+document.getElementById('rev-date').value = data.review_date;
+    } else alert("No review found for this roll number.");
+}
+
+// 4. UPDATE Review
+async function editTeacherReview() {
+    const roll = document.getElementById('rev-roll').value.toUpperCase();
+    const score = parseFloat(document.getElementById('rev-score').value);
+    if(score > 5) return alert("Error: Score cannot exceed 5.");
+
+    const { error } = await db.from('reviews').update({
+        rating: score,
+        message: document.getElementById('rev-msg').value
+    }).eq('student_roll', roll).eq('institute_id', sessionInstID);
+
+    if(error) alert(error.message);
+    else alert("Review Updated successfully!");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* --- FORGOT PASSWORD & EMAIL RECOVERY LOGIC --- */
 
