@@ -1129,24 +1129,22 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
                     <option>COMPUTER SCIENCE</option>
                 </select>
             </div>
-            <div class="input-group" style="grid-column: 1 / -1; margin-top: 10px;">
-    <label style="font-weight:bold; color: #00796b;">Confirmed Timings (Fetched from Teacher Portal):</label>
-    <div id="batch-slots-display" style="
-        padding: 20px; 
+          <div class="input-group" style="grid-column: 1 / -1; margin-top: 10px;">
+    <label style="font-weight:bold; color: #00796b;">Select Batch Timing (Available slots from Teacher Portal):</label>
+    <!-- REPLACED DIV WITH SELECT -->
+    <select id="batch-slots-select" style="
+        padding: 15px; 
         background: #e0f2f1; 
-        border: 2px dashed #00796b; 
+        border: 2px solid #00796b; 
         border-radius: 12px; 
-        text-align: center; 
-        font-size: 1.2rem; 
+        font-size: 1.1rem; 
         font-weight: 900; 
         color: #004d40;
-        min-height: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        width: 100%;
+        cursor: pointer;
     ">
-        Select Teacher & Subject to view timings...
-    </div>
+        <option value="">-- Select Teacher & Subject First --</option>
+    </select>
 </div>
             <div class="input-group">
                 <label>Max Students Allotted</label>
@@ -3685,7 +3683,7 @@ async function addBatch() {
     }
 
     // 3. PROCEED TO INSERT
-    const displaySlots = document.getElementById('batch-slots-display').innerText;
+   const displaySlots = document.getElementById('batch-slots-select').value;
     const subject = document.getElementById('batch-subject').value;
 
     const batchData = {
@@ -3735,9 +3733,9 @@ async function fetchBatch() {
     document.getElementById('batch-remarks').value = data.remarks || "";
 
     // IMPORTANT: Update the 3D Display Box for Timings
-    const displayArea = document.getElementById('batch-slots-display');
-    displayArea.innerText = data.batch_time || "No timings saved";
-    displayArea.style.background = "#7FFFD4"; 
+  const slotDropdown = document.getElementById('batch-slots-select');
+slotDropdown.innerHTML = `<option value="${data.batch_time}">${data.batch_time}</option>`;
+slotDropdown.value = data.batch_time;
     
     alert("Batch details loaded!");
 }
@@ -3752,7 +3750,7 @@ async function updateBatch() {
     const batchData = {
         teacher_id: document.getElementById('batch-teacher-id').value,
         teacher_name: document.getElementById('batch-teacher-name').value,
-        batch_time: document.getElementById('batch-slots-display').innerText, // Read from display div
+     batch_time: document.getElementById('batch-slots-select').value,
         subject_name: document.getElementById('batch-subject').value,
         students_allotted: parseInt(document.getElementById('batch-students').value) || 0, // THIS FIELD
         remarks: document.getElementById('batch-remarks').value
@@ -3801,9 +3799,9 @@ async function fetchBatchByTeacher() {
     document.getElementById('batch-remarks').value = selection.remarks || "";
 
     // IMPORTANT: Update the 3D Display Box for Timings
-    const displayArea = document.getElementById('batch-slots-display');
-    displayArea.innerText = selection.batch_time || "No timings saved";
-    displayArea.style.background = "#7FFFD4";
+const slotDropdown = document.getElementById('batch-slots-select');
+slotDropdown.innerHTML = `<option value="${selection.batch_time}">${selection.batch_time}</option>`;
+slotDropdown.value = selection.batch_time;
 
     alert("Batch details loaded!");
 }
@@ -3874,12 +3872,11 @@ async function handleBatchTeacherChange() {
     const tid = document.getElementById('batch-teacher-id').value;
     const selectedSubject = document.getElementById('batch-subject').value.trim().toUpperCase();
     const nameInput = document.getElementById('batch-teacher-name');
-    const displayArea = document.getElementById('batch-slots-display');
+    const slotDropdown = document.getElementById('batch-slots-select');
 
     if (!tid) {
         nameInput.value = "";
-        displayArea.innerText = "Select Teacher & Subject to view timings...";
-        displayArea.style.background = "#e0f2f1";
+        slotDropdown.innerHTML = '<option value="">-- Select Teacher First --</option>';
         return;
     }
 
@@ -3891,54 +3888,58 @@ async function handleBatchTeacherChange() {
         .maybeSingle();
 
     if (error || !teacher) {
-        displayArea.innerText = "Error: Teacher ID not found.";
+        slotDropdown.innerHTML = '<option value="">Error: Teacher not found</option>';
         return;
     }
 
     nameInput.value = teacher.teacher_name;
 
-    // 2. Parse the timing map safely
+    // 2. Parse the timing map
     let slotMap = {};
     try {
         const rawData = teacher.time_of_slot;
         slotMap = (typeof rawData === 'string') ? JSON.parse(rawData) : rawData;
     } catch (e) {
-        console.error("JSON Parse Error:", e);
         slotMap = {};
     }
 
-    // 3. Logic to show relevant timings (Case-Insensitive Search)
-    if (teacher.availability === "No") {
-        displayArea.innerText = "TEACHER MARKED UNAVAILABLE IN PORTAL";
-        displayArea.style.background = "#ffebee";
-        displayArea.style.color = "#c62828";
-    } else {
-        // We search the keys of the map (Subjects) in Uppercase to avoid mismatches
-    let foundTiming = null;
-if (slotMap) {
-    // Standardize the search term
-    const searchSubject = selectedSubject.trim().toUpperCase();
-    
-    Object.keys(slotMap).forEach(key => {
-        // Standardize the key from the database
-        if (key.trim().toUpperCase() === searchSubject) {
-            foundTiming = slotMap[key];
-        }
-    });
-}
+    // 3. Logic to populate the Dropdown
+    slotDropdown.innerHTML = ""; // Clear existing
 
-        if (foundTiming) {
-            // SUCCESS
-            displayArea.innerText = foundTiming;
-            displayArea.style.background = "#7FFFD4"; 
-            displayArea.style.color = "#000";
-            displayArea.style.border = "2px solid #000";
+    if (teacher.availability === "No") {
+        let opt = document.createElement('option');
+        opt.text = "TEACHER UNAVAILABLE";
+        slotDropdown.appendChild(opt);
+        slotDropdown.style.background = "#ffebee";
+    } else {
+        const searchSubject = selectedSubject.trim().toUpperCase();
+        let foundTimingString = "";
+
+        // Find match in the map
+        if (slotMap) {
+            Object.keys(slotMap).forEach(key => {
+                if (key.trim().toUpperCase() === searchSubject) {
+                    foundTimingString = slotMap[key];
+                }
+            });
+        }
+
+        if (foundTimingString) {
+            // THE DYNAMIC PART: Split the string "09:00 AM to 10:00 AM, 11:00 AM to 12:00 PM"
+            const slotsArray = foundTimingString.split(',').map(s => s.trim());
+            
+            slotsArray.forEach(slot => {
+                let opt = document.createElement('option');
+                opt.value = slot;
+                opt.text = slot;
+                slotDropdown.appendChild(opt);
+            });
+            slotDropdown.style.background = "#7FFFD4";
         } else {
-            // FAIL
-            displayArea.innerText = "No slots found for [" + selectedSubject + "] in Teacher's Profile.";
-            displayArea.style.background = "#fff3e0";
-            displayArea.style.color = "#e65100";
-            console.log("Looking for:", selectedSubject, "Available keys:", Object.keys(slotMap || {}));
+            let opt = document.createElement('option');
+            opt.text = "No slots found for this subject in Teacher Profile";
+            slotDropdown.appendChild(opt);
+            slotDropdown.style.background = "#fff3e0";
         }
     }
 }
