@@ -3254,17 +3254,14 @@ async function openBatchPicker() {
         return;
     }
 
-    // 2. Flatten data (Safely extracts times so they always show)
+    // 2. Flatten data (One row per time slot)
     let rows = [];
     batches.forEach(b => {
-        let rawTime = b.batch_time || "N/A";
-        const times = rawTime.split(',').map(t => t.trim()).filter(t => t !== "");
-        if (times.length === 0) times.push("N/A");
-
+        const times = b.batch_time.split(',').map(t => t.trim());
         times.forEach(t => {
             rows.push({
-                subject: b.subject_name ? b.subject_name.toUpperCase() : "N/A",
-                teacher: b.teacher_name || "N/A",
+                subject: b.subject_name.toUpperCase(),
+                teacher: b.teacher_name || "N/A", // CAPTURE TEACHER NAME
                 time: t.toUpperCase(),
                 capacity: b.students_allotted || 0,
                 batchName: b.batch_name
@@ -3284,8 +3281,8 @@ async function openBatchPicker() {
         tbody.innerHTML += `
             <tr style="border-bottom: 2px solid #eee; height: 50px;">
                 <td style="padding:10px; font-weight:bold; border-right:1px solid #ddd;">${row.subject}</td>
-                <td style="padding:10px; border-right:1px solid #ddd; color: #555;">${row.teacher}</td>
-                <td style="padding:10px; border-right:1px solid #ddd; color: #007bff; font-weight:bold;">🕒 ${row.time}</td>
+                <td style="padding:10px; border-right:1px solid #ddd; color: #555;">${row.teacher}</td> <!-- DISPLAY TEACHER -->
+                <td style="padding:10px; border-right:1px solid #ddd;">${row.time}</td>
                 <td style="padding:10px; text-align:center; border-right:1px solid #ddd;">${enrolled} / ${row.capacity || '∞'}</td>
                 <td style="padding:10px; text-align:center; font-weight:bold; color:${isFull ? 'red':'green'}; border-right:1px solid #ddd;">
                     ${isFull ? 'NO' : 'YES'}
@@ -3764,9 +3761,6 @@ async function handleBatchTeacherChange() {
     const tid = tidSelect.value;
     const nameSelect = document.getElementById('batch-teacher-name');
     const timeSelect = document.getElementById('batch-time');
-    const subSelect = document.getElementById('batch-subject');
-    const studentsInput = document.getElementById('batch-students');
-    const remarksInput = document.getElementById('batch-remarks');
 
     if (!tid) {
         resetBatchFields();
@@ -3775,33 +3769,34 @@ async function handleBatchTeacherChange() {
 
     // Auto-fill Teacher Name Dropdown
     const selectedOpt = tidSelect.options[tidSelect.selectedIndex];
-    nameSelect.innerHTML = `<option value="${selectedOpt.dataset.name}">${selectedOpt.dataset.name}</option>`;
+    const tName = selectedOpt.dataset.name || "";
+    nameSelect.innerHTML = `<option value="${tName}">${tName}</option>`;
 
-    // If the batch name ALREADY EXISTS in the system
-    if (currentBatchesByName && currentBatchesByName.length > 0) {
-        const masterBatch = currentBatchesByName[0]; // All records for this batch share these properties
+    // Check if we are viewing an EXISTING batch record for this specific teacher
+    const existingBatch = currentBatchesByName.find(b => b.teacher_id === tid);
 
-        // LOCK Subject to the existing batch's subject
-        subSelect.innerHTML = `<option value="${masterBatch.subject_name}" selected>${masterBatch.subject_name}</option>`;
+    if (existingBatch) {
+        // EXACT MATCH FOUND: Lock fields to the exact saved batch details
+        document.getElementById('batch-subject').innerHTML = `<option value="${existingBatch.subject_name}" selected>${existingBatch.subject_name}</option>`;
         
-        // LOCK Time to the existing batch's time (Fixes missing times display)
-        timeSelect.innerHTML = `<option value="${masterBatch.batch_time}" selected>🕒 ${masterBatch.batch_time}</option>`;
+        // FIX: Display batch timings neatly broken down in the dropdown box
+        timeSelect.innerHTML = ''; 
+        const splitTimes = existingBatch.batch_time.split(',').map(t => t.trim()).filter(t => t !== "");
         
-        // DYNAMICALLY update Capacity based on the master batch
-        studentsInput.value = masterBatch.students_allotted || "";
-        remarksInput.value = masterBatch.remarks || "";
+        splitTimes.forEach(t => {
+            let opt = document.createElement('option');
+            opt.value = existingBatch.batch_time; // Keep full string as value so update doesn't erase data
+            opt.text = "🕒 " + t; // Add an icon for neatness
+            timeSelect.appendChild(opt);
+        });
 
-        // Check if THIS specific teacher is already saved in it
-        const existingTeacherRec = currentBatchesByName.find(b => b.teacher_id === tid);
-        if (existingTeacherRec) {
-            remarksInput.value = existingTeacherRec.remarks || ""; 
-        }
-    } 
-    else {
-        // BRAND NEW BATCH: Let them choose subject and time from scratch
+        document.getElementById('batch-students').value = existingBatch.students_allotted || "";
+        document.getElementById('batch-remarks').value = existingBatch.remarks || "";
+    } else {
+        // NEW BATCH FOR THIS TEACHER: Fetch their subjects and let user build it
         timeSelect.innerHTML = '<option value="">-- Select Subject First --</option>';
-        studentsInput.value = "";
-        remarksInput.value = "";
+        document.getElementById('batch-students').value = "";
+        document.getElementById('batch-remarks').value = "";
 
         const { data: teacher } = await db.from('teacher_details')
             .select('subject_taught')
@@ -3809,6 +3804,7 @@ async function handleBatchTeacherChange() {
             .eq('institute_id', sessionInstID)
             .maybeSingle();
         
+        const subSelect = document.getElementById('batch-subject');
         subSelect.innerHTML = '<option value="">-- Select Subject --</option>';
         if (teacher && teacher.subject_taught) {
             const subjects = teacher.subject_taught.split(',').map(s => s.trim().toUpperCase());
@@ -3855,32 +3851,21 @@ async function handleBatchSubjectChange() {
 }
 
 // 4. ADD BATCH
-// 4. ADD BATCH
 async function addBatch() {
     const tid = document.getElementById('batch-teacher-id').value;
     const bname = document.getElementById('batch-name').value.trim().toUpperCase();
     const timeVal = document.getElementById('batch-time').value;
-    const subVal = document.getElementById('batch-subject').value;
 
-    if (!bname || !tid || !timeVal || !subVal) return alert("Please complete Batch Name, Teacher, Subject, and Time Slot.");
+    if (!bname || !tid || !timeVal) return alert("Please complete Batch Name, Teacher, Subject, and Time Slot.");
 
-    // Check if this batch name already exists in the institute
+    // Check if this exact teacher already has this exact batch name created
     const { data: existingBatches } = await db.from('batches')
-        .select('subject_name, teacher_id')
+        .select('id')
         .eq('institute_id', sessionInstID)
+        .eq('teacher_id', tid)
         .eq('batch_name', bname);
 
-    if (existingBatches && existingBatches.length > 0) {
-        // Validation 1: Check if teacher is already in it
-        const teacherExists = existingBatches.find(b => b.teacher_id === tid);
-        if (teacherExists) return alert("THIS BATCH IS ALREADY CREATED FOR THIS TEACHER.");
-        
-        // Validation 2: Subject Clubbing Restriction
-        const lockedSubject = existingBatches[0].subject_name.toUpperCase();
-        if (subVal.toUpperCase() !== lockedSubject) {
-            return alert(`🛑 SUBJECT MISMATCH ERROR: \nThe batch "${bname}" is already dedicated to ${lockedSubject}.\nTwo teachers teaching different subjects cannot be clubbed in the same batch.`);
-        }
-    }
+    if (existingBatches && existingBatches.length > 0) return alert("THIS BATCH IS ALREADY CREATED FOR THIS TEACHER.");
 
     const batchData = {
         institute_id: sessionInstID,
@@ -3888,7 +3873,7 @@ async function addBatch() {
         teacher_id: tid,
         teacher_name: document.getElementById('batch-teacher-name').value,
         batch_time: timeVal,
-        subject_name: subVal,
+        subject_name: document.getElementById('batch-subject').value,
         students_allotted: parseInt(document.getElementById('batch-students').value) || 0,
         remarks: document.getElementById('batch-remarks').value
     };
@@ -3901,6 +3886,7 @@ async function addBatch() {
         autopopulateBatchByName(); // Refresh memory to instantly lock the newly created batch
     }
 }
+
 // 5. UPDATE BATCH (Uses Teacher ID + Batch Name safely)
 async function updateBatch() {
     const batchName = document.getElementById('batch-name').value.trim().toUpperCase();
