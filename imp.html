@@ -10234,17 +10234,46 @@ window.bm2AllTeachers = [];
 
 // 2. THIS HOOKS INTO YOUR TAB CLICK. IT WILL NOT FIRE UNTIL YOU ARE LOGGED IN.
 window.loadBatchTeacherDropdown = async function() {
-    if (!sessionInstID) return; // Failsafe
-    
-    const { data } = await db.from('teacher_details')
-        .select('id, teacher_name, subject_taught, time_of_slot')
-        .eq('institute_id', sessionInstID)
-        .eq('status', 'Active');
-        
-    window.bm2AllTeachers = data || [];
-    bm2RenderTeachers(window.bm2AllTeachers);
-};
+    if (!sessionInstID) return;
 
+    // Identify current user
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+
+    const tidSelect = document.getElementById('bm2-tid');
+    const tnameInput = document.getElementById('bm2-tname');
+
+    if (profile.role === 'Teacher') {
+        // --- TEACHER VIEW: FETCH ONLY SELF DATA ---
+        const { data: selfData } = await db.from('teacher_details')
+            .select('id, teacher_name, subject_taught, time_of_slot')
+            .eq('email', profile.email)
+            .eq('institute_id', sessionInstID)
+            .maybeSingle();
+
+        if (selfData) {
+            window.bm2AllTeachers = [selfData]; 
+            tidSelect.innerHTML = `<option value="${selfData.id}">${selfData.id} - ${selfData.teacher_name}</option>`;
+            tidSelect.disabled = true; // Visual lock for professional UI
+            tnameInput.value = selfData.teacher_name;
+            
+            // Trigger UI population for the locked teacher
+            bm2SyncTeacher(); 
+        } else {
+            alert("Error: Teacher profile not found for this account.");
+        }
+    } else {
+        // --- OWNER VIEW: SHOW ALL ACTIVE TEACHERS ---
+        tidSelect.disabled = false; 
+        const { data: allData } = await db.from('teacher_details')
+            .select('id, teacher_name, subject_taught, time_of_slot')
+            .eq('institute_id', sessionInstID)
+            .eq('status', 'Active');
+
+        window.bm2AllTeachers = allData || [];
+        bm2RenderTeachers(window.bm2AllTeachers);
+    }
+};
 // 3. RENDER UNIQUE TEACHERS ONLY
 window.bm2RenderTeachers = function(teacherList) {
     const sel = document.getElementById('bm2-tid');
@@ -10366,31 +10395,58 @@ window.bm2Add = async function() {
     const stu = parseInt(document.getElementById('bm2-stu').value) || 0;
     const rem = document.getElementById('bm2-rem').value;
     
+    // Time slot validation
     const timeOpts = Array.from(document.getElementById('bm2-time').options).map(o => o.value).filter(v => v);
     const timeVal = timeOpts.join(', ');
 
-    if (!bname || !sub || !tid || timeOpts.length === 0) return alert("Please fill Batch Name, Subject, Teacher ID, and ensure Time is loaded.");
+    // Validation 1: Required Fields
+    if (!bname || !sub || !tid || timeOpts.length === 0) {
+        return alert("Error: Please fill Batch Name, Subject, and ensure Time is loaded.");
+    }
     
-    // Validation 1: Max 15 students
-    if (stu > 15) return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
-
-    // Validation 2: Cross matching
-    const { data: existSub } = await db.from('batches').select('subject_name').eq('batch_name', bname).eq('institute_id', sessionInstID).limit(1).maybeSingle();
-    if (existSub && existSub.subject_name.toUpperCase() !== sub.toUpperCase()) {
-        return alert(`🛑 CROSS-MATCH ERROR:\nBatch "${bname}" is already locked to Subject "${existSub.subject_name}". You cannot add a teacher teaching ${sub} to this batch.`);
+    // Validation 2: Maximum 15 Students (Business Rule)
+    if (stu > 15) {
+        return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
     }
 
-    // Validation 3: Duplicate entry
-    const { data: existTch } = await db.from('batches').select('id').eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID).maybeSingle();
-    if (existTch) return alert("🛑 ERROR: This Teacher is already added to this Batch.");
+    // Validation 3: Cross-Match Subject Check
+    // Prevents "Batch A" being Algebra for one teacher and Physics for another
+    const { data: existSub } = await db.from('batches').select('subject_name')
+        .eq('batch_name', bname).eq('institute_id', sessionInstID).limit(1).maybeSingle();
+        
+    if (existSub && existSub.subject_name.toUpperCase() !== sub.toUpperCase()) {
+        return alert(`🛑 CROSS-MATCH ERROR:\nBatch "${bname}" is already locked to Subject "${existSub.subject_name}". You cannot add a different subject to this batch name.`);
+    }
 
-    const payload = { institute_id: sessionInstID, batch_name: bname, teacher_id: tid, teacher_name: tname, subject_name: sub, batch_time: timeVal, students_allotted: stu, remarks: rem };
+    // Validation 4: Duplicate Entry Check
+    const { data: existTch } = await db.from('batches').select('id')
+        .eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID).maybeSingle();
+        
+    if (existTch) {
+        return alert("🛑 ERROR: You have already created this batch record.");
+    }
+
+    // Execution: Final Data Payload
+    const payload = { 
+        institute_id: sessionInstID, 
+        batch_name: bname, 
+        teacher_id: tid, 
+        teacher_name: tname, 
+        subject_name: sub, 
+        batch_time: timeVal, 
+        students_allotted: stu, 
+        remarks: rem 
+    };
     
     const { error } = await db.from('batches').insert([payload]);
-    if (error) alert("Database Error: " + error.message); 
-    else { 
+    if (error) {
+        alert("Database Error: " + error.message);
+    } else { 
         alert("Batch Added Successfully!"); 
-        bm2FilterTeachers(); // Refresh UI dynamically 
+        // Refresh filter logic only if Owner (to see the new entry)
+        const { data: { user } } = await db.auth.getUser();
+        const { data: prof } = await db.from('profiles').select('role').eq('id', user.id).single();
+        if (prof && prof.role === 'Owner') bm2FilterTeachers(); 
     }
 };
 
