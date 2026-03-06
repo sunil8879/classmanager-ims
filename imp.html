@@ -6362,20 +6362,22 @@ if (!document.getElementById('alloc-tbatch').selectedOptions[0].text.toUpperCase
         alert("Linked Successfully!");
 
         // --- CORRECTED AUTO-SYNC TO SECTION 25 ---
-        const listSync = {
-            institute_id: sessionInstID,
-            date_today: new Date().toISOString().split('T')[0],
-            roll_number: data.roll_number,
-            student_name: data.student_name,
-            course_name: data.subject,
-            teacher_id: data.teacher_id,
-            teacher_name: data.teacher_name,
-            batch_name: data.batch_name,
-            remarks: "Auto-synced from Sec 18"
-        };
+     // ... after alert("Linked Successfully!"); ...
 
-        await db.from('list').upsert([listSync], { onConflict: 'roll_number, batch_name' });
-        console.log("Batch Master automatically synced.");
+const listSync = {
+    institute_id: sessionInstID,
+    date_today: new Date().toISOString().split('T')[0],
+    roll_number: data.roll_number.trim().toUpperCase(),
+    student_name: data.student_name.trim(),
+    course_name: data.subject.trim(),
+    teacher_id: data.teacher_id.trim().toUpperCase(),
+    teacher_name: data.teacher_name.trim(),
+    batch_name: data.batch_name.trim(),
+    remarks: "Auto-synced from Sec 18"
+};
+
+// THIS IS THE PART THAT NEEDS THE SQL RULE TO WORK
+await db.from('list').upsert([listSync], { onConflict: 'roll_number, batch_name' });
     }
 }
 // 4. View all students assigned to a specific teacher
@@ -8559,25 +8561,20 @@ if (!document.getElementById('bm-course').value.toUpperCase().includes(document.
 // --- CORRECTED AUTO-SYNC TO SECTION 18 ---
     // --- ROBUST AUTO-SYNC TO SECTION 18 ---
       // --- 4. ROBUST AUTO-SYNC TO SECTION 18 ---
-        const syncData = {
-            institute_id: sessionInstID,
-            teacher_id: teacherId.trim().toUpperCase(),
-            teacher_name: document.getElementById('bm-tname').value.trim(), 
-            roll_number: roll.trim().toUpperCase(),
-            student_name: studentName.trim(),
-            subject: document.getElementById('bm-course').value.trim(),
-            batch_name: batchName.trim()
-        };
+// ... after listAllByBatch(); ...
 
-        // This sends the data to Section 18. 
-        // IMPORTANT: We use 'insert' here if 'upsert' is failing Test 1.
-        const { error: syncErr } = await db.from('student_allocations').upsert([syncData], { onConflict: 'roll_number, teacher_id' });
+const syncData = {
+    institute_id: sessionInstID,
+    teacher_id: teacherId.trim().toUpperCase(),
+    teacher_name: document.getElementById('bm-tname').value.trim(), 
+    roll_number: roll.trim().toUpperCase(),
+    student_name: studentName.trim(),
+    subject: document.getElementById('bm-course').value.trim(),
+    batch_name: batchName.trim()
+};
 
-        if (syncErr) {
-            console.error("Sync Error Details:", syncErr.message);
-        } else {
-            console.log("Section 18 successfully updated for: " + studentName);
-        }
+// THIS IS THE PART THAT NEEDS THE SQL RULE TO WORK
+await db.from('student_allocations').upsert([syncData], { onConflict: 'roll_number, teacher_id' });
 }}
 
 // 5. FETCH RECORD (By Roll Number)
