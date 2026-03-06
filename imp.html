@@ -9439,6 +9439,20 @@ function calculateLeaveDays() {
 
 // 4. Validate Rules & Save Record
 async function validateAndAddLeave() {
+// ADDED: Duplicate Prevention Check
+const checkTid = document.getElementById('lv-tid').value.toUpperCase();
+const checkStart = document.getElementById('lv-start').value;
+
+const { data: alreadyExists } = await db.from('leave_management')
+    .select('id')
+    .eq('teacher_id', checkTid)
+    .eq('start_date', checkStart)
+    .eq('institute_id', sessionInstID)
+    .maybeSingle();
+
+if (alreadyExists) {
+    return alert("🛑 DUPLICATE ERROR: A leave request for this teacher starting on this date already exists.\n\nTo change the status, please use the 'FETCH' and 'UPDATE' buttons instead of 'ADD'.");
+}
     const tid = document.getElementById('lv-tid').value.toUpperCase();
     const tname = document.getElementById('lv-tname').value;
     const start = document.getElementById('lv-start').value;
