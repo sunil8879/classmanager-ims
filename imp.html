@@ -4896,13 +4896,17 @@ async function loadReminders() {
    BI REPORT: LEADS & CONVERSION ANALYTICS
    ========================================== */
 
+/* ==========================================
+   SECTION 7 BI REPORT: LEADS & CONVERSION (DYNAMIC)
+   ========================================== */
+
 async function generateLeadsReport() {
     let monthInput = document.getElementById('rep-leads-month').value.trim().toUpperCase(); 
     if (!monthInput) return alert("Please select a Month & Year.");
 
-    // 1. DATE PARSING & DYNAMIC END-DAY CALCULATION
+    // --- POINT 1: PARSING MONTH & YEAR ---
     let year, monthNum, monthYearLabel;
-    const months = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+    const monthsUpper = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
     if (monthInput.includes('-')) {
         const parts = monthInput.split('-');
@@ -4911,73 +4915,125 @@ async function generateLeadsReport() {
     } else {
         const parts = monthInput.split(' ');
         year = parseInt(parts[1]);
-        monthNum = months.indexOf(parts[0]) + 1;
+        monthNum = monthsUpper.indexOf(parts[0]) + 1;
     }
 
     if (isNaN(year) || monthNum < 1) return alert("Invalid Date Format.");
 
-    // Calculate exact last day of this specific month (handles Leap Years too)
+    // Calculate Dynamic Date Bounds
     const lastDay = new Date(year, monthNum, 0).getDate(); 
-    
-    // Format for Supabase query (YYYY-MM-DD)
     const mStr = monthNum.toString().padStart(2, '0');
     const startDate = `${year}-${mStr}-01`;
-    const endDate = `${year}-${mStr}-${lastDay}`; // Dynamically sets 28, 30, or 31
+    const endDate = `${year}-${mStr}-${lastDay}`;
 
-    // Label for Payment History lookup (e.g. "February 2026")
-    const properMonth = months[monthNum-1].charAt(0) + months[monthNum-1].slice(1).toLowerCase();
-    monthYearLabel = `${properMonth} ${year}`;
+    // Month Label (e.g. "February 2026")
+    const properMonthName = monthsUpper[monthNum-1].charAt(0) + monthsUpper[monthNum-1].slice(1).toLowerCase();
+    monthYearLabel = `${properMonthName} ${year}`;
 
     try {
-        // 2. FETCH DATA
+        // --- FETCHING DATA ---
         const { data: leads, error: leadErr } = await db.from('leads')
-            .select('*')
-            .eq('institute_id', sessionInstID)
-            .gte('date_of_visit', startDate)
-            .lte('date_of_visit', endDate);
+            .select('*').eq('institute_id', sessionInstID).gte('date_of_visit', startDate).lte('date_of_visit', endDate);
 
         const { data: exp } = await db.from('expenses')
-            .select('marketing')
-            .eq('month_year', `${year}-${mStr}`)
-            .eq('institute_id', sessionInstID)
-            .maybeSingle();
+            .select('marketing').eq('month_year', `${year}-${mStr}`).eq('institute_id', sessionInstID).maybeSingle();
 
         const { data: revenue } = await db.from('payment_history')
-            .select('amount')
-            .eq('month_year', monthYearLabel)
-            .eq('institute_id', sessionInstID);
+            .select('amount').eq('month_year', monthYearLabel).eq('institute_id', sessionInstID);
 
         if (leadErr) throw leadErr;
 
-        // 3. CALCULATIONS
+        // --- CORE CALCULATIONS ---
+        
+        // Point 2: Total Leads
         const totalLeads = leads ? leads.length : 0;
+
+        // Point 3: Total Converted
         const convertedLeads = leads ? leads.filter(l => l.status === 'Converted').length : 0;
-        const convRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : 0;
-        const marketingCost = exp ? parseFloat(exp.marketing || 0) : 0;
+
+        // Point 4: Conversion %
+        const conversionPct = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : 0;
+
+        // Point 5 & 6: Mode Logic (Best Selling Course & Source)
+        const getMode = (arr) => {
+            const validItems = arr.filter(v => v && v !== "" && v !== "null");
+            if (validItems.length === 0) return "N/A";
+            const counts = {};
+            validItems.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+            return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        };
+        const bestSellingCourse = getMode(leads ? leads.map(l => l.interested_course) : []);
+        const bestReferenceSource = getMode(leads ? leads.map(l => l.reference) : []);
+
+        // Marketing Data for Point 7, 8, 9
+        const totalMarketingCost = exp ? parseFloat(exp.marketing || 0) : 0;
         const totalRevenue = revenue ? revenue.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0) : 0;
 
-        const cpl = totalLeads > 0 ? (marketingCost / totalLeads).toFixed(0) : 0;
-        const cpa = convertedLeads > 0 ? (marketingCost / convertedLeads).toFixed(0) : 0;
-        const rpl = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(0) : 0;
+        // Point 7: CPL (Marketing Cost / Total Leads)
+        const cpl = totalLeads > 0 ? (totalMarketingCost / totalLeads).toFixed(2) : 0;
 
-        // 4. DISPLAY
-        document.getElementById('rep-title').innerText = `Leads Analytics: ${monthYearLabel}`;
+        // Point 8: CPA (Marketing Cost / Conversions)
+        const cpa = convertedLeads > 0 ? (totalMarketingCost / convertedLeads).toFixed(2) : 0;
+
+        // Point 9: Revenue Per Lead (Total Revenue / Total Leads)
+        const rpl = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(2) : 0;
+
+        // Point 10: Remarks Logic
+        let remarksText = "";
+        let color = "#000";
+
+        if (totalLeads === 0) {
+            remarksText = "No enquiries recorded for this period.";
+        } else if (conversionPct >= 70) {
+            remarksText = "Outstanding Performance!"; color = "green";
+        } else if (conversionPct >= 45) {
+            remarksText = "Excellent system and follow-up."; color = "#27ae60";
+        } else if (conversionPct >= 35) {
+            remarksText = "Very good conversion health."; color = "#2980b9";
+        } else if (conversionPct >= 25) {
+            remarksText = "Healthy overall conversion."; color = "#f39c12";
+        } else if (conversionPct < 20) {
+            remarksText = "Something is wrong: Check Pricing, Counsellor skills, or Follow-up urgency."; color = "red";
+        } else {
+            remarksText = "Stable conversion rate."; color = "#555";
+        }
+
+        // --- FINAL RENDERING (PRESERVING YOUR EXACT 10-POINT FORMAT) ---
+        document.getElementById('rep-title').innerText = `Leads & Conversion BI Report`;
+        document.getElementById('rep-summary-text').innerHTML = `Marketing Effectiveness Analysis for <b>${sessionInstID}</b>`;
+        
+        document.getElementById('rep-table-head').innerHTML = `
+            <tr style="background:#000; color:#fff;">
+                <th style="padding:10px;">ID</th>
+                <th style="padding:10px;">Analytics Category</th>
+                <th style="padding:10px;">Data Results</th>
+            </tr>`;
+
         document.getElementById('rep-table-body').innerHTML = `
-            <tr><td>Total Leads (Enquiries)</td><td>${totalLeads}</td></tr>
-            <tr><td>Conversions (Admissions)</td><td style="color:green;">${convertedLeads}</td></tr>
-            <tr style="background:#e0f2f1;"><td><b>Conversion Rate</b></td><td><b>${convRate}%</b></td></tr>
-            <tr><td>Marketing Cost</td><td>₹ ${marketingCost}</td></tr>
-            <tr><td>Cost Per Lead (CPL)</td><td>₹ ${cpl}</td></tr>
-            <tr style="background:#fff8e1;"><td><b>Cost Per Acquisition (CPA)</b></td><td><b>₹ ${cpa}</b></td></tr>
-            <tr><td>Revenue Per Lead</td><td>₹ ${rpl}</td></tr>
+            <tr><td>1</td><td><b>Month & Year</b></td><td>${monthYearLabel}</td></tr>
+            <tr><td>2</td><td><b>Total Enquiries & Walk-ins (Leads)</b></td><td>${totalLeads}</td></tr>
+            <tr><td>3</td><td><b>Total Converted Admissions</b></td><td style="color:green; font-weight:bold;">${convertedLeads}</td></tr>
+            <tr style="background:#e0f2f1;"><td>4</td><td><b>Conversion Percentage (%)</b></td><td style="font-size:1.2rem; font-weight:900;">${conversionPct}%</td></tr>
+            <tr><td>5</td><td><b>Best Selling Course</b></td><td style="color:#673ab7; font-weight:bold;">${bestSellingCourse}</td></tr>
+            <tr><td>6</td><td><b>Best Selling Reference Source</b></td><td style="color:#007bff; font-weight:bold;">${bestReferenceSource}</td></tr>
+            <tr><td>7</td><td><b>Cost Per Lead (CPL)</b></td><td>₹ ${cpl}</td></tr>
+            <tr style="background:#fff8e1;"><td>8</td><td><b>Cost Per Acquisition (CPA)</b></td><td style="font-weight:bold; color:#d35400;">₹ ${cpa}</td></tr>
+            <tr><td>9</td><td><b>Revenue Per Lead (RPL)</b></td><td style="color:green; font-weight:bold;">₹ ${rpl}</td></tr>
+            <tr style="background:#f9f9f9; border-top:2px solid #000;">
+                <td>10</td>
+                <td><b>ADMIN REMARKS</b></td>
+                <td style="color:${color}; font-weight:bold; font-size:1rem;">${remarksText}</td>
+            </tr>
         `;
 
+        // UI Clean up
         document.getElementById('report-output-area').style.display = 'block';
         document.getElementById('chart_div').style.display = 'none';
         document.getElementById('filter_div').style.display = 'none';
+        document.getElementById('rep-stats-boxes').innerHTML = "";
 
     } catch (err) {
-        alert("Lead Report Error: " + err.message);
+        alert("Lead BI Report Error: " + err.message);
     }
 }
 /* ==========================================
