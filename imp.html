@@ -4950,7 +4950,8 @@ async function generateLeadsReport() {
         const totalLeads = leads ? leads.length : 0;
 
         // Point 3: Total Converted
-        const convertedLeads = leads ? leads.filter(l => l.status === 'Converted').length : 0;
+    // This counts the lead if the status is "Converted", "CONVERTED", or even "Converted " with a space
+const convertedLeads = leads ? leads.filter(l => l.status && l.status.toString().trim().toUpperCase() === 'CONVERTED').length : 0;
 
         // Point 4: Conversion %
         const conversionPct = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : 0;
