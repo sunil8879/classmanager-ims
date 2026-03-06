@@ -4900,29 +4900,33 @@ async function generateLeadsReport() {
     let monthInput = document.getElementById('rep-leads-month').value.trim().toUpperCase(); 
     if (!monthInput) return alert("Please select a Month & Year.");
 
-    // 1. ROBUST DATE PARSING (Handles "2026-02" OR "FEBRUARY 2026")
+    // 1. DATE PARSING & DYNAMIC END-DAY CALCULATION
     let year, monthNum, monthYearLabel;
     const months = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
     if (monthInput.includes('-')) {
-        // Handle standard YYYY-MM
         const parts = monthInput.split('-');
-        year = parts[0];
-        monthNum = parts[1];
+        year = parseInt(parts[0]);
+        monthNum = parseInt(parts[1]);
     } else {
-        // Handle "FEBRUARY 2026" caused by the Standardizer
         const parts = monthInput.split(' ');
-        year = parts[1];
-        monthNum = (months.indexOf(parts[0]) + 1).toString().padStart(2, '0');
+        year = parseInt(parts[1]);
+        monthNum = months.indexOf(parts[0]) + 1;
     }
 
-    // Label for Payment History (e.g., "February 2026")
-    const properMonth = months[parseInt(monthNum)-1].charAt(0) + months[parseInt(monthNum)-1].slice(1).toLowerCase();
-    monthYearLabel = `${properMonth} ${year}`;
+    if (isNaN(year) || monthNum < 1) return alert("Invalid Date Format.");
 
-    // Standard database dates for the Leads table
-    const startDate = `${year}-${monthNum}-01`;
-    const endDate = `${year}-${monthNum}-31`;
+    // Calculate exact last day of this specific month (handles Leap Years too)
+    const lastDay = new Date(year, monthNum, 0).getDate(); 
+    
+    // Format for Supabase query (YYYY-MM-DD)
+    const mStr = monthNum.toString().padStart(2, '0');
+    const startDate = `${year}-${mStr}-01`;
+    const endDate = `${year}-${mStr}-${lastDay}`; // Dynamically sets 28, 30, or 31
+
+    // Label for Payment History lookup (e.g. "February 2026")
+    const properMonth = months[monthNum-1].charAt(0) + months[monthNum-1].slice(1).toLowerCase();
+    monthYearLabel = `${properMonth} ${year}`;
 
     try {
         // 2. FETCH DATA
@@ -4934,7 +4938,7 @@ async function generateLeadsReport() {
 
         const { data: exp } = await db.from('expenses')
             .select('marketing')
-            .eq('month_year', `${year}-${monthNum}`) // Try numerical match
+            .eq('month_year', `${year}-${mStr}`)
             .eq('institute_id', sessionInstID)
             .maybeSingle();
 
@@ -4949,7 +4953,6 @@ async function generateLeadsReport() {
         const totalLeads = leads ? leads.length : 0;
         const convertedLeads = leads ? leads.filter(l => l.status === 'Converted').length : 0;
         const convRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : 0;
-        
         const marketingCost = exp ? parseFloat(exp.marketing || 0) : 0;
         const totalRevenue = revenue ? revenue.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0) : 0;
 
@@ -4957,24 +4960,15 @@ async function generateLeadsReport() {
         const cpa = convertedLeads > 0 ? (marketingCost / convertedLeads).toFixed(0) : 0;
         const rpl = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(0) : 0;
 
-        const getMode = (arr) => {
-            const validItems = arr.filter(v => v && v !== "" && v !== "null");
-            if (validItems.length === 0) return "N/A";
-            const counts = {};
-            validItems.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
-            return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-        };
-
-        // 4. DISPLAY RESULT
+        // 4. DISPLAY
         document.getElementById('rep-title').innerText = `Leads Analytics: ${monthYearLabel}`;
-        document.getElementById('rep-table-head').innerHTML = `<tr><th>Metric</th><th>Data</th></tr>`;
         document.getElementById('rep-table-body').innerHTML = `
-            <tr><td>Total Leads</td><td>${totalLeads}</td></tr>
-            <tr><td>Conversions</td><td style="color:green;">${convertedLeads}</td></tr>
+            <tr><td>Total Leads (Enquiries)</td><td>${totalLeads}</td></tr>
+            <tr><td>Conversions (Admissions)</td><td style="color:green;">${convertedLeads}</td></tr>
             <tr style="background:#e0f2f1;"><td><b>Conversion Rate</b></td><td><b>${convRate}%</b></td></tr>
             <tr><td>Marketing Cost</td><td>₹ ${marketingCost}</td></tr>
             <tr><td>Cost Per Lead (CPL)</td><td>₹ ${cpl}</td></tr>
-            <tr style="background:#fff8e1;"><td><b>Cost Per Admission (CPA)</b></td><td><b>₹ ${cpa}</b></td></tr>
+            <tr style="background:#fff8e1;"><td><b>Cost Per Acquisition (CPA)</b></td><td><b>₹ ${cpa}</b></td></tr>
             <tr><td>Revenue Per Lead</td><td>₹ ${rpl}</td></tr>
         `;
 
