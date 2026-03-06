@@ -2506,6 +2506,9 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
             <button class="btn-add" onclick="addBatchMasterRecord()">ADD RECORD</button>
             <button class="btn-fetch" onclick="fetchBatchMasterRecord()">FETCH (By Roll No)</button>
             <button class="btn-fetch" style="background:#8e44ad;" onclick="listAllByBatch()">LIST STUDENTS (By Batch)</button>
+<button class="btn-fetch" style="background:#2c3e50;" onclick="listAllTimeBatches()">
+    <i class="fas fa-history"></i> LIST ALL TIME BATCHES
+</button>
             <button class="btn-edit" style="background:#666;" onclick="clearBatchMaster()">CLEAR</button>
         </div>
         <!-- ... rest of the table code remains same ... -->
@@ -8631,6 +8634,114 @@ async function deleteBatchMasterRecord(recordId, studentName) {
             title.innerText = title.innerText.replace(currentCount, currentCount - 1);
         }
     }
+}
+
+
+
+/* ==========================================
+   SECTION 25 ADDITION: LIST ALL TIME BATCHES
+   ========================================== */
+
+async function listAllTimeBatches() {
+    // 1. Fetch all student records from the 'list' table
+    const { data: roster, error: rErr } = await db.from('list')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .order('batch_name', { ascending: true });
+
+    // 2. Fetch all batch metadata (to get allotted capacity and time)
+    const { data: batchMeta, error: bErr } = await db.from('batches')
+        .select('batch_name, teacher_id, students_allotted, batch_time')
+        .eq('institute_id', sessionInstID);
+
+    if (rErr || bErr) return alert("Error fetching data: " + (rErr?.message || bErr?.message));
+    if (!roster || roster.length === 0) return alert("No batches found in the Master Roster.");
+
+    // 3. Process Logic: Count students per batch to determine Status
+    const enrollmentCount = {};
+    roster.forEach(r => {
+        const key = r.batch_name + "|" + r.teacher_id;
+        enrollmentCount[key] = (enrollmentCount[key] || 0) + 1;
+    });
+
+    // 4. Build the Table Rows
+    let tableRows = "";
+    roster.forEach(row => {
+        // Find matching metadata
+        const meta = batchMeta.find(m => m.batch_name === row.batch_name && m.teacher_id === row.teacher_id);
+        const allotted = meta ? meta.students_allotted : 0;
+        const time = meta ? meta.batch_time : "N/A";
+        
+        // Month & Year parsing from date_today
+        let mYear = "N/A";
+        if (row.date_today) {
+            const d = new Date(row.date_today);
+            mYear = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+        }
+
+        // Status Logic: If enrolled >= allotted, it's CLOSED
+        const currentTotal = enrollmentCount[row.batch_name + "|" + row.teacher_id] || 0;
+        const status = (allotted > 0 && currentTotal >= allotted) ? 
+            '<span style="color:red; font-weight:bold;">CLOSED (FULL)</span>' : 
+            '<span style="color:green; font-weight:bold;">OPEN</span>';
+
+        tableRows += `
+            <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding:10px; border:1px solid #ccc;">${mYear}</td>
+                <td style="padding:10px; border:1px solid #ccc; font-weight:bold;">${row.batch_name}</td>
+                <td style="padding:10px; border:1px solid #ccc;">${row.course_name || 'N/A'}</td>
+                <td style="padding:10px; border:1px solid #ccc; font-size:0.8rem;">${time}</td>
+                <td style="padding:10px; border:1px solid #ccc;">${row.student_name}</td>
+                <td style="padding:10px; border:1px solid #ccc;">${row.roll_number}</td>
+                <td style="padding:10px; border:1px solid #ccc;">${row.teacher_id}</td>
+                <td style="padding:10px; border:1px solid #ccc;">${row.teacher_name}</td>
+                <td style="padding:10px; border:1px solid #ccc; text-align:center;">${status}</td>
+                <td style="padding:10px; border:1px solid #ccc; text-align:center;">${allotted}</td>
+                <td style="padding:10px; border:1px solid #ccc; text-align:center;">
+                    <button onclick="deleteBatchMasterRecord('${row.id}', '${row.student_name}')" style="background:none; border:none; color:red; cursor:pointer;">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    // 5. Generate Popup Overlay
+    const modalHtml = `
+        <div id="all-time-batch-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; display:flex; justify-content:center; align-items:center;">
+            <div style="background:white; padding:20px; border-radius:15px; width:98%; max-width:1300px; max-height:90vh; overflow-y:auto; font-family:'Times New Roman', serif;">
+                <h2 style="text-align:center; text-decoration:underline; color:#000;">INSTITUTE MASTER ROSTER (ALL TIME)</h2>
+                <p style="text-align:center; font-weight:bold;">Sorted by Batch Name (A-Z)</p>
+                
+                <table style="width:100%; border-collapse:collapse; margin-top:20px; font-size:0.85rem; color:#000;" border="1">
+                    <thead style="background:#eee; position:sticky; top:0;">
+                        <tr>
+                            <th>Month & Year</th>
+                            <th>Batch Name</th>
+                            <th>Course Name</th>
+                            <th>Batch Time</th>
+                            <th>Student Name</th>
+                            <th>Roll No</th>
+                            <th>Teacher ID</th>
+                            <th>Teacher Name</th>
+                            <th>Status</th>
+                            <th>Allotted</th>
+                            <th>Del</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+                
+                <div style="text-align:center; margin-top:30px;">
+                    <button onclick="document.getElementById('all-time-batch-overlay').remove()" style="padding:15px 40px; background:#ff0000; color:white; font-weight:bold; border:2px solid #000; border-radius:8px; cursor:pointer;">CLOSE MASTER LIST</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const existing = document.getElementById('all-time-batch-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 
