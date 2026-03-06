@@ -637,15 +637,22 @@ input, select, textarea {
 
 
 
-/* --- TITLE COLOR ADJUSTMENT --- */
+/* --- 100% SOLID WHITE TITLE --- */
 .main-title {
-    /* Changing the top half from Red to White */
-    background: linear-gradient(to bottom,  #7FFFD4 50%, #ffffff 50%) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
+    background: none !important; /* Removes the gradient */
+    -webkit-background-clip: unset !important; /* Removes the clipping effect */
+    -webkit-text-fill-color: #000000 !important; /* Sets color to Pure black */
+    color: #000000 !important;
     
-    /* Strengthening the shadow so the White part is visible against the White background */
-    filter: drop-shadow(2px 2px 0px #888) drop-shadow(4px 4px 10px rgba(0,0,0,0.5)) !important;
+    /* Strong Black shadows to make the black letters pop off the screen */
+    filter: drop-shadow(2px 2px 0px #000000) drop-shadow(4px 4px 5px rgba(0,0,0,0.5)) !important;
+    
+    text-transform: uppercase;
+    font-weight: 900;
+
+border-bottom: 4px solid #000000 !important; /* The thick black line */
+padding-bottom: 10px !important;            /* Space between text and line */
+display: inline-block !important;           /* Limits the line to text width only */
 }
 
 
