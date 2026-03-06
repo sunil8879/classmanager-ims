@@ -4936,8 +4936,11 @@ async function generateLeadsReport() {
         const { data: leads, error: leadErr } = await db.from('leads')
             .select('*').eq('institute_id', sessionInstID).gte('date_of_visit', startDate).lte('date_of_visit', endDate);
 
-        const { data: exp } = await db.from('expenses')
-            .select('marketing').eq('month_year', `${year}-${mStr}`).eq('institute_id', sessionInstID).maybeSingle();
+    const { data: exp } = await db.from('expenses')
+    .select('marketing')
+    .eq('institute_id', sessionInstID)
+    .or(`month_year.eq.${year}-${mStr},month_year.eq.${monthYearLabel.toUpperCase()}`)
+    .maybeSingle();
 
         const { data: revenue } = await db.from('payment_history')
             .select('amount').eq('month_year', monthYearLabel).eq('institute_id', sessionInstID);
@@ -4968,14 +4971,14 @@ const convertedLeads = leads ? leads.filter(l => l.status && l.status.toString()
         const bestReferenceSource = getMode(leads ? leads.map(l => l.reference) : []);
 
         // Marketing Data for Point 7, 8, 9
-        const totalMarketingCost = exp ? parseFloat(exp.marketing || 0) : 0;
+    const marketingCost = exp ? parseFloat(exp.marketing || 0) : 0;
         const totalRevenue = revenue ? revenue.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0) : 0;
 
         // Point 7: CPL (Marketing Cost / Total Leads)
-        const cpl = totalLeads > 0 ? (totalMarketingCost / totalLeads).toFixed(2) : 0;
+     const cpl = totalLeads > 0 ? (marketingCost / totalLeads).toFixed(0) : 0;
 
         // Point 8: CPA (Marketing Cost / Conversions)
-        const cpa = convertedLeads > 0 ? (totalMarketingCost / convertedLeads).toFixed(2) : 0;
+     const cpa = convertedLeads > 0 ? (marketingCost / convertedLeads).toFixed(0) : 0;
 
         // Point 9: Revenue Per Lead (Total Revenue / Total Leads)
         const rpl = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(2) : 0;
