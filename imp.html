@@ -1387,6 +1387,7 @@ nav.sidebar {
                     <option value="t-attendance">4. Teachers Attendance Report</option>
 <option value="teacher-rating">5. Teacher Appraisal Report</option>
 <option value="profit-loss">6. Profit & Loss (P&L) Report</option>
+<option value="leads-report">7. Leads & Conversion Report</option>
 
                 </select>
             </div>
@@ -1494,6 +1495,18 @@ nav.sidebar {
     <div class="button-row">
         <button class="btn-add" style="background:#20B2AA;" onclick="generatePLReport('snapshot')">SNAPSHOT VIEW</button>
         <button class="btn-fetch" style="background:#673ab7;" onclick="generatePLReport('detailed')">DETAILED VIEW</button>
+    </div>
+</div>
+<!-- LEADS & CONVERSION REPORT INPUTS -->
+<div id="report-ui-leads" style="display:none; margin-top:20px; padding-top:20px; border-top:1px dashed #ccc;">
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Select Month & Year</label>
+            <input type="month" id="rep-leads-month">
+        </div>
+    </div>
+    <div class="button-row">
+        <button class="btn-add" style="background:#673ab7;" onclick="generateLeadsReport()">GENERATE ANALYTICS</button>
     </div>
 </div>
 
@@ -4357,6 +4370,7 @@ function toggleReportUI() {
 // Add this line inside your toggleReportUI function
 document.getElementById('report-ui-teacher-rating').style.display = (val === 'teacher-rating') ? 'block' : 'none';
 document.getElementById('report-ui-pl').style.display = (val === 'profit-loss') ? 'block' : 'none';
+document.getElementById('report-ui-leads').style.display = (val === 'leads-report') ? 'block' : 'none';
 
 
 // Also add this trigger to load the teachers into the dropdown
@@ -4875,6 +4889,95 @@ async function loadReminders() {
     }
 }
 
+
+
+
+/* ==========================================
+   BI REPORT: LEADS & CONVERSION ANALYTICS
+   ========================================== */
+
+async function generateLeadsReport() {
+    const monthVal = document.getElementById('rep-leads-month').value; // YYYY-MM
+    if (!monthVal) return alert("Please select a Month & Year.");
+
+    const dateObj = new Date(monthVal + "-01");
+    const monthYearLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    try {
+        // 1. FETCH DATA FROM THREE TABLES
+        // A. Leads for that month
+        const { data: leads } = await db.from('leads').select('*').eq('institute_id', sessionInstID).filter('date_of_visit', 'gte', `${monthVal}-01`).filter('date_of_visit', 'lte', `${monthVal}-31`);
+
+        // B. Marketing Expenses for that month
+        const { data: exp } = await db.from('expenses').select('marketing').eq('month_year', monthVal).eq('institute_id', sessionInstID).maybeSingle();
+
+        // C. Total Revenue Collected for that month
+        const { data: revenue } = await db.from('payment_history').select('amount').eq('month_year', monthYearLabel).eq('institute_id', sessionInstID);
+
+        // 2. DATA CALCULATIONS
+        const totalLeads = leads ? leads.length : 0;
+        const convertedLeads = leads ? leads.filter(l => l.status === 'Converted').length : 0;
+        const convRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : 0;
+        
+        const marketingCost = exp ? parseFloat(exp.marketing) : 0;
+        const totalRevenue = revenue ? revenue.reduce((sum, r) => sum + parseFloat(r.amount), 0) : 0;
+
+        // ROI Math
+        const cpl = totalLeads > 0 ? (marketingCost / totalLeads).toFixed(2) : 0;
+        const cpa = convertedLeads > 0 ? (marketingCost / convertedLeads).toFixed(2) : 0;
+        const rpl = totalLeads > 0 ? (totalRevenue / totalLeads).toFixed(2) : 0;
+
+        // Finding "Best Selling" (Mode Logic)
+        const getMode = (arr) => {
+            if (!arr || arr.length === 0) return "N/A";
+            const counts = {};
+            arr.forEach(v => { if(v) counts[v] = (counts[v] || 0) + 1; });
+            return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        };
+
+        const bestCourse = getMode(leads ? leads.map(l => l.interested_course) : []);
+        const bestSource = getMode(leads ? leads.map(l => l.reference) : []);
+
+        // Remarks Logic
+        let remarks = "";
+        let remarkColor = "#000";
+        if (convRate >= 70) { remarks = "Outstanding Conversion! System is perfect."; remarkColor = "green"; }
+        else if (convRate >= 45) { remarks = "Excellent system & follow-up."; remarkColor = "#27ae60"; }
+        else if (convRate >= 35) { remarks = "Very good conversion health."; remarkColor = "#2980b9"; }
+        else if (convRate >= 25) { remarks = "Healthy overall conversion."; remarkColor = "#f39c12"; }
+        else if (convRate < 20 && totalLeads > 0) { 
+            remarks = "Something is wrong: Check Pricing, Counsellor skills, or Follow-up urgency."; 
+            remarkColor = "red"; 
+        } else { remarks = "Insufficient data for accurate remarks."; }
+
+        // 3. RENDER UI
+        document.getElementById('rep-title').innerText = `Leads & Conversion Report: ${monthYearLabel}`;
+        document.getElementById('rep-summary-text').innerHTML = `<b>Performance Summary:</b> This report analyzes the efficiency of your marketing spend vs converted admissions.`;
+        
+        document.getElementById('rep-table-head').innerHTML = `<tr><th>Analytics Metric</th><th>Result / Data</th></tr>`;
+        document.getElementById('rep-table-body').innerHTML = `
+            <tr><td>Total Enquiries / Walk-ins</td><td><b>${totalLeads}</b></td></tr>
+            <tr><td>Total Converted Admissions</td><td style="color:green;"><b>${convertedLeads}</b></td></tr>
+            <tr style="background:#f0faff;"><td><b>Conversion Percentage</b></td><td style="font-size:1.2rem; font-weight:900;">${convRate}%</td></tr>
+            <tr><td>Best Selling Course</td><td style="color:#673ab7; font-weight:bold;">${bestCourse}</td></tr>
+            <tr><td>Top Reference Source</td><td style="color:#007bff; font-weight:bold;">${bestSource}</td></tr>
+            <tr><td>Marketing Spend (Cost)</td><td>₹ ${marketingCost.toLocaleString()}</td></tr>
+            <tr><td>Cost Per Lead (CPL)</td><td>₹ ${cpl}</td></tr>
+            <tr style="background:#fff8e1;"><td><b>Cost Per Acquisition (CPA)</b></td><td style="font-weight:bold; color:#d35400;">₹ ${cpa}</td></tr>
+            <tr><td>Revenue Per Lead (RPL)</td><td style="color:green; font-weight:bold;">₹ ${rpl}</td></tr>
+            <tr style="background:#eee;"><td><b>ADMIN REMARKS</b></td><td style="color:${remarkColor}; font-weight:bold;">${remarks}</td></tr>
+        `;
+
+        document.getElementById('report-output-area').style.display = 'block';
+        document.getElementById('chart_div').style.display = 'none';
+        document.getElementById('filter_div').style.display = 'none';
+        document.getElementById('rep-stats-boxes').innerHTML = "";
+
+    } catch (err) {
+        console.error(err);
+        alert("Error generating leads report: " + err.message);
+    }
+}
 /* ==========================================
    8. FEE REMINDER (SMS/WhatsApp)
    ========================================== */
