@@ -8557,21 +8557,26 @@ if (!document.getElementById('bm-course').value.toUpperCase().includes(document.
         listAllByBatch(); 
 
 // --- CORRECTED AUTO-SYNC TO SECTION 18 ---
+    // --- ROBUST AUTO-SYNC TO SECTION 18 ---
         const syncData = {
             institute_id: sessionInstID,
-            teacher_id: teacherId,
-            teacher_name: document.getElementById('bm-tname').value, 
-            roll_number: roll,
-            student_name: studentName,
-            subject: document.getElementById('bm-course').value,
-            batch_name: batchName
+            teacher_id: teacherId.trim().toUpperCase(), 
+            teacher_name: document.getElementById('bm-tname').value.trim(), 
+            roll_number: roll.trim().toUpperCase(), 
+            student_name: studentName.trim(),
+            subject: document.getElementById('bm-course').value.trim(),
+            batch_name: batchName.trim()
         };
 
-        // This updates Section 18 so you don't have to do it manually
-        await db.from('student_allocations').upsert([syncData], { onConflict: 'roll_number, teacher_id' });
-        console.log("Section 18 automatically synced.");
-    }
-}
+        // This line sends the data and logs any error to the console (F12)
+        const { error: syncErr } = await db.from('student_allocations').upsert([syncData], { onConflict: 'roll_number, teacher_id' });
+        
+        if (syncErr) {
+            console.error("Sync to Sec 18 failed:", syncErr.message);
+        } else {
+            console.log("Section 18 automatically synced successfully.");
+        }
+}}
 
 // 5. FETCH RECORD (By Roll Number)
 async function fetchBatchMasterRecord() {
