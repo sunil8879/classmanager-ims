@@ -1589,11 +1589,12 @@ nav.sidebar {
             </select>
             <input type="text" id="lead-remarks" placeholder="Remarks">
         </div>
-        <div class="button-row">
-            <button class="btn-add" onclick="addLead()">ADD Lead</button>
-            <button class="btn-fetch" onclick="fetchLead()">FETCH (by Contact)</button>
-            <button class="btn-edit" style="background:#666;" onclick="clearLeadForm()">Clear</button>
-        </div>
+     <div class="button-row">
+    <button class="btn-add" onclick="addLead()">ADD Lead</button>
+    <button class="btn-edit" style="background:#f39c12;" onclick="updateLead()">UPDATE Lead</button>
+    <button class="btn-fetch" onclick="fetchLead()">FETCH (by Contact)</button>
+    <button class="btn-edit" style="background:#666;" onclick="clearLeadForm()">Clear</button>
+</div>
     </div>
 </section>
 
@@ -5141,6 +5142,56 @@ async function addLead() {
         clearLeadForm();
     }
 }
+
+
+
+/* ==========================================
+   SECTION 9: UPDATE LEAD LOGIC
+   ========================================== */
+
+async function updateLead() {
+    const contact = document.getElementById('lead-contact').value.trim();
+    
+    // 1. Validation: Must have a contact number to find the record
+    if (!contact) {
+        return alert("Please enter the Contact Number and click FETCH first to load the lead details.");
+    }
+
+    // 2. Prepare the updated data from the form
+    const updatedData = {
+        full_name: document.getElementById('lead-name').value.trim(),
+        email: document.getElementById('lead-email').value.trim(),
+        interested_course: document.getElementById('lead-course').value.trim(),
+        date_of_visit: document.getElementById('lead-date').value,
+        reference: document.getElementById('lead-ref').value.trim(),
+        status: document.getElementById('lead-status').value,
+        remarks: document.getElementById('lead-remarks').value.trim()
+    };
+
+    // 3. Update the Lead in Supabase
+    // We match by both Contact Number and Institute ID for security
+    const { error } = await db.from('leads')
+        .update(updatedData)
+        .eq('contact', contact)
+        .eq('institute_id', sessionInstID);
+
+    if (error) {
+        alert("Update Failed: " + error.message);
+    } else {
+        alert(`SUCCESS: Lead status for ${updatedData.full_name} has been updated to "${updatedData.status}".`);
+        
+        // If the lead is converted, we give a professional confirmation
+        if (updatedData.status === 'Converted') {
+            alert("CONGRATULATIONS! You have successfully converted a lead into an admission.");
+        }
+        
+        clearLeadForm(); // Reset form after successful update
+    }
+}
+
+
+
+
 
 async function fetchLead() {
     const contact = prompt("Enter Lead Contact Number:");
