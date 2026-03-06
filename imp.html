@@ -6377,7 +6377,7 @@ if (!document.getElementById('alloc-tbatch').selectedOptions[0].text.toUpperCase
         await db.from('list').upsert([listSync], { onConflict: 'roll_number, batch_name' });
         console.log("Batch Master automatically synced.");
     }
-
+}
 // 4. View all students assigned to a specific teacher
 async function viewTeacherStudents() {
     const tid = document.getElementById('alloc-tid').value.toUpperCase();
