@@ -6356,10 +6356,27 @@ if (!document.getElementById('alloc-tbatch').selectedOptions[0].text.toUpperCase
     };
 
     const { error } = await db.from('student_allocations').insert([data]);
-    if (error) alert(error.message); else alert("Linked Successfully!");
-}
+ if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("Linked Successfully!");
 
+        // --- CORRECTED AUTO-SYNC TO SECTION 25 ---
+        const listSync = {
+            institute_id: sessionInstID,
+            date_today: new Date().toISOString().split('T')[0],
+            roll_number: data.roll_number,
+            student_name: data.student_name,
+            course_name: data.subject,
+            teacher_id: data.teacher_id,
+            teacher_name: data.teacher_name,
+            batch_name: data.batch_name,
+            remarks: "Auto-synced from Sec 18"
+        };
 
+        await db.from('list').upsert([listSync], { onConflict: 'roll_number, batch_name' });
+        console.log("Batch Master automatically synced.");
+    }
 
 // 4. View all students assigned to a specific teacher
 async function viewTeacherStudents() {
@@ -8480,6 +8497,12 @@ if (!document.getElementById('bm-course').value.toUpperCase().includes(document.
 
     if (!roll || !batchName || !teacherId) return alert("Please fill all details (Roll No, Teacher, and Batch).");
 
+
+
+
+
+
+
     // --- 1. MODIFIED DUPLICATE CHECK: Check Roll + Batch Name ---
     const { data: existingEntry } = await db.from('list')
         .select('id')
@@ -8532,6 +8555,21 @@ if (!document.getElementById('bm-course').value.toUpperCase().includes(document.
         alert(`Success! ${studentName} added to ${batchName}.`);
         // Refresh the list view if visible
         listAllByBatch(); 
+
+// --- CORRECTED AUTO-SYNC TO SECTION 18 ---
+        const syncData = {
+            institute_id: sessionInstID,
+            teacher_id: teacherId,
+            teacher_name: document.getElementById('bm-tname').value, 
+            roll_number: roll,
+            student_name: studentName,
+            subject: document.getElementById('bm-course').value,
+            batch_name: batchName
+        };
+
+        // This updates Section 18 so you don't have to do it manually
+        await db.from('student_allocations').upsert([syncData], { onConflict: 'roll_number, teacher_id' });
+        console.log("Section 18 automatically synced.");
     }
 }
 
