@@ -6098,6 +6098,8 @@ function triggerTAttn(status) {
     // --- NEW: Disable future dates (Local Timezone Safe) ---
     const todayLocal = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
     picker.max = todayLocal;
+// ADD THIS LINE right after picker.max = todayLocal;
+picker.min = todayLocal; // This disables all past dates
 
     // Reset the picker value so 'onchange' fires every time
     picker.value = ""; 
@@ -6141,6 +6143,12 @@ function triggerTAttn(status) {
 }
 // REPLACE your existing fetchTeacherHistory function with this Dynamic Pop-up version:
 async function fetchTeacherHistory() {
+// ADD THIS TO THE TOP OF fetchTeacherHistory()
+const monthCheck = document.getElementById('t-attn-month').value;
+if (!monthCheck) {
+    return alert("Please select a Month & Year in the 'Select Month/Year' calendar first!");
+}
+// This ensures variables are defined properly before the popup opens
     const tid = document.getElementById('t-attn-id').value.trim().toUpperCase();
     const monthView = document.getElementById('t-attn-month').value; // e.g., "2026-02"
 
@@ -6151,9 +6159,11 @@ async function fetchTeacherHistory() {
     const year = parseInt(parts[0]);
     const monthNum = parseInt(parts[1], 10);
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+if (isNaN(year) || isNaN(monthNum)) {
+        return alert("Invalid Date selected. Please re-select the month.");
+    }
+
     const targetMonthYear = monthNames[monthNum - 1] + " " + year;
-    
-    // Calculate exact total days in that specific month (e.g., 28 for Feb, 31 for March)
     const daysInMonth = new Date(year, monthNum, 0).getDate();
 
     // 2. Fetch Data (Case-Insensitive)
