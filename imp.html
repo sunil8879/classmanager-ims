@@ -574,6 +574,131 @@ body:has(#home-visitor-view:not([style*="display: none"])) .nav-tab { margin-bot
 }
 
 
+
+
+
+
+
+/* --- MINIMALIST HIGH-CONTRAST UI (WHITE + BLACK) --- */
+
+/* 1. Set Right Content Area to Pure White */
+main.content {
+    background: #ffffff !important;
+    background-image: none !important;
+}
+
+/* 2. Style Cards with thick outlines and sharp 3D shadows */
+.card {
+    background: #ffffff !important;
+    border: 3px solid #000000 !important; /* Thick black outline */
+    box-shadow: 12px 12px 0px #000000 !important; /* Sharp, solid 3D shadow */
+    color: #000000 !important;
+    transition: transform 0.2s ease;
+}
+
+/* Hover effect to make cards feel interactive */
+.card:hover {
+    transform: translate(-4px, -4px) !important;
+    box-shadow: 16px 16px 0px #000000 !important;
+}
+
+/* 3. Force all Input Boxes, Selects, and Textareas to have sharp black borders */
+input, select, textarea {
+    border: 2px solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 10px !important;
+    border-radius: 4px !important;
+}
+
+/* 4. Feature Box (Rotating text area) adjustment */
+.feature-box {
+    background: #ffffff !important;
+    border: 3px solid #000000 !important;
+    box-shadow: 8px 8px 0px #000000 !important;
+    color: #000000 !important;
+}
+
+/* 5. Headers inside cards (Underlining them for clarity) */
+.card h3, .card h2 {
+    border-bottom: 2px solid #000000 !important;
+    padding-bottom: 10px !important;
+    text-decoration: none !important; /* Replacing standard underline with border */
+}
+
+/* 6. Dashboard Stat Cards adjustment */
+.stat-card {
+    background: #ffffff !important;
+    border: 2px solid #000000 !important;
+    box-shadow: 5px 5px 0px #000000 !important;
+}
+
+
+
+
+
+/* --- TITLE COLOR ADJUSTMENT --- */
+.main-title {
+    /* Changing the top half from Red to White */
+    background: linear-gradient(to bottom,  #7FFFD4 50%, #ffffff 50%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    
+    /* Strengthening the shadow so the White part is visible against the White background */
+    filter: drop-shadow(2px 2px 0px #888) drop-shadow(4px 4px 10px rgba(0,0,0,0.5)) !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+/* --- 3D NEOBRUTALIST SIDEBAR TABS --- */
+
+.nav-tab {
+    background: #7FFFD4 !important; /* Keeping the Aquamarine base */
+    border: 2px solid #000000 !important; /* Thick black border */
+    box-shadow: 5px 5px 0px #000000 !important; /* Solid black 3D shadow */
+    color: #000000 !important;
+    margin-bottom: 12px !important;
+    transition: all 0.1s ease !important; /* Fast transition for a snappy button feel */
+    position: relative;
+    top: 0;
+    left: 0;
+}
+
+/* 1. HOVER STATE: The button rises up slightly */
+.nav-tab:hover {
+    transform: translate(-2px, -2px) !important; /* Moves up and left */
+    box-shadow: 7px 7px 0px #000000 !important; /* Shadow gets bigger */
+    background: #66e0bb !important; /* Slightly darker aqua on hover */
+}
+
+/* 2. ACTIVE/PRESSED STATE: The button physically pushes down when clicked */
+.nav-tab:active {
+    transform: translate(4px, 4px) !important; /* Moves down and right */
+    box-shadow: 1px 1px 0px #000000 !important; /* Shadow almost disappears */
+}
+
+/* 3. SELECTED STATE: When the tab is actually active/open */
+.nav-tab.active {
+    background: #ffffff !important; /* Turns White to match the right side content */
+    border: 3px solid #000000 !important; /* Thicker border for the active tab */
+    box-shadow: 5px 5px 0px #ff0000 !important; /* Optional: Red shadow to show selection */
+    font-weight: 900 !important;
+}
+
+/* Adjusting the sidebar container to give the 3D buttons room to breathe */
+nav.sidebar {
+    padding-right: 20px !important; 
+    background: #ffffff !important;
+    border-right: 4px solid #000 !important;
+}
     </style>
 </head>
 <body>
