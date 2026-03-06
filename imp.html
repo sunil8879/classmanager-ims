@@ -6512,6 +6512,29 @@ case 'batch':
 case 'students':
     refreshStudentBatchDropdown();
     break;
+
+case 'leave-mod':
+    // SECURITY BLOCK: Auto-lock Teacher ID for Teachers
+    (async () => {
+        const { data: { user } } = await db.auth.getUser();
+        const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+        if (profile && profile.role === 'Teacher') {
+            const { data: self } = await db.from('teacher_details').select('id').eq('email', profile.email).eq('institute_id', sessionInstID).maybeSingle();
+            if (self) {
+                const tidField = document.getElementById('lv-tid');
+                tidField.value = self.id;
+                tidField.readOnly = true; // Prevents teacher from changing ID
+                tidField.style.background = "#eee"; // Visual lock
+                fetchTeacherForLeave(); // Existing function: Auto-loads their balance
+            }
+        } else {
+            // Unlocks for Owner
+            const tidField = document.getElementById('lv-tid');
+            tidField.readOnly = false;
+            tidField.style.background = "#fff";
+        }
+    })();
+    break;
 				
 				// Inside your switch (id) statement in showSection(id)
 case 'calendar-mod':
@@ -9498,10 +9521,22 @@ async function validateAndAddLeave() {
 
 
 // 5. Fetch Latest Record
+// 5. Fetch Latest Record
 async function fetchLeaveRecord() {
-    const tid = prompt("Enter Teacher ID to fetch last leave record:");
+    // SECURITY BLOCK: Identify user role
+    const { data: { user: currentUser } } = await db.auth.getUser();
+    const { data: currentProf } = await db.from('profiles').select('role').eq('id', currentUser.id).single();
+
+    let tid;
+    if (currentProf && currentProf.role === 'Teacher') {
+        tid = document.getElementById('lv-tid').value; // Use the locked ID for teachers
+    } else {
+        tid = prompt("Enter Teacher ID to fetch last leave record:");
+    }
+
     if (!tid) return;
 
+    // Proceed with database query using the determined tid
     const { data, error } = await db.from('leave_management')
         .select('*')
         .eq('teacher_id', tid.toUpperCase())
@@ -9512,6 +9547,7 @@ async function fetchLeaveRecord() {
 
     if (error || !data) return alert("No leave records found for this Teacher ID.");
 
+    // Fill UI exactly as per original code
     document.getElementById('lv-today').value = data.date_today;
     document.getElementById('lv-tid').value = data.teacher_id;
     document.getElementById('lv-tname').value = data.teacher_name;
@@ -9524,7 +9560,6 @@ async function fetchLeaveRecord() {
     
     alert("Latest Leave Record Loaded.");
 }
-
 // 6. Update Record (With Rounding Math)
 async function updateLeaveRecord() {
     const tid = document.getElementById('lv-tid').value.toUpperCase();
@@ -9606,12 +9641,24 @@ async function listTeachersOnLeave() {
     const startDate = `${monthYearStr}-01`;
     const endDate = `${monthYearStr}-31`;
 
-    const { data, error } = await db.from('leave_management')
-        .select('*')
+    // SECURITY BLOCK: Identify user role
+    const { data: { user: listUser } } = await db.auth.getUser();
+    const { data: listProf } = await db.from('profiles').select('role').eq('id', listUser.id).single();
+
+    // Initialize the query with basic filters
+    let query = db.from('leave_management').select('*')
         .eq('institute_id', sessionInstID)
         .gte('start_date', startDate)
-        .lte('start_date', endDate)
-        .order('start_date', { ascending: true });
+        .lte('start_date', endDate);
+
+    // Apply strict filtering if the user is a teacher
+    if (listProf && listProf.role === 'Teacher') {
+        const selfId = document.getElementById('lv-tid').value;
+        query = query.eq('teacher_id', selfId);
+    }
+
+    // Execute the final query
+    const { data, error } = await query.order('start_date', { ascending: true });
 
     if (error) return alert("Database Error: " + error.message);
     
@@ -9634,6 +9681,7 @@ async function listTeachersOnLeave() {
         tableRows = `<tr><td colspan="6" style="padding:20px;">No leave records found for this month.</td></tr>`;
     }
 
+    // Modal UI exactly as per original code
     const modalHtml = `
         <div id="leave-popup-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; display:flex; justify-content:center; align-items:center;">
             <div style="background:white; padding:30px; border-radius:15px; width:95%; max-width:850px; max-height:85vh; overflow-y:auto; text-align:center; font-family:'Times New Roman', serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
