@@ -7014,6 +7014,9 @@ case 'batch-master':
 case 'batch':
     loadBatchTeacherDropdown();
     break;
+case 'teacher-leaderboard':
+    loadAnalyticsDropdowns(); // Fills the teacher list when the tab is clicked
+    break;
 
 // Locate the switch(id) inside showSection(id) and add this:
 case 'students':
@@ -10712,12 +10715,117 @@ async function calculateStudentEngagement() {
 
 // Helper to fill Teacher dropdowns for analytics
 async function loadAnalyticsDropdowns() {
-    const { data } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID);
+    if (!sessionInstID) return; // Wait if not ready
+    const { data } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID).eq('status', 'Active');
     const sel = document.getElementById('t-perf-id');
-    if(sel) sel.innerHTML = data.map(t => `<option value="${t.id}">${t.id} - ${t.teacher_name}</option>`).join('');
+    if(sel) {
+        sel.innerHTML = '<option value="">-- Select Teacher --</option>';
+        data.forEach(t => {
+            sel.innerHTML += `<option value="${t.id}">${t.id} - ${t.teacher_name}</option>`;
+        });
+    }
 }
-// Trigger dropdown load when section opens
-document.addEventListener('DOMContentLoaded', loadAnalyticsDropdowns);
+
+
+// Sync Teacher Name in Section 29
+async function syncTeacherNamePerf() {
+    const sel = document.getElementById('t-perf-id');
+    const nameInput = document.getElementById('t-perf-name');
+    const selectedText = sel.options[sel.selectedIndex].text;
+    nameInput.value = selectedText.split(' - ')[1] || "";
+}
+
+// 29. LIST ALL TEACHER RANKINGS
+async function listAllTeacherPerf() {
+    const monthVal = document.getElementById('t-perf-month').value;
+    if(!monthVal) return alert("Select Month first");
+    
+    // We will calculate scores for ALL teachers in one go
+    const { data: teachers } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID).eq('status', 'Active');
+    
+    let results = [];
+    for(let t of teachers) {
+        // Simple internal call to get score (logic reused from single calc)
+        const score = await internalTScoreCalc(t.id, monthVal);
+        results.push({ name: t.teacher_name, score: score });
+    }
+    
+    results.sort((a,b) => b.score - a.score);
+    
+    let html = `<table border="1" style="width:100%; background:white; color:black; border-collapse:collapse;">
+                <tr style="background:#eee;"><th>Rank</th><th>Teacher</th><th>Performance Score</th></tr>`;
+    results.forEach((r, i) => {
+        html += `<tr><td>${i+1}</td><td>${r.name}</td><td><b>${r.score}/100</b></td></tr>`;
+    });
+    html += "</table>";
+    
+    openAnalyticsPopup("OVERALL STAFF RANKINGS", html);
+}
+
+// 30. LIST ALL STUDENT ENGAGEMENT
+async function listAllStudentEng() {
+    const monthVal = document.getElementById('s-eng-month').value;
+    if(!monthVal) return alert("Select Month first");
+
+    const { data: students } = await db.from('students').select('roll_number, full_name').eq('institute_id', sessionInstID).eq('status', 'Active');
+    
+    let results = [];
+    for(let s of students) {
+        const score = await internalSEngageCalc(s.roll_number, monthVal);
+        results.push({ name: s.full_name, score: score });
+    }
+    
+    results.sort((a,b) => b.score - a.score);
+
+    let html = `<table border="1" style="width:100%; background:white; color:black; border-collapse:collapse;">
+                <tr style="background:#eee;"><th>Rank</th><th>Student Name</th><th>Engagement Score</th></tr>`;
+    results.forEach((r, i) => {
+        html += `<tr><td>${i+1}</td><td>${r.name}</td><td><b>${r.score}/100</b></td></tr>`;
+    });
+    html += "</table>";
+    
+    openAnalyticsPopup("STUDENT ENGAGEMENT RANKINGS", html);
+}
+
+// Universal Popup for Analytics
+function openAnalyticsPopup(title, content) {
+    const modalHtml = `
+        <div id="analytics-popup" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:999999;display:flex;justify-content:center;align-items:center;">
+            <div style="background:white; padding:30px; border-radius:15px; width:90%; max-width:800px; max-height:80vh; overflow-y:auto; font-family:serif;">
+                <h2 style="text-align:center; text-decoration:underline; color:black;">${title}</h2>
+                <div style="margin-top:20px;">${content}</div>
+                <button onclick="document.getElementById('analytics-popup').remove()" style="margin-top:20px; width:100%; padding:15px; background:red; color:white; border:none; font-weight:bold; cursor:pointer;">CLOSE REPORT</button>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// Internal Logic Helpers (To prevent "Undefined" errors)
+async function internalTScoreCalc(tid, month) {
+    // Re-calculates score for the "List All" loop
+    const { data: revs } = await db.from('reviews').select('rating').eq('teacher_id', tid);
+    const avgRev = revs.length ? (revs.reduce((sum, r) => sum + r.rating, 0) / revs.length) : 0;
+    return Math.round((avgRev / 5) * 100); // Simplified for the global list
+}
+
+async function internalSEngageCalc(roll, month) {
+    // Re-calculates score for the "List All" loop
+    const { data: att } = await db.from('attendance').select('id').eq('roll_number', roll).eq('status', 'Present');
+    return Math.round((att.length / 20) * 100); // Simplified for global list
+}
+
+// Cleanup functions for the buttons
+function clearAIAttn() { document.querySelectorAll('#ai-attendance input').forEach(i => i.value = ""); }
+function clearTPerf() { document.querySelectorAll('#teacher-leaderboard input').forEach(i => i.value = ""); }
+function clearSEng() { document.querySelectorAll('#student-engagement input').forEach(i => i.value = ""); }
+
+
+
+
+
+
+
+
 
 
 
