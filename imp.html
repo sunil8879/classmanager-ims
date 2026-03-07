@@ -749,6 +749,76 @@ footer ul li a:hover {
 
 
 #ai-attendance .main-title, #teacher-leaderboard .main-title, #student-engagement .main-title { background: none !important; -webkit-text-fill-color: #000 !important; filter: none !important; border-bottom: 2px solid #000; padding-bottom: 5px; }
+
+
+
+
+
+
+
+
+
+
+/* --- MOBILE COMPLIANCE FOR ANALYTICS (MODS 28, 29, 30) --- */
+
+@media (max-width: 768px) {
+    /* 1. Stack the grids into a single column for easy thumb-scrolling */
+    #ai-attendance .form-grid, 
+    #teacher-leaderboard .form-grid, 
+    #student-engagement .form-grid {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+
+    /* 2. Responsive Tables: Allow horizontal swipe so the data isn't crushed */
+    #teacher-leaderboard table, 
+    #student-engagement table,
+    #teacher-perf-body table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+        font-size: 0.85rem !important; /* Slightly smaller font for mobile tables */
+    }
+
+    /* 3. Resize the "Big Score" boxes so they fit on a phone screen */
+    #t-perf-total, #s-eng-total {
+        font-size: 1.5rem !important; /* Shrunk from 2rem */
+        height: 60px !important;     /* Shrunk from 80px */
+        width: 100% !important;
+    }
+
+    /* 4. Adjust the 3D Headings so they don't wrap onto 3 lines */
+    #ai-attendance .main-title, 
+    #teacher-leaderboard .main-title, 
+    #student-engagement .main-title {
+        font-size: 1.4rem !important;
+        line-height: 1.2 !important;
+    }
+
+    /* 5. Ensure the "Run Scan" and "Generate" buttons take full width for easier clicking */
+    #ai-attendance .button-row, 
+    #teacher-leaderboard .button-row, 
+    #student-engagement .button-row {
+        flex-direction: column !important;
+    }
+
+    #ai-attendance button, 
+    #teacher-leaderboard button, 
+    #student-engagement button {
+        width: 100% !important;
+    }
+}
+
+/* 6. Clean fix for the "List All" popup tables on mobile */
+#analytics-popup div {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+#analytics-popup table {
+    min-width: 500px; /* Forces the table to maintain shape while scrolling */
+}
     </style>
 </head>
 <body>
