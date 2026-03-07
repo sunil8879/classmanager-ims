@@ -2849,6 +2849,32 @@ footer ul li a:hover {
         <div id="feature-highlighter" class="feature-box">
             <span id="feature-text">1. Automated Fee Collection & Pending Dues Tracking</span>
         </div>
+
+
+
+
+
+
+<!-- SYSTEM PROCESS GUIDE BOX -->
+<div id="process-guide-box" class="feature-box" style="margin-top: 20px; margin-bottom: 50px; flex-direction: column; gap: 15px; min-height: 150px;">
+    <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: #666; font-weight: bold; border-bottom: 1px solid #ddd; width: 100%; padding-bottom: 5px;">
+        <i class="fas fa-map-signs"></i> Operational Flow Guide
+    </div>
+    <div id="guide-text" style="font-weight: 600; line-height: 1.4;">
+        Loading Guide...
+    </div>
+    <div class="button-row" style="margin-top: 10px; gap: 20px;">
+        <button onclick="changeGuideStep(-1)" style="background: #000; color: #fff; padding: 8px 20px; border: none; cursor: pointer; border-radius: 5px; font-weight: bold;">
+            <i class="fas fa-arrow-left"></i> PREV
+        </button>
+        <button onclick="changeGuideStep(1)" style="background: #7FFFD4; color: #000; padding: 8px 20px; border: 2px solid #000; cursor: pointer; border-radius: 5px; font-weight: 900; box-shadow: 4px 4px 0px #000;">
+            NEXT <i class="fas fa-arrow-right"></i>
+        </button>
+    </div>
+</div>
+
+
+
         </main>
     </div>
 
@@ -9833,6 +9859,77 @@ if (featureBox) {
     setInterval(triggerBlastEffect, 5000);
 }
 
+
+
+
+
+/* ==========================================
+   SYSTEM PROCESS GUIDE LOGIC (FULL MANUAL)
+   ========================================== */
+const operationalSteps = [
+    "<h3 style='color:#673ab7; text-decoration:none;'>PHASE 1: REGISTRATION & SETUP</h3>",
+    "<b>1. Owner Signup (Sec 2):</b> The process begins with the Owner creating an account. During this step, the system generates a unique Institute ID (e.g., CM-1234) which serves as the master key for the entire institute. This module is open to all for registration.",
+    "<b>2. Teacher Signup (Sec 2):</b> Teachers then create their accounts. They must use the specific Institute ID provided by the Owner to be linked to the correct institute. This is open to all for registration.",
+    "<b>3. Student Signup (Sec 2):</b> Students create their personal accounts using the same Institute ID provided by the Owner. This is open to all for registration.",
+    "<b>4. Staff Profile Setup (Sec 11):</b> This is controlled by the Owner and Teacher. The Teacher generates their unique Teacher ID and enters qualifications and subjects. The 'Salary' field is visible to the Owner only. Locked for Students.",
+    "<b>5. Course Timing (Sec 5):</b> Controlled by the Owner and Teacher. Teachers set their daily availability and time slots. For security, the Teacher ID is locked to 'Self' so one teacher cannot edit another's schedule. Locked for Students.",
+    "<b>6. Student Admission (Sec 3):</b> This is controlled strictly by the Owner. The Owner generates the Student Roll Number, enters contact details, and sets the master fee structure. Locked for Teachers and Students.",
+    "<b>7. Staff Linkage (Sec 18):</b> Controlled strictly by the Owner. The Owner 'hands over' students by linking specific Roll Numbers to specific Teachers and Subjects. Locked for Teachers and Students.",
+    "<b>8. Enrollment Roster (Sec 25):</b> Controlled strictly by the Owner. This is the official registry where students are confirmed into specific batches. Locked for Teachers and Students.",
+    "<h3 style='color:#673ab7; text-decoration:none;'>PHASE 2: DAILY OPERATIONS</h3>",
+    "<b>9. Welcome/Stats (Sec 1):</b> Controlled by the Owner. The Owner sees full financial and admission stats. Visitors see a generic institute overview. Real-time statistics are Locked for Teachers and Students.",
+    "<b>10. Operations (Sec 20):</b> Controlled by the Owner, who writes events and holidays. The Teacher and Student have 'View Only' access.",
+    "<b>11. Attendance Tracking (Sec 6):</b> Controlled by the Teacher and Owner. They mark daily presence or absence, which triggers instant WhatsApp alerts to parents. Locked for Students.",
+    "<b>12. Broadcasts (Sec 19):</b> Controlled by the Owner and Teacher. They send bulk WhatsApp messages or post notices to the internal Student Portal. The Student can only receive and read these messages.",
+    "<b>13. Staff HR Ops (Sec 17):</b> Controlled strictly by the Owner to track staff arrival and workdays. Locked for Teachers and Students.",
+    "<b>14. Meeting Support (Sec 24):</b> Controlled by the Owner and Teacher. They allocate specific meeting time slots to parents for progress reviews. Locked for Students.",
+    "<h3 style='color:#673ab7; text-decoration:none;'>PHASE 3: FINANCIAL MANAGEMENT</h3>",
+    "<b>15. Revenue Collection (Sec 4):</b> Controlled strictly by the Owner. The Owner logs fee payments, tracks pending balances, and generates professional receipts. Locked for Teachers and Students.",
+    "<b>16. Waivers (Sec 23):</b> Controlled strictly by the Owner. The Owner has the final authority to approve or reject fee scholarship applications. Locked for Teachers and Students.",
+    "<b>17. Ancillary Sales (Sec 22):</b> Controlled strictly by the Owner. This tracks the sale of uniforms, books, and bags to students. Locked for Teachers and Students.",
+    "<b>18. Follow-ups (Sec 8):</b> Controlled strictly by the Owner. This generates automated WhatsApp reminders for students with outstanding dues. Locked for Teachers and Students.",
+    "<b>19. Monthly Overheads (Sec 10):</b> Controlled strictly by the Owner. This is used to log rent, staff salaries, electricity, and marketing costs. Locked for Teachers and Students.",
+    "<h3 style='color:#673ab7; text-decoration:none;'>PHASE 4: ACADEMIC & CERTIFICATION</h3>",
+    "<b>20. Assessment (Sec 16):</b> Controlled by the Teacher and Owner. They enter exam marks, calculate percentages, and determine Pass/Fail results. Locked for Students.",
+    "<b>21. Analytics (Sec 15):</b> Controlled by the Teacher and Owner. This displays historical trends and subject-wise averages. Locked for Students.",
+    "<b>22. Student Dashboards (Sec 12):</b> Controlled by the Student. This allows each student to view their own marks, attendance history, and fee status. Locked for Teachers.",
+    "<b>23. Official Identification (Sec 13):</b> Controlled strictly by the Owner. This handles student photo uploads and the printing of official ID cards. Locked for Teachers and Students.",
+    "<b>24. Course Graduation (Sec 14):</b> Controlled strictly by the Owner. This is the final step where professional completion certificates are issued to students. Locked for Teachers and Students.",
+    "<h3 style='color:#673ab7; text-decoration:none;'>PHASE 5: GROWTH & HR</h3>",
+    "<b>25. New Enquiries (Sec 9):</b> Controlled strictly by the Owner. This tracks potential students (Walk-ins) and manages the conversion into admissions. Locked for Teachers and Students.",
+    "<b>26. Business Intelligence (Sec 7):</b> Controlled strictly by the Owner. This generates high-level financial reports, profit/loss statements, and growth analytics. Locked for Teachers and Students.",
+    "<b>27. Teacher Feedback (Sec 26):</b> Controlled by the Student and Owner. Strictly Blocked for Teachers to ensure unbiased feedback.",
+    "<b>28. Staff Welfare (Sec 27):</b> Controlled by the Teacher (applies) and the Owner (approves). For teachers, ID and Status fields are locked. Locked for Students.",
+    "<b>29. Post-Course (Sec 21):</b> Controlled strictly by the Owner. This tracks where students go after graduation, including college placements and jobs. Locked for Teachers and Students.",
+    "<h3 style='color:#ff0000; text-decoration:none;'>SYSTEM LOGIC SUMMARY</h3>",
+    "<b>Owner Authority:</b> The Owner has 'God View' access. No section is locked for the Owner as they manage business strategy and finances.",
+    "<b>Teacher Focus:</b> Teachers are blocked from Financial sections and Master Admin sections. They are also blocked from seeing their own reviews.",
+    "<b>Student Privacy:</b> Students are strictly limited to their own Portal, Reviews, Messages, and Calendar.",
+    "<b>Data Integrity:</b> In Sec 5 (Batch) and Sec 27 (Leave), the system auto-detects the logged-in Teacher's ID and locks it."
+];
+
+let currentGuideIndex = 0;
+
+function updateGuideUI() {
+    const textEl = document.getElementById('guide-text');
+    if (textEl) {
+        textEl.style.opacity = 0;
+        setTimeout(() => {
+            textEl.innerHTML = operationalSteps[currentGuideIndex];
+            textEl.style.opacity = 1;
+            textEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 200);
+    }
+}
+
+function changeGuideStep(direction) {
+    currentGuideIndex += direction;
+    if (currentGuideIndex >= operationalSteps.length) currentGuideIndex = 0;
+    if (currentGuideIndex < 0) currentGuideIndex = operationalSteps.length - 1;
+    updateGuideUI();
+}
+
+document.addEventListener('DOMContentLoaded', updateGuideUI);
 
 
 
