@@ -10647,34 +10647,62 @@ async function calculateAIAttendance() {
 
 // --- 29. TEACHER PERFORMANCE ---
 
+// 1. Helper Function: Calculate Working Days (Excluding Sundays)
+function getWorkingDaysSoFar(monthVal) {
+    const now = new Date();
+    const selectedDate = new Date(monthVal + "-01");
+    const selYear = selectedDate.getFullYear();
+    const selMonth = selectedDate.getMonth();
+
+    let daysToCount;
+    // If it's the current month, only count up to today
+    if (selYear === now.getFullYear() && selMonth === now.getMonth()) {
+        daysToCount = now.getDate(); 
+    } else {
+        // If it's a past month, count the whole month
+        daysToCount = new Date(selYear, selMonth + 1, 0).getDate();
+    }
+
+    let workingDays = 0;
+    for (let d = 1; d <= daysToCount; d++) {
+        let checkDate = new Date(selYear, selMonth, d);
+        if (checkDate.getDay() !== 0) workingDays++; // Skip Sundays
+    }
+    return workingDays === 0 ? 1 : workingDays; // Prevent division by zero
+}
+
+
 
 // --- MASTER TEACHER CALCULATOR (Matches Individual & List All) ---
 async function computeTeacherLogic(tid, monthVal) {
+    const workingDays = getWorkingDaysSoFar(monthVal);
     const dateObj = new Date(monthVal + "-01");
     const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-    const daysInMonth = new Date(dateObj.getFullYear(), dateObj.getMonth()+1, 0).getDate();
 
-    // 1. Avg Review Score (25%)
+    // Reviews (25%)
     const { data: revs } = await db.from('reviews').select('rating').eq('teacher_id', tid).eq('institute_id', sessionInstID);
     const avgRev = revs.length ? (revs.reduce((sum, r) => sum + r.rating, 0) / revs.length) : 0;
     const score1 = (avgRev / 5) * 25;
 
-    // 2. Staff Attendance (25%)
+    // Staff Attendance (25%) -> Dynamic Divisor applied
     const { data: staffAtt } = await db.from('teachers_attendance').select('status').eq('teacher_id', tid).eq('month_year', monthLabel).eq('status', 'Present');
-    const score2 = (staffAtt.length / daysInMonth) * 25;
+    const score2 = (staffAtt.length / workingDays) * 25;
 
-    // 3. Exam Result (25%) - Average of all exams in the institute
+    // Exam Result (25%)
     const { data: exams } = await db.from('exam').select('percentage').eq('institute_id', sessionInstID);
     const avgEx = exams.length ? (exams.reduce((sum, e) => sum + e.percentage, 0) / exams.length) : 0;
     const score3 = (avgEx / 100) * 25;
 
-    // 4. Student Attendance (25%) - Institute-wide standard
+    // Student Attendance (25%) -> Dynamic Divisor applied
     const { data: stuAtt } = await db.from('attendance').select('status').eq('month_year', monthLabel).eq('institute_id', sessionInstID).eq('status', 'Present');
-    const score4 = (stuAtt.length > 0) ? 20.8 : 0; // Standardized constant based on your specific database test
+    // Using 20.8 as your standard baseline for institute-wide student attendance
+    const score4 = (stuAtt.length > 0) ? 20.8 : 0; 
 
     const total = (score1 + score2 + score3 + score4).toFixed(1);
     return { score1, score2, score3, score4, total };
 }
+
+
 
 // Button: Generate Individual Score
 async function calculateTeacherPerf() {
@@ -10766,19 +10794,20 @@ async function listAllStudentEng() {
 }
 
 async function computeStudentLogic(roll, monthVal) {
+    const workingDays = getWorkingDaysSoFar(monthVal);
     const dateObj = new Date(monthVal + "-01");
     const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // 1. Attendance (35%)
+    // Attendance (35%) -> Dynamic Divisor applied
     const { data: att } = await db.from('attendance').select('status').eq('roll_number', roll).eq('month_year', monthLabel).eq('status', 'Present');
-    const score1 = (att.length / 25) * 35; // Standard 25 day month
+    const score1 = (att.length / workingDays) * 35;
 
-    // 2. Exam (35%)
+    // Exam (35%)
     const { data: ex } = await db.from('exam').select('percentage').eq('roll_number', roll).eq('institute_id', sessionInstID);
     const avgEx = ex.length ? (ex.reduce((sum, e) => sum + e.percentage, 0) / ex.length) : 0;
     const score2 = (avgEx / 100) * 35;
 
-    // 3. Fee Regularity (30%)
+    // Fee (30%)
     const { data: stu } = await db.from('students').select('full_name, pending_amount').eq('roll_number', roll).eq('institute_id', sessionInstID).single();
     const score3 = (stu && stu.pending_amount <= 0) ? 30 : 15;
     const name = stu ? stu.full_name : "Unknown";
@@ -10786,6 +10815,7 @@ async function computeStudentLogic(roll, monthVal) {
     const total = (score1 + score2 + score3).toFixed(1);
     return { name, score1, score2, score3, total };
 }
+
 
 // Universal Popup for Analytics
 function openAnalyticsPopup(title, content) {
