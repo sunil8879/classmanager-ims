@@ -10808,9 +10808,36 @@ async function computeStudentLogic(roll, monthVal) {
     const score2 = (avgEx / 100) * 35;
 
     // Fee (30%)
-    const { data: stu } = await db.from('students').select('full_name, pending_amount').eq('roll_number', roll).eq('institute_id', sessionInstID).single();
-    const score3 = (stu && stu.pending_amount <= 0) ? 30 : 15;
-    const name = stu ? stu.full_name : "Unknown";
+// --- 3. Fee Regularity (30%) - Dynamic Installment Logic ---
+const { data: stu } = await db.from('students')
+    .select('full_name, pending_amount, due_dates')
+    .eq('roll_number', roll)
+    .eq('institute_id', sessionInstID)
+    .single();
+
+let feeScore = 0;
+let feeStatusLabel = "DELAYED";
+
+if (stu) {
+    // We calculate based on the number of installments left in the 'due_dates' string
+    const duesText = stu.due_dates ? stu.due_dates.trim() : "";
+    const remainingInstallmentCount = (duesText === "") ? 0 : duesText.split(',').length;
+
+    if (stu.pending_amount <= 0) {
+        // Full Score if no debt
+        feeScore = 30;
+        feeStatusLabel = "PAID (30)";
+    } else {
+        // User Math: 30 / (Remaining installments + 1)
+        // If 2 dates left: 30 / 3 = 10
+        // If 1 date left: 30 / 2 = 15
+        feeScore = 30 / (remainingInstallmentCount + 1);
+        feeStatusLabel = `ON TRACK (${feeScore.toFixed(0)})`;
+    }
+}
+
+const name = stu ? stu.full_name : "Unknown";
+// --- END OF FEE LOGIC ---
 
     const total = (score1 + score2 + score3).toFixed(1);
     return { name, score1, score2, score3, total };
