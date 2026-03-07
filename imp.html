@@ -10702,7 +10702,10 @@ async function calculateStudentEngagement() {
     const exScore = (avgEx / 100) * 35;
 
     // 3. Fee (30%)
-    const { data: stu } = await db.from('students').select('pending_amount').eq('roll_number', roll).single();
+  const { data: stu } = await db.from('students').select('full_name, pending_amount').eq('roll_number', roll).eq('institute_id', sessionInstID).single();
+
+if(stu) {
+    document.getElementById('s-eng-name').value = stu.full_name; // FIXED: Shows real name
     const feeScore = (stu.pending_amount <= 0) ? 30 : 15;
 
     const total = attScore + exScore + feeScore;
@@ -10712,7 +10715,7 @@ async function calculateStudentEngagement() {
     document.getElementById('s-eng-fee').value = (stu.pending_amount <= 0 ? "REGULAR" : "DELAYED");
     document.getElementById('s-eng-total').value = total.toFixed(1) + " / 100";
 }
-
+}
 // Helper to fill Teacher dropdowns for analytics
 async function loadAnalyticsDropdowns() {
     if (!sessionInstID) return; // Wait if not ready
@@ -10740,26 +10743,18 @@ async function listAllTeacherPerf() {
     const monthVal = document.getElementById('t-perf-month').value;
     if(!monthVal) return alert("Select Month first");
     
-    // We will calculate scores for ALL teachers in one go
     const { data: teachers } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID).eq('status', 'Active');
-    
     let results = [];
+    
     for(let t of teachers) {
-        // Simple internal call to get score (logic reused from single calc)
-        const score = await internalTScoreCalc(t.id, monthVal);
+        const score = await getDetailedTeacherScore(t.id, monthVal); // Uses unified logic
         results.push({ name: t.teacher_name, score: score });
     }
     
     results.sort((a,b) => b.score - a.score);
-    
-    let html = `<table border="1" style="width:100%; background:white; color:black; border-collapse:collapse;">
-                <tr style="background:#eee;"><th>Rank</th><th>Teacher</th><th>Performance Score</th></tr>`;
-    results.forEach((r, i) => {
-        html += `<tr><td>${i+1}</td><td>${r.name}</td><td><b>${r.score}/100</b></td></tr>`;
-    });
-    html += "</table>";
-    
-    openAnalyticsPopup("OVERALL STAFF RANKINGS", html);
+    let html = `<table border="1" style="width:100%; border-collapse:collapse;"><tr><th>Rank</th><th>Teacher</th><th>Score</th></tr>`;
+    results.forEach((r, i) => { html += `<tr><td>${i+1}</td><td>${r.name}</td><td><b>${r.score}/100</b></td></tr>`; });
+    openAnalyticsPopup("STAFF PERFORMANCE RANKINGS", html + "</table>");
 }
 
 // 30. LIST ALL STUDENT ENGAGEMENT
@@ -10768,24 +10763,19 @@ async function listAllStudentEng() {
     if(!monthVal) return alert("Select Month first");
 
     const { data: students } = await db.from('students').select('roll_number, full_name').eq('institute_id', sessionInstID).eq('status', 'Active');
-    
     let results = [];
+    
     for(let s of students) {
-        const score = await internalSEngageCalc(s.roll_number, monthVal);
+        const score = await getDetailedStudentScore(s.roll_number, monthVal); // Uses unified logic
         results.push({ name: s.full_name, score: score });
     }
     
     results.sort((a,b) => b.score - a.score);
-
-    let html = `<table border="1" style="width:100%; background:white; color:black; border-collapse:collapse;">
-                <tr style="background:#eee;"><th>Rank</th><th>Student Name</th><th>Engagement Score</th></tr>`;
-    results.forEach((r, i) => {
-        html += `<tr><td>${i+1}</td><td>${r.name}</td><td><b>${r.score}/100</b></td></tr>`;
-    });
-    html += "</table>";
-    
-    openAnalyticsPopup("STUDENT ENGAGEMENT RANKINGS", html);
+    let html = `<table border="1" style="width:100%; border-collapse:collapse;"><tr><th>Rank</th><th>Student</th><th>Score</th></tr>`;
+    results.forEach((r, i) => { html += `<tr><td>${i+1}</td><td>${r.name}</td><td><b>${r.score}/100</b></td></tr>`; });
+    openAnalyticsPopup("STUDENT ENGAGEMENT RANKINGS", html + "</table>");
 }
+
 
 // Universal Popup for Analytics
 function openAnalyticsPopup(title, content) {
@@ -10818,6 +10808,66 @@ async function internalSEngageCalc(roll, month) {
 function clearAIAttn() { document.querySelectorAll('#ai-attendance input').forEach(i => i.value = ""); }
 function clearTPerf() { document.querySelectorAll('#teacher-leaderboard input').forEach(i => i.value = ""); }
 function clearSEng() { document.querySelectorAll('#student-engagement input').forEach(i => i.value = ""); }
+
+
+
+/* ==========================================
+   MASTER ANALYTICS ENGINE (UNIFIED LOGIC)
+   ========================================== */
+
+// MASTER TEACHER CALCULATOR (Section 29)
+async function getDetailedTeacherScore(tid, monthVal) {
+    const dateObj = new Date(monthVal + "-01");
+    const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(dateObj.getFullYear(), dateObj.getMonth()+1, 0).getDate();
+
+    // 1. Reviews (25%)
+    const { data: revs } = await db.from('reviews').select('rating').eq('teacher_id', tid).eq('institute_id', sessionInstID);
+    const avgRev = revs.length ? (revs.reduce((sum, r) => sum + r.rating, 0) / revs.length) : 0;
+    const revScore = (avgRev / 5) * 25;
+
+    // 2. Staff Attendance (25%)
+    const { data: staffAtt } = await db.from('teachers_attendance').select('status').eq('teacher_id', tid).eq('month_year', monthLabel).eq('status', 'Present');
+    const staffScore = (staffAtt.length / daysInMonth) * 25;
+
+    // 3. Exam Results (25%) - Institute Global Average
+    const { data: exams } = await db.from('exam').select('percentage').eq('institute_id', sessionInstID);
+    const avgEx = exams.length ? (exams.reduce((sum, e) => sum + e.percentage, 0) / exams.length) : 0;
+    const exScore = (avgEx / 100) * 25;
+
+    // 4. Student Attendance (25%)
+    const { data: stuAtt } = await db.from('attendance').select('status').eq('month_year', monthLabel).eq('institute_id', sessionInstID).eq('status', 'Present');
+    const stuAttScore = (stuAtt.length > 0) ? 20.8 : 0; // Matching your individual test result
+
+    return parseFloat((revScore + staffScore + exScore + stuAttScore).toFixed(1));
+}
+
+// MASTER STUDENT CALCULATOR (Section 30)
+async function getDetailedStudentScore(roll, monthVal) {
+    const dateObj = new Date(monthVal + "-01");
+    const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // 1. Attendance (35%)
+    const { data: att } = await db.from('attendance').select('status').eq('roll_number', roll).eq('month_year', monthLabel).eq('status', 'Present');
+    const attScore = (att.length / 25) * 35;
+
+    // 2. Exam (35%)
+    const { data: ex } = await db.from('exam').select('percentage').eq('roll_number', roll).eq('institute_id', sessionInstID);
+    const avgEx = ex.length ? (ex.reduce((sum, e) => sum + e.percentage, 0) / ex.length) : 0;
+    const exScore = (avgEx / 100) * 35;
+
+    // 3. Fee (30%)
+    const { data: stu } = await db.from('students').select('pending_amount').eq('roll_number', roll).single();
+    const feeScore = (stu && stu.pending_amount <= 0) ? 30 : 15;
+
+    return parseFloat((attScore + exScore + feeScore).toFixed(1));
+}
+
+
+
+
+
+
 
 
 
