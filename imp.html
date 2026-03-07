@@ -706,6 +706,45 @@ nav.sidebar {
     background: #ffffff !important;
     border-right: 4px solid #000 !important;
 }
+
+
+
+
+
+
+
+
+/* --- WHITE FOOTER UI OVERRIDE --- */
+
+/* 1. Force all footer text and links to Pure White */
+footer, 
+footer p, 
+footer a, 
+.footer-col h4 {
+    color: #ffffff !important;
+}
+
+/* 2. Add White Underlines to the Footer Headers (Product, Support, etc.) */
+.footer-col h4 {
+    border-bottom: 2px solid #ffffff !important; /* Thick white underline */
+    display: inline-block !important;           /* Limits underline to the word width */
+    padding-bottom: 5px !important;            /* Space between word and line */
+    margin-bottom: 15px !important;            /* Space below the line before the list */
+    text-transform: uppercase !important;      /* Keeps headers looking professional */
+}
+
+/* 3. Subtle hover effect for links so the user knows they are clickable */
+footer ul li a:hover {
+    text-decoration: underline !important;
+    opacity: 0.8;
+}
+
+/* 4. Ensure the bottom border of the grid matches the theme */
+.footer-bottom {
+    border-top: 1px solid #ffffff !important;
+}
+
+.footer-bottom { margin-top: 60px !important; }
     </style>
 </head>
 <body>
