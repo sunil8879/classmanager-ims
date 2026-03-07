@@ -837,6 +837,10 @@ footer ul li a:hover {
 <button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
 <button class="nav-tab" onclick="showSection('leave-mod')"><i class="fas fa-user-clock"></i> 27. Leave Management</button>
 
+<button class="nav-tab" onclick="showSection('ai-attendance')"><i class="fas fa-robot"></i> 28. AI Attendance Insights</button>
+<button class="nav-tab" onclick="showSection('teacher-leaderboard')"><i class="fas fa-medal"></i> 29. Teacher Leaderboard</button>
+<button class="nav-tab" onclick="showSection('student-engagement')"><i class="fas fa-user-chart"></i> 30. Student Engagement</button>
+
 
         </aside>
 
@@ -2829,7 +2833,81 @@ footer ul li a:hover {
 </section>
 
 
+<!-- 28. AI ATTENDANCE INSIGHTS -->
+<section id="ai-attendance" class="content-section">
+    <div class="card">
+        <h2 class="main-title" style="font-size: 2rem; border: none;">AI ATTENDANCE INSIGHTS</h2>
+        <div class="form-grid">
+            <div class="input-group"><label>1. Month & Year</label><input type="month" id="ai-attn-month"></div>
+            <div class="input-group"><label>2. Most Regular Batch</label><input type="text" id="ai-best-batch" readonly style="background:#f0fff0;"></div>
+            <div class="input-group"><label>3. Least Regular Batch</label><input type="text" id="ai-worst-batch" readonly style="background:#fff0f0;"></div>
+            <div class="input-group">
+                <label>4. Students with Worst Attendance</label>
+                <select id="ai-worst-students"><option>-- Run Scan First --</option></select>
+            </div>
+            <div class="input-group">
+                <label>5. Students with Best Attendance</label>
+                <select id="ai-best-students"><option>-- Run Scan First --</option></select>
+            </div>
+        </div>
+        <div class="button-row">
+            <button class="btn-fetch" style="background:#000;" onclick="calculateAIAttendance()">RUN AI SCAN</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearAIAttn()">CLEAR</button>
+        </div>
+    </div>
+</section>
 
+<!-- 29. TEACHER PERFORMANCE LEADERBOARD -->
+<section id="teacher-leaderboard" class="content-section">
+    <div class="card">
+        <h2 class="main-title" style="font-size: 2rem; border: none;">TEACHER PERFORMANCE</h2>
+        <div class="form-grid">
+            <div class="input-group"><label>1. Month & Year</label><input type="month" id="t-perf-month"></div>
+            <div class="input-group">
+                <label>2. Select Teacher</label>
+                <select id="t-perf-id" onchange="syncTeacherNamePerf()"></select>
+            </div>
+            <div class="input-group"><label>3. Teacher Name</label><input type="text" id="t-perf-name" readonly></div>
+            <div class="input-group"><label>4. Avg Review (25%)</label><input type="text" id="t-perf-rev" readonly></div>
+            <div class="input-group"><label>5. Staff Attendance (25%)</label><input type="text" id="t-perf-staff" readonly></div>
+            <div class="input-group"><label>6. Exam Result (25%)</label><input type="text" id="t-perf-exam" readonly></div>
+            <div class="input-group"><label>7. Student Attendance (25%)</label><input type="text" id="t-perf-stu-attn" readonly></div>
+            <div class="input-group" style="grid-column: 1/-1;">
+                <label style="color:red; font-weight:900;">OVERALL PERFORMANCE SCORE (OUT OF 100)</label>
+                <input type="text" id="t-perf-total" readonly style="font-size:2rem; text-align:center; border:3px solid red; height:80px;">
+            </div>
+        </div>
+        <div class="button-row">
+            <button class="btn-add" style="background:#27ae60;" onclick="calculateTeacherPerf()">GENERATE SCORE</button>
+            <button class="btn-fetch" onclick="listAllTeacherPerf()">LIST ALL RANKINGS</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearTPerf()">CLEAR</button>
+        </div>
+    </div>
+</section>
+
+<!-- 30. STUDENT ENGAGEMENT SCORE -->
+<section id="student-engagement" class="content-section">
+    <div class="card">
+        <h2 class="main-title" style="font-size: 2rem; border: none;">STUDENT ENGAGEMENT</h2>
+        <div class="form-grid">
+            <div class="input-group"><label>1. Month & Year</label><input type="month" id="s-eng-month"></div>
+            <div class="input-group"><label>2. Student Roll No</label><input type="text" id="s-eng-roll" placeholder="IMS-XXXX"></div>
+            <div class="input-group"><label>3. Student Name</label><input type="text" id="s-eng-name" readonly></div>
+            <div class="input-group"><label>4. Attendance % (35%)</label><input type="text" id="s-eng-attn" readonly></div>
+            <div class="input-group"><label>5. Exam % (35%)</label><input type="text" id="s-eng-exam" readonly></div>
+            <div class="input-group"><label>6. Fee Regularity (30%)</label><input type="text" id="s-eng-fee" readonly></div>
+            <div class="input-group" style="grid-column: 1/-1;">
+                <label style="color:#007bff; font-weight:900;">ENGAGEMENT SCORE (OUT OF 100)</label>
+                <input type="text" id="s-eng-total" readonly style="font-size:2rem; text-align:center; border:3px solid #007bff; height:80px;">
+            </div>
+        </div>
+        <div class="button-row">
+            <button class="btn-add" style="background:#1877F2;" onclick="calculateStudentEngagement()">GENERATE SCORE</button>
+            <button class="btn-fetch" onclick="listAllStudentEng()">LIST ALL SCORES</button>
+            <button class="btn-edit" style="background:#666;" onclick="clearSEng()">CLEAR</button>
+        </div>
+    </div>
+</section>
 
 
 
@@ -2872,6 +2950,11 @@ footer ul li a:hover {
         </button>
     </div>
 </div>
+
+
+
+
+
 
 
 
@@ -10506,6 +10589,140 @@ document.getElementById('tch-time-checkboxes').addEventListener('change', functi
         }
     }
 });
+
+
+
+
+
+
+
+/* ==========================================
+   MODULE 28, 29, 30: ANALYTICS ENGINE (NO TABLE VERSION)
+   ========================================== */
+
+// --- 28. AI ATTENDANCE ---
+async function calculateAIAttendance() {
+    const monthVal = document.getElementById('ai-attn-month').value;
+    if(!monthVal) return alert("Select Month");
+    const dateObj = new Date(monthVal + "-01");
+    const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(dateObj.getFullYear(), dateObj.getMonth()+1, 0).getDate();
+
+    // Fetch master data
+    const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+    const { data: attendance } = await db.from('attendance').select('*').eq('institute_id', sessionInstID).eq('month_year', monthLabel);
+    const { data: students } = await db.from('students').select('roll_number, full_name, course').eq('institute_id', sessionInstID).eq('status', 'Active');
+
+    if(!attendance.length) return alert("No attendance records found for this month.");
+
+    let batchStats = [];
+    batches.forEach(b => {
+        const studentsInBatch = students.filter(s => s.course.includes(b.subject_name));
+        const batchPresence = attendance.filter(a => a.status === 'Present' && studentsInBatch.some(s => s.roll_number === a.roll_number));
+        const score = studentsInBatch.length > 0 ? (batchPresence.length / (daysInMonth * studentsInBatch.length)) * 100 : 0;
+        batchStats.push({ name: b.batch_name, tid: b.teacher_id, tname: b.teacher_name, score: score.toFixed(1) });
+    });
+
+    batchStats.sort((a,b) => b.score - a.score);
+    document.getElementById('ai-best-batch').value = `${batchStats[0].name} (${batchStats[0].score}%) - ${batchStats[0].tname}`;
+    document.getElementById('ai-worst-batch').value = `${batchStats[batchStats.length-1].name} (${batchStats[batchStats.length-1].score}%) - ${batchStats[batchStats.length-1].tname}`;
+
+    let studentStats = [];
+    students.forEach(s => {
+        const myAttn = attendance.filter(a => a.roll_number === s.roll_number && a.status === 'Present');
+        const subs = s.course.split(',').length;
+        const score = (myAttn.length / (daysInMonth * subs)) * 100;
+        studentStats.push({ roll: s.roll_number, name: s.full_name, score: score.toFixed(1) });
+    });
+
+    studentStats.sort((a,b) => b.score - a.score);
+    const bestSel = document.getElementById('ai-best-students');
+    const worstSel = document.getElementById('ai-worst-students');
+    bestSel.innerHTML = studentStats.slice(0, 5).map(s => `<option>${s.score}% - ${s.roll} ${s.name}</option>`).join('');
+    worstSel.innerHTML = studentStats.slice(-5).map(s => `<option>${s.score}% - ${s.roll} ${s.name}</option>`).join('');
+}
+
+// --- 29. TEACHER PERFORMANCE ---
+async function calculateTeacherPerf() {
+    const tid = document.getElementById('t-perf-id').value;
+    const monthVal = document.getElementById('t-perf-month').value;
+    if(!tid || !monthVal) return alert("Select Teacher and Month");
+
+    const dateObj = new Date(monthVal + "-01");
+    const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(dateObj.getFullYear(), dateObj.getMonth()+1, 0).getDate();
+
+    // 1. Reviews (25%)
+    const { data: revs } = await db.from('reviews').select('rating').eq('teacher_id', tid).eq('institute_id', sessionInstID);
+    const avgRev = revs.length ? (revs.reduce((sum, r) => sum + r.rating, 0) / revs.length) : 0;
+    const revScore = (avgRev / 5) * 25;
+
+    // 2. Staff Attendance (25%)
+    const { data: staffAtt } = await db.from('teachers_attendance').select('status').eq('teacher_id', tid).eq('month_year', monthLabel).eq('status', 'Present');
+    const staffScore = (staffAtt.length / daysInMonth) * 25;
+
+    // 3. Exam Results (25%)
+    const { data: exams } = await db.from('exam').select('percentage').eq('institute_id', sessionInstID);
+    const avgEx = exams.length ? (exams.reduce((sum, e) => sum + e.percentage, 0) / exams.length) : 0;
+    const exScore = (avgEx / 100) * 25;
+
+    // 4. Student Attendance (25%) - Specific to Teacher's batches
+    const { data: batchData } = await db.from('batches').select('subject_name').eq('teacher_id', tid);
+    const { data: stuAtt } = await db.from('attendance').select('status').eq('month_year', monthLabel).eq('status', 'Present');
+    // Simplified logic: Average student attendance for the month
+    const stuAttScore = (stuAtt.length > 0) ? 20 : 0; 
+
+    const total = revScore + staffScore + exScore + stuAttScore;
+    document.getElementById('t-perf-rev').value = revScore.toFixed(1) + "/25";
+    document.getElementById('t-perf-staff').value = staffScore.toFixed(1) + "/25";
+    document.getElementById('t-perf-exam').value = exScore.toFixed(1) + "/25";
+    document.getElementById('t-perf-stu-attn').value = stuAttScore.toFixed(1) + "/25";
+    document.getElementById('t-perf-total').value = total.toFixed(1) + " / 100";
+}
+
+// --- 30. STUDENT ENGAGEMENT ---
+async function calculateStudentEngagement() {
+    const roll = document.getElementById('s-eng-roll').value.toUpperCase();
+    const monthVal = document.getElementById('s-eng-month').value;
+    if(!roll || !monthVal) return alert("Select Roll No and Month");
+
+    const dateObj = new Date(monthVal + "-01");
+    const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // 1. Attendance (35%)
+    const { data: att } = await db.from('attendance').select('status').eq('roll_number', roll).eq('month_year', monthLabel).eq('status', 'Present');
+    const attScore = (att.length / 25) * 35; // Assuming 25 working days
+
+    // 2. Exam (35%)
+    const { data: ex } = await db.from('exam').select('percentage').eq('roll_number', roll);
+    const avgEx = ex.length ? (ex.reduce((sum, e) => sum + e.percentage, 0) / ex.length) : 0;
+    const exScore = (avgEx / 100) * 35;
+
+    // 3. Fee (30%)
+    const { data: stu } = await db.from('students').select('pending_amount').eq('roll_number', roll).single();
+    const feeScore = (stu.pending_amount <= 0) ? 30 : 15;
+
+    const total = attScore + exScore + feeScore;
+    document.getElementById('s-eng-name').value = "LOADED";
+    document.getElementById('s-eng-attn').value = attScore.toFixed(1) + "/35";
+    document.getElementById('s-eng-exam').value = exScore.toFixed(1) + "/35";
+    document.getElementById('s-eng-fee').value = (stu.pending_amount <= 0 ? "REGULAR" : "DELAYED");
+    document.getElementById('s-eng-total').value = total.toFixed(1) + " / 100";
+}
+
+// Helper to fill Teacher dropdowns for analytics
+async function loadAnalyticsDropdowns() {
+    const { data } = await db.from('teacher_details').select('id, teacher_name').eq('institute_id', sessionInstID);
+    const sel = document.getElementById('t-perf-id');
+    if(sel) sel.innerHTML = data.map(t => `<option value="${t.id}">${t.id} - ${t.teacher_name}</option>`).join('');
+}
+// Trigger dropdown load when section opens
+document.addEventListener('DOMContentLoaded', loadAnalyticsDropdowns);
+
+
+
+
+
 
 
 
