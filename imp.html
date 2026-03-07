@@ -10750,7 +10750,7 @@ async function calculateStudentEngagement() {
     document.getElementById('s-eng-name').value = results.name; // FIXED: No more "LOADED"
     document.getElementById('s-eng-attn').value = results.score1.toFixed(1) + "/35";
     document.getElementById('s-eng-exam').value = results.score2.toFixed(1) + "/35";
-    document.getElementById('s-eng-fee').value = (results.score3 === 30 ? "REGULAR (30)" : "DELAYED (15)");
+  document.getElementById('s-eng-fee').value = results.feeStatusLabel;
     document.getElementById('s-eng-total').value = results.total + " / 100";
 }
 // Helper to fill Teacher dropdowns for analytics
@@ -10798,49 +10798,46 @@ async function computeStudentLogic(roll, monthVal) {
     const dateObj = new Date(monthVal + "-01");
     const monthLabel = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // Attendance (35%) -> Dynamic Divisor applied
+    // 1. Attendance (35%)
     const { data: att } = await db.from('attendance').select('status').eq('roll_number', roll).eq('month_year', monthLabel).eq('status', 'Present');
     const score1 = (att.length / workingDays) * 35;
 
-    // Exam (35%)
+    // 2. Exam (35%)
     const { data: ex } = await db.from('exam').select('percentage').eq('roll_number', roll).eq('institute_id', sessionInstID);
     const avgEx = ex.length ? (ex.reduce((sum, e) => sum + e.percentage, 0) / ex.length) : 0;
     const score2 = (avgEx / 100) * 35;
 
-    // Fee (30%)
-// --- 3. Fee Regularity (30%) - Dynamic Installment Logic ---
-const { data: stu } = await db.from('students')
-    .select('full_name, pending_amount, due_dates')
-    .eq('roll_number', roll)
-    .eq('institute_id', sessionInstID)
-    .single();
+    // 3. Fee Regularity (30%) - Dynamic Logic
+    const { data: stu } = await db.from('students')
+        .select('full_name, pending_amount, due_dates')
+        .eq('roll_number', roll)
+        .eq('institute_id', sessionInstID)
+        .single();
 
-let feeScore = 0;
-let feeStatusLabel = "DELAYED";
+    let score3 = 0; // FIXED: Changed name from feeScore to score3
+    let feeStatusLabel = "DELAYED";
 
-if (stu) {
-    // We calculate based on the number of installments left in the 'due_dates' string
-    const duesText = stu.due_dates ? stu.due_dates.trim() : "";
-    const remainingInstallmentCount = (duesText === "") ? 0 : duesText.split(',').length;
+    if (stu) {
+        const duesText = stu.due_dates ? stu.due_dates.trim() : "";
+        const remainingInstallmentCount = (duesText === "") ? 0 : duesText.split(',').length;
 
-    if (stu.pending_amount <= 0) {
-        // Full Score if no debt
-        feeScore = 30;
-        feeStatusLabel = "PAID (30)";
-    } else {
-        // User Math: 30 / (Remaining installments + 1)
-        // If 2 dates left: 30 / 3 = 10
-        // If 1 date left: 30 / 2 = 15
-        feeScore = 30 / (remainingInstallmentCount + 1);
-        feeStatusLabel = `ON TRACK (${feeScore.toFixed(0)})`;
+        if (stu.pending_amount <= 0) {
+            score3 = 30;
+            feeStatusLabel = "PAID (30)";
+        } else {
+            // Your custom math: 30 / (installments left + 1)
+            score3 = 30 / (remainingInstallmentCount + 1);
+            feeStatusLabel = `ON TRACK (${score3.toFixed(0)})`;
+        }
     }
-}
 
-const name = stu ? stu.full_name : "Unknown";
-// --- END OF FEE LOGIC ---
-
+    const name = stu ? stu.full_name : "Unknown";
+    
+    // The final calculation now finds score3 correctly
     const total = (score1 + score2 + score3).toFixed(1);
-    return { name, score1, score2, score3, total };
+    
+    // We return everything including the label for the UI
+    return { name, score1, score2, score3, total, feeStatusLabel };
 }
 
 
