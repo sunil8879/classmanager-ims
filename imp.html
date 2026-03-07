@@ -10697,9 +10697,31 @@ async function computeTeacherLogic(tid, monthVal) {
     const score3 = (avgEx / 100) * 25;
 
     // Student Attendance (25%) -> Dynamic Divisor applied
-    const { data: stuAtt } = await db.from('attendance').select('status').eq('month_year', monthLabel).eq('institute_id', sessionInstID).eq('status', 'Present');
-    // Using 20.8 as your standard baseline for institute-wide student attendance
-    const score4 = (stuAtt.length > 0) ? 20.8 : 0; 
+// --- 4. Student Attendance (25%) - TRULY DYNAMIC ---
+// This finds only the students who are actually assigned to THIS teacher
+const { data: myStudents } = await db.from('student_allocations')
+    .select('roll_number')
+    .eq('teacher_id', tid)
+    .eq('institute_id', sessionInstID);
+
+let score4 = 0; // Standardized name to prevent errors
+
+if (myStudents && myStudents.length > 0) {
+    const studentRolls = myStudents.map(ms => ms.roll_number);
+    
+    // Fetch presence only for these specific students this month
+    const { data: stuPresence } = await db.from('attendance')
+        .select('id')
+        .in('roll_number', studentRolls)
+        .eq('month_year', monthLabel)
+        .eq('status', 'Present');
+    
+    // Your exact formula: (Total Present / (Working Days * Total Students)) * 25
+    score4 = (stuPresence.length / (workingDays * myStudents.length)) * 25;
+}
+
+// Ensure score4 is a clean number even if no students found
+score4 = isNaN(score4) ? 0 : score4;
 
     const total = (score1 + score2 + score3 + score4).toFixed(1);
     return { score1, score2, score3, score4, total };
