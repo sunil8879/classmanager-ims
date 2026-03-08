@@ -9924,18 +9924,21 @@ widget.style.setProperty('gap', '80px', 'important'); // This increases the spac
 
 
 // --- DYNAMIC ID & QR LOGIC ---
-// --- CASE-INSENSITIVE ID & QR LOGIC ---
+// --- RELIABLE NAME-MATCHING ID & QR LOGIC ---
     (async () => {
         let displayID = "ID NOT FOUND";
-        const userEmail = profile.email; // This is usually lowercase from signup
-        const instID = profile.institute_id; // Using direct profile data for speed
+        
+        // We use the Full Name from the login profile (which is already Uppercase)
+        const fullName = profile.full_name; 
+        const instID = profile.institute_id;
 
         if (role === 'Teacher') {
-            // .ilike ignores Case Sensitivity (matches SUNIL vs sunil)
-            const { data: t } = await db.from('teacher_details').select('id').ilike('email', userEmail).eq('institute_id', instID).maybeSingle();
+            // Search Teacher table by Teacher Name
+            const { data: t } = await db.from('teacher_details').select('id').eq('teacher_name', fullName).eq('institute_id', instID).maybeSingle();
             if (t) displayID = t.id;
         } else if (role === 'Student') {
-            const { data: s } = await db.from('students').select('roll_number').ilike('email', userEmail).eq('institute_id', instID).maybeSingle();
+            // Search Student table by Full Name
+            const { data: s } = await db.from('students').select('roll_number').eq('full_name', fullName).eq('institute_id', instID).maybeSingle();
             if (s) displayID = s.roll_number;
         }
 
