@@ -6054,29 +6054,37 @@ document.getElementById('p-absent').innerText = absent;
 document.getElementById('p-attn-pct').innerText = attnPct + "%";
 
         // 3. Populate Course Dropdown (From Student Allocations Section 18)
-       // 3. Populate Course Dropdown (FILTERED FOR UNIQUE SUBJECTS)
-        const { data: allocations } = await db.from('student_allocations')
-            .select('subject, teacher_name')
-            .eq('roll_number', roll)
-            .eq('institute_id', sessionInstID);
+// --- 3. DYNAMIC COURSE DROPDOWN (STRICT FILTER) ---
+// Gets the current list of allowed subjects from the Master Admission record
+const allowedSubjects = student.course ? student.course.toUpperCase().split(',').map(c => c.trim()) : [];
 
-        const courseSelect = document.getElementById('p-course-list');
-        courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
-        
-        if (allocations && allocations.length > 0) {
-            // Minimal Fix: Use a Map to store one record per subject name
-            const uniqueAllocs = new Map();
-            allocations.forEach(a => uniqueAllocs.set(a.subject.toUpperCase().trim(), a.teacher_name));
+const { data: allocations } = await db.from('student_allocations')
+    .select('subject, teacher_name')
+    .eq('roll_number', roll)
+    .eq('institute_id', sessionInstID);
 
-            uniqueAllocs.forEach((teacher, subject) => {
-                let opt = document.createElement('option');
-                opt.value = subject;
-                opt.text = subject;
-                opt.dataset.teacher = teacher;
-                courseSelect.appendChild(opt);
-            });
+const courseSelect = document.getElementById('p-course-list');
+courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+
+if (allocations && allocations.length > 0) {
+    const uniqueFilteredAllocs = new Map();
+    allocations.forEach(a => {
+        const sub = a.subject.toUpperCase().trim();
+        // THE DYNAMIC GATEKEEPER: Only add to dropdown if subject is in the Master Admission box
+        if (allowedSubjects.includes(sub)) {
+            uniqueFilteredAllocs.set(sub, a.teacher_name);
         }
+    });
 
+    uniqueFilteredAllocs.forEach((teacher, subject) => {
+        let opt = document.createElement('option');
+        opt.value = subject;
+        opt.text = subject;
+        opt.dataset.teacher = teacher;
+        courseSelect.appendChild(opt);
+    });
+}
+// --- END OF DYNAMIC DROPDOWN ---
         // 4. Global Avg % Calculation (All exams ever taken)
         const { data: allExams } = await db.from('exam')
             .select('marks_obtained, total_marks')
