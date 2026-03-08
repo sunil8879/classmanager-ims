@@ -3621,9 +3621,9 @@ async function editStudentByRoll() {
 
 
 // --- ADDED: AUTO-CLEANUP ROSTER (Updates Scheduler Count) ---
-        const newCourseList = updateData.course.split(',').map(c => c.trim().toUpperCase());
-        
-        // Find this student in the Master Roster (list table)
+      const newCourses = document.getElementById('stu-course').value.split(',').map(c => c.trim().toUpperCase());
+
+        // 2. Find every batch this student is currently in (from the 'list' table)
         const { data: currentRoster } = await db.from('list')
             .select('id, course_name')
             .eq('roll_number', roll)
@@ -3631,10 +3631,17 @@ async function editStudentByRoll() {
 
         if (currentRoster) {
             for (let entry of currentRoster) {
-                // If a batch in the roster is NOT in the new course list, delete it
-                if (!newCourseList.includes(entry.course_name.toUpperCase())) {
+                // 3. If a batch in the roster is NOT in your new list, DELETE IT
+                if (!newCourses.includes(entry.course_name.toUpperCase())) {
                     await db.from('list').delete().eq('id', entry.id);
-                    console.log(`Removed ${roll} from ${entry.course_name} (Roster Cleaned)`);
+                    
+                    // Also clean up Section 18 (Allocation) so everything stays synced
+                    await db.from('student_allocations')
+                        .delete()
+                        .eq('roll_number', roll)
+                        .eq('subject', entry.course_name);
+                        
+                    console.log("Cleaned up: " + entry.course_name);
                 }
             }
         }
