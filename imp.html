@@ -6055,36 +6055,38 @@ document.getElementById('p-attn-pct').innerText = attnPct + "%";
 
         // 3. Populate Course Dropdown (From Student Allocations Section 18)
 // --- 3. DYNAMIC COURSE DROPDOWN (STRICT FILTER) ---
-// --- 3. DYNAMIC COURSE DROPDOWN (MASTER SYNC) ---
-// This grabs exactly what is written in the student's Admission record (Section 3)
+// --- 3. DYNAMIC COURSE DROPDOWN (SMART LINKING) ---
 const currentCourses = student.course ? student.course.split(',').map(c => c.trim().toUpperCase()).filter(c => c !== "") : [];
 
-// Fetch allocations to find the teacher's name for those courses
+// Fetch every allocation for this student
 const { data: allocData } = await db.from('student_allocations')
     .select('subject, teacher_name')
     .eq('roll_number', roll)
     .eq('institute_id', sessionInstID);
-
-// Create a lookup helper to find teachers by subject
-const teacherLookup = {};
-if (allocData) {
-    allocData.forEach(a => {
-        teacherLookup[a.subject.toUpperCase().trim()] = a.teacher_name;
-    });
-}
 
 const courseSelect = document.getElementById('p-course-list');
 courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
 
 // Build the dropdown using the LIVE list from Section 3
 currentCourses.forEach(subName => {
+    let assignedTeacher = "Teacher Not Assigned";
+    
+    if (allocData) {
+        // SMART SEARCH: Find a teacher whose subject matches or contains our course name
+        const match = allocData.find(a => {
+            const dbSub = a.subject.toUpperCase();
+            return dbSub === subName || dbSub.includes(subName) || subName.includes(dbSub);
+        });
+        if (match) assignedTeacher = match.teacher_name;
+    }
+
     let opt = document.createElement('option');
     opt.value = subName;
     opt.text = subName;
-    // Link the teacher from Section 18, or show "TBD" if not yet allocated
-    opt.dataset.teacher = teacherLookup[subName] || "Teacher Not Assigned";
+    opt.dataset.teacher = assignedTeacher; // This now correctly holds the teacher's name
     courseSelect.appendChild(opt);
 });
+// --- END OF POINT 3 ---
 // --- END OF POINT 3 ---
 // --- END OF DYNAMIC DROPDOWN ---
         // 4. Global Avg % Calculation (All exams ever taken)
