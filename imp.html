@@ -9924,22 +9924,24 @@ widget.style.setProperty('gap', '80px', 'important'); // This increases the spac
 
 
 // --- DYNAMIC ID & QR LOGIC ---
-// --- FIXED DYNAMIC ID & QR LOGIC ---
+// --- CASE-INSENSITIVE ID & QR LOGIC ---
     (async () => {
         let displayID = "ID NOT FOUND";
-        const userEmail = profile.email;
+        const userEmail = profile.email; // This is usually lowercase from signup
+        const instID = profile.institute_id; // Using direct profile data for speed
 
         if (role === 'Teacher') {
-            const { data: t } = await db.from('teacher_details').select('id').eq('email', userEmail).eq('institute_id', sessionInstID).maybeSingle();
+            // .ilike ignores Case Sensitivity (matches SUNIL vs sunil)
+            const { data: t } = await db.from('teacher_details').select('id').ilike('email', userEmail).eq('institute_id', instID).maybeSingle();
             if (t) displayID = t.id;
         } else if (role === 'Student') {
-            const { data: s } = await db.from('students').select('roll_number').eq('email', userEmail).eq('institute_id', sessionInstID).maybeSingle();
+            const { data: s } = await db.from('students').select('roll_number').ilike('email', userEmail).eq('institute_id', instID).maybeSingle();
             if (s) displayID = s.roll_number;
         }
 
-        document.getElementById('widget-display-id').innerText = displayID;
+        const idBox = document.getElementById('widget-display-id');
+        if (idBox) idBox.innerText = displayID;
 
-        // Using a more reliable QR API
         const qrEl = document.getElementById('sidebar-qr-code');
         if (qrEl) {
             qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${displayID}`;
