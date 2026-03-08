@@ -10771,8 +10771,12 @@ async function calculateAIAttendance() {
     batches.forEach(b => {
         const studentsInBatch = students.filter(s => s.course.includes(b.subject_name));
         const batchPresence = attendance.filter(a => a.status === 'Present' && studentsInBatch.some(s => s.roll_number === a.roll_number));
-        const score = studentsInBatch.length > 0 ? (batchPresence.length / (daysInMonth * studentsInBatch.length)) * 100 : 0;
-        batchStats.push({ name: b.batch_name, tid: b.teacher_id, tname: b.teacher_name, score: score.toFixed(1) });
+    // This counts actual records (Present + Absent) for all students in this specific batch
+// RENAMED TO bScore TO PREVENT ERRORS
+        const batchAllRecords = attendance.filter(a => studentsInBatch.some(s => s.roll_number === a.roll_number));
+        const bScore = batchAllRecords.length > 0 ? (batchPresence.length / batchAllRecords.length) * 100 : 0;
+        
+        batchStats.push({ name: b.batch_name, tid: b.teacher_id, tname: b.teacher_name, score: bScore.toFixed(1) });
     });
 
     batchStats.sort((a,b) => b.score - a.score);
@@ -10783,8 +10787,12 @@ async function calculateAIAttendance() {
     students.forEach(s => {
         const myAttn = attendance.filter(a => a.roll_number === s.roll_number && a.status === 'Present');
         const subs = s.course.split(',').length;
-        const score = (myAttn.length / (daysInMonth * subs)) * 100;
-        studentStats.push({ roll: s.roll_number, name: s.full_name, score: score.toFixed(1) });
+// This fetches every attendance record for this student (MWF safe)
+// RENAMED TO sScore TO PREVENT ERRORS
+        const myTotalRecords = attendance.filter(a => a.roll_number === s.roll_number);
+        const sScore = myTotalRecords.length > 0 ? (myAttn.length / myTotalRecords.length) * 100 : 0;
+        
+        studentStats.push({ roll: s.roll_number, name: s.full_name, score: sScore.toFixed(1) });
     });
 
     studentStats.sort((a,b) => b.score - a.score);
