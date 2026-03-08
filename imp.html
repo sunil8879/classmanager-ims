@@ -8592,6 +8592,31 @@ async function addScholarship() {
         else alert("Save Error: " + error.message);
     } else {
         alert("Success: Scholarship Record Added!");
+// --- COMPLETE FINANCIAL SYNC (Sec 3, 4, 8 & DASHBOARD) ---
+if (document.getElementById('sch-status').value === 'Approved') {
+    const finalFees = parseFloat(document.getElementById('sch-final-fee').value);
+    const rollNo = document.getElementById('sch-roll').value.trim().toUpperCase();
+    
+    // 1. Fetch current paid amount to keep balance accurate
+    const { data: stu } = await db.from('students').select('paid_amount').eq('roll_number', rollNo).single();
+    
+    if (stu) {
+        const newPending = finalFees - (stu.paid_amount || 0);
+
+        // 2. Update Master Table (Syncs Student Mgmt, Fees, and Reminders)
+        await db.from('students').update({
+            total_fees: finalFees,
+            pending_amount: newPending
+        }).eq('roll_number', rollNo);
+
+        // 3. Refresh the Logged-in Dashboard numbers instantly
+        if (typeof loadHomeDashboardStats === 'function') {
+            await loadHomeDashboardStats();
+        }
+        
+        console.log("Finance and Dashboard synced successfully.");
+    }
+}
     }
 }
 
@@ -8638,6 +8663,29 @@ async function updateScholarship() {
 
     if (error) alert("Update Error: " + error.message);
     else alert("Success: Scholarship Record Updated!");
+// --- COMPLETE FINANCIAL SYNC (Sec 3, 4, 8 & DASHBOARD) ---
+if (document.getElementById('sch-status').value === 'Approved') {
+    const finalFees = parseFloat(document.getElementById('sch-final-fee').value);
+    const rollNo = document.getElementById('sch-roll').value.trim().toUpperCase();
+    
+    // 1. Fetch current paid amount to keep balance accurate
+    const { data: stu } = await db.from('students').select('paid_amount').eq('roll_number', rollNo).single();
+    
+    if (stu) {
+        const newPending = finalFees - (stu.paid_amount || 0);
+await db.from('students').update({
+    total_fees: finalFees,
+    pending_amount: newPending
+}).eq('roll_number', rollNo).eq('institute_id', sessionInstID); // Security: ensures you only update YOUR student
+
+        // 3. Refresh the Logged-in Dashboard numbers instantly
+        if (typeof loadHomeDashboardStats === 'function') {
+            await loadHomeDashboardStats();
+        }
+        
+        console.log("Finance and Dashboard synced successfully.");
+    }
+}
 }
 
 // 9. PRINT Award Letter
