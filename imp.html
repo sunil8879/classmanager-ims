@@ -914,53 +914,41 @@ footer ul li a:hover {
 <button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
 <button class="nav-tab" onclick="showSection('leave-mod')"><i class="fas fa-user-clock"></i> 27. Leave Management</button>
 
-<!-- SIDEBAR ENGAGEMENT STACK (For Teachers/Students) -->
-<div id="sidebar-extra-widget" style="display: none; margin-top: 30px; display: flex; flex-direction: column; gap: 30px;">
+
+<!-- MASTER SIDEBAR ENGAGEMENT STACK (Visible to Teachers/Students) -->
+<div id="sidebar-extra-widget" style="display: none; margin-top: 60px; flex-direction: column; gap: 25px;">
     
-    <!-- 1. USER PROFILE CARD -->
+    <!-- 1. USER IDENTITY CARD -->
     <div style="padding: 20px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 8px 8px 0px #000; text-align: center;">
         <div style="width: 60px; height: 60px; background: #eee; border: 2px solid #000; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;"><i class="fas fa-user-circle"></i></div>
-        <div style="font-size: 0.7rem; text-transform: uppercase; color: #666; font-weight: bold;">Official Profile</div>
-        <h4 id="widget-user-name" style="margin: 5px 0; font-size: 1.2rem; text-transform: uppercase;">---</h4>
+        <div style="font-size: 0.6rem; text-transform: uppercase; color: #666; font-weight: bold; letter-spacing: 1px;">Personal Profile</div>
+        <h4 id="widget-user-name" style="margin: 5px 0; font-size: 1.1rem; text-transform: uppercase; color: #000;">---</h4>
         <p id="widget-user-role" style="margin: 0; color: #ff0000; font-weight: 900; font-size: 0.8rem; letter-spacing: 1px;">---</p>
     </div>
 
-
-
-
-
-<!-- 1.5 DYNAMIC IDENTITY BADGE (No Table Changes Needed) -->
-<div id="widget-id-badge" style="padding: 20px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 8px 8px 0px #000; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-    <div style="font-size: 0.6rem; font-weight: 900; color: #007bff; letter-spacing: 2px;">INSTITUTE PASS</div>
-    
-    <!-- This is the QR Code area -->
-    <div style="padding: 10px; border: 2px solid #eee; border-radius: 10px; background: #fafafa;">
-        <img id="sidebar-qr-code" src="" alt="QR Code" style="width: 100px; height: 100px;">
+    <!-- 2. DYNAMIC INSTITUTE CONTACT CARD -->
+    <div style="padding: 20px; border: 3px solid #000; border-radius: 15px; background: #f0faff; box-shadow: 8px 8px 0px #000;">
+        <div style="font-size: 0.7rem; font-weight: 900; color: #007bff; margin-bottom: 12px; letter-spacing: 1px; text-transform: uppercase;">Office Contact</div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <p style="margin: 0; font-size: 0.85rem; color: #000; font-weight: 600;"><i class="fas fa-map-marker-alt" style="width: 20px; color: #000;"></i> <span id="side-addr">Loading...</span></p>
+            <p style="margin: 0; font-size: 0.85rem; color: #000; font-weight: 600;"><i class="fas fa-phone-alt" style="width: 20px; color: #000;"></i> <span id="side-ph">Loading...</span></p>
+            <p style="margin: 0; font-size: 0.85rem; color: #000; font-weight: 600;"><i class="fas fa-envelope" style="width: 20px; color: #000;"></i> <span id="side-em">Loading...</span></p>
+        </div>
     </div>
-    
-    <div style="margin-top: 5px;">
-        <small style="display: block; color: #666; font-size: 0.7rem; text-transform: uppercase;">Unique ID</small>
-        <b id="widget-display-id" style="font-size: 1rem; color: #000;">---</b>
-    </div>
-</div>
 
-
-
-
-
-    <!-- 2. MOTIVATIONAL QUOTE CARD -->
-    <div style="padding: 15px; border: 2px solid #000; border-radius: 15px; background: #f0faff; box-shadow: 5px 5px 0px #000; text-align: center; font-style: italic;">
+    <!-- 3. MOTIVATIONAL QUOTE CARD -->
+    <div style="padding: 15px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 8px 8px 0px #000; text-align: center; font-style: italic;">
         <i class="fas fa-quote-left" style="color: #007bff; margin-bottom: 5px;"></i>
-        <p id="sidebar-quote" style="font-size: 0.9rem; font-weight: 600; line-height: 1.4; color: #333;">"The roots of education are bitter, but the fruit is sweet."</p>
+        <p id="sidebar-quote" style="font-size: 0.85rem; font-weight: 600; line-height: 1.4; color: #333; transition: opacity 0.5s;">"The roots of education are bitter, but the fruit is sweet."</p>
     </div>
 
-    <!-- 3. QUICK SUPPORT & BRANDING -->
-    <div style="padding: 15px; border: 2px solid #000; border-radius: 15px; background: #7FFFD4; box-shadow: 5px 5px 0px #000; text-align: center;">
-        <p style="font-weight: 800; font-size: 0.8rem; margin-bottom: 10px;">ClassManager Support</p>
-        <a id="admin-wa-link" href="#" target="_blank" style="display: block; background: #000; color: #fff; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.8rem;">
+    <!-- 4. QUICK SUPPORT & BRANDING -->
+    <div style="padding: 15px; border: 3px solid #000; border-radius: 15px; background: #7FFFD4; box-shadow: 8px 8px 0px #000; text-align: center;">
+        <p style="font-weight: 800; font-size: 0.8rem; margin-bottom: 10px; color: #000;">INSTITUTE SUPPORT</p>
+        <a id="admin-wa-link" href="#" target="_blank" style="display: block; background: #000; color: #fff; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.8rem; border: 1px solid #000;">
             <i class="fab fa-whatsapp"></i> CHAT WITH ADMIN
         </a>
-        <p style="margin-top: 15px; font-size: 0.6rem; font-weight: bold; letter-spacing: 2px; color: #000;">VER 2026.1.0</p>
+        <p style="margin-top: 15px; font-size: 0.55rem; font-weight: 900; letter-spacing: 2px; color: #000; text-transform: uppercase;">ver 2026.1.0 | SECURE CLOUD</p>
     </div>
 </div>
 
@@ -1683,6 +1671,26 @@ footer ul li a:hover {
         <button class="btn-add" style="background:#673ab7;" onclick="generateLeadsReport()">GENERATE ANALYTICS</button>
     </div>
 </div>
+
+
+
+
+<!-- INSTITUTE BRANDING SETUP (OWNER ONLY) -->
+<div class="card" style="margin-top: 30px; border-top: 5px solid #25D366;">
+    <h3><i class="fas fa-id-badge"></i> Institute Contact Setup</h3>
+    <div class="form-grid">
+        <div class="input-group"><label>Office Address</label><input type="text" id="set-address" placeholder="e.g. Sector 4, MG Road"></div>
+        <div class="input-group"><label>Contact Number</label><input type="text" id="set-phone" placeholder="e.g. +91 98XXX XXXX"></div>
+        <div class="input-group"><label>Office Email</label><input type="email" id="set-email" placeholder="e.g. contact@institute.com"></div>
+        <div class="input-group"><label>WhatsApp for Support</label><input type="text" id="set-wa" placeholder="10 Digit Number Only"></div>
+    </div>
+    <div class="button-row">
+        <button class="btn-add" onclick="saveInstSettings()">SAVE BRANDING</button>
+    </div>
+</div>
+
+
+
 
 
 
@@ -9911,6 +9919,7 @@ const role = profile.role;
 const widget = document.getElementById('sidebar-extra-widget');
     if (widget) {
         if (role !== 'Owner') {
+loadSidebarContact(); // This fills the card with that institute's specific data
             // 1. FORCE FLEX DISPLAY (This makes the 'gap' work)
             widget.style.display = 'flex'; 
 
@@ -9923,42 +9932,7 @@ widget.style.setProperty('gap', '80px', 'important'); // This increases the spac
 
 
 
-// --- DYNAMIC ID & QR LOGIC ---
-// --- RELIABLE NAME-MATCHING ID & QR LOGIC ---
-// --- THE ULTIMATE "NO-FAIL" ID MATCHING LOGIC ---
-    (async () => {
-        let displayID = "DATA NOT FOUND";
-        const instID = profile.institute_id;
-        const targetTable = (role === 'Teacher') ? 'teacher_details' : 'students';
-        const idColumn = (role === 'Teacher') ? 'id' : 'roll_number';
 
-        // 1. Download all records for your institute
-        const { data: allRecords } = await db.from(targetTable).select('*').eq('institute_id', instID);
-
-        if (allRecords && allRecords.length > 0) {
-            // 2. Search for a match manually in JavaScript (More reliable than SQL)
-            const match = allRecords.find(row => {
-                const dbEmail = (row.email || "").trim().toUpperCase();
-                const authEmail = (profile.email || "").trim().toUpperCase();
-                const dbName = (row.teacher_name || row.full_name || "").trim().toUpperCase();
-                const authName = (profile.full_name || "").trim().toUpperCase();
-
-                // Match if Email is same OR Name is same
-                return (authEmail !== "" && dbEmail === authEmail) || (dbName === authName);
-            });
-
-            if (match) displayID = match[idColumn];
-        }
-
-        // 3. Update the UI
-        const idBox = document.getElementById('widget-display-id');
-        if (idBox) idBox.innerText = displayID;
-
-        const qrEl = document.getElementById('sidebar-qr-code');
-        if (qrEl) {
-            qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${displayID}`;
-        }
-    })();
             
             const ownerWhatsApp = "910000000000"; // REPLACE WITH YOUR REAL NUMBER
             const waLink = document.getElementById('admin-wa-link');
@@ -11613,6 +11587,34 @@ async function generatePLReport(viewType) {
         alert("Error generating report: " + err.message);
     }
 }
+
+
+
+
+// --- 1. OWNER: SAVE SETTINGS ---
+async function saveInstSettings() {
+    const data = {
+        institute_id: sessionInstID,
+        address: document.getElementById('set-address').value,
+        phone: document.getElementById('set-phone').value,
+        email: document.getElementById('set-email').value,
+        whatsapp_number: document.getElementById('set-wa').value
+    };
+    const { error } = await db.from('institute_settings').upsert(data);
+    if (error) alert(error.message); else alert("Branding Saved Successfully!");
+}
+
+// --- 2. SIDEBAR: LOAD SETTINGS ---
+async function loadSidebarContact() {
+    const { data } = await db.from('institute_settings').select('*').eq('institute_id', sessionInstID).maybeSingle();
+    if (data) {
+        document.getElementById('side-addr').innerText = data.address || "Not Set";
+        document.getElementById('side-ph').innerText = data.phone || "Not Set";
+        document.getElementById('side-em').innerText = data.email || "Not Set";
+        document.getElementById('admin-wa-link').href = `https://wa.me/91${data.whatsapp_number}?text=Help Required`;
+    }
+}
+
 
 
 
