@@ -11471,41 +11471,49 @@ async function generatePLReport(viewType) {
 
 
 // --- DYNAMIC EDUCATION SEARCH LOGIC (WIKIPEDIA API) ---
-// --- FIXED DYNAMIC EDUCATION SEARCH LOGIC ---
+// --- THE BULLETPROOF SEARCH (WORKS WITH ALL CAPS) ---
 async function performEduSearch() {
     const inputEl = document.getElementById('edu-search-input');
-    let query = inputEl.value.trim();
+    const query = inputEl.value.trim();
     const contentArea = document.getElementById('edu-content-area');
     const loading = document.getElementById('edu-loading');
 
-    if (!query) return alert("Please type a topic to search.");
+    if (!query) return alert("Please type an academic topic.");
 
-    // THE MAGIC FIX: Convert "PHYSICS" to "Physics" for Wikipedia
-    query = query.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-    // UI Feedback
     contentArea.style.display = 'none';
     loading.style.display = 'block';
 
     try {
-        // Wikipedia API Call
-        const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            contentArea.innerHTML = `<p style="color: red; font-weight: bold;">Topic not found. Try a more common academic term (e.g. Algebra, Newton, History).</p>`;
-        } else {
-            const data = await response.json();
-            contentArea.innerHTML = `
-                <h3 style="color: #000; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #007bff; display: inline-block;">${data.title}</h3>
-                <p style="font-size: 0.95rem; line-height: 1.6; color: #000; font-weight: 500;">${data.extract}</p>
-                <a href="${data.content_urls.desktop.page}" target="_blank" style="display: block; margin-top: 15px; color: #007bff; font-weight: bold; font-size: 0.8rem; text-decoration: none;">
-                    READ FULL ARTICLE <i class="fas fa-external-link-alt"></i>
-                </a>
-            `;
+        // STEP 1: Search Wikipedia for the real title (Forgives ALL CAPS)
+        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
+        const searchResponse = await fetch(searchUrl);
+        const searchData = await searchResponse.json();
+
+        if (!searchData.query.search || searchData.query.search.length === 0) {
+            contentArea.innerHTML = `<p style="color: red; font-weight: bold;">Academic topic not found. Try terms like 'Calculus', 'Biology', or 'French Revolution'.</p>`;
+            return;
         }
+
+        // STEP 2: Use the best matching title from the search results
+        const correctTitle = searchData.query.search[0].title;
+
+        // STEP 3: Fetch the summary using the correctly cased title
+        const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(correctTitle)}`;
+        const summaryResponse = await fetch(summaryUrl);
+        const data = await summaryResponse.json();
+
+        // STEP 4: Display to the Vertical Card
+        contentArea.innerHTML = `
+            <h3 style="color: #000; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #007bff; display: inline-block;">${data.title}</h3>
+            <p style="font-size: 0.95rem; line-height: 1.6; color: #000; font-weight: 600;">${data.extract}</p>
+            <hr style="margin: 15px 0; border: 1px dashed #ddd;">
+            <a href="${data.content_urls.desktop.page}" target="_blank" style="display: block; color: #007bff; font-weight: 800; font-size: 0.8rem; text-decoration: none;">
+                <i class="fas fa-book-open"></i> OPEN FULL RESEARCH PAPER
+            </a>
+        `;
+
     } catch (err) {
-        contentArea.innerHTML = `<p style="color: red;">Error connecting to Educational Hub.</p>`;
+        contentArea.innerHTML = `<p style="color: red;">Connectivity Error. Check internet.</p>`;
     } finally {
         loading.style.display = 'none';
         contentArea.style.display = 'block';
