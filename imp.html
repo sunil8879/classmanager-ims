@@ -9924,20 +9924,26 @@ widget.style.setProperty('gap', '80px', 'important'); // This increases the spac
 
 
 // --- DYNAMIC ID & QR LOGIC ---
+// --- FIXED DYNAMIC ID & QR LOGIC ---
     (async () => {
-        let displayID = "N/A";
+        let displayID = "ID NOT FOUND";
         const userEmail = profile.email;
+
         if (role === 'Teacher') {
-            const { data: t } = await db.from('teacher_details').select('id').eq('email', userEmail).maybeSingle();
-            displayID = t ? t.id : "TCH-PENDING";
+            const { data: t } = await db.from('teacher_details').select('id').eq('email', userEmail).eq('institute_id', sessionInstID).maybeSingle();
+            if (t) displayID = t.id;
         } else if (role === 'Student') {
-            const { data: s } = await db.from('students').select('roll_number').eq('email', userEmail).maybeSingle();
-            displayID = s ? s.roll_number : "IMS-PENDING";
+            const { data: s } = await db.from('students').select('roll_number').eq('email', userEmail).eq('institute_id', sessionInstID).maybeSingle();
+            if (s) displayID = s.roll_number;
         }
-        const dispIdEl = document.getElementById('widget-display-id');
-        if (dispIdEl) dispIdEl.innerText = displayID;
+
+        document.getElementById('widget-display-id').innerText = displayID;
+
+        // Using a more reliable QR API
         const qrEl = document.getElementById('sidebar-qr-code');
-        if (qrEl) qrEl.src = `https://chart.googleapis.com/chart?cht=qr&chl=${displayID}&chs=160x160&chld=L|0`;
+        if (qrEl) {
+            qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${displayID}`;
+        }
     })();
             
             const ownerWhatsApp = "910000000000"; // REPLACE WITH YOUR REAL NUMBER
