@@ -3668,9 +3668,11 @@ async function openBatchPicker() {
     const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
   const { data: listData } = await db.from('list').select('batch_name, roll_number').eq('institute_id', sessionInstID);
 
-// ADD THIS: Get only current students to exclude deleted ones from the count
-const { data: activeStu } = await db.from('students').select('roll_number').eq('institute_id', sessionInstID);
-const activeRolls = activeStu ? activeStu.map(s => s.roll_number) : [];
+// This creates a "Live Map" of which student is allowed in which course
+const { data: activeStu } = await db.from('students').select('roll_number, course').eq('institute_id', sessionInstID);
+const studentCourseMap = activeStu ? Object.fromEntries(activeStu.map(s => [s.roll_number.trim().toUpperCase(), s.course ? s.course.toUpperCase() : ""])) : {};
+
+
 
     if (!batches || batches.length === 0) {
         tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No Batches found. Create them in Section 5.</td></tr>";
@@ -3697,10 +3699,17 @@ const activeRolls = activeStu ? activeStu.map(s => s.roll_number) : [];
 
     // 4. Render tidy table
     tbody.innerHTML = "";
-    rows.forEach(row => {
-        const enrolled = listData ? listData.filter(l => l.batch_name === row.batchName).length : 0;
-// ADD THIS: Re-calculate to exclude deleted students
-const enrolledClean = listData ? listData.filter(l => l.batch_name === row.batchName && activeRolls.some(roll => roll.trim().toUpperCase() === l.roll_number.trim().toUpperCase())).length : 0;
+ rows.forEach(row => {
+        // This counts the student ONLY if they are active AND still enrolled in this specific subject
+        const enrolledClean = listData ? listData.filter(l => {
+            // Safety: Check if roll_number exists before trimming
+            const roll = (l.roll_number) ? l.roll_number.trim().toUpperCase() : "MISSING";
+            const studentMasterCourses = studentCourseMap[roll] || "";
+            
+            // Only count if Batch Name matches AND the student's Admission file still includes this subject
+            return l.batch_name === row.batchName && studentMasterCourses.includes(row.subject.toUpperCase());
+        }).length : 0;
+
         const isFull = row.capacity > 0 && enrolledClean >= row.capacity;
 
         tbody.innerHTML += `
