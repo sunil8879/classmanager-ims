@@ -6055,35 +6055,37 @@ document.getElementById('p-attn-pct').innerText = attnPct + "%";
 
         // 3. Populate Course Dropdown (From Student Allocations Section 18)
 // --- 3. DYNAMIC COURSE DROPDOWN (STRICT FILTER) ---
-// Gets the current list of allowed subjects from the Master Admission record
-const allowedSubjects = student.course ? student.course.toUpperCase().split(',').map(c => c.trim()) : [];
+// --- 3. DYNAMIC COURSE DROPDOWN (MASTER SYNC) ---
+// This grabs exactly what is written in the student's Admission record (Section 3)
+const currentCourses = student.course ? student.course.split(',').map(c => c.trim().toUpperCase()).filter(c => c !== "") : [];
 
-const { data: allocations } = await db.from('student_allocations')
+// Fetch allocations to find the teacher's name for those courses
+const { data: allocData } = await db.from('student_allocations')
     .select('subject, teacher_name')
     .eq('roll_number', roll)
     .eq('institute_id', sessionInstID);
 
+// Create a lookup helper to find teachers by subject
+const teacherLookup = {};
+if (allocData) {
+    allocData.forEach(a => {
+        teacherLookup[a.subject.toUpperCase().trim()] = a.teacher_name;
+    });
+}
+
 const courseSelect = document.getElementById('p-course-list');
 courseSelect.innerHTML = '<option value="">-- Select Course --</option>';
 
-if (allocations && allocations.length > 0) {
-    const uniqueFilteredAllocs = new Map();
-    allocations.forEach(a => {
-        const sub = a.subject.toUpperCase().trim();
-        // THE DYNAMIC GATEKEEPER: Only add to dropdown if subject is in the Master Admission box
-        if (allowedSubjects.includes(sub)) {
-            uniqueFilteredAllocs.set(sub, a.teacher_name);
-        }
-    });
-
-    uniqueFilteredAllocs.forEach((teacher, subject) => {
-        let opt = document.createElement('option');
-        opt.value = subject;
-        opt.text = subject;
-        opt.dataset.teacher = teacher;
-        courseSelect.appendChild(opt);
-    });
-}
+// Build the dropdown using the LIVE list from Section 3
+currentCourses.forEach(subName => {
+    let opt = document.createElement('option');
+    opt.value = subName;
+    opt.text = subName;
+    // Link the teacher from Section 18, or show "TBD" if not yet allocated
+    opt.dataset.teacher = teacherLookup[subName] || "Teacher Not Assigned";
+    courseSelect.appendChild(opt);
+});
+// --- END OF POINT 3 ---
 // --- END OF DYNAMIC DROPDOWN ---
         // 4. Global Avg % Calculation (All exams ever taken)
         const { data: allExams } = await db.from('exam')
