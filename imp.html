@@ -9860,7 +9860,7 @@ async function applyRoleVisibility() {
     // 4. Filter Sidebar Tabs
     const tabs = document.querySelectorAll('aside.sidebar .nav-tab');
     const studentAllowed = ['home', 'login', 'student-p', 'message-corner', 'calendar-mod', 'reviews-mod'];
-    const teacherBlocked = ['fee', 'expense', 'reminder', 'admin', 'reviews-mod', 'leads', 'allocation-mod','batch-master', 'students', 'inventory-mod',  'scholarship-mod', 'alumni-mod', 'cert-gen', 'id-gen'];
+    const teacherBlocked = ['fee', 'expense', 'reminder', 'admin', 'reviews-mod', 'leads', 'allocation-mod','batch-master', 'students', 'inventory-mod',  'scholarship-mod', 'alumni-mod', 'cert-gen', 'id-gen', 'ai-attendance',  'teacher-leaderboard',  'student-engagement'];
 
     tabs.forEach(tab => {
         const clickAttr = tab.getAttribute('onclick') || "";
