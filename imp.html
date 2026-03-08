@@ -3620,31 +3620,22 @@ async function editStudentByRoll() {
 
 
 
-// --- ADDED: AUTO-CLEANUP ROSTER (Updates Scheduler Count) ---
-      const newCourses = document.getElementById('stu-course').value.split(',').map(c => c.trim().toUpperCase());
+// --- DYNAMIC ROSTER CLEANUP START ---
+const newCrs = updateData.course.split(',').map(c => c.trim().toUpperCase());
+const { data: currentRoster } = await db.from('list').select('id, course_name').eq('roll_number', roll).eq('institute_id', sessionInstID);
 
-        // 2. Find every batch this student is currently in (from the 'list' table)
-        const { data: currentRoster } = await db.from('list')
-            .select('id, course_name')
-            .eq('roll_number', roll)
-            .eq('institute_id', sessionInstID);
-
-        if (currentRoster) {
-            for (let entry of currentRoster) {
-                // 3. If a batch in the roster is NOT in your new list, DELETE IT
-                if (!newCourses.includes(entry.course_name.toUpperCase())) {
-                    await db.from('list').delete().eq('id', entry.id);
-                    
-                    // Also clean up Section 18 (Allocation) so everything stays synced
-                    await db.from('student_allocations')
-                        .delete()
-                        .eq('roll_number', roll)
-                        .eq('subject', entry.course_name);
-                        
-                    console.log("Cleaned up: " + entry.course_name);
-                }
-            }
+if (currentRoster) {
+    for (let item of currentRoster) {
+        // If the batch in the roster is NOT in the new Admission text box, DELETE IT
+        if (!newCrs.includes(item.course_name.toUpperCase())) {
+            await db.from('list').delete().eq('id', item.id);
+            // Also clean up Section 18 Allocation
+            await db.from('student_allocations').delete().eq('roll_number', roll).eq('subject', item.course_name).eq('institute_id', sessionInstID);
+            console.log("Physically removed student from dropped course: " + item.course_name);
         }
+    }
+}
+// --- DYNAMIC ROSTER CLEANUP END ---
 }
 
 
@@ -3668,8 +3659,10 @@ async function openBatchPicker() {
     const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
   const { data: listData } = await db.from('list').select('batch_name, roll_number').eq('institute_id', sessionInstID);
 
+
 // This creates a "Live Map" of which student is allowed in which course
 const { data: activeStu } = await db.from('students').select('roll_number, course').eq('institute_id', sessionInstID);
+const activeRolls = activeStu ? activeStu.map(s => s.roll_number.trim().toUpperCase()) : [];
 const studentCourseMap = activeStu ? Object.fromEntries(activeStu.map(s => [s.roll_number.trim().toUpperCase(), s.course ? s.course.toUpperCase() : ""])) : {};
 
 
@@ -3701,14 +3694,18 @@ const studentCourseMap = activeStu ? Object.fromEntries(activeStu.map(s => [s.ro
     tbody.innerHTML = "";
  rows.forEach(row => {
         // This counts the student ONLY if they are active AND still enrolled in this specific subject
-        const enrolledClean = listData ? listData.filter(l => {
-            // Safety: Check if roll_number exists before trimming
-            const roll = (l.roll_number) ? l.roll_number.trim().toUpperCase() : "MISSING";
-            const studentMasterCourses = studentCourseMap[roll] || "";
-            
-            // Only count if Batch Name matches AND the student's Admission file still includes this subject
-            return l.batch_name === row.batchName && studentMasterCourses.includes(row.subject.toUpperCase());
-        }).length : 0;
+      // This only counts students who still exist in the main Student table
+const enrolledClean = listData ? listData.filter(l => {
+    const roll = l.roll_number ? l.roll_number.trim().toUpperCase() : "";
+    const studentMasterCourses = studentCourseMap[roll] || "";
+    
+    // THE FIX: It only counts the student if:
+    // 1. Their Roll No exists (activeRolls.includes)
+    // 2. This specific subject is still in their Course box (studentMasterCourses.includes)
+    return l.batch_name === row.batchName && 
+           activeRolls.includes(roll) && 
+           studentMasterCourses.includes(row.subject.toUpperCase());
+}).length : 0;
 
         const isFull = row.capacity > 0 && enrolledClean >= row.capacity;
 
