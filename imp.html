@@ -911,40 +911,6 @@ footer ul li a:hover {
 <button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
 <button class="nav-tab" onclick="showSection('leave-mod')"><i class="fas fa-user-clock"></i> 27. Leave Management</button>
 
-
-
-
-
-<!-- VERTICAL EDUCATION SEARCH HUB -->
-<div id="edu-search-area" style="display: none; margin-top: 50px; flex-direction: column; gap: 15px; padding: 10px;">
-    
-    <!-- SEARCH INPUT BOX -->
-    <div style="position: relative;">
-        <input type="text" id="edu-search-input" placeholder="Search Education..." style="width: 100%; border: 3px solid #000 !important; border-radius: 10px !important; padding: 12px 40px 12px 15px !important; font-weight: bold;">
-        <i class="fas fa-search" style="position: absolute; right: 15px; top: 15px; color: #000;"></i>
-    </div>
-
-    <!-- BIG VERTICAL RESULT CARD -->
-    <div id="edu-result-card" class="card" style="margin: 0 !important; padding: 20px !important; min-height: 400px; display: flex; flex-direction: column; background: #fff !important; box-shadow: 8px 8px 0px #000 !important; text-align: left !important; overflow-y: auto;">
-        <div id="edu-loading" style="display: none; text-align: center; margin-top: 100px;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #007bff;"></i>
-            <p style="margin-top: 10px; font-weight: bold;">Browsing Library...</p>
-        </div>
-        <div id="edu-content-area">
-            <h4 style="color: #007bff; text-decoration: underline;">Educational Wiki</h4>
-            <p style="font-size: 0.9rem; color: #666; line-height: 1.4;">Type any academic topic (e.g., "Quantum Physics", "Algebra", "World War 2") above to fetch instant educational insights here.</p>
-        </div>
-    </div>
-
-    <button onclick="performEduSearch()" style="background: #000; color: #fff; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 4px 4px 0px #7FFFD4;">
-        FETCH INSIGHTS
-    </button>
-</div>
-
-
-
-
-
 <button class="nav-tab" onclick="showSection('ai-attendance')"><i class="fas fa-robot"></i> 28. AI Attendance Insights</button>
 <button class="nav-tab" onclick="showSection('teacher-leaderboard')"><i class="fas fa-medal"></i> 29. Teacher Leaderboard</button>
 <button class="nav-tab" onclick="showSection('student-engagement')"><i class="fas fa-chart-line"></i> 30. Student Engagement</button>
@@ -9859,18 +9825,6 @@ async function applyRoleVisibility() {
     if (!profile) return;
 
     const role = profile.role;
-
-
-
-// --- SEARCH HUB VISIBILITY LOGIC ---
-    const eduSearch = document.getElementById('edu-search-area');
-    if (eduSearch) {
-        if (role === 'Teacher' || role === 'Student') {
-            eduSearch.style.display = 'flex'; // Show for staff/students
-        } else {
-            eduSearch.style.display = 'none'; // Keep hidden for Owner
-        }
-    }
     
     // 2. Hide Dashboard Stats for non-owners
     if (role !== 'Owner') {
@@ -11481,56 +11435,6 @@ async function generatePLReport(viewType) {
 }
 
 
-
-// --- DYNAMIC EDUCATION SEARCH LOGIC (WIKIPEDIA API) ---
-// --- THE BULLETPROOF SEARCH (WORKS WITH ALL CAPS) ---
-async function performEduSearch() {
-    const inputEl = document.getElementById('edu-search-input');
-    const query = inputEl.value.trim();
-    const contentArea = document.getElementById('edu-content-area');
-    const loading = document.getElementById('edu-loading');
-
-    if (!query) return alert("Please type an academic topic.");
-
-    contentArea.style.display = 'none';
-    loading.style.display = 'block';
-
-    try {
-        // STEP 1: Search Wikipedia for the real title (Forgives ALL CAPS)
-        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
-        const searchResponse = await fetch(searchUrl);
-        const searchData = await searchResponse.json();
-
-        if (!searchData.query.search || searchData.query.search.length === 0) {
-            contentArea.innerHTML = `<p style="color: red; font-weight: bold;">Academic topic not found. Try terms like 'Calculus', 'Biology', or 'French Revolution'.</p>`;
-            return;
-        }
-
-        // STEP 2: Use the best matching title from the search results
-        const correctTitle = searchData.query.search[0].title;
-
-        // STEP 3: Fetch the summary using the correctly cased title
-        const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(correctTitle)}`;
-        const summaryResponse = await fetch(summaryUrl);
-        const data = await summaryResponse.json();
-
-        // STEP 4: Display to the Vertical Card
-        contentArea.innerHTML = `
-            <h3 style="color: #000; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #007bff; display: inline-block;">${data.title}</h3>
-            <p style="font-size: 0.95rem; line-height: 1.6; color: #000; font-weight: 600;">${data.extract}</p>
-            <hr style="margin: 15px 0; border: 1px dashed #ddd;">
-            <a href="${data.content_urls.desktop.page}" target="_blank" style="display: block; color: #007bff; font-weight: 800; font-size: 0.8rem; text-decoration: none;">
-                <i class="fas fa-book-open"></i> OPEN FULL RESEARCH PAPER
-            </a>
-        `;
-
-    } catch (err) {
-        contentArea.innerHTML = `<p style="color: red;">Connectivity Error. Check internet.</p>`;
-    } finally {
-        loading.style.display = 'none';
-        contentArea.style.display = 'block';
-    }
-}
 
     </script>
 <script>
