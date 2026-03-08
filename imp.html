@@ -819,6 +819,9 @@ footer ul li a:hover {
 #analytics-popup table {
     min-width: 500px; /* Forces the table to maintain shape while scrolling */
 }
+
+/* Smooth transition for the rotating quote */
+#sidebar-quote { transition: opacity 0.5s ease-in-out; }
     </style>
 </head>
 <body>
@@ -911,9 +914,64 @@ footer ul li a:hover {
 <button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
 <button class="nav-tab" onclick="showSection('leave-mod')"><i class="fas fa-user-clock"></i> 27. Leave Management</button>
 
+<!-- SIDEBAR ENGAGEMENT STACK (For Teachers/Students) -->
+<div id="sidebar-extra-widget" style="display: none; margin-top: 30px; display: flex; flex-direction: column; gap: 30px;">
+    
+    <!-- 1. USER PROFILE CARD -->
+    <div style="padding: 20px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 8px 8px 0px #000; text-align: center;">
+        <div style="width: 60px; height: 60px; background: #eee; border: 2px solid #000; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;"><i class="fas fa-user-circle"></i></div>
+        <div style="font-size: 0.7rem; text-transform: uppercase; color: #666; font-weight: bold;">Official Profile</div>
+        <h4 id="widget-user-name" style="margin: 5px 0; font-size: 1.2rem; text-transform: uppercase;">---</h4>
+        <p id="widget-user-role" style="margin: 0; color: #ff0000; font-weight: 900; font-size: 0.8rem; letter-spacing: 1px;">---</p>
+    </div>
+
+
+
+
+
+<!-- 1.5 DYNAMIC IDENTITY BADGE (No Table Changes Needed) -->
+<div id="widget-id-badge" style="padding: 20px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 8px 8px 0px #000; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+    <div style="font-size: 0.6rem; font-weight: 900; color: #007bff; letter-spacing: 2px;">INSTITUTE PASS</div>
+    
+    <!-- This is the QR Code area -->
+    <div style="padding: 10px; border: 2px solid #eee; border-radius: 10px; background: #fafafa;">
+        <img id="sidebar-qr-code" src="" alt="QR Code" style="width: 100px; height: 100px;">
+    </div>
+    
+    <div style="margin-top: 5px;">
+        <small style="display: block; color: #666; font-size: 0.7rem; text-transform: uppercase;">Unique ID</small>
+        <b id="widget-display-id" style="font-size: 1rem; color: #000;">---</b>
+    </div>
+</div>
+
+
+
+
+
+    <!-- 2. MOTIVATIONAL QUOTE CARD -->
+    <div style="padding: 15px; border: 2px solid #000; border-radius: 15px; background: #f0faff; box-shadow: 5px 5px 0px #000; text-align: center; font-style: italic;">
+        <i class="fas fa-quote-left" style="color: #007bff; margin-bottom: 5px;"></i>
+        <p id="sidebar-quote" style="font-size: 0.9rem; font-weight: 600; line-height: 1.4; color: #333;">"The roots of education are bitter, but the fruit is sweet."</p>
+    </div>
+
+    <!-- 3. QUICK SUPPORT & BRANDING -->
+    <div style="padding: 15px; border: 2px solid #000; border-radius: 15px; background: #7FFFD4; box-shadow: 5px 5px 0px #000; text-align: center;">
+        <p style="font-weight: 800; font-size: 0.8rem; margin-bottom: 10px;">ClassManager Support</p>
+        <a id="admin-wa-link" href="#" target="_blank" style="display: block; background: #000; color: #fff; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.8rem;">
+            <i class="fab fa-whatsapp"></i> CHAT WITH ADMIN
+        </a>
+        <p style="margin-top: 15px; font-size: 0.6rem; font-weight: bold; letter-spacing: 2px; color: #000;">VER 2026.1.0</p>
+    </div>
+</div>
+
 <button class="nav-tab" onclick="showSection('ai-attendance')"><i class="fas fa-robot"></i> 28. AI Attendance Insights</button>
 <button class="nav-tab" onclick="showSection('teacher-leaderboard')"><i class="fas fa-medal"></i> 29. Teacher Leaderboard</button>
 <button class="nav-tab" onclick="showSection('student-engagement')"><i class="fas fa-chart-line"></i> 30. Student Engagement</button>
+
+
+
+
+
 
         </aside>
 
@@ -9824,7 +9882,109 @@ async function applyRoleVisibility() {
     const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
     if (!profile) return;
 
-    const role = profile.role;
+
+
+const role = profile.role;
+
+
+
+
+
+
+// --- DYNAMIC TAB SPACING LOGIC ---
+    const allTabs = document.querySelectorAll('.nav-tab');
+    allTabs.forEach(tab => {
+        if (role !== 'Owner') {
+            // INCREASED GAP (30px) for Teachers and Students to fill space
+            tab.style.setProperty('margin-bottom', '30px', 'important');
+        } else {
+            // STANDARD GAP (12px) for Owner to fit all 30 tabs
+            tab.style.setProperty('margin-bottom', '12px', 'important');
+        }
+    });
+
+
+
+
+    
+    // --- NEW: SIDEBAR WIDGET LOGIC ---
+const widget = document.getElementById('sidebar-extra-widget');
+    if (widget) {
+        if (role !== 'Owner') {
+            // 1. FORCE FLEX DISPLAY (This makes the 'gap' work)
+            widget.style.display = 'flex'; 
+
+widget.style.setProperty('margin-top', '80px', 'important');
+
+widget.style.setProperty('gap', '80px', 'important'); // This increases the space between the 3 boxes
+            
+            document.getElementById('widget-user-name').innerText = sessionUserName;
+            document.getElementById('widget-user-role').innerText = role;
+
+
+
+// --- DYNAMIC ID & QR LOGIC ---
+    (async () => {
+        let displayID = "N/A";
+        const userEmail = profile.email;
+        if (role === 'Teacher') {
+            const { data: t } = await db.from('teacher_details').select('id').eq('email', userEmail).maybeSingle();
+            displayID = t ? t.id : "TCH-PENDING";
+        } else if (role === 'Student') {
+            const { data: s } = await db.from('students').select('roll_number').eq('email', userEmail).maybeSingle();
+            displayID = s ? s.roll_number : "IMS-PENDING";
+        }
+        const dispIdEl = document.getElementById('widget-display-id');
+        if (dispIdEl) dispIdEl.innerText = displayID;
+        const qrEl = document.getElementById('sidebar-qr-code');
+        if (qrEl) qrEl.src = `https://chart.googleapis.com/chart?cht=qr&chl=${displayID}&chs=160x160&chld=L|0`;
+    })();
+            
+            const ownerWhatsApp = "910000000000"; // REPLACE WITH YOUR REAL NUMBER
+            const waLink = document.getElementById('admin-wa-link');
+            if(waLink) waLink.href = `https://wa.me/${ownerWhatsApp}?text=Hi Admin, I am ${sessionUserName} (${role}) and I need assistance.`;
+
+            // --- AUTO-ROTATING QUOTE LOGIC (5 SECONDS) ---
+            const quotes = [
+                '"Education is the most powerful weapon which you can use to change the world."',
+                '"The beautiful thing about learning is that no one can take it away from you."',
+                '"Success is the sum of small efforts, repeated day in and day out."',
+                '"Knowledge is power. Information is liberating."',
+                '"Your education is a dress rehearsal for a life that is yours to lead."'
+            ];
+
+            let qIndex = 0;
+            const quoteEl = document.getElementById('sidebar-quote');
+            if (quoteEl) {
+                // Set initial look
+                quoteEl.innerText = quotes[0];
+                quoteEl.style.opacity = 1;
+                
+                // Reset timer if it already exists
+                if (window.quoteTimer) clearInterval(window.quoteTimer);
+                
+                // Start the 5-second loop
+                window.quoteTimer = setInterval(() => {
+                    qIndex = (qIndex + 1) % quotes.length;
+                    quoteEl.style.opacity = 0; // Fade out
+                    setTimeout(() => {
+                        quoteEl.innerText = quotes[qIndex];
+                        quoteEl.style.opacity = 1; // Fade in
+                    }, 500);
+                }, 5000);
+            }
+        } else {
+            // HIDE WIDGET FOR OWNER
+            widget.style.display = 'none';
+        }
+    }
+
+
+
+
+
+
+
     
     // 2. Hide Dashboard Stats for non-owners
     if (role !== 'Owner') {
