@@ -3616,6 +3616,28 @@ async function editStudentByRoll() {
     
     if (error) alert("Update Failed: " + error.message);
     else alert("Success: Student " + roll + " updated.");
+
+
+
+
+// --- ADDED: AUTO-CLEANUP ROSTER (Updates Scheduler Count) ---
+        const newCourseList = updateData.course.split(',').map(c => c.trim().toUpperCase());
+        
+        // Find this student in the Master Roster (list table)
+        const { data: currentRoster } = await db.from('list')
+            .select('id, course_name')
+            .eq('roll_number', roll)
+            .eq('institute_id', sessionInstID);
+
+        if (currentRoster) {
+            for (let entry of currentRoster) {
+                // If a batch in the roster is NOT in the new course list, delete it
+                if (!newCourseList.includes(entry.course_name.toUpperCase())) {
+                    await db.from('list').delete().eq('id', entry.id);
+                    console.log(`Removed ${roll} from ${entry.course_name} (Roster Cleaned)`);
+                }
+            }
+        }
 }
 
 
