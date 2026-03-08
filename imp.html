@@ -4357,7 +4357,9 @@ function triggerAttendance(status) {
     // --- NEW: Disable future dates (Local Timezone Safe) ---
     const todayLocal = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
     picker.max = todayLocal;
-    
+    picker.min = todayLocal; // This disables all past dates
+
+
     picker.onchange = null; // Prevent double clicks
     
     picker.onchange = async function() {
