@@ -819,9 +819,6 @@ footer ul li a:hover {
 #analytics-popup table {
     min-width: 500px; /* Forces the table to maintain shape while scrolling */
 }
-
-/* Smooth transition for the rotating quote */
-#sidebar-quote { transition: opacity 0.5s ease-in-out; }
     </style>
 </head>
 <body>
@@ -914,52 +911,9 @@ footer ul li a:hover {
 <button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
 <button class="nav-tab" onclick="showSection('leave-mod')"><i class="fas fa-user-clock"></i> 27. Leave Management</button>
 
-
-<!-- MASTER SIDEBAR ENGAGEMENT STACK (Visible to Teachers/Students) -->
-<div id="sidebar-extra-widget" style="display: none; margin-top: 60px; flex-direction: column; gap: 25px;">
-    
-    <!-- 1. USER IDENTITY CARD -->
-    <div style="padding: 20px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 8px 8px 0px #000; text-align: center;">
-        <div style="width: 60px; height: 60px; background: #eee; border: 2px solid #000; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;"><i class="fas fa-user-circle"></i></div>
-        <div style="font-size: 0.6rem; text-transform: uppercase; color: #666; font-weight: bold; letter-spacing: 1px;">Personal Profile</div>
-        <h4 id="widget-user-name" style="margin: 5px 0; font-size: 1.1rem; text-transform: uppercase; color: #000;">---</h4>
-        <p id="widget-user-role" style="margin: 0; color: #ff0000; font-weight: 900; font-size: 0.8rem; letter-spacing: 1px;">---</p>
-    </div>
-
-    <!-- 2. DYNAMIC INSTITUTE CONTACT CARD -->
-    <div style="padding: 20px; border: 3px solid #000; border-radius: 15px; background: #f0faff; box-shadow: 8px 8px 0px #000;">
-        <div style="font-size: 0.7rem; font-weight: 900; color: #007bff; margin-bottom: 12px; letter-spacing: 1px; text-transform: uppercase;">Office Contact</div>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-            <p style="margin: 0; font-size: 0.85rem; color: #000; font-weight: 600;"><i class="fas fa-map-marker-alt" style="width: 20px; color: #000;"></i> <span id="side-addr">Loading...</span></p>
-            <p style="margin: 0; font-size: 0.85rem; color: #000; font-weight: 600;"><i class="fas fa-phone-alt" style="width: 20px; color: #000;"></i> <span id="side-ph">Loading...</span></p>
-            <p style="margin: 0; font-size: 0.85rem; color: #000; font-weight: 600;"><i class="fas fa-envelope" style="width: 20px; color: #000;"></i> <span id="side-em">Loading...</span></p>
-        </div>
-    </div>
-
-    <!-- 3. MOTIVATIONAL QUOTE CARD -->
-    <div style="padding: 15px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 8px 8px 0px #000; text-align: center; font-style: italic;">
-        <i class="fas fa-quote-left" style="color: #007bff; margin-bottom: 5px;"></i>
-        <p id="sidebar-quote" style="font-size: 0.85rem; font-weight: 600; line-height: 1.4; color: #333; transition: opacity 0.5s;">"The roots of education are bitter, but the fruit is sweet."</p>
-    </div>
-
-    <!-- 4. QUICK SUPPORT & BRANDING -->
-    <div style="padding: 15px; border: 3px solid #000; border-radius: 15px; background: #7FFFD4; box-shadow: 8px 8px 0px #000; text-align: center;">
-        <p style="font-weight: 800; font-size: 0.8rem; margin-bottom: 10px; color: #000;">INSTITUTE SUPPORT</p>
-        <a id="admin-wa-link" href="#" target="_blank" style="display: block; background: #000; color: #fff; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.8rem; border: 1px solid #000;">
-            <i class="fab fa-whatsapp"></i> CHAT WITH ADMIN
-        </a>
-        <p style="margin-top: 15px; font-size: 0.55rem; font-weight: 900; letter-spacing: 2px; color: #000; text-transform: uppercase;">ver 2026.1.0 | SECURE CLOUD</p>
-    </div>
-</div>
-
 <button class="nav-tab" onclick="showSection('ai-attendance')"><i class="fas fa-robot"></i> 28. AI Attendance Insights</button>
 <button class="nav-tab" onclick="showSection('teacher-leaderboard')"><i class="fas fa-medal"></i> 29. Teacher Leaderboard</button>
 <button class="nav-tab" onclick="showSection('student-engagement')"><i class="fas fa-chart-line"></i> 30. Student Engagement</button>
-
-
-
-
-
 
         </aside>
 
@@ -1671,26 +1625,6 @@ footer ul li a:hover {
         <button class="btn-add" style="background:#673ab7;" onclick="generateLeadsReport()">GENERATE ANALYTICS</button>
     </div>
 </div>
-
-
-
-
-<!-- INSTITUTE BRANDING SETUP (OWNER ONLY) -->
-<div class="card" style="margin-top: 30px; border-top: 5px solid #25D366;">
-    <h3><i class="fas fa-id-badge"></i> Institute Contact Setup</h3>
-    <div class="form-grid">
-        <div class="input-group"><label>Office Address</label><input type="text" id="set-address" placeholder="e.g. Sector 4, MG Road"></div>
-        <div class="input-group"><label>Contact Number</label><input type="text" id="set-phone" placeholder="e.g. +91 98XXX XXXX"></div>
-        <div class="input-group"><label>Office Email</label><input type="email" id="set-email" placeholder="e.g. contact@institute.com"></div>
-        <div class="input-group"><label>WhatsApp for Support</label><input type="text" id="set-wa" placeholder="10 Digit Number Only"></div>
-    </div>
-    <div class="button-row">
-        <button class="btn-add" onclick="saveInstSettings()">SAVE BRANDING</button>
-    </div>
-</div>
-
-
-
 
 
 
@@ -9890,95 +9824,7 @@ async function applyRoleVisibility() {
     const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
     if (!profile) return;
 
-
-
-const role = profile.role;
-
-
-
-
-
-
-// --- DYNAMIC TAB SPACING LOGIC ---
-    const allTabs = document.querySelectorAll('.nav-tab');
-    allTabs.forEach(tab => {
-        if (role !== 'Owner') {
-            // INCREASED GAP (30px) for Teachers and Students to fill space
-            tab.style.setProperty('margin-bottom', '30px', 'important');
-        } else {
-            // STANDARD GAP (12px) for Owner to fit all 30 tabs
-            tab.style.setProperty('margin-bottom', '12px', 'important');
-        }
-    });
-
-
-
-
-    
-    // --- NEW: SIDEBAR WIDGET LOGIC ---
-const widget = document.getElementById('sidebar-extra-widget');
-    if (widget) {
-        if (role !== 'Owner') {
-loadSidebarContact(); // This fills the card with that institute's specific data
-            // 1. FORCE FLEX DISPLAY (This makes the 'gap' work)
-            widget.style.display = 'flex'; 
-
-widget.style.setProperty('margin-top', '80px', 'important');
-
-widget.style.setProperty('gap', '80px', 'important'); // This increases the space between the 3 boxes
-            
-            document.getElementById('widget-user-name').innerText = sessionUserName;
-            document.getElementById('widget-user-role').innerText = role;
-
-
-
-
-            
-            const ownerWhatsApp = "910000000000"; // REPLACE WITH YOUR REAL NUMBER
-            const waLink = document.getElementById('admin-wa-link');
-            if(waLink) waLink.href = `https://wa.me/${ownerWhatsApp}?text=Hi Admin, I am ${sessionUserName} (${role}) and I need assistance.`;
-
-            // --- AUTO-ROTATING QUOTE LOGIC (5 SECONDS) ---
-            const quotes = [
-                '"Education is the most powerful weapon which you can use to change the world."',
-                '"The beautiful thing about learning is that no one can take it away from you."',
-                '"Success is the sum of small efforts, repeated day in and day out."',
-                '"Knowledge is power. Information is liberating."',
-                '"Your education is a dress rehearsal for a life that is yours to lead."'
-            ];
-
-            let qIndex = 0;
-            const quoteEl = document.getElementById('sidebar-quote');
-            if (quoteEl) {
-                // Set initial look
-                quoteEl.innerText = quotes[0];
-                quoteEl.style.opacity = 1;
-                
-                // Reset timer if it already exists
-                if (window.quoteTimer) clearInterval(window.quoteTimer);
-                
-                // Start the 5-second loop
-                window.quoteTimer = setInterval(() => {
-                    qIndex = (qIndex + 1) % quotes.length;
-                    quoteEl.style.opacity = 0; // Fade out
-                    setTimeout(() => {
-                        quoteEl.innerText = quotes[qIndex];
-                        quoteEl.style.opacity = 1; // Fade in
-                    }, 500);
-                }, 5000);
-            }
-        } else {
-            // HIDE WIDGET FOR OWNER
-            widget.style.display = 'none';
-        }
-    }
-
-
-
-
-
-
-
+    const role = profile.role;
     
     // 2. Hide Dashboard Stats for non-owners
     if (role !== 'Owner') {
@@ -10014,7 +9860,7 @@ widget.style.setProperty('gap', '80px', 'important'); // This increases the spac
     // 4. Filter Sidebar Tabs
     const tabs = document.querySelectorAll('aside.sidebar .nav-tab');
     const studentAllowed = ['home', 'login', 'student-p', 'message-corner', 'calendar-mod', 'reviews-mod'];
-    const teacherBlocked = ['fee', 'expense', 'reminder', 'admin', 'reviews-mod', 'leads', 'allocation-mod','batch-master', 'students', 'inventory-mod',  'scholarship-mod', 'alumni-mod', 'cert-gen', 'id-gen', 'ai-attendance',  'teacher-leaderboard',  'student-engagement'];
+    const teacherBlocked = ['fee', 'expense', 'reminder', 'admin', 'reviews-mod', 'leads', 'allocation-mod','batch-master', 'students', 'inventory-mod',  'scholarship-mod', 'alumni-mod', 'cert-gen', 'id-gen'];
 
     tabs.forEach(tab => {
         const clickAttr = tab.getAttribute('onclick') || "";
@@ -11587,34 +11433,6 @@ async function generatePLReport(viewType) {
         alert("Error generating report: " + err.message);
     }
 }
-
-
-
-
-// --- 1. OWNER: SAVE SETTINGS ---
-async function saveInstSettings() {
-    const data = {
-        institute_id: sessionInstID,
-        address: document.getElementById('set-address').value,
-        phone: document.getElementById('set-phone').value,
-        email: document.getElementById('set-email').value,
-        whatsapp_number: document.getElementById('set-wa').value
-    };
-    const { error } = await db.from('institute_settings').upsert(data);
-    if (error) alert(error.message); else alert("Branding Saved Successfully!");
-}
-
-// --- 2. SIDEBAR: LOAD SETTINGS ---
-async function loadSidebarContact() {
-    const { data } = await db.from('institute_settings').select('*').eq('institute_id', sessionInstID).maybeSingle();
-    if (data) {
-        document.getElementById('side-addr').innerText = data.address || "Not Set";
-        document.getElementById('side-ph').innerText = data.phone || "Not Set";
-        document.getElementById('side-em').innerText = data.email || "Not Set";
-        document.getElementById('admin-wa-link').href = `https://wa.me/91${data.whatsapp_number}?text=Help Required`;
-    }
-}
-
 
 
 
