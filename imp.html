@@ -6048,7 +6048,7 @@ document.getElementById('p-batch').innerText = student.course || "N/A";
      
     // --- TRUE FIGURE ATTENDANCE LOGIC ---
 const totalMarked = attendance ? attendance.length : 0; // Total classes checked so far
-const attnPct = totalMarked > 0 ? ((present / totalMarked) * 100).toFixed(1) : "100";
+const attnPct = totalMarked > 0 ? ((present / totalMarked) * 100).toFixed(1) : "0";
 
 document.getElementById('p-absent').innerText = absent;
 document.getElementById('p-attn-pct').innerText = attnPct + "%";
