@@ -916,7 +916,7 @@ footer ul li a:hover {
 
 
 <!-- VERTICAL EDUCATION SEARCH HUB -->
-<div id="edu-search-area" style="margin-top: 50px; display: flex; flex-direction: column; gap: 15px; padding: 10px;">
+<div id="edu-search-area" style="display: none; margin-top: 50px; flex-direction: column; gap: 15px; padding: 10px;">
     
     <!-- SEARCH INPUT BOX -->
     <div style="position: relative;">
@@ -9859,6 +9859,18 @@ async function applyRoleVisibility() {
     if (!profile) return;
 
     const role = profile.role;
+
+
+
+// --- SEARCH HUB VISIBILITY LOGIC ---
+    const eduSearch = document.getElementById('edu-search-area');
+    if (eduSearch) {
+        if (role === 'Teacher' || role === 'Student') {
+            eduSearch.style.display = 'flex'; // Show for staff/students
+        } else {
+            eduSearch.style.display = 'none'; // Keep hidden for Owner
+        }
+    }
     
     // 2. Hide Dashboard Stats for non-owners
     if (role !== 'Owner') {
