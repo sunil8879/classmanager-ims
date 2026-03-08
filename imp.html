@@ -9925,23 +9925,32 @@ widget.style.setProperty('gap', '80px', 'important'); // This increases the spac
 
 // --- DYNAMIC ID & QR LOGIC ---
 // --- RELIABLE NAME-MATCHING ID & QR LOGIC ---
+// --- THE ULTIMATE "NO-FAIL" ID MATCHING LOGIC ---
     (async () => {
-        let displayID = "ID NOT FOUND";
-        
-        // We use the Full Name from the login profile (which is already Uppercase)
-        const fullName = profile.full_name; 
+        let displayID = "DATA NOT FOUND";
         const instID = profile.institute_id;
+        const targetTable = (role === 'Teacher') ? 'teacher_details' : 'students';
+        const idColumn = (role === 'Teacher') ? 'id' : 'roll_number';
 
-        if (role === 'Teacher') {
-            // Search Teacher table by Teacher Name
-            const { data: t } = await db.from('teacher_details').select('id').eq('teacher_name', fullName).eq('institute_id', instID).maybeSingle();
-            if (t) displayID = t.id;
-        } else if (role === 'Student') {
-            // Search Student table by Full Name
-            const { data: s } = await db.from('students').select('roll_number').eq('full_name', fullName).eq('institute_id', instID).maybeSingle();
-            if (s) displayID = s.roll_number;
+        // 1. Download all records for your institute
+        const { data: allRecords } = await db.from(targetTable).select('*').eq('institute_id', instID);
+
+        if (allRecords && allRecords.length > 0) {
+            // 2. Search for a match manually in JavaScript (More reliable than SQL)
+            const match = allRecords.find(row => {
+                const dbEmail = (row.email || "").trim().toUpperCase();
+                const authEmail = (profile.email || "").trim().toUpperCase();
+                const dbName = (row.teacher_name || row.full_name || "").trim().toUpperCase();
+                const authName = (profile.full_name || "").trim().toUpperCase();
+
+                // Match if Email is same OR Name is same
+                return (authEmail !== "" && dbEmail === authEmail) || (dbName === authName);
+            });
+
+            if (match) displayID = match[idColumn];
         }
 
+        // 3. Update the UI
         const idBox = document.getElementById('widget-display-id');
         if (idBox) idBox.innerText = displayID;
 
