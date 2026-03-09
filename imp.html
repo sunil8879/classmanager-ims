@@ -911,6 +911,34 @@ footer ul li a:hover {
 <button class="nav-tab" onclick="showSection('reviews-mod')"><i class="fas fa-star"></i> 26. Teacher Reviews</button>
 <button class="nav-tab" onclick="showSection('leave-mod')"><i class="fas fa-user-clock"></i> 27. Leave Management</button>
 
+
+
+
+
+<!-- START: TEACHER/STUDENT USER SECTION -->
+<div id="sidebar-user-area" style="display: none; flex-direction: column; margin-top: 50px; padding: 10px;">
+    
+    <!-- UPLOAD BUTTON -->
+    <button onclick="document.getElementById('sidebar-photo-input').click()" class="nav-tab" style="background: #000 !important; color: #fff !important; justify-content: center; width: 100%; border: 3px solid #000 !important; box-shadow: 5px 5px 0px #7FFFD4 !important;">
+        <i class="fas fa-camera"></i> UPLOAD PHOTO
+    </button>
+    <input type="file" id="sidebar-photo-input" style="display: none;" accept="image/*" onchange="uploadSidebarPhoto(this)">
+
+    <!-- PHOTO & IDENTITY CARD -->
+    <div id="user-photo-card" style="margin-top: 60px; padding: 20px; border: 3px solid #000; border-radius: 15px; background: #fff; box-shadow: 10px 10px 0px #000; text-align: center;">
+        <div style="width: 130px; height: 130px; margin: 0 auto 20px; border: 2px solid #000; border-radius: 50%; overflow: hidden; background: #eee; display: flex; align-items: center; justify-content: center;">
+            <img id="sidebar-profile-img" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+            <i id="sidebar-img-placeholder" class="fas fa-user-circle" style="font-size: 5rem; color: #ccc;"></i>
+        </div>
+        <h4 id="sidebar-user-display-name" style="margin: 5px 0; font-size: 1.2rem; text-transform: uppercase; color: #000;">---</h4>
+        <p id="sidebar-user-display-id" style="margin: 0; color: #ff0000; font-weight: 900; font-size: 0.9rem; letter-spacing: 1px;">---</p>
+    </div>
+</div>
+<!-- END: USER SECTION -->
+
+
+
+
 <button class="nav-tab" onclick="showSection('ai-attendance')"><i class="fas fa-robot"></i> 28. AI Attendance Insights</button>
 <button class="nav-tab" onclick="showSection('teacher-leaderboard')"><i class="fas fa-medal"></i> 29. Teacher Leaderboard</button>
 <button class="nav-tab" onclick="showSection('student-engagement')"><i class="fas fa-chart-line"></i> 30. Student Engagement</button>
@@ -9825,6 +9853,48 @@ async function applyRoleVisibility() {
     if (!profile) return;
 
     const role = profile.role;
+
+
+
+
+
+// --- SIDEBAR USER AREA LOGIC ---
+    const userArea = document.getElementById('sidebar-user-area');
+    if (userArea) {
+        if (role === 'Teacher' || role === 'Student') {
+            userArea.style.display = 'flex';
+            document.getElementById('sidebar-user-display-name').innerText = sessionUserName;
+            
+            // Fetch User ID and Photo URL from their respective tables
+            (async () => {
+                const table = (role === 'Teacher') ? 'teacher_details' : 'students';
+                const idCol = (role === 'Teacher') ? 'id' : 'roll_number';
+                
+                const { data } = await db.from(table).select(`photo_url, ${idCol}`).ilike('email', profile.email).maybeSingle();
+                
+                if (data) {
+                    document.getElementById('sidebar-user-display-id').innerText = data[idCol];
+                    if (data.photo_url) {
+                        const img = document.getElementById('sidebar-profile-img');
+                        img.src = data.photo_url;
+                        img.style.display = 'block';
+                        document.getElementById('sidebar-img-placeholder').style.display = 'none';
+                    }
+                }
+            })();
+        } else {
+            userArea.style.display = 'none';
+        }
+    }
+
+
+
+
+
+
+
+
+
     
     // 2. Hide Dashboard Stats for non-owners
     if (role !== 'Owner') {
@@ -11433,6 +11503,41 @@ async function generatePLReport(viewType) {
         alert("Error generating report: " + err.message);
     }
 }
+
+
+
+// --- SIDEBAR PHOTO UPLOAD HANDLER ---
+async function uploadSidebarPhoto(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    
+    // 1. Determine User Info
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+    const table = (profile.role === 'Teacher') ? 'teacher_details' : 'students';
+
+    alert("Uploading... Please wait.");
+
+    // 2. Upload to Supabase Storage (Using the 'public' bucket)
+    const filePath = `profile_photos/${user.id}_${Date.now()}.png`;
+    const { error: uploadError } = await db.storage.from('scholarship_docs').upload(filePath, file);
+
+    if (uploadError) return alert("Upload Error: " + uploadError.message);
+
+    // 3. Get Public URL
+    const { data: { publicUrl } } = db.storage.from('scholarship_docs').getPublicUrl(filePath);
+
+    // 4. Update the Database Table
+    const { error: dbError } = await db.from(table).update({ photo_url: publicUrl }).ilike('email', profile.email);
+
+    if (dbError) {
+        alert("Database Sync Error: " + dbError.message);
+    } else {
+        alert("Photo Uploaded Successfully!");
+        location.reload(); // Refresh to show the new photo
+    }
+}
+
 
 
 
