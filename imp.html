@@ -9856,30 +9856,36 @@ async function applyRoleVisibility() {
 
 
 
+// --- UPDATED SIDEBAR PHOTO FETCH ---
 const userBlock = document.getElementById('sidebar-user-section');
-    if (userBlock && (role === 'Teacher' || role === 'Student')) {
-        userBlock.style.display = 'flex';
-        document.getElementById('side-display-name').innerText = sessionUserName;
+if (userBlock && (role === 'Teacher' || role === 'Student')) {
+    userBlock.style.display = 'flex';
+    document.getElementById('side-display-name').innerText = sessionUserName;
+
+    (async () => {
+        // 1. Fetch photo and ID info
+        // We get photo from 'profiles' (reliable) and ID from management tables (secondary)
+        const { data: profData } = await db.from('profiles').select('photo_url').eq('id', user.id).single();
         
-        (async () => {
-            const table = (role === 'Teacher') ? 'teacher_details' : 'students';
-            const idCol = (role === 'Teacher') ? 'id' : 'roll_number';
-            const { data } = await db.from(table).select(`photo_url, ${idCol}`).ilike('email', profile.email).maybeSingle();
-            if (data) {
-                document.getElementById('side-display-id').innerText = data[idCol];
-                if (data.photo_url) {
-                    document.getElementById('side-profile-img').src = data.photo_url;
-                    document.getElementById('side-profile-img').style.display = 'block';
-                    document.getElementById('side-icon-placeholder').style.display = 'none';
-                }
-            }
-        })();
-    }
+        const mgmtTable = (role === 'Teacher') ? 'teacher_details' : 'students';
+        const idCol = (role === 'Teacher') ? 'id' : 'roll_number';
+        const { data: mgmtData } = await db.from(mgmtTable).select(idCol).ilike('email', user.email).maybeSingle();
 
+        // 2. Display the ID if record exists
+        if (mgmtData) {
+            document.getElementById('side-display-id').innerText = mgmtData[idCol];
+        }
 
-
-
-
+        // 3. Display the Photo from profiles
+        if (profData && profData.photo_url) {
+            const imgEl = document.getElementById('side-profile-img');
+            const iconEl = document.getElementById('side-icon-placeholder');
+            imgEl.src = profData.photo_url;
+            imgEl.style.display = 'block';
+            iconEl.style.display = 'none';
+        }
+    })();
+}
 
 
     
@@ -11499,66 +11505,57 @@ async function generatePLReport(viewType) {
 async function directUpload(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
-
-    // UI Feedback: Change button state
-    const uploadBtn = document.querySelector('button[onclick*="side-file-input"]');
-    const originalBtnHTML = uploadBtn.innerHTML;
-    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> UPLOADING...';
-    uploadBtn.disabled = true;
+    
+    // UI Feedback
+    const btn = document.querySelector('button[onclick*="side-file-input"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> UPLOADING...';
 
     try {
-        // 1. Get current user and profile info
-        const { data: { user }, error: authErr } = await db.auth.getUser();
-        if (authErr || !user) throw new Error("Authentication failed. Please log in again.");
+        // 1. Get Logged-in User Identity
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) throw new Error("Not logged in");
 
-        const { data: profile, error: profErr } = await db.from('profiles')
-            .select('role, institute_id')
+        // 2. Fetch Profile Info (Role and Institute)
+        const { data: profile } = await db.from('profiles')
+            .select('role, institute_id, email')
             .eq('id', user.id)
             .single();
-        if (profErr) throw new Error("Could not fetch user profile.");
 
-        // 2. Prepare file path (organized by institute and user ID)
+        // 3. Upload to Storage
         const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-        const filePath = `${profile.institute_id}/${fileName}`;
+        const filePath = `${profile.institute_id}/${user.id}.${fileExt}`;
 
-        // 3. Upload to Supabase Storage
-        // NOTE: Ensure your bucket "profile_photos" is created and set to "Public" in Supabase Dashboard
-        const { error: upErr } = await db.storage
+        const { error: uploadError } = await db.storage
             .from('profile_photos')
-            .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: true
-            });
+            .upload(filePath, file, { upsert: true });
 
-        if (upErr) throw new Error("Storage Error: " + upErr.message + ". Ensure 'profile_photos' bucket is created in Supabase.");
+        if (uploadError) throw uploadError;
 
-        // 4. Get the Public URL
-        const { data: { publicUrl } } = db.storage.from('profile_photos').getPublicUrl(filePath);
+        // 4. Get Public URL
+        const { data: { publicUrl } } = db.storage
+            .from('profile_photos')
+            .getPublicUrl(filePath);
 
-        // 5. Update the correct database table (teacher_details or students)
-        const table = (profile.role === 'Teacher') ? 'teacher_details' : 'students';
-        
-        // We update based on email and institute_id for security
-        const { error: dbErr } = await db.from(table)
+        // 5. UPDATE ALL TABLES SIMULTANEOUSLY
+        // Update Core Profile (Guaranteed to exist)
+        await db.from('profiles').update({ photo_url: publicUrl }).eq('id', user.id);
+
+        // Update Management Tables (Students/Teachers - may or may not exist yet)
+        const managementTable = (profile.role === 'Teacher') ? 'teacher_details' : 'students';
+        await db.from(managementTable)
             .update({ photo_url: publicUrl })
-            .eq('institute_id', profile.institute_id)
-            .ilike('email', user.email);
+            .ilike('email', user.email)
+            .eq('institute_id', profile.institute_id);
 
-        if (dbErr) throw new Error("Database link failed: " + dbErr.message);
-
-        // Success!
-        alert("Profile photo updated successfully!");
-        location.reload(); // Refresh to update the photo in the sidebar and other modules
+        alert("Photo updated successfully!");
+        location.reload();
 
     } catch (err) {
-        alert("UPLOAD FAILED: " + err.message);
-        console.error(err);
-        uploadBtn.innerHTML = originalBtnHTML;
-        uploadBtn.disabled = false;
+        alert("Upload Error: " + err.message);
+        btn.innerHTML = originalText;
     }
 }
-
 
 
 
