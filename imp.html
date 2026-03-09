@@ -11493,27 +11493,74 @@ async function generatePLReport(viewType) {
 
 
 
+/* ==========================================
+   FIXED: PHOTO UPLOAD LOGIC
+   ========================================== */
 async function directUpload(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
-    const { data: { user } } = await db.auth.getUser();
-    const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
-    
-    // 1. Upload file silently
-    const path = `p-${user.id}-${Date.now()}.png`;
-    const { error: upErr } = await db.storage.from('profile_photos').upload(path, file);
-    if (upErr) return console.error(upErr);
 
-    // 2. Get URL
-    const { data: { publicUrl } } = db.storage.from('profile_photos').getPublicUrl(path);
+    // UI Feedback: Change button state
+    const uploadBtn = document.querySelector('button[onclick*="side-file-input"]');
+    const originalBtnHTML = uploadBtn.innerHTML;
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> UPLOADING...';
+    uploadBtn.disabled = true;
 
-    // 3. Update Database
-    const table = (profile.role === 'Teacher') ? 'teacher_details' : 'students';
-    await db.from(table).update({ photo_url: publicUrl }).ilike('email', user.email);
+    try {
+        // 1. Get current user and profile info
+        const { data: { user }, error: authErr } = await db.auth.getUser();
+        if (authErr || !user) throw new Error("Authentication failed. Please log in again.");
 
-    // 4. Refresh to show photo
-    location.reload();
+        const { data: profile, error: profErr } = await db.from('profiles')
+            .select('role, institute_id')
+            .eq('id', user.id)
+            .single();
+        if (profErr) throw new Error("Could not fetch user profile.");
+
+        // 2. Prepare file path (organized by institute and user ID)
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        const filePath = `${profile.institute_id}/${fileName}`;
+
+        // 3. Upload to Supabase Storage
+        // NOTE: Ensure your bucket "profile_photos" is created and set to "Public" in Supabase Dashboard
+        const { error: upErr } = await db.storage
+            .from('profile_photos')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: true
+            });
+
+        if (upErr) throw new Error("Storage Error: " + upErr.message + ". Ensure 'profile_photos' bucket is created in Supabase.");
+
+        // 4. Get the Public URL
+        const { data: { publicUrl } } = db.storage.from('profile_photos').getPublicUrl(filePath);
+
+        // 5. Update the correct database table (teacher_details or students)
+        const table = (profile.role === 'Teacher') ? 'teacher_details' : 'students';
+        
+        // We update based on email and institute_id for security
+        const { error: dbErr } = await db.from(table)
+            .update({ photo_url: publicUrl })
+            .eq('institute_id', profile.institute_id)
+            .ilike('email', user.email);
+
+        if (dbErr) throw new Error("Database link failed: " + dbErr.message);
+
+        // Success!
+        alert("Profile photo updated successfully!");
+        location.reload(); // Refresh to update the photo in the sidebar and other modules
+
+    } catch (err) {
+        alert("UPLOAD FAILED: " + err.message);
+        console.error(err);
+        uploadBtn.innerHTML = originalBtnHTML;
+        uploadBtn.disabled = false;
+    }
 }
+
+
+
 
 
     </script>
