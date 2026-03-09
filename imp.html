@@ -11507,38 +11507,50 @@ async function generatePLReport(viewType) {
 
 
 // --- SIDEBAR PHOTO UPLOAD HANDLER ---
+// --- REFINED SIDEBAR PHOTO UPLOAD ---
 async function uploadSidebarPhoto(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
     
-    // 1. Determine User Info
-    const { data: { user } } = await db.auth.getUser();
-    const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
-    const table = (profile.role === 'Teacher') ? 'teacher_details' : 'students';
+    try {
+        // 1. Get current session info
+        const { data: { user }, error: authError } = await db.auth.getUser();
+        if (authError || !user) throw new Error("Authentication failed. Please login again.");
 
-    alert("Uploading... Please wait.");
+        const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+        const table = (profile.role === 'Teacher') ? 'teacher_details' : 'students';
 
-    // 2. Upload to Supabase Storage (Using the 'public' bucket)
-    const filePath = `profile_photos/${user.id}_${Date.now()}.png`;
-    const { error: uploadError } = await db.storage.from('scholarship_docs').upload(filePath, file);
+        console.log("Starting upload for:", profile.email);
+        alert("Upload started... please wait for the 'Success' message.");
 
-    if (uploadError) return alert("Upload Error: " + uploadError.message);
+        // 2. Upload to Storage (Using a simplified path)
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await db.storage
+            .from('scholarship_docs')
+            .upload(fileName, file, { cacheControl: '3600', upsert: true });
 
-    // 3. Get Public URL
-    const { data: { publicUrl } } = db.storage.from('scholarship_docs').getPublicUrl(filePath);
+        if (uploadError) throw uploadError;
 
-    // 4. Update the Database Table
-    const { error: dbError } = await db.from(table).update({ photo_url: publicUrl }).ilike('email', profile.email);
+        // 3. Get the URL
+        const { data: { publicUrl } } = db.storage.from('scholarship_docs').getPublicUrl(fileName);
 
-    if (dbError) {
-        alert("Database Sync Error: " + dbError.message);
-    } else {
+        // 4. Update the actual Table
+        const { error: dbError } = await db.from(table)
+            .update({ photo_url: publicUrl })
+            .ilike('email', profile.email);
+
+        if (dbError) throw dbError;
+
         alert("Photo Uploaded Successfully!");
-        location.reload(); // Refresh to show the new photo
+        location.reload(); 
+
+    } catch (err) {
+        console.error("Upload Process Failed:", err);
+        alert("System Error: " + (err.message || "Upload failed. Check console (F12) for details."));
     }
 }
-
-
 
 
     </script>
