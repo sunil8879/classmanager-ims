@@ -942,6 +942,27 @@ window.loadAssignmentSummary = async function() {
         const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
         const { data: bookings } = await db.from('class_bookings').select('course, time_slot').eq('booking_date', targetDate).eq('institute_id', sessionInstID);
 
+
+// --- START OF ADDED CODE TO SYNC FRESH TEACHER TIMINGS ---
+        const { data: liveTeachers } = await db.from('teacher_details').select('id, time_of_slot').eq('institute_id', sessionInstID);
+        if (liveTeachers && batches) {
+            batches.forEach(b => {
+                const t = liveTeachers.find(x => x.id === b.teacher_id);
+                if (t && t.time_of_slot) {
+                    try {
+                        const slotObj = typeof t.time_of_slot === 'string' ? JSON.parse(t.time_of_slot) : t.time_of_slot;
+                        const freshTime = Object.entries(slotObj).find(([k, v]) => k.toUpperCase() === b.subject_name.toUpperCase());
+                        if (freshTime && freshTime[1]) {
+                            b.batch_time = freshTime[1]; // Overrides stale batch time with fresh teacher time
+                        }
+                    } catch(e) { console.error("Slot Sync Error", e); }
+                }
+            });
+        }
+        // --- END OF ADDED CODE ---
+
+
+
         if (!roster || roster.length === 0) {
             tbody.innerHTML = '<tr><td colspan="10">Student not assigned to any Batch. Use Section 25.</td></tr>';
             return;

@@ -12777,6 +12777,28 @@ window.listAllTimeBatches = async function() {
             .eq('booking_date', tmrwStr)
             .eq('institute_id', sessionInstID);
 
+
+
+// --- START OF ADDED CODE TO SYNC FRESH TEACHER TIMINGS ---
+        const { data: liveTeachers } = await db.from('teacher_details').select('id, time_of_slot').eq('institute_id', sessionInstID);
+        if (liveTeachers && batches) {
+            batches.forEach(b => {
+                const t = liveTeachers.find(x => x.id === b.teacher_id);
+                if (t && t.time_of_slot) {
+                    try {
+                        const slotObj = typeof t.time_of_slot === 'string' ? JSON.parse(t.time_of_slot) : t.time_of_slot;
+                        const freshTime = Object.entries(slotObj).find(([k, v]) => k.toUpperCase() === b.subject_name.toUpperCase());
+                        if (freshTime && freshTime[1]) {
+                            b.batch_time = freshTime[1]; // Overrides stale batch time with fresh teacher time
+                        }
+                    } catch(e) { console.error("Slot Sync Error", e); }
+                }
+            });
+        }
+        // --- END OF ADDED CODE ---
+
+
+
         // 3. Build the Dynamic Table
         let tableRows = "";
         batches.forEach(b => {
