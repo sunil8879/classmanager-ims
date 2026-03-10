@@ -13127,5 +13127,102 @@ window.setTeacherTimeSlots = function(slotsStr) {
 
 
 
+<!-- ADD THIS SCRIPT BLOCK RIGHT BEFORE </body> TO FIX BATCH MASTER CRASH -->
+<script>
+/* =========================================================================
+   ADD-ON FIX: SAFE SUBJECT MISMATCH CHECK FOR BATCH MASTER
+   ========================================================================= */
+window.addBatchMasterRecord = async function() {
+    const courseInput = document.getElementById('bm-course').value.toUpperCase();
+    const bnameSelect = document.getElementById('bm-bname');
+    
+    // 1. SAFE SUBJECT MISMATCH CHECK (Prevents the 'null' crash)
+    if (bnameSelect.selectedIndex >= 0) {
+        const selectedText = bnameSelect.options[bnameSelect.selectedIndex].text.toUpperCase();
+        const match = selectedText.match(/\(([^)]+)\)/);
+        
+        // Only run the strict check if parentheses actually exist in the dropdown text
+        if (match && match[1]) {
+            const subjectInBatch = match[1];
+            if (!courseInput.includes(subjectInBatch)) {
+                return alert("🛑 ERROR: Subject Mismatch! Student is not enrolled for the subject taught in this batch.");
+            }
+        }
+    }
+
+    // 2. CONTINUE WITH ORIGINAL SAVING LOGIC
+    const roll = document.getElementById('bm-roll').value.trim().toUpperCase();
+    const batchName = document.getElementById('bm-bname').value.trim();
+    const studentName = document.getElementById('bm-sname').value;
+    const teacherId = document.getElementById('bm-tid').value;
+
+    if (!roll || !batchName || !teacherId) return alert("Please fill all details (Roll No, Teacher, and Batch).");
+
+    const { data: existingEntry } = await db.from('list')
+        .select('id')
+        .eq('roll_number', roll)
+        .eq('batch_name', batchName)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (existingEntry) {
+        return alert(`Error: ${studentName} is already enrolled in the batch "${batchName}".`);
+    }
+
+    const { data: batchData } = await db.from('batches')
+        .select('students_allotted')
+        .eq('teacher_id', teacherId)
+        .eq('batch_name', batchName)
+        .eq('institute_id', sessionInstID)
+        .maybeSingle();
+
+    if (batchData && batchData.students_allotted > 0) {
+        const { data: currentStudents } = await db.from('list')
+            .select('id')
+            .eq('batch_name', batchName)
+            .eq('institute_id', sessionInstID);
+        
+        if (currentStudents && currentStudents.length >= batchData.students_allotted) {
+            return alert(`🛑 BATCH FULL! Cannot add student to "${batchName}".`);
+        }
+    }
+
+    const data = {
+        institute_id: sessionInstID,
+        date_today: document.getElementById('bm-date').value,
+        roll_number: roll,
+        student_name: studentName,
+        course_name: document.getElementById('bm-course').value,
+        teacher_id: teacherId,
+        teacher_name: document.getElementById('bm-tname').value,
+        batch_name: batchName,
+        remarks: document.getElementById('bm-remarks').value
+    };
+
+    const { error } = await db.from('list').insert([data]);
+
+    if (error) {
+        alert("Error saving record: " + error.message);
+    } else {
+        alert(`Success! ${studentName} added to ${batchName}.`);
+        if (typeof listAllByBatch === 'function') listAllByBatch(); 
+
+        const syncData = {
+            institute_id: sessionInstID,
+            teacher_id: teacherId.trim().toUpperCase(),
+            teacher_name: document.getElementById('bm-tname').value.trim(), 
+            roll_number: roll.trim().toUpperCase(),
+            student_name: studentName.trim(),
+            subject: document.getElementById('bm-course').value.trim(),
+            batch_name: batchName.trim()
+        };
+
+        await db.from('student_allocations').upsert([syncData], { onConflict: 'roll_number, teacher_id' });
+    }
+};
+</script>
+
+
+
 </body>
 </html>
