@@ -12929,13 +12929,13 @@ window.listAllTimeBatches = async function() {
         const { data: batchData } = await db.from('batches').select('batch_name, teacher_id, students_allotted').eq('institute_id', sessionInstID);
 
         // Map data for fast lookup
-        const studentMap = Object.fromEntries(stuData.map(s => [s.roll_number.toUpperCase(), s.full_name]));
+       const studentMap = Object.fromEntries(stuData.map(s => [(s.roll_number || "").trim().toUpperCase(), s.full_name]));
         const teacherMap = Object.fromEntries(tchData.map(t => [t.id.toUpperCase(), t.teacher_name]));
 
         let tableRows = "";
         if (bookings && bookings.length > 0) {
             bookings.forEach(bk => {
-                const sRoll = bk.student_roll.toUpperCase();
+               const sRoll = (bk.student_roll || "").trim().toUpperCase();
                 const tID = bk.teacher_id.toUpperCase();
                 const bName = bk.course.toUpperCase();
                 const bTime = bk.time_slot;
