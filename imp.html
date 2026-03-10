@@ -856,6 +856,52 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
         order: -1;                /* MAGIC TRICK: Pushes it to the very front of the tabs on mobile! */
     }
 }
+
+
+
+
+
+/* --- DAILY LEARNING WIDGET --- */
+#sidebar-learning-widget {
+    background: #ffffff; border: 2px solid #000; border-radius: 12px;
+    box-shadow: 4px 4px 0px #000; padding: 15px; margin: 150px auto 0;
+    display: none; /* Hidden by default, shown to Teachers/Students via JS */
+    flex-direction: column; width: 90%; text-align: center;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.learning-title {
+    font-size: 0.95rem; font-weight: 900; color: #ff0000;
+    text-transform: uppercase; margin-bottom: 10px;
+    border-bottom: 2px solid #000; display: inline-block; padding-bottom: 2px;
+}
+
+.learning-content {
+    font-size: 0.9rem; font-weight: 600; color: #333;
+    min-height: 60px; display: flex; align-items: center; justify-content: center;
+    line-height: 1.4; padding: 0 5px;
+}
+#idiom-display b { display: block; font-size: 1.1rem; color: #000; margin-bottom: 5px; text-transform: lowercase; }
+#idiom-display { flex-direction: column; text-transform: lowercase; color: #666; }
+
+.learning-controls { display: flex; justify-content: space-between; margin-top: 10px; }
+
+.learning-btn {
+    background: #7FFFD4; border: 2px solid #000; border-radius: 5px;
+    cursor: pointer; padding: 5px 15px; font-weight: bold; color: #000;
+    box-shadow: 2px 2px 0px #000; transition: 0.1s; display: flex; align-items: center; justify-content: center;
+}
+.learning-btn:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px #000; }
+
+/* Mobile Compliance for Widget */
+@media (max-width: 992px) {
+    #sidebar-learning-widget {
+        min-width: 250px; margin: 0 15px 0 0 !important;
+        flex-shrink: 0; order: -1; /* Keeps it right next to the profile pic in horizontal scroll */
+    }
+}
+
+
     </style>
 </head>
 <body>
@@ -968,6 +1014,36 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
                 <i class="fas fa-camera"></i> UPLOAD PHOTO
             </button>
             <span id="sidebar-upload-status" style="font-size: 0.75rem; color: #27ae60; margin-top: 8px; font-weight: bold; text-align: center;"></span>
+        </div>
+
+
+
+
+
+
+<!-- DAILY LEARNING WIDGET -->
+        <div id="sidebar-learning-widget">
+            <!-- 1. English Idioms -->
+            <div style="margin-bottom: 15px;">
+                <span class="learning-title"><i class="fas fa-book-open"></i> English Idiom</span>
+                <div class="learning-content" id="idiom-display">Loading...</div>
+                <div class="learning-controls">
+                    <button class="learning-btn" onclick="changeIdiom(-1)"><i class="fas fa-chevron-left"></i></button>
+                    <button class="learning-btn" onclick="changeIdiom(1)"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+
+            <hr style="border-top: 1px dashed #ccc; margin: 10px 0;">
+
+            <!-- 2. Math Formulas -->
+            <div>
+                <span class="learning-title" style="color: #007bff;"><i class="fas fa-square-root-alt"></i> Math Formula</span>
+                <div class="learning-content" id="math-display">Loading...</div>
+                <div class="learning-controls">
+                    <button class="learning-btn" style="background: #007bff; color: white;" onclick="changeMath(-1)"><i class="fas fa-chevron-left"></i></button>
+                    <button class="learning-btn" style="background: #007bff; color: white;" onclick="changeMath(1)"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
         </div>
 
 
@@ -11597,6 +11673,164 @@ async function handleProfilePhotoUpload(event) {
     event.target.value = "";
 }
 
+
+
+
+
+
+
+
+
+
+/* ==========================================
+   DAILY LEARNING WIDGET LOGIC (100 Idioms & 100 Formulas)
+   ========================================== */
+
+const arrIdioms = [
+    "<b>Bite the bullet</b><br>To endure a painful or difficult situation.", "<b>Break a leg</b><br>Good luck!", "<b>Call it a day</b><br>Stop working on something.", "<b>Cut corners</b><br>Doing something poorly to save time/money.", "<b>Get out of hand</b><br>Get out of control.",
+    "<b>Hang in there</b><br>Don't give up.", "<b>Hit the sack</b><br>Go to sleep.", "<b>It's not rocket science</b><br>It's not complicated.", "<b>Let someone off the hook</b><br>To not hold someone responsible.", "<b>Make a long story short</b><br>Tell something briefly.",
+    "<b>Miss the boat</b><br>It's too late.", "<b>No pain, no gain</b><br>You have to work for what you want.", "<b>On the ball</b><br>Doing a good job.", "<b>Pull someone's leg</b><br>To joke with someone.", "<b>Speak of the devil</b><br>The person we were just talking about appeared.",
+    "<b>That's the last straw</b><br>My patience has run out.", "<b>The best of both worlds</b><br>An ideal situation.", "<b>Time flies when you're having fun</b><br>You don't notice time passing.", "<b>To get bent out of shape</b><br>To get upset.", "<b>To make matters worse</b><br>Make a problem worse.",
+    "<b>Under the weather</b><br>Feeling sick.", "<b>We'll cross that bridge when we come to it</b><br>Let's not talk about that problem right now.", "<b>Wrap your head around something</b><br>Understand something complicated.", "<b>You can say that again</b><br>That's true, I agree.", "<b>Your guess is as good as mine</b><br>I have no idea.",
+    "<b>A blessing in disguise</b><br>A good thing that seemed bad at first.", "<b>A dime a dozen</b><br>Something common.", "<b>Beat around the bush</b><br>Avoid saying what you mean.", "<b>Better late than never</b><br>Better to arrive late than not to come at all.", "<b>Bite the dust</b><br>To die or fail.",
+    "<b>Break the ice</b><br>Make people feel more comfortable.", "<b>By the skin of your teeth</b><br>Just barely.", "<b>Compare apples to oranges</b><br>Comparing two things that cannot be compared.", "<b>Cost an arm and a leg</b><br>Very expensive.", "<b>Do something at the drop of a hat</b><br>Do something instantly.",
+    "<b>Don't cry over spilt milk</b><br>There's no reason to complain about something that can't be fixed.", "<b>Don't put all your eggs in one basket</b><br>What you're doing is too risky.", "<b>Every cloud has a silver lining</b><br>Good things come after bad things.", "<b>Get a taste of your own medicine</b><br>Get treated the way you've been treating others.", "<b>Give someone the cold shoulder</b><br>Ignore someone.",
+    "<b>Go on a wild goose chase</b><br>To do something pointless.", "<b>Good things come to those who wait</b><br>Be patient.", "<b>He has bigger fish to fry</b><br>He has bigger things to take care of.", "<b>Hit the nail on the head</b><br>Get something exactly right.", "<b>Ignorance is bliss</b><br>You're better off not knowing.",
+    "<b>Leave no stone unturned</b><br>Look everywhere.", "<b>Let the cat out of the bag</b><br>Give away a secret.", "<b>Lose your touch</b><br>Stop having an ability or talent.", "<b>Once in a blue moon</b><br>Rarely.", "<b>Piece of cake</b><br>A task that can be accomplished very easily.",
+    "<b>Put something on ice</b><br>Put a project on hold.", "<b>Rain on someone's parade</b><br>To spoil something.", "<b>Save for a rainy day</b><br>Save money for later.", "<b>See eye to eye</b><br>Agreeing with someone.", "<b>Shed light on something</b><br>Clarify a situation.",
+    "<b>Sit on the fence</b><br>To delay making a decision.", "<b>Spill the beans</b><br>Reveal a secret.", "<b>Steal someone's thunder</b><br>Take credit for someone else's work.", "<b>Take it with a pinch of salt</b><br>Don't take it too seriously.", "<b>Take the plunge</b><br>Finally do something you were hesitant about.",
+    "<b>The ball is in your court</b><br>It's your decision.", "<b>The elephant in the room</b><br>The big issue, problem, or fact that everyone knows about but no one wants to talk about.", "<b>The whole nine yards</b><br>Everything. All of it.", "<b>Throw caution to the wind</b><br>Take a risk.", "<b>Through thick and thin</b><br>To be loyal no matter what.",
+    "<b>To add insult to injury</b><br>To make a bad situation worse.", "<b>To barking up the wrong tree</b><br>Looking in the wrong place.", "<b>To burn bridges</b><br>Destroy relationships.", "<b>To cost a pretty penny</b><br>To be expensive.", "<b>To cut the mustard</b><br>To do a good job.",
+    "<b>To get cold feet</b><br>To get nervous.", "<b>To give someone a run for their money</b><br>To be a challenge.", "<b>To go back to the drawing board</b><br>Start over.", "<b>To have a chip on your shoulder</b><br>To be holding a grudge.", "<b>To hear it on the grapevine</b><br>To hear rumors.",
+    "<b>To hit the books</b><br>To start studying.", "<b>To jump on the bandwagon</b><br>Join a popular trend.", "<b>To keep at bay</b><br>Keep a safe distance.", "<b>To kill two birds with one stone</b><br>Get two things done with a single action.", "<b>To let sleeping dogs lie</b><br>Leave a situation alone.",
+    "<b>To lose your marbles</b><br>To go crazy.", "<b>To make a pitch</b><br>Suggest an idea.", "<b>To miss the mark</b><br>To fail to achieve the result.", "<b>To nip something in the bud</b><br>Stop something early on.", "<b>To pass the buck</b><br>Shift responsibility.",
+    "<b>To play devil's advocate</b><br>To argue the opposite, just for the sake of argument.", "<b>To pull strings</b><br>Use influence.", "<b>To put the cart before the horse</b><br>Do things out of the proper order.", "<b>To read between the lines</b><br>Find the hidden meaning.", "<b>To rule the roost</b><br>To be the boss.",
+    "<b>To spill blood</b><br>To fight.", "<b>To stand your ground</b><br>To refuse to change your opinion.", "<b>To take a rain check</b><br>Postpone a plan.", "<b>To tie the knot</b><br>Get married.", "<b>To walk on eggshells</b><br>Be very careful.",
+    "<b>Water under the bridge</b><br>Past events to be forgiven and forgotten.", "<b>Wear your heart on your sleeve</b><br>Show your emotions.", "<b>When pigs fly</b><br>Something that will never happen.", "<b>Wild goose chase</b><br>A pointless search.", "<b>You can't judge a book by its cover</b><br>Don't judge things by their appearance."
+];
+
+const arrMath = [
+    "<b>(a + b)²</b> = a² + 2ab + b²", "<b>(a - b)²</b> = a² - 2ab + b²", "<b>a² - b²</b> = (a - b)(a + b)", "<b>(a + b)³</b> = a³ + 3a²b + 3ab² + b³", "<b>(a - b)³</b> = a³ - 3a²b + 3ab² - b³",
+    "<b>a³ + b³</b> = (a + b)(a² - ab + b²)", "<b>a³ - b³</b> = (a - b)(a² + ab + b²)", "<b>Quadratic Formula:</b><br>x = (-b ± √(b² - 4ac)) / 2a", "<b>Discriminant (Δ):</b><br>Δ = b² - 4ac", "<b>Sum of Roots:</b><br>α + β = -b/a",
+    "<b>Product of Roots:</b><br>αβ = c/a", "<b>Linear Equation:</b><br>y = mx + c", "<b>Slope (m):</b><br>m = (y₂ - y₁) / (x₂ - x₁)", "<b>Distance Formula:</b><br>d = √((x₂ - x₁)² + (y₂ - y₁)²)", "<b>Midpoint Formula:</b><br>((x₁+x₂)/2 , (y₁+y₂)/2)",
+    "<b>Area of Triangle (Vertices):</b><br>½ |x₁(y₂-y₃) + x₂(y₃-y₁) + x₃(y₁-y₂)|", "<b>Pythagoras Theorem:</b><br>a² + b² = c²", "<b>Area of Circle:</b> A = πr²", "<b>Circumference of Circle:</b> C = 2πr", "<b>Area of Rectangle:</b> A = l × w",
+    "<b>Area of Triangle:</b> A = ½bh", "<b>Area of Trapezium:</b> A = ½(a+b)h", "<b>Volume of Cylinder:</b> V = πr²h", "<b>Surface Area of Cylinder:</b><br>2πr(r + h)", "<b>Volume of Cone:</b> V = ⅓πr²h",
+    "<b>Volume of Sphere:</b> V = ⁴⁄₃πr³", "<b>Surface Area of Sphere:</b> A = 4πr²", "<b>Volume of Hemisphere:</b> V = ⅔πr³", "<b>Volume of Cube:</b> V = a³", "<b>Surface Area of Cube:</b> A = 6a²",
+    "<b>Volume of Cuboid:</b> V = l × w × h", "<b>sin²θ + cos²θ</b> = 1", "<b>1 + tan²θ</b> = sec²θ", "<b>1 + cot²θ</b> = cosec²θ", "<b>sin(90° - θ)</b> = cosθ",
+    "<b>cos(90° - θ)</b> = sinθ", "<b>tan(90° - θ)</b> = cotθ", "<b>sin(2θ)</b> = 2sinθcosθ", "<b>cos(2θ)</b> = cos²θ - sin²θ", "<b>tan(2θ)</b> = (2tanθ) / (1 - tan²θ)",
+    "<b>Law of Sines:</b><br>a/sinA = b/sinB = c/sinC", "<b>Law of Cosines:</b><br>c² = a² + b² - 2ab·cosC", "<b>Arithmetic Progression (nth term):</b><br>aₙ = a + (n-1)d", "<b>AP Sum (Sₙ):</b><br>Sₙ = ⁿ⁄₂(2a + (n-1)d)", "<b>Geometric Progression (nth term):</b><br>aₙ = arⁿ⁻¹",
+    "<b>GP Sum (Finite):</b><br>Sₙ = a(1 - rⁿ) / (1 - r)", "<b>GP Sum (Infinite, |r| < 1):</b><br>S∞ = a / (1 - r)", "<b>Logarithm Product:</b><br>log(xy) = log(x) + log(y)", "<b>Logarithm Quotient:</b><br>log(x/y) = log(x) - log(y)", "<b>Logarithm Power:</b><br>log(xⁿ) = n·log(x)",
+    "<b>Change of Base:</b><br>logₐ(b) = log꜀(b) / log꜀(a)", "<b>Permutation (ⁿPᵣ):</b><br>n! / (n - r)!", "<b>Combination (ⁿCᵣ):</b><br>n! / (r!(n - r)!)", "<b>Probability (P(A)):</b><br>Fav. Outcomes / Total Outcomes", "<b>P(A ∪ B)</b> = P(A) + P(B) - P(A ∩ B)",
+    "<b>Mean (x̄):</b> ∑fx / ∑f", "<b>Mode:</b><br>L + ((f₁-f₀)/(2f₁-f₀-f₂)) × h", "<b>Median:</b><br>L + ((N/2 - CF)/f) × h", "<b>Standard Deviation (σ):</b><br>√( ∑(x - x̄)² / N )", "<b>Euler's Formula:</b><br>V - E + F = 2",
+    "<b>Derivative: d/dx (xⁿ)</b> = nxⁿ⁻¹", "<b>Derivative: d/dx (eˣ)</b> = eˣ", "<b>Derivative: d/dx (ln x)</b> = 1/x", "<b>Derivative: d/dx (sin x)</b> = cos x", "<b>Derivative: d/dx (cos x)</b> = -sin x",
+    "<b>Derivative: d/dx (tan x)</b> = sec² x", "<b>Product Rule (d/dx):</b><br>uv' + vu'", "<b>Quotient Rule (d/dx):</b><br>(vu' - uv') / v²", "<b>Chain Rule:</b><br>f'(g(x)) · g'(x)", "<b>Integral: ∫ xⁿ dx</b> = (xⁿ⁺¹) / (n+1) + C",
+    "<b>Integral: ∫ eˣ dx</b> = eˣ + C", "<b>Integral: ∫ 1/x dx</b> = ln|x| + C", "<b>Integral: ∫ sin x dx</b> = -cos x + C", "<b>Integral: ∫ cos x dx</b> = sin x + C", "<b>Integral: ∫ sec² x dx</b> = tan x + C",
+    "<b>Integration by Parts:</b><br>∫ u dv = uv - ∫ v du", "<b>Definite Integral (Area):</b><br>∫[a,b] f(x) dx = F(b) - F(a)", "<b>Euler's Identity:</b><br>e^(iπ) + 1 = 0", "<b>Complex Number:</b><br>z = a + bi", "<b>Modulus of z:</b><br>|z| = √(a² + b²)",
+    "<b>Vector Dot Product:</b><br>A · B = |A||B|cosθ", "<b>Vector Cross Product:</b><br>|A × B| = |A||B|sinθ", "<b>Equation of a Circle:</b><br>(x - h)² + (y - k)² = r²", "<b>Equation of Ellipse:</b><br>(x²/a²) + (y²/b²) = 1", "<b>Equation of Hyperbola:</b><br>(x²/a²) - (y²/b²) = 1",
+    "<b>Equation of Parabola:</b><br>y² = 4ax", "<b>Determinant of 2x2 Matrix:</b><br>|A| = ad - bc", "<b>Inverse of 2x2 Matrix:</b><br>1/|A| × [d, -b; -c, a]", "<b>Matrix Multiplication:</b><br>Row × Column", "<b>Cramer's Rule:</b><br>x = |Dx|/|D|, y = |Dy|/|D|",
+    "<b>Limit (L'Hôpital's Rule):</b><br>lim(f/g) = lim(f'/g')", "<b>Maclaurin Series (eˣ):</b><br>1 + x + x²/2! + x³/3! + ...", "<b>Taylor Series:</b><br>∑ (fⁿ(a)/n!) (x-a)ⁿ", "<b>Binomial Expansion:</b><br>(x+y)ⁿ = ∑ ⁿCₖ xⁿ⁻ᵏ yᵏ", "<b>Compound Interest:</b><br>A = P(1 + r/n)ⁿᵗ",
+// --- BASIC IDENTITIES & RATIOS ---
+    "<b>sin²θ + cos²θ</b> = 1",
+    "<b>1 + tan²θ</b> = sec²θ",
+    "<b>1 + cot²θ</b> = cosec²θ",
+    "<b>tanθ</b> = sinθ / cosθ",
+    "<b>cotθ</b> = cosθ / sinθ",
+    "<b>sinθ</b> = 1 / cosecθ",
+    "<b>cosθ</b> = 1 / secθ",
+
+    // --- EVEN / ODD IDENTITIES ---
+    "<b>sin(-θ)</b> = -sinθ",
+    "<b>cos(-θ)</b> = cosθ",
+    "<b>tan(-θ)</b> = -tanθ",
+
+    // --- COMPLEMENTARY ANGLES ---
+    "<b>sin(90° - θ)</b> = cosθ",
+    "<b>cos(90° - θ)</b> = sinθ",
+    "<b>tan(90° - θ)</b> = cotθ",
+    "<b>sec(90° - θ)</b> = cosecθ",
+
+    // --- SUM & DIFFERENCE (COMPOUND ANGLES) ---
+    "<b>sin(A + B)</b> = sinA cosB + cosA sinB",
+    "<b>sin(A - B)</b> = sinA cosB - cosA sinB",
+    "<b>cos(A + B)</b> = cosA cosB - sinA sinB",
+    "<b>cos(A - B)</b> = cosA cosB + sinA sinB",
+    "<b>tan(A + B)</b> = (tanA + tanB) / (1 - tanA tanB)",
+    "<b>tan(A - B)</b> = (tanA - tanB) / (1 + tanA tanB)",
+
+    // --- DOUBLE ANGLE FORMULAS ---
+    "<b>sin(2θ)</b> = 2sinθ cosθ",
+    "<b>cos(2θ)</b> = cos²θ - sin²θ",
+    "<b>cos(2θ)</b> = 2cos²θ - 1 = 1 - 2sin²θ",
+    "<b>tan(2θ)</b> = (2tanθ) / (1 - tan²θ)",
+    "<b>sin(2θ) in terms of tan:</b><br>2tanθ / (1 + tan²θ)",
+    "<b>cos(2θ) in terms of tan:</b><br>(1 - tan²θ) / (1 + tan²θ)",
+
+    // --- TRIPLE ANGLE FORMULAS ---
+    "<b>sin(3θ)</b> = 3sinθ - 4sin³θ",
+    "<b>cos(3θ)</b> = 4cos³θ - 3cosθ",
+    "<b>tan(3θ)</b> = (3tanθ - tan³θ) / (1 - 3tan²θ)",
+
+    // --- HALF ANGLE FORMULAS ---
+    "<b>sin(θ/2)</b> = ±√((1 - cosθ) / 2)",
+    "<b>cos(θ/2)</b> = ±√((1 + cosθ) / 2)",
+    "<b>tan(θ/2)</b> = ±√((1 - cosθ) / (1 + cosθ))",
+
+    // --- SUM TO PRODUCT ---
+    "<b>sinA + sinB</b> = 2sin((A+B)/2) cos((A-B)/2)",
+    "<b>sinA - sinB</b> = 2cos((A+B)/2) sin((A-B)/2)",
+    "<b>cosA + cosB</b> = 2cos((A+B)/2) cos((A-B)/2)",
+    "<b>cosA - cosB</b> = -2sin((A+B)/2) sin((A-B)/2)",
+
+    // --- PRODUCT TO SUM ---
+    "<b>2sinA cosB</b> = sin(A+B) + sin(A-B)",
+    "<b>2cosA sinB</b> = sin(A+B) - sin(A-B)",
+    "<b>2cosA cosB</b> = cos(A+B) + cos(A-B)",
+    "<b>2sinA sinB</b> = cos(A-B) - cos(A+B)",
+
+    // --- INVERSE TRIGONOMETRY ---
+    "<b>sin⁻¹(-x)</b> = -sin⁻¹(x)",
+    "<b>cos⁻¹(-x)</b> = π - cos⁻¹(x)",
+    "<b>tan⁻¹(-x)</b> = -tan⁻¹(x)",
+    "<b>sin⁻¹(x) + cos⁻¹(x)</b> = π/2",
+    "<b>tan⁻¹(x) + cot⁻¹(x)</b> = π/2",
+    "<b>tan⁻¹(x) + tan⁻¹(y)</b> = tan⁻¹((x+y)/(1-xy))",
+
+    // --- TRIANGLE LAWS ---
+    "<b>Law of Sines:</b><br>a/sinA = b/sinB = c/sinC",
+    "<b>Law of Cosines:</b><br>c² = a² + b² - 2ab·cosC",
+    "<b>Area of Triangle (Trig):</b><br>Area = ½ ab·sinC"
+];
+
+let curIdiom = 0;
+let curMath = 0;
+
+function changeIdiom(dir) {
+    curIdiom = (curIdiom + dir + arrIdioms.length) % arrIdioms.length;
+    document.getElementById('idiom-display').innerHTML = arrIdioms[curIdiom];
+}
+
+function changeMath(dir) {
+    curMath = (curMath + dir + arrMath.length) % arrMath.length;
+    document.getElementById('math-display').innerHTML = arrMath[curMath];
+}
+
+// Attach initialization to the existing Profile trigger
+const originalInitSidebarProfile = window.initSidebarProfile;
+window.initSidebarProfile = async function() {
+    if (originalInitSidebarProfile) await originalInitSidebarProfile();
+    
+    // If not Owner, show the learning widget and select a random daily fact
+    if (loggedInRole === 'Teacher' || loggedInRole === 'Student') {
+        document.getElementById('sidebar-learning-widget').style.display = 'flex';
+        
+        // Pick a random starting point so it's fresh every time they log in
+        curIdiom = Math.floor(Math.random() * arrIdioms.length);
+        curMath = Math.floor(Math.random() * arrMath.length);
+        
+        changeIdiom(0);
+        changeMath(0);
+    }
+};
     </script>
 <script>
 if ('serviceWorker' in navigator) {
