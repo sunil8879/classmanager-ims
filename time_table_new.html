@@ -527,12 +527,24 @@ async function loadAssignmentSummary() {
             .eq('institute_id', sessionInstID);
 
         tbody.innerHTML = "";
-        if (!listData || listData.length === 0) {
+     if (!listData || listData.length === 0) {
             tbody.innerHTML = '<tr><td colspan="10">No active assignments found.</td></tr>';
             return;
         }
 
-        listData.forEach((item, index) => {
+        // --- DEDUPLICATION FIX: Removes duplicate teacher/batch rows ---
+        const uniqueList = [];
+        const seenBatches = new Set();
+        listData.forEach(item => {
+            const uniqueKey = item.teacher_id + "_" + item.batch_name;
+            if (!seenBatches.has(uniqueKey)) {
+                seenBatches.add(uniqueKey);
+                uniqueList.push(item);
+            }
+        });
+
+        uniqueList.forEach((item, index) => {
+            // Find batch info
             // Find batch info
             const bRow = batchData?.find(b => 
                 b.teacher_id === item.teacher_id && 
