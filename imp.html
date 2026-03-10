@@ -13265,5 +13265,167 @@ window.editTeacher = async function() {
 
 
 
+
+
+
+
+
+
+
+
+<!-- ADD THIS SCRIPT BLOCK RIGHT BEFORE </body> TO FIX STALE TIMINGS EVERYWHERE -->
+<script>
+/* =========================================================================
+   ADD-ON FIX: DEEP TIME SYNC & BATCH MASTER REAL-TIME OVERRIDE
+   ========================================================================= */
+
+// 1. Hook into the Teacher Update button to push changes deep into the database
+const originalTeacherUpdateAction = window.editTeacher;
+
+window.editTeacher = async function() {
+    // Run the normal update first
+    if (originalTeacherUpdateAction) {
+        await originalTeacherUpdateAction();
+    }
+
+    const tid = document.getElementById('tch-id').value.toUpperCase();
+    if (!tid || !sessionInstID || typeof availabilityMap === 'undefined') return;
+
+    try {
+        // Fetch all batches for this teacher
+        const { data: batches } = await db.from('batches').select('batch_name, subject_name').eq('teacher_id', tid).eq('institute_id', sessionInstID);
+        
+        if (batches) {
+            for (const b of batches) {
+                const freshTimeEntry = Object.entries(availabilityMap).find(([k, v]) => k.toUpperCase() === b.subject_name.toUpperCase());
+                
+                if (freshTimeEntry && freshTimeEntry[1]) {
+                    const newTime = freshTimeEntry[1];
+
+                    // Update Batches Table
+                    await db.from('batches')
+                        .update({ batch_time: newTime })
+                        .eq('teacher_id', tid)
+                        .eq('batch_name', b.batch_name)
+                        .eq('institute_id', sessionInstID);
+
+                    // Update existing Class Bookings to new time
+                    await db.from('class_bookings')
+                        .update({ time_slot: newTime })
+                        .eq('teacher_id', tid)
+                        .ilike('course', b.batch_name)
+                        .eq('institute_id', sessionInstID);
+                }
+            }
+        }
+
+        // Force a silent refresh of the global memory so Section 5 sees it instantly
+        if (typeof window.loadBatchTeacherDropdown === 'function') {
+            await window.loadBatchTeacherDropdown();
+        }
+        
+    } catch (err) {
+        console.error("Deep Sync Error:", err);
+    }
+};
+
+// 2. Override Section 25 Batch Master Popup to ALWAYS read Live Teacher Profiles
+window.listAllTimeBatches = async function() {
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    const tmrwStr = tmrw.toISOString().split('T')[0];
+
+    try {
+        const { data: bookings } = await db.from('class_bookings').select('*').eq('booking_date', tmrwStr).eq('institute_id', sessionInstID);
+        const { data: stuData } = await db.from('students').select('roll_number, full_name').eq('institute_id', sessionInstID);
+        const { data: tchData } = await db.from('teacher_details').select('id, teacher_name, time_of_slot').eq('institute_id', sessionInstID);
+        const { data: batchData } = await db.from('batches').select('batch_name, teacher_id, students_allotted, subject_name').eq('institute_id', sessionInstID);
+
+        const studentMap = Object.fromEntries((stuData||[]).map(s => [(s.roll_number || "").trim().toUpperCase(), s.full_name]));
+        const teacherMap = Object.fromEntries((tchData||[]).map(t => [t.id.toUpperCase(), t]));
+
+        let tableRows = "";
+        if (bookings && bookings.length > 0) {
+            bookings.forEach(bk => {
+                const sRoll = (bk.student_roll || "").trim().toUpperCase();
+                const tID = bk.teacher_id.toUpperCase();
+                const bName = bk.course.toUpperCase();
+                
+                // --- REAL-TIME TIME EXTRACTION FIX ---
+                let bTime = bk.time_slot; 
+                const tObj = teacherMap[tID];
+                const meta = batchData.find(b => b.batch_name.toUpperCase() === bName && b.teacher_id.toUpperCase() === tID);
+                
+                if (tObj && tObj.time_of_slot && meta) {
+                    try {
+                        const slotMap = typeof tObj.time_of_slot === 'string' ? JSON.parse(tObj.time_of_slot) : tObj.time_of_slot;
+                        const fresh = Object.entries(slotMap).find(([k,v]) => k.toUpperCase() === meta.subject_name.toUpperCase());
+                        if (fresh && fresh[1]) bTime = fresh[1]; // Uses live time instead of old booking time
+                    } catch(e){}
+                }
+
+                const capacity = meta ? meta.students_allotted : 0;
+                const allotted = bookings.filter(b => b.course.toUpperCase() === bName && b.teacher_id.toUpperCase() === tID).length;
+                const balance = capacity - allotted;
+
+                tableRows += `
+                    <tr style="border-bottom: 1px solid #000;">
+                        <td style="padding:10px; border:1px solid #ccc;">${bName}</td>
+                        <td style="padding:10px; border:1px solid #ccc; color:#007bff; font-weight:bold;">${bTime}</td>
+                        <td style="padding:10px; border:1px solid #ccc; font-weight:bold; color:red;">${sRoll}</td>
+                        <td style="padding:10px; border:1px solid #ccc; font-weight:bold;">${studentMap[sRoll] || 'N/A'}</td>
+                        <td style="padding:10px; border:1px solid #ccc;">${tID}</td>
+                        <td style="padding:10px; border:1px solid #ccc;">${tObj ? tObj.teacher_name : 'N/A'}</td>
+                        <td style="padding:10px; border:1px solid #ccc; text-align:center;">${capacity}</td>
+                        <td style="padding:10px; border:1px solid #ccc; text-align:center; color:blue; font-weight:900;">${allotted}</td>
+                        <td style="padding:10px; border:1px solid #ccc; text-align:center; color:${balance <= 0 ? 'red' : 'green'}; font-weight:900;">${balance}</td>
+                        <td style="padding:10px; text-align:center; border:1px solid #ccc;">
+                            <button onclick="cancelBooking('${bk.id}', '${sRoll}')" style="background:none; border:none; color:red; cursor:pointer; font-size:1.2rem;">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } else {
+            tableRows = `<tr><td colspan="10" style="padding:30px; text-align:center; font-weight:bold;">No bookings for tomorrow (${tmrwStr}).</td></tr>`;
+        }
+
+        const modalHtml = `
+            <div id="fixed-batch-master-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; display:flex; justify-content:center; align-items:center;">
+                <div style="background:white; padding:25px; border-radius:15px; width:98%; max-width:1400px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif;">
+                    <h2 style="text-align:center; text-decoration:underline; margin-bottom:20px;">LIVE BATCH MASTER: ${tmrwStr}</h2>
+                    <table style="width:100%; border-collapse:collapse; color:#000;" border="1">
+                        <thead style="background:#7FFFD4;">
+                            <tr>
+                                <th>BATCH NAME</th>
+                                <th>BATCH TIME</th>
+                                <th>ROLL NO</th>
+                                <th>STUDENT NAME</th>
+                                <th>TEACHER ID</th>
+                                <th>TEACHER NAME</th>
+                                <th>CAPACITY</th>
+                                <th>ALLOTTED</th>
+                                <th>BALANCE</th>
+                                <th>DEL</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                    <div style="text-align:center; margin-top:30px;">
+                        <button onclick="document.getElementById('fixed-batch-master-overlay').remove()" style="padding:12px 60px; background:#ff0000; color:#fff; font-weight:900; border-radius:8px; cursor:pointer; border:2px solid #000;">CLOSE</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        const existing = document.getElementById('fixed-batch-master-overlay');
+        if (existing) existing.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    } catch (err) {
+        alert("Sync Error: " + err.message);
+    }
+};
+</script>
 </body>
 </html>
