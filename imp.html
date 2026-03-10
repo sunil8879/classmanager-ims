@@ -13006,6 +13006,25 @@ window.listAllTimeBatches = async function() {
         alert("Sync Error: " + err.message);
     }
 };
+
+
+
+
+
+window.cancelBooking = async function(id, roll) {
+    if (!confirm("Remove student " + roll + " from this batch?")) return;
+    
+    // 1. Delete from database (This automatically frees up the seat for everyone)
+    const { error } = await db.from('class_bookings').delete().eq('id', id);
+
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("Booking removed. Seat is now available.");
+        // 2. Refresh the Master List popup so the student disappears immediately
+        listAllTimeBatches(); 
+    }
+};
 </script>
 </body>
 </html>
