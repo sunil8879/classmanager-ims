@@ -12632,5 +12632,103 @@ window.bm2PopulateUI = function(b) {
     });
 };
 </script>
+
+
+
+
+<script>
+/* --- Paste this at the bottom of imp.html to sync Section 3 with Time Table --- */
+window.openBatchPicker = async function() {
+    const modal = document.getElementById('batch-picker-modal');
+    const tbody = document.getElementById('batch-picker-body');
+    const thead = modal.querySelector('thead tr');
+
+    // 1. DYNAMICALLY UPDATE THE HEADER TO MATCH TIME TABLE COLUMNS
+    thead.innerHTML = `
+        <th style="padding:15px; border:1px solid #ddd;">SUBJECT</th>
+        <th style="padding:15px; border:1px solid #ddd;">TEACHER</th>
+        <th style="padding:15px; border:1px solid #ddd;">TIME SLOT</th>
+        <th style="padding:15px; border:1px solid #ddd; text-align:center;">ALLOTTED</th>
+        <th style="padding:15px; border:1px solid #ddd; text-align:center;">BALANCE</th>
+        <th style="padding:15px; border:1px solid #ddd; text-align:center;">SELECT</th>
+    `;
+
+    tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>Syncing Real-time Balance...</td></tr>";
+    modal.style.display = 'flex';
+
+    // 2. GET TOMORROW'S DATE (Matches Time Table logic)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tmrwStr = tomorrow.toISOString().split('T')[0];
+
+    try {
+        // 3. FETCH LIVE DATA
+        const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+        const { data: bookings } = await db.from('class_bookings').select('course, time_slot').eq('booking_date', tmrwStr).eq('institute_id', sessionInstID);
+
+        if (!batches || batches.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No Batches configured in Section 5.</td></tr>";
+            return;
+        }
+
+        // 4. PROCESS AND CALCULATE
+        let rows = [];
+        batches.forEach(b => {
+            const slots = b.batch_time.split(',').map(s => s.trim().toUpperCase());
+            slots.forEach(slot => {
+                rows.push({
+                    subject: b.subject_name.toUpperCase(),
+                    teacher: b.teacher_name || "N/A",
+                    time: slot,
+                    total: parseInt(b.students_allotted) || 0,
+                    batchName: b.batch_name
+                });
+            });
+        });
+
+        rows.sort((a, b) => a.subject.localeCompare(b.subject));
+        tbody.innerHTML = "";
+
+        rows.forEach(row => {
+            // COUNT BOOKINGS FOR TOMORROW (Matches logic in Attachment 1)
+            const count = bookings ? bookings.filter(b => 
+                b.course.trim().toUpperCase() === row.batchName.trim().toUpperCase() &&
+                b.time_slot.trim().toUpperCase() === row.time
+            ).length : 0;
+
+            const balance = row.total - count;
+            const isFull = row.total > 0 && balance <= 0;
+
+            // 5. GENERATE THE ROW
+            tbody.innerHTML += `
+                <tr style="border-bottom: 2px solid #eee; background: ${isFull ? '#fff0f0' : '#fff'};">
+                    <td style="padding:12px; font-weight:bold; border-right:1px solid #ddd;">${row.subject}</td>
+                    <td style="padding:12px; border-right:1px solid #ddd;">${row.teacher}</td>
+                    <td style="padding:12px; border-right:1px solid #ddd; font-weight:800;">${row.time}</td>
+                    
+                    <!-- MATCHES SEATS ALLOTTED -->
+                    <td style="padding:12px; text-align:center; border-right:1px solid #ddd; font-weight:900; color:blue;">
+                        ${row.total}
+                    </td>
+
+                    <!-- MATCHES BALANCE SEATS -->
+                    <td style="padding:12px; text-align:center; border-right:1px solid #ddd; font-weight:900; color:${balance <= 0 ? 'red' : 'green'};">
+                        ${balance}
+                    </td>
+
+                    <td style="padding:12px; text-align:center;">
+                        <input type="checkbox" class="batch-cb" 
+                               data-sub="${row.subject}" data-time="${row.time}" 
+                               ${isFull ? 'disabled' : ''} 
+                               style="width:22px; height:22px; cursor:${isFull ? 'not-allowed' : 'pointer'};">
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (err) {
+        tbody.innerHTML = "<tr><td colspan='6' style='color:red;'>Connection Error.</td></tr>";
+    }
+};
+</script>
 </body>
 </html>
