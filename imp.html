@@ -13079,6 +13079,52 @@ window.cancelBooking = async function(id, roll) {
 
 
 
+<!-- ADD THIS SCRIPT BLOCK RIGHT BEFORE </body> TO FIX TEACHER TIME SLOTS -->
+<script>
+/* =========================================================================
+   ADD-ON FIX: TEACHER TIME SLOTS VISIBILITY UPON FETCH
+   ========================================================================= */
+window.setTeacherTimeSlots = function(slotsStr) {
+    const checkboxes = document.querySelectorAll('#tch-time-checkboxes input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false); // Clear all boxes first
+    
+    if (!slotsStr) return;
+
+    let actualSlotsToDisplay = slotsStr;
+
+    // Detect if the incoming data is JSON from the Database Fetch
+    if (typeof slotsStr === 'object' || (typeof slotsStr === 'string' && slotsStr.trim().startsWith('{'))) {
+        try {
+            // 1. Restore the global memory map so it remembers all subjects
+            availabilityMap = typeof slotsStr === 'string' ? JSON.parse(slotsStr) : slotsStr;
+            
+            // 2. Force the Subject display UI to update to the first subject
+            updateSubjectPages(); 
+            
+            // 3. Extract only the slots for the currently visible subject
+            const currentSub = document.getElementById('tch-current-subject-display').innerText.trim();
+            actualSlotsToDisplay = availabilityMap[currentSub] || "";
+        } catch(e) {
+            console.error("Time Slot Parse Error:", e);
+            actualSlotsToDisplay = "";
+        }
+    }
+
+    // 4. Finally, check the appropriate boxes
+    if (!actualSlotsToDisplay || typeof actualSlotsToDisplay !== 'string') return;
+    const slotsArr = actualSlotsToDisplay.split(',').map(s => s.trim());
+    
+    checkboxes.forEach(cb => {
+        if (slotsArr.includes(cb.value)) {
+            cb.checked = true;
+        }
+    });
+};
+</script>
+
+
+
+
 
 
 </body>
