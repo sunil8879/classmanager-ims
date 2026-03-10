@@ -924,62 +924,80 @@ async function updateBalanceUI(selectedTime, batchName, totalAllotted, cellId) {
 
 
 <script>
-/* --- DYNAMIC SYNC: Show only latest Active records from list table --- */
+/* --- Override: Use ONLY the 'list' table to define student rows --- */
 window.loadAssignmentSummary = async function() {
     const tbody = document.getElementById('session-table-body');
     if (!currentUserProfile || !sessionInstID) return;
 
-    const targetDate = document.getElementById('f-date').value || new Date(new Date().getTime() + 86400000).toISOString().split('T')[0];
+    // 1. Get tomorrow's date for live balance calculation
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    const targetDate = tmrw.toISOString().split('T')[0];
 
     try {
-        // 1. Fetch latest links (list), active statuses (students), and live bookings
-        const { data: roster } = await db.from('list').select('*').eq('institute_id', sessionInstID).order('created_at', { ascending: false });
-        const { data: activeStu } = await db.from('students').select('roll_number').eq('status', 'Active').eq('institute_id', sessionInstID);
+        // 2. Fetch the entire Roster from 'list' table (Newest entries first)
+        const { data: roster } = await db.from('list')
+            .select('*')
+            .eq('institute_id', sessionInstID)
+            .order('created_at', { ascending: false });
+
+        // Fetch support data for the "Balance Seats" math
         const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
         const { data: bookings } = await db.from('class_bookings').select('course, time_slot').eq('booking_date', targetDate).eq('institute_id', sessionInstID);
 
-        const activeRolls = activeStu ? activeStu.map(s => s.roll_number.trim().toUpperCase()) : [];
-        const myName = currentUserProfile.full_name.trim().toUpperCase();
-
-        // 2. DEDUPLICATION: Use a Map to keep ONLY the newest record for each Student-Batch combo
-        let latestUniqueLinks = new Map();
-        if (roster) {
-            roster.forEach(r => {
-                const roll = r.roll_number.trim().toUpperCase();
-                const batchKey = roll + "|" + r.batch_name.trim().toUpperCase();
-
-                // Only include if Student is "Active" AND record doesn't already exist in our map (since we ordered by latest first)
-                if (activeRolls.includes(roll) && !latestUniqueLinks.has(batchKey)) {
-                    
-                    // Filter by Login Role
-                    if (currentUserProfile.role === 'Student' && r.student_name.trim().toUpperCase() !== myName) return;
-                    if (currentUserProfile.role === 'Teacher' && r.teacher_name.trim().toUpperCase() !== myName) return;
-
-                    latestUniqueLinks.set(batchKey, r);
-                }
-            });
+        if (!roster || roster.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No records found in Batch Master (Section 25).</td></tr>';
+            return;
         }
 
-        const finalData = Array.from(latestUniqueLinks.values());
-        tbody.innerHTML = finalData.length ? "" : '<tr><td colspan="10">No active assignments found.</td></tr>';
+        // 3. DEDUPLICATION: Only keep the LATEST record for each Student + Batch combo
+        const uniqueMap = new Map();
+        const myName = currentUserProfile.full_name.trim().toUpperCase();
 
-        // 3. Render the 5 Latest Unique Records
-        finalData.forEach((item, index) => {
-            const b = batches?.find(x => x.teacher_id === item.teacher_id && x.batch_name.toUpperCase() === item.batch_name.toUpperCase());
+        roster.forEach(r => {
+            const roll = r.roll_number.trim().toUpperCase();
+            const bName = r.batch_name.trim().toUpperCase();
+            const key = roll + "|" + bName;
+
+            // If we haven't seen this Student+Batch combo yet, add it (it's the latest because of our sort)
+            if (!uniqueMap.has(key)) {
+                // Filter based on who is logged in
+                if (currentUserProfile.role === 'Student' && r.student_name.trim().toUpperCase() !== myName) return;
+                if (currentUserProfile.role === 'Teacher' && r.teacher_name.trim().toUpperCase() !== myName) return;
+
+                uniqueMap.set(key, r);
+            }
+        });
+
+        // 4. Render the clean list (This will show 5 records instead of 9)
+        const finalRows = Array.from(uniqueMap.values());
+        tbody.innerHTML = "";
+
+        finalRows.forEach((item, index) => {
+            // Find the batch settings (from Section 5) to get capacity and time
+            const b = batches?.find(x => x.batch_name.toUpperCase() === item.batch_name.toUpperCase());
             const booked = bookings?.filter(bk => bk.course.toUpperCase() === item.batch_name.toUpperCase()).length || 0;
             const cap = b ? parseInt(b.students_allotted) : 0;
             const balance = cap - booked;
-            const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+            const options = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
 
             tbody.innerHTML += `<tr>
-                <td>${item.roll_number}</td><td>${item.student_name}</td><td>${item.teacher_name}</td><td>${item.teacher_id}</td><td>${item.course_name}</td>
-                <td><b>${item.batch_name}</b></td><td>${cap}</td>
+                <td>${item.roll_number}</td>
+                <td>${item.student_name}</td>
+                <td>${item.teacher_name}</td>
+                <td>${b ? b.teacher_id : 'N/A'}</td>
+                <td>${item.course_name || item.batch_name}</td>
+                <td><b>${item.batch_name}</b></td>
+                <td style="color:blue; font-weight:800;">${cap}</td>
                 <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
-                <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')" style="width:100%">${slots}</select></td>
-                <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${b?.batch_time}','ts-${index}','${cap}')">SELECT</button></td>
+                <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')">${options}</select></td>
+                <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button></td>
             </tr>`;
         });
-    } catch (err) { console.error(err); }
+
+    } catch (err) {
+        console.error("Assignment Summary Error:", err);
+    }
 };
 </script>
 </body>
