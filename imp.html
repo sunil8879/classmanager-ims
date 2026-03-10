@@ -7358,6 +7358,37 @@ case 'leave-mod':
         }
     })();
     break;
+
+
+
+case 't-attn-mod':
+    // SECURITY BLOCK: Auto-lock Teacher ID for Teachers in Attendance
+    (async () => {
+        const { data: { user } } = await db.auth.getUser();
+        const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+        const tidField = document.getElementById('t-attn-id');
+        
+        if (profile && profile.role === 'Teacher') {
+            const { data: self } = await db.from('teacher_details').select('id').eq('email', profile.email).eq('institute_id', sessionInstID).maybeSingle();
+            if (self) {
+                tidField.value = self.id;
+                tidField.readOnly = true; // Lock the field so they can't change it
+                tidField.style.background = "#eee"; // Grey out visually
+                fetchTeacherForTAttn(); // Automatically fetch their name so they don't have to click the button
+            }
+        } else {
+            // Unlocks for Owner
+            tidField.readOnly = false;
+            tidField.style.background = "#fff";
+        }
+    })();
+    break;
+
+
+
+
+
+
 				
 				// Inside your switch (id) statement in showSection(id)
 case 'calendar-mod':
