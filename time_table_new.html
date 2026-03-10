@@ -924,5 +924,80 @@ async function updateBalanceUI(selectedTime, batchName, totalAllotted, cellId) {
 
 
 
+
+<script>
+/* --- Super-Forgiving Sync: Pull from list, fallback to Students table for Names --- */
+window.loadAssignmentSummary = async function() {
+    const tbody = document.getElementById('session-table-body');
+    if (!currentUserProfile || !sessionInstID) return;
+
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    const targetDate = tmrw.toISOString().split('T')[0];
+
+    try {
+        // 1. Fetch data from all 4 tables
+        const { data: roster } = await db.from('list').select('*').eq('institute_id', sessionInstID).order('created_at', { ascending: false });
+        const { data: students } = await db.from('students').select('roll_number, full_name').eq('status', 'Active').eq('institute_id', sessionInstID);
+        const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+        const { data: bookings } = await db.from('class_bookings').select('course, time_slot').eq('booking_date', targetDate).eq('institute_id', sessionInstID);
+
+        if (!roster || roster.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">Student not assigned to any Batch. Use Section 25.</td></tr>';
+            return;
+        }
+
+        // 2. DEDUPLICATION & NAME RECOVERY
+        const uniqueMap = new Map();
+        const myName = currentUserProfile.full_name.trim().toUpperCase();
+
+        roster.forEach(r => {
+            const roll = (r.roll_number || "").trim().toUpperCase();
+            const bName = (r.batch_name || "").trim().toUpperCase();
+            const key = roll + "|" + bName;
+
+            if (!uniqueMap.has(key) && roll !== "") {
+                // FALLBACK: If name is missing in 'list' table, find it in 'students' table
+                if (!r.student_name || r.student_name === "N/A") {
+                    const match = students?.find(s => s.roll_number.trim().toUpperCase() === roll);
+                    if (match) r.student_name = match.full_name;
+                }
+
+                // Filtering based on role
+                if (currentUserProfile.role === 'Student' && r.student_name.trim().toUpperCase() !== myName) return;
+                if (currentUserProfile.role === 'Teacher' && r.teacher_name.trim().toUpperCase() !== myName) return;
+
+                uniqueMap.set(key, r);
+            }
+        });
+
+        // 3. RENDER CLEAN ROWS
+        const finalRows = Array.from(uniqueMap.values());
+        tbody.innerHTML = "";
+
+        finalRows.forEach((item, index) => {
+            const b = batches?.find(x => x.batch_name.toUpperCase() === item.batch_name.toUpperCase());
+            const booked = bookings?.filter(bk => bk.course.toUpperCase() === item.batch_name.toUpperCase()).length || 0;
+            const cap = b ? parseInt(b.students_allotted) : 0;
+            const balance = cap - booked;
+            const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+
+            tbody.innerHTML += `<tr>
+                <td>${item.roll_number}</td>
+                <td>${item.student_name}</td>
+                <td>${item.teacher_name}</td>
+                <td>${b ? b.teacher_id : 'N/A'}</td>
+                <td>${item.course_name || 'N/A'}</td>
+                <td><b>${item.batch_name}</b></td>
+                <td style="color:blue; font-weight:800;">${cap}</td>
+                <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
+                <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')">${slots}</select></td>
+                <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button></td>
+            </tr>`;
+        });
+
+    } catch (err) { console.error("Sync Error:", err); }
+};
+</script>
 </body>
 </html>
