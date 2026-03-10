@@ -13224,5 +13224,46 @@ window.addBatchMasterRecord = async function() {
 
 
 
+<!-- ADD THIS SCRIPT BLOCK RIGHT BEFORE </body> TO AUTO-SYNC TIME SLOTS -->
+<script>
+/* =========================================================================
+   ADD-ON FIX: AUTO-SYNC TEACHER PORTAL SLOTS TO BATCH MASTER
+   ========================================================================= */
+// 1. We store a copy of your original editTeacher function
+const originalEditTeacherAction = window.editTeacher;
+
+// 2. We wrap it with our new synchronization logic
+window.editTeacher = async function() {
+    // Run your original update logic first
+    if (originalEditTeacherAction) {
+        await originalEditTeacherAction();
+    }
+
+    // Get the Teacher ID
+    const tid = document.getElementById('tch-id').value.toUpperCase();
+    if (!tid || !sessionInstID || typeof availabilityMap === 'undefined') return;
+
+    // 3. Loop through the updated subjects and push the new times into the Batches table
+    // This guarantees Section 25 (Batch Master) instantly reflects the changes.
+    try {
+        for (const [subject, slots] of Object.entries(availabilityMap)) {
+            if (slots) {
+                await db.from('batches')
+                    .update({ batch_time: slots })
+                    .eq('teacher_id', tid)
+                    .ilike('subject_name', subject)
+                    .eq('institute_id', sessionInstID);
+            }
+        }
+        console.log("Success: System automatically synced new time slots to the Master Batch lists.");
+    } catch (err) {
+        console.error("Background Slot Sync Error:", err);
+    }
+};
+</script>
+
+
+
+
 </body>
 </html>
