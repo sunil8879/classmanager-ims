@@ -13026,5 +13026,61 @@ window.cancelBooking = async function(id, roll) {
     }
 };
 </script>
+
+
+
+
+
+
+
+<script>
+/* --- Add this at the bottom of imp.html or time_table_new.html to fix Ghost/Missing records --- */
+window.loadAssignmentSummary = async function() {
+    const tbody = document.getElementById('session-table-body');
+    if (!currentUserProfile || !sessionInstID) return;
+
+    // 1. Calculate Tomorrow's Date
+    let targetDate = document.getElementById('f-date').value || new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    try {
+        // 2. Fetch Data from 4 Tables simultaneously
+        const { data: roster } = await db.from('list').select('*').eq('institute_id', sessionInstID);
+        const { data: activeStu } = await db.from('students').select('roll_number').eq('status', 'Active').eq('institute_id', sessionInstID);
+        const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+        const { data: bookings } = await db.from('class_bookings').select('course, time_slot').eq('booking_date', targetDate).eq('institute_id', sessionInstID);
+
+        // 3. PURGE: Only keep roster entries for students who are currently "Active" in Management
+        const activeRolls = activeStu ? activeStu.map(s => s.roll_number.trim().toUpperCase()) : [];
+        let filtered = roster ? roster.filter(r => activeRolls.includes(r.roll_number.trim().toUpperCase())) : [];
+
+        // 4. Role Filtering (with trim/uppercase safety)
+        const myName = currentUserProfile.full_name.trim().toUpperCase();
+        if (currentUserProfile.role === 'Student') {
+            filtered = filtered.filter(r => r.student_name.trim().toUpperCase() === myName);
+        } else if (currentUserProfile.role === 'Teacher') {
+            filtered = filtered.filter(r => r.teacher_name.trim().toUpperCase() === myName);
+        }
+
+        // 5. Render Clean Table
+        tbody.innerHTML = "";
+        if (filtered.length === 0) { tbody.innerHTML = '<tr><td colspan="10">No active linked records found.</td></tr>'; return; }
+
+        filtered.forEach((item, index) => {
+            const b = batches?.find(x => x.teacher_id === item.teacher_id && x.batch_name.toUpperCase() === item.batch_name.toUpperCase());
+            const booked = bookings?.filter(bk => bk.course.toUpperCase() === item.batch_name.toUpperCase()).length || 0;
+            const balance = (b ? parseInt(b.students_allotted) : 0) - booked;
+            const options = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+
+            tbody.innerHTML += `<tr>
+                <td>${item.roll_number}</td><td>${item.student_name}</td><td>${item.teacher_name}</td><td>${item.teacher_id}</td><td>${item.course_name}</td>
+                <td><b>${item.batch_name}</b></td><td>${b ? b.students_allotted : 0}</td>
+                <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
+                <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${b ? b.students_allotted : 0}', 'bal-${index}')">${options}</select></td>
+                <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${item.teacher_id}','${item.teacher_name}','${b?.batch_time}','ts-${index}','${b ? b.students_allotted : 0}')">SELECT</button></td>
+            </tr>`;
+        });
+    } catch (err) { console.error("Roster Sync Error:", err); }
+};
+</script>
 </body>
 </html>
