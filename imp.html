@@ -3217,6 +3217,25 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
         </div>
     </footer>
 <script>
+
+// 1. Force the browser to forget the last scroll position
+if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+}
+
+// 2. Immediately force scroll to top before everything renders
+window.scrollTo(0, 0);
+
+// 3. Prevent any "autofocus" elements from stealing focus and jumping the page
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        window.scrollTo(0, 0);
+        // Optional: removes focus from any element that might be pulling the page down
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+    }, 10);
+});
 /* ==========================================
    1. CORE INITIALIZATION
    ========================================== */
