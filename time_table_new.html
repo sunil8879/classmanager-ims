@@ -358,20 +358,21 @@
             </h2>
             <div class="summary-table-wrapper" style="margin-bottom: 0;">
                 <table class="summary-table">
-                    <thead>
-                        <tr style="background: #20B2AA;">
-                            <th>Roll No</th>
-                            <th>Student Name</th>
-                            <th>Teacher Allotted</th>
-                            <th>Teacher ID</th>
-                            <th>Subject</th>
-                            <th>Batch Name</th>
-                            <th>Seats Allotted</th>
-                            <th>Balance Seats</th>
-                            <th>Batch Time</th>
-                            <th>action</th>
-                        </tr>
-                    </thead>
+                   <thead>
+    <tr>
+        <th>Roll No</th>
+        <th>Student Name</th>
+        <th>Teacher Allotted</th>
+        <th>Teacher ID</th>
+        <th>Subject</th>
+        <th>Batch Name</th>
+        <th>Batch Capacity</th> 
+        <th>Seats Available</th>  
+        <th>Status</th> <!-- NEW COLUMN ADDED -->
+        <th style="width: 200px;">Batch Time</th>
+        <th>Action</th>
+    </tr>
+</thead>
                     <tbody id="today-table-body">
                         <tr><td colspan="10">Checking today's bookings...</td></tr>
                     </tbody>
@@ -1045,6 +1046,7 @@ async function updateBalanceUI(selectedTime, batchName, totalAllotted, cellId) {
 
 <script>
 /* --- Super-Forgiving Sync: Pull from list, fallback to Students table for Names --- */
+/* --- Super-Forgiving Sync: Pull from list, fallback to Students table for Names --- */
 window.loadAssignmentSummary = async function() {
     const tbody = document.getElementById('session-table-body');
     if (!currentUserProfile || !sessionInstID) return;
@@ -1058,10 +1060,11 @@ window.loadAssignmentSummary = async function() {
         const { data: roster } = await db.from('list').select('*').eq('institute_id', sessionInstID).order('created_at', { ascending: false });
         const { data: students } = await db.from('students').select('roll_number, full_name').eq('status', 'Active').eq('institute_id', sessionInstID);
         const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
-        const { data: bookings } = await db.from('class_bookings').select('course, time_slot').eq('booking_date', targetDate).eq('institute_id', sessionInstID);
+        
+        // FETCH BOOKINGS TO CHECK INDIVIDUAL STUDENT STATUS
+        const { data: bookings } = await db.from('class_bookings').select('course, time_slot, student_roll').eq('booking_date', targetDate).eq('institute_id', sessionInstID);
 
-
-// --- START OF ADDED CODE TO SYNC FRESH TEACHER TIMINGS ---
+        // SYNC FRESH TEACHER TIMINGS
         const { data: liveTeachers } = await db.from('teacher_details').select('id, time_of_slot').eq('institute_id', sessionInstID);
         if (liveTeachers && batches) {
             batches.forEach(b => {
@@ -1071,18 +1074,15 @@ window.loadAssignmentSummary = async function() {
                         const slotObj = typeof t.time_of_slot === 'string' ? JSON.parse(t.time_of_slot) : t.time_of_slot;
                         const freshTime = Object.entries(slotObj).find(([k, v]) => k.toUpperCase() === b.subject_name.toUpperCase());
                         if (freshTime && freshTime[1]) {
-                            b.batch_time = freshTime[1]; // Overrides stale batch time with fresh teacher time
+                            b.batch_time = freshTime[1]; 
                         }
                     } catch(e) { console.error("Slot Sync Error", e); }
                 }
             });
         }
-        // --- END OF ADDED CODE ---
-
-
 
         if (!roster || roster.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10">Student not assigned to any Batch. Use Section 25.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11">Student not assigned to any Batch. Use Section 25.</td></tr>';
             return;
         }
 
@@ -1096,13 +1096,11 @@ window.loadAssignmentSummary = async function() {
             const key = roll + "|" + bName;
 
             if (!uniqueMap.has(key) && roll !== "") {
-                // FALLBACK: If name is missing in 'list' table, find it in 'students' table
                 if (!r.student_name || r.student_name === "N/A") {
                     const match = students?.find(s => s.roll_number.trim().toUpperCase() === roll);
                     if (match) r.student_name = match.full_name;
                 }
 
-                // Filtering based on role
                 if (currentUserProfile.role === 'Student' && r.student_name.trim().toUpperCase() !== myName) return;
                 if (currentUserProfile.role === 'Teacher' && r.teacher_name.trim().toUpperCase() !== myName) return;
 
@@ -1110,15 +1108,28 @@ window.loadAssignmentSummary = async function() {
             }
         });
 
-        // 3. RENDER CLEAN ROWS
+        // 3. RENDER CLEAN ROWS WITH EXPLICIT STUDENT STATUS
         const finalRows = Array.from(uniqueMap.values());
         tbody.innerHTML = "";
 
         finalRows.forEach((item, index) => {
             const b = batches?.find(x => x.batch_name.toUpperCase() === item.batch_name.toUpperCase());
-            const booked = bookings?.filter(bk => bk.course.toUpperCase() === item.batch_name.toUpperCase()).length || 0;
+            
+            // Look at the specific time slot currently visible in the dropdown to calculate balance
+            const firstSlot = b?.batch_time ? b.batch_time.split(',')[0].trim() : null;
+            const bookedInSlot = bookings?.filter(bk => bk.course.toUpperCase() === item.batch_name.toUpperCase() && bk.time_slot === firstSlot).length || 0;
+            
             const cap = b ? parseInt(b.students_allotted) : 0;
-            const balance = cap - booked;
+            const balance = cap - bookedInSlot;
+            
+            // EXPLICIT CHECK: Did THIS specific student book a slot for THIS batch?
+            const isStudentBooked = bookings?.some(bk => bk.student_roll.toUpperCase() === item.roll_number.toUpperCase() && bk.course.toUpperCase() === item.batch_name.toUpperCase());
+
+            // Create Badge
+            const statusBadge = isStudentBooked 
+                ? `<span style="background:green; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">BOOKED</span>` 
+                : `<span style="background:orange; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PENDING</span>`;
+
             const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
 
             tbody.innerHTML += `<tr>
@@ -1130,6 +1141,7 @@ window.loadAssignmentSummary = async function() {
                 <td><b>${item.batch_name}</b></td>
                 <td style="color:blue; font-weight:800;">${cap}</td>
                 <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
+                <td>${statusBadge}</td> <!-- INJECTED STATUS BADGE -->
                 <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')">${slots}</select></td>
                 <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button></td>
             </tr>`;
