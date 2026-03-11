@@ -560,7 +560,37 @@ async function loadTodaySummary() {
             const bookedCount = bookings.filter(x => x.course === bk.course && x.time_slot === bk.time_slot).length;
             const balance = allotted - bookedCount;
 
-            tbody.innerHTML += `
+
+
+
+
+ // --- ADD START: TIME EXPIRATION CHECK ---
+            let isOver = false;
+            // (Using todayStr which is already defined in the function)
+            if (bk.booking_date === todayStr) {
+                try {
+                    let tStr = bk.time_slot.split(/TO|-/i)[0].trim();
+                    let [h, m] = tStr.match(/\d+/g).map(Number);
+                    if (tStr.toUpperCase().includes("PM") && h < 12) h += 12;
+                    if (tStr.toUpperCase().includes("AM") && h === 12) h = 0;
+                    let now = new Date();
+                    if (now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m)) isOver = true;
+                } catch(e) {}
+            }
+            
+            let statusHtml = isOver 
+                ? `<span style="background:#666; color:#fff; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">OVER</span>` 
+                : `<span style="background:#27ae60; color:#fff; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">LIVE</span>`;
+                
+            let cancelAttr = isOver ? `disabled` : ``;
+            let cancelStyle = isOver ? `opacity:0.5; cursor:not-allowed;` : `cursor:pointer;`;
+            // --- ADD END ---
+
+
+
+
+
+      tbody.innerHTML += `
                 <tr>
                     <td>${bk.student_roll}</td>
                     <td>${stuMap[bk.student_roll.toUpperCase()] || 'N/A'}</td>
@@ -571,10 +601,10 @@ async function loadTodaySummary() {
                     <td style="color:blue; font-weight:800;">${allotted}</td>
                     <td style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
                     <td style="background:#fff8e1; font-weight:bold;">${bk.time_slot}</td>
-                   <td>
-    <span style="color:green; font-weight:900; display:block; margin-bottom:5px;">LIVE</span>
-    <button onclick="cancelBooking('${bk.id}', '${bk.student_roll}')" style="background:#ff4757; color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.75rem;">CANCEL</button>
-</td>
+                    <td>
+                        <div style="margin-bottom:5px;">${statusHtml}</div>
+                        <button ${cancelAttr} onclick="cancelBooking('${bk.id}', '${bk.student_roll}')" style="background:#ff4757; color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; ${cancelStyle} font-size:0.75rem;">CANCEL</button>
+                    </td>
                 </tr>`;
         });
     } catch (e) { console.error(e); }
