@@ -345,8 +345,7 @@
         <!-- Mischief Warning Banner -->
 
 <!-- ADDITION: TODAY'S LIVE SUMMARY (STUDENTS WHO BOOKED) -->
-      <!-- ADDITION: TODAY'S LIVE SUMMARY -->
-   <!-- ADDITION: TODAY'S LIVE SUMMARY -->
+<!-- TODAY'S LIVE SUMMARY SECTION -->
         <div id="today-schedule-section" style="margin-bottom: 50px; border: 4px solid #20B2AA; border-radius: 16px; padding: 20px; background: #f0fdfa;">
             <h2 style="text-align: center; text-transform: uppercase; font-weight: 900; margin-bottom: 15px; color: #008080;">
                 <i class="fas fa-calendar-day"></i> Today's Live Schedule (<span id="display-today-date"></span>)
@@ -373,6 +372,7 @@
                 </table>
             </div>
         </div>
+
 
  <div id="mischief-warning">
             ⚠️ WARNING: YOU HAVE A HISTORY OF MULTIPLE CANCELLATIONS. FURTHER MISCHIEF WILL RESULT IN A BLOCK.
@@ -457,7 +457,7 @@
     let currentUserProfile = null;
 
  
-    async function initSession() {
+async function initSession() {
         const { data: { user } } = await db.auth.getUser();
         if (!user) {
             alert("No active session found. Please login from the main application.");
@@ -470,26 +470,30 @@
         currentUserProfile = profile;
         sessionInstID = profile.institute_id;
         
-        document.getElementById('session-title').innerText = `${profile.role.toUpperCase()} PORTAL: ${profile.full_name}`;
+        // Safety check for session title
+        const sessionTitle = document.getElementById('session-title');
+        if (sessionTitle) {
+            sessionTitle.innerText = `${profile.role.toUpperCase()} PORTAL: ${profile.full_name}`;
+        }
         
-        // --- VALIDATION: LOCK CALENDAR TO TOMORROW ONLY ---
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const dateStr = tomorrow.toISOString().split('T')[0];
         const dateInput = document.getElementById('f-date');
         
-        dateInput.value = dateStr;
-        dateInput.setAttribute('min', dateStr);
-        dateInput.setAttribute('max', dateStr);
+        if (dateInput) {
+            dateInput.value = dateStr;
+            dateInput.setAttribute('min', dateStr);
+            dateInput.setAttribute('max', dateStr);
+        }
 
-        // Mischief Check for Students
         if (profile.role === 'Student') {
             checkMischiefHistory(profile.full_name);
         }
-loadTodaySummary();
-        loadAssignmentSummary();
-// ADD THIS LINE at the end of your existing initSession() function
 
+        // Trigger both tables
+        loadTodaySummary();
+        loadAssignmentSummary();
     }
 
   
@@ -711,7 +715,7 @@ async function renderTimetableGrid(bookings, dateVal) {
             if (day === todayDayName && day !== activeDayName) {
                 td.style.opacity = "0.5"; td.style.background = "#f4f4f4"; td.style.pointerEvents = "none";
                 const match = todayBookings?.find(b => b.time_slot === time);
-                if (match) td.innerHTML = `<small style="font-size:0.6rem; color:#666; font-weight:bold;">OCCUPIED:<br>${match.course}</small>`;
+                if (match) td.innerHTML = `<small style="font-size:0.6rem; color:#666;">OCCUPIED:<br>${match.course}</small>`;
             } 
             else if (day === activeDayName) {
                 if (myBooking) {
@@ -913,17 +917,13 @@ await loadAssignmentSummary();
 
 // ADDITION: Function to load Today's Schedule (DYNAMIC & ROLE-BASED)
 // ADDITION: LOAD TODAY'S LIVE BOOKINGS WITH SAFETY CHECK
-// ADDITION: LOAD TODAY'S LIVE BOOKINGS WITH SAFETY CHECK TO PREVENT "NULL" ERROR
+// LOAD TODAY'S BOOKINGS (STRICT FORMAT)
 async function loadTodaySummary() {
     const tbody = document.getElementById('today-table-body');
     const dateLabel = document.getElementById('display-today-date');
-    
-    // CRITICAL FIX: If the element is not found, stop here instead of crashing
-    if (!tbody) return; 
+    if (!currentUserProfile || !sessionInstID || !tbody) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    
-    // Safety check for the date label
     if (dateLabel) {
         dateLabel.innerText = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     }
@@ -940,24 +940,23 @@ async function loadTodaySummary() {
         const myName = currentUserProfile.full_name.toUpperCase();
         let list = bookings || [];
         
-        // Filtering based on who is logged in
         if (currentUserProfile.role === 'Student') {
-            list = list.filter(b => b.student_roll.toUpperCase() === currentUserProfile.full_name.toUpperCase() || stuMap[b.student_roll.toUpperCase()] === myName);
+            list = list.filter(b => stuMap[b.student_roll.toUpperCase()] === myName);
         } else if (currentUserProfile.role === 'Teacher') {
             const myTid = batches?.find(b => b.teacher_name.toUpperCase() === myName)?.teacher_id;
             if (myTid) list = list.filter(b => b.teacher_id === myTid);
         }
 
         if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;">No bookings found for today.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;">No student bookings found for today.</td></tr>';
             return;
         }
 
         list.forEach(bk => {
             const bMeta = batches?.find(x => x.batch_name.toUpperCase() === bk.course.toUpperCase());
             const allotted = bMeta ? bMeta.students_allotted : 0;
-            const bookedCount = bookings.filter(x => x.course === bk.course && x.time_slot === bk.time_slot).length;
-            const balance = allotted - bookedCount;
+            const bookedInThisSlot = bookings.filter(x => x.course === bk.course && x.time_slot === bk.time_slot).length;
+            const balance = allotted - bookedInThisSlot;
 
             tbody.innerHTML += `
                 <tr>
@@ -974,8 +973,7 @@ async function loadTodaySummary() {
                 </tr>`;
         });
     } catch (e) { 
-        console.error("Today Sync Error:", e);
-        tbody.innerHTML = '<tr><td colspan="10">Error loading today\'s sessions.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10">Error loading records.</td></tr>';
     }
 }
 
