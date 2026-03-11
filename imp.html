@@ -13908,6 +13908,25 @@ window.openBatchPicker = async function() {
           const makeRow = (count, label, color) => {
                 let bal = row.total - count;
                 let full = row.total > 0 && bal <= 0;
+
+
+
+// --- ADD START: TIME EXPIRATION CHECK ---
+            if (label === "Today" || label === "") {
+                try {
+                    let tStr = row.time.split(/TO|-/i)[0].trim();
+                    let [h, m] = tStr.match(/\d+/g).map(Number);
+                    if (tStr.toUpperCase().includes("PM") && h < 12) h += 12;
+                    if (tStr.toUpperCase().includes("AM") && h === 12) h = 0;
+                    let now = new Date();
+                    if (now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m)) full = true;
+                } catch(e) {}
+            }
+            // --- ADD END ---
+
+
+
+
                 
                 // Sleek, pill-shaped badge with subtle shadow
             let badge = count > 0 ? `<span style="background:${color}; color:#fff; font-size:0.7rem; padding:4px 10px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">${label.toUpperCase()}</span>` : "";
