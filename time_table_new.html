@@ -766,13 +766,13 @@ async function renderTimetableGrid(bookings, dateVal) {
       // 2 lines before:
 const batchMembers = bookings?.filter(b => b.time_slot === time) || [];
 
-// THE FIX: Strict Personal Enrollment Check
+// THE FIX: Strictly checks if YOUR roll number is in the booking list
 const myBooking = batchMembers.find(b => 
     String(b.student_roll).trim().toUpperCase() === String(loggedInRoll).trim().toUpperCase()
 );
 
-// Identify the Batch Subject from any member in this slot
-const batchSubject = batchMembers.length > 0 ? batchMembers[0].course.trim().toUpperCase() : null;
+// Identify the Batch Name/Subject in this slot
+const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
 
         if (batchMembers.length > 0) {
             tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)";
@@ -800,39 +800,43 @@ const batchSubject = batchMembers.length > 0 ? batchMembers[0].course.trim().toU
         tr.appendChild(tdTime);
 
         DAYS.forEach(day => {
-            const td = document.createElement('td');
+        const td = document.createElement('td');
 
-
-          // TODAY COLUMN: Visible but Disabled
-        if (day === todayDayName && day !== activeDayName) {
-            td.style.opacity = "0.5"; td.style.background = "#f4f4f4"; td.style.pointerEvents = "none";
-            const match = todayBookings?.find(b => b.time_slot === time);
-            if (match) td.innerHTML = `<small style="font-size:0.6rem; color:#666;">OCCUPIED:<br>${match.course}</small>`;
-        } 
-        // TOMORROW COLUMN: The active one
-        else if (day === activeDayName) {
-            if (myBooking) {
-                td.className = 'booked-cell';
-                td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
-            } else if (batchSubject && batchSubject !== currentCourse) {
-                td.style.background = "#ffeae6";
-                td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject}<br>ONLY</span>`;
-            } else {
-                const label = batchMembers.length > 0 ? `JOIN ${batchSubject}` : "BOOK SLOT";
-                if (currentUserProfile.role === 'Student') {
-                    td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">${label}</button>`;
+            // TODAY COLUMN: Visible but Disabled
+            if (day === todayDayName && day !== activeDayName) {
+                td.style.opacity = "0.5"; td.style.background = "#f4f4f4"; td.style.pointerEvents = "none";
+                const match = todayBookings?.find(b => b.time_slot === time);
+                if (match) td.innerHTML = `<small style="font-size:0.6rem; color:#666;">OCCUPIED:<br>${match.course}</small>`;
+            } 
+            // TOMORROW COLUMN: The active one
+            else if (day === activeDayName) {
+                if (myBooking) {
+                    // CASE 1: You personally booked this slot
+                    td.className = 'booked-cell';
+                    td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
+                } else if (batchSubject && batchSubject.trim().toUpperCase() === currentCourse.trim().toUpperCase()) {
+                    // CASE 2: Someone else in your batch booked it, but you haven't joined yet
+                    td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem; background:#FFD700; color:#000; border:2px solid #000;">JOIN ${batchSubject}</button>`;
+                } else if (batchSubject && batchSubject.trim().toUpperCase() !== currentCourse.trim().toUpperCase()) {
+                    // CASE 3: Slot locked by a different subject
+                    td.style.background = "#ffeae6";
+                    td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject}<br>ONLY</span>`;
                 } else {
-                    td.innerHTML = `<span style="font-size:0.7rem; color:#999;">${batchMembers.length > 0 ? batchMembers.length + ' Students' : 'EMPTY'}</span>`;
+                    // CASE 4: Slot is completely empty
+                    if (currentUserProfile.role === 'Student') {
+                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">BOOK SLOT</button>`;
+                    } else {
+                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">EMPTY</span>`;
+                    }
                 }
+            } else {
+                td.style.opacity = "0.1"; td.style.pointerEvents = "none";
             }
-        } else {
-            td.style.opacity = "0.1"; td.style.pointerEvents = "none";
-        }
-        tr.appendChild(td);
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
     });
-    tbody.appendChild(tr);
-});
-document.getElementById('timetable-wrapper').style.display = 'block';
+    document.getElementById('timetable-wrapper').style.display = 'block';
 }
 
 
