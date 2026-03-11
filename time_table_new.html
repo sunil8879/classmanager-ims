@@ -346,6 +346,7 @@
 
 <!-- ADDITION: TODAY'S LIVE SUMMARY (STUDENTS WHO BOOKED) -->
       <!-- ADDITION: TODAY'S LIVE SUMMARY -->
+   <!-- ADDITION: TODAY'S LIVE SUMMARY -->
         <div id="today-schedule-section" style="margin-bottom: 50px; border: 4px solid #20B2AA; border-radius: 16px; padding: 20px; background: #f0fdfa;">
             <h2 style="text-align: center; text-transform: uppercase; font-weight: 900; margin-bottom: 15px; color: #008080;">
                 <i class="fas fa-calendar-day"></i> Today's Live Schedule (<span id="display-today-date"></span>)
@@ -372,7 +373,6 @@
                 </table>
             </div>
         </div>
-
 
  <div id="mischief-warning">
             ⚠️ WARNING: YOU HAVE A HISTORY OF MULTIPLE CANCELLATIONS. FURTHER MISCHIEF WILL RESULT IN A BLOCK.
@@ -658,7 +658,6 @@ async function renderTimetableGrid(bookings, dateVal) {
     const SLOTS = ["09:00 AM to 10:00 AM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM", "12:00 PM to 01:00 PM", "01:00 PM to 02:00 PM", "02:00 PM to 03:00 PM", "03:00 PM to 04:00 PM", "04:00 PM to 05:00 PM", "05:00 PM to 06:00 PM", "06:00 PM to 07:00 PM", "07:00 PM to 08:00 PM", "08:00 PM to 09:00 PM"];
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
     
-    // 1. Calculate Date References
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(dateVal).getDay()];
     const todayDate = new Date();
     const todayStr = todayDate.toISOString().split('T')[0];
@@ -668,22 +667,16 @@ async function renderTimetableGrid(bookings, dateVal) {
     const currentCourse = document.getElementById('f-course').value;
     const tid = document.getElementById('f-teacher-id').value;
 
-    // 2. Fetch Supporting Data once at the top for speed
-    // Today's bookings (to show in the disabled column)
-    const { data: todayBookings } = await db.from("class_bookings").select("*")
-        .eq("booking_date", todayStr).eq("teacher_id", tid).eq("institute_id", sessionInstID);
-
-    // Registry to map Roll Numbers to Student Names for the Yellow Boxes
+    const { data: todayBookings } = await db.from("class_bookings").select("*").eq("booking_date", todayStr).eq("teacher_id", tid).eq("institute_id", sessionInstID);
     const { data: studentRegistry } = await db.from('list').select('student_name, roll_number').eq('teacher_id', tid).eq('institute_id', sessionInstID);
 
     const tbody = document.getElementById('timetable-body');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     SLOTS.forEach(time => {
         const tr = document.createElement('tr');
         const tdTime = document.createElement('td'); 
-        
-        // Logic for the Time Column (Yellow Box for tomorrow's assigned students)
         const batchMembers = bookings?.filter(b => b.time_slot === time) || [];
         const myBooking = batchMembers.find(b => b.student_roll === loggedInRoll);
         const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
@@ -707,38 +700,19 @@ async function renderTimetableGrid(bookings, dateVal) {
             }).join('<br>');
 
             const totalCap = document.getElementById('f-capacity').value || 10;
-
-            tdTime.innerHTML = `
-                ${deleteBtn}
-                <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
-                <div style="font-size:0.7rem; line-height:1.4;">
-                    <b style="color:red; font-size:0.8rem;">CAPACITY: ${batchMembers.length} / ${totalCap}</b>
-                    <b style="color:blue;">BATCH: ${batchSubject}</b>
-                    <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">${rollList}</div>
-                </div>`;
+            tdTime.innerHTML = `${deleteBtn} <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div><div style="font-size:0.7rem; line-height:1.4;"><b style="color:red; font-size:0.8rem;">CAPACITY: ${batchMembers.length} / ${totalCap}</b> <b style="color:blue;">BATCH: ${batchSubject}</b><div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">${rollList}</div></div>`;
         } else {
-            tdTime.className = 'time-slot'; 
-            tdTime.innerText = time;
-            tdTime.style.minWidth = "220px";
+            tdTime.className = 'time-slot'; tdTime.innerText = time; tdTime.style.minWidth = "220px";
         }
         tr.appendChild(tdTime);
 
-        // Day Columns Logic
         DAYS.forEach(day => {
             const td = document.createElement('td');
-            
-            // --- LOGIC FOR TODAY (Visible but Disabled) ---
             if (day === todayDayName && day !== activeDayName) {
-                td.style.opacity = "0.5"; 
-                td.style.background = "#f4f4f4";
-                td.style.pointerEvents = "none";
-                // Uses the pre-fetched todayBookings variable
-                const matchToday = todayBookings?.find(b => b.time_slot === time);
-                if (matchToday) {
-                    td.innerHTML = `<small style="font-size:0.6rem; color:#666; font-weight:bold;">OCCUPIED:<br>${matchToday.course}</small>`;
-                }
+                td.style.opacity = "0.5"; td.style.background = "#f4f4f4"; td.style.pointerEvents = "none";
+                const match = todayBookings?.find(b => b.time_slot === time);
+                if (match) td.innerHTML = `<small style="font-size:0.6rem; color:#666; font-weight:bold;">OCCUPIED:<br>${match.course}</small>`;
             } 
-            // --- LOGIC FOR TOMORROW (The Active column) ---
             else if (day === activeDayName) {
                 if (myBooking) {
                     td.className = 'booked-cell';
@@ -754,11 +728,8 @@ async function renderTimetableGrid(bookings, dateVal) {
                         td.innerHTML = `<span style="font-size:0.7rem; color:#999;">${batchMembers.length > 0 ? batchMembers.length + ' Students' : 'EMPTY'}</span>`;
                     }
                 }
-            } 
-            // --- OTHER DAYS (Faded Out) ---
-            else {
-                td.style.opacity = "0.1";
-                td.style.pointerEvents = "none";
+            } else {
+                td.style.opacity = "0.1"; td.style.pointerEvents = "none";
             }
             tr.appendChild(td);
         });
@@ -766,6 +737,9 @@ async function renderTimetableGrid(bookings, dateVal) {
     });
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
+
+
+
 
 async function bookThisSlot(day, time) {
     // 1. GET ALL NECESSARY DATA FROM THE UI
@@ -939,13 +913,17 @@ await loadAssignmentSummary();
 
 // ADDITION: Function to load Today's Schedule (DYNAMIC & ROLE-BASED)
 // ADDITION: LOAD TODAY'S LIVE BOOKINGS WITH SAFETY CHECK
+// ADDITION: LOAD TODAY'S LIVE BOOKINGS WITH SAFETY CHECK TO PREVENT "NULL" ERROR
 async function loadTodaySummary() {
     const tbody = document.getElementById('today-table-body');
     const dateLabel = document.getElementById('display-today-date');
-    if (!currentUserProfile || !sessionInstID || !tbody) return;
+    
+    // CRITICAL FIX: If the element is not found, stop here instead of crashing
+    if (!tbody) return; 
 
     const todayStr = new Date().toISOString().split('T')[0];
-    // Safety: Only update label if it exists in HTML
+    
+    // Safety check for the date label
     if (dateLabel) {
         dateLabel.innerText = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     }
@@ -962,8 +940,9 @@ async function loadTodaySummary() {
         const myName = currentUserProfile.full_name.toUpperCase();
         let list = bookings || [];
         
+        // Filtering based on who is logged in
         if (currentUserProfile.role === 'Student') {
-            list = list.filter(b => stuMap[b.student_roll.toUpperCase()] === myName);
+            list = list.filter(b => b.student_roll.toUpperCase() === currentUserProfile.full_name.toUpperCase() || stuMap[b.student_roll.toUpperCase()] === myName);
         } else if (currentUserProfile.role === 'Teacher') {
             const myTid = batches?.find(b => b.teacher_name.toUpperCase() === myName)?.teacher_id;
             if (myTid) list = list.filter(b => b.teacher_id === myTid);
@@ -988,18 +967,17 @@ async function loadTodaySummary() {
                     <td>${bk.teacher_id}</td>
                     <td>${bMeta ? bMeta.subject_name : 'N/A'}</td>
                     <td><b>${bk.course}</b></td>
-                    <td style="color:blue;">${allotted}</td>
-                    <td style="color:${balance <= 0 ? 'red' : 'green'};">${balance}</td>
+                    <td style="color:blue; font-weight:800;">${allotted}</td>
+                    <td style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
                     <td style="background:#fff8e1; font-weight:bold;">${bk.time_slot}</td>
                     <td><span style="color:green; font-weight:900;">LIVE</span></td>
                 </tr>`;
         });
     } catch (e) { 
         console.error("Today Sync Error:", e);
-        tbody.innerHTML = '<tr><td colspan="10">Error loading records.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10">Error loading today\'s sessions.</td></tr>';
     }
 }
-
 
     initSession();
 
