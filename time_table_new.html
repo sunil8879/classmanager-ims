@@ -384,31 +384,37 @@
 
 
         <!-- Session Header (User Name) -->
-        <h2 id="session-title">Identifying Session...</h2>
-
-        <!-- Dynamic Summary Table -->
-        <div class="summary-table-wrapper">
-            <table class="summary-table">
-               <thead>
-    <tr>
-        <th>Roll No</th>
-        <th>Student Name</th>
-        <th>Teacher Allotted</th>
-        <th>Teacher ID</th>
-        <th>Subject</th>
-        <th>Batch Name</th>
-        <th>Seats Allotted</th> <!-- NEW -->
-        <th>Balance Seats</th>  <!-- NEW -->
-        <th style="width: 200px;">Batch Time</th>
-        <th>Action</th>
-    </tr>
-</thead>
-                <tbody id="session-table-body">
-                    <!-- JavaScript will inject rows here -->
-                    <tr><td colspan="8">Searching for your assignments...</td></tr>
-                </tbody>
-            </table>
+     <!-- ADDITION: TODAY'S LIVE SUMMARY -->
+        <div id="today-schedule-section" style="margin-bottom: 50px; border: 4px solid #20B2AA; border-radius: 16px; padding: 20px; background: #f0fdfa;">
+            <h2 style="text-align: center; text-transform: uppercase; font-weight: 900; margin-bottom: 15px; color: #008080;">
+                <i class="fas fa-calendar-day"></i> Today's Live Schedule (<span id="display-today-date"></span>)
+            </h2>
+            <div class="summary-table-wrapper" style="margin-bottom: 0;">
+                <table class="summary-table">
+                    <thead>
+                        <tr style="background: #20B2AA;">
+                            <th>Roll No</th>
+                            <th>Student Name</th>
+                            <th>Teacher Allotted</th>
+                            <th>Teacher ID</th>
+                            <th>Subject</th>
+                            <th>Batch Name</th>
+                            <th>Seats Allotted</th>
+                            <th>Balance Seats</th>
+                            <th>Batch Time</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="today-table-body">
+                        <tr><td colspan="10">Checking today's bookings...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
+
+
+
+
 
         <div class="form-grid">
             <!-- 1. Booking Date (Readonly/Next Day Only) -->
@@ -687,10 +693,7 @@ async function renderTimetableGrid(bookings, dateVal) {
     const currentCourse = document.getElementById('f-course').value;
     const tid = document.getElementById('f-teacher-id').value;
 
-    // 1. Fetch Today's bookings once at the top for speed
-    const { data: todayBookings } = await db.from("class_bookings").select("*")
-        .eq("booking_date", todayStr).eq("teacher_id", tid).eq("institute_id", sessionInstID);
-
+    const { data: todayBookings } = await db.from("class_bookings").select("*").eq("booking_date", todayStr).eq("teacher_id", tid).eq("institute_id", sessionInstID);
     const { data: studentRegistry } = await db.from('list').select('student_name, roll_number').eq('teacher_id', tid);
 
     const tbody = document.getElementById('timetable-body');
@@ -699,7 +702,6 @@ async function renderTimetableGrid(bookings, dateVal) {
     SLOTS.forEach(time => {
         const tr = document.createElement('tr');
         const tdTime = document.createElement('td'); 
-        
         const batchMembers = bookings?.filter(b => b.time_slot === time) || [];
         const myBooking = batchMembers.find(b => b.student_roll === loggedInRoll);
         const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
@@ -724,35 +726,19 @@ async function renderTimetableGrid(bookings, dateVal) {
 
             const totalCap = document.getElementById('f-capacity').value || 10;
 
-            tdTime.innerHTML = `
-                ${deleteBtn}
-                <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
-                <div style="font-size:0.7rem; line-height:1.4;">
-                    <b style="color:red; font-size:0.8rem;">CAPACITY: ${batchMembers.length} / ${totalCap}</b>
-                    <b style="color:blue;">BATCH: ${batchSubject}</b>
-                    <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">${rollList}</div>
-                </div>`;
+            tdTime.innerHTML = `${deleteBtn} <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div><div style="font-size:0.7rem; line-height:1.4;"><b style="color:red; font-size:0.8rem;">CAPACITY: ${batchMembers.length} / ${totalCap}</b> <b style="color:blue;">BATCH: ${batchSubject}</b><div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">${rollList}</div></div>`;
         } else {
-            tdTime.className = 'time-slot'; 
-            tdTime.innerText = time;
-            tdTime.style.minWidth = "220px";
+            tdTime.className = 'time-slot'; tdTime.innerText = time; tdTime.style.minWidth = "220px";
         }
         tr.appendChild(tdTime);
 
         DAYS.forEach(day => {
             const td = document.createElement('td');
-            
-            // LOGIC FOR TODAY (Visible but Disabled)
             if (day === todayDayName && day !== activeDayName) {
-                td.style.opacity = "0.5"; 
-                td.style.background = "#eeeeee";
-                td.style.pointerEvents = "none";
+                td.style.opacity = "0.5"; td.style.background = "#f4f4f4"; td.style.pointerEvents = "none";
                 const match = todayBookings?.find(b => b.time_slot === time);
-                if (match) {
-                    td.innerHTML = `<small style="font-size:0.65rem; font-weight:bold; color:#666;">OCCUPIED:<br>${match.course}</small>`;
-                }
+                if (match) td.innerHTML = `<small style="font-size:0.6rem; color:#666;">OCCUPIED:<br>${match.course}</small>`;
             } 
-            // LOGIC FOR TOMORROW (Active Day)
             else if (day === activeDayName) {
                 if (myBooking) {
                     td.className = 'booked-cell';
@@ -768,11 +754,8 @@ async function renderTimetableGrid(bookings, dateVal) {
                         td.innerHTML = `<span style="font-size:0.7rem; color:#999;">${batchMembers.length > 0 ? batchMembers.length + ' Students' : 'EMPTY'}</span>`;
                     }
                 }
-            } 
-            // ALL OTHER DAYS
-            else {
-                td.style.opacity = "0.1";
-                td.style.pointerEvents = "none";
+            } else {
+                td.style.opacity = "0.1"; td.style.pointerEvents = "none";
             }
             tr.appendChild(td);
         });
@@ -780,7 +763,6 @@ async function renderTimetableGrid(bookings, dateVal) {
     });
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
-
 
 async function bookThisSlot(day, time) {
     // 1. GET ALL NECESSARY DATA FROM THE UI
@@ -953,59 +935,64 @@ await loadAssignmentSummary();
 
 
 // ADDITION: Function to load Today's Schedule (DYNAMIC & ROLE-BASED)
+// ADDITION: Function to load Today's Schedule (DYNAMIC & FORMATTED)
 async function loadTodaySummary() {
     const tbody = document.getElementById('today-table-body');
     const dateLabel = document.getElementById('display-today-date');
     if (!currentUserProfile || !sessionInstID) return;
 
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    dateLabel.innerText = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const todayStr = new Date().toISOString().split('T')[0];
+    dateLabel.innerText = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     try {
-        // 1. Fetch Today's bookings
-        const { data: bookings } = await db.from('class_bookings')
-            .select('*')
-            .eq('booking_date', todayStr)
-            .eq('institute_id', sessionInstID);
-
-        // 2. Fetch Students for Name Mapping
+        // Fetch bookings for Today
+        const { data: bookings } = await db.from('class_bookings').select('*').eq('booking_date', todayStr).eq('institute_id', sessionInstID);
+        // Fetch batches for metadata
+        const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+        // Fetch students for name recovery
         const { data: students } = await db.from('students').select('roll_number, full_name').eq('institute_id', sessionInstID);
+        
         const stuMap = Object.fromEntries(students.map(s => [s.roll_number.toUpperCase(), s.full_name]));
+        const tchMap = Object.fromEntries(batches.map(b => [b.teacher_id.toUpperCase(), b.teacher_name]));
 
         tbody.innerHTML = "";
         
         const myName = currentUserProfile.full_name.toUpperCase();
-        let filtered = bookings || [];
+        let myBookings = bookings || [];
         
-        // 3. Role-Based Filtering
         if (currentUserProfile.role === 'Student') {
-            filtered = filtered.filter(b => b.student_roll.toUpperCase() === currentUserProfile.full_name.toUpperCase() || stuMap[b.student_roll.toUpperCase()] === myName);
+            myBookings = myBookings.filter(b => stuMap[b.student_roll.toUpperCase()] === myName);
         } else if (currentUserProfile.role === 'Teacher') {
-            const { data: tDetails } = await db.from('teacher_details').select('id').eq('teacher_name', myName).maybeSingle();
-            if (tDetails) filtered = filtered.filter(b => b.teacher_id === tDetails.id);
+            const myTid = batches.find(b => b.teacher_name.toUpperCase() === myName)?.teacher_id;
+            if (myTid) myBookings = myBookings.filter(b => b.teacher_id === myTid);
         }
 
-        if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="color:#666; padding:20px;">No sessions booked for today.</td></tr>';
+        if (myBookings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="color:#666; padding:20px;">No students have booked for today.</td></tr>';
             return;
         }
 
-        filtered.forEach(bk => {
+        myBookings.forEach(bk => {
+            const bMeta = batches.find(x => x.batch_name.toUpperCase() === bk.course.toUpperCase());
+            const allotted = bMeta ? bMeta.students_allotted : 0;
+            const bookedCount = bookings.filter(x => x.course === bk.course && x.time_slot === bk.time_slot).length;
+            const balance = allotted - bookedCount;
+
             tbody.innerHTML += `
                 <tr>
                     <td>${bk.student_roll}</td>
                     <td>${stuMap[bk.student_roll.toUpperCase()] || 'N/A'}</td>
+                    <td>${tchMap[bk.teacher_id.toUpperCase()] || 'N/A'}</td>
                     <td>${bk.teacher_id}</td>
-                    <td>${bk.course}</td>
-                    <td>${bk.course}</td>
-                    <td style="background:#fff8e1; font-weight:bold; color:blue;">${bk.time_slot}</td>
-                    <td style="color:green; font-weight:800;">LIVE / ACTIVE</td>
+                    <td>${bMeta ? bMeta.subject_name : 'N/A'}</td>
+                    <td><b>${bk.course}</b></td>
+                    <td style="color:blue;">${allotted}</td>
+                    <td style="color:${balance <= 0 ? 'red' : 'green'};">${balance}</td>
+                    <td style="background:#fff8e1; font-weight:bold;">${bk.time_slot}</td>
+                    <td><span style="color:green; font-weight:900;">LIVE</span></td>
                 </tr>`;
         });
-    } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:red">Error syncing today\'s schedule.</td></tr>';
-    }
+    } catch (err) { tbody.innerHTML = '<tr><td colspan="10" style="color:red">Error syncing today\'s schedule.</td></tr>'; }
 }
 
 
