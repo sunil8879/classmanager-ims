@@ -13764,7 +13764,7 @@ window.listAllTimeBatches = async function() {
 
 
 let isOver = false; if (bDate === todayStr) { try { let tStr = bTime.split(/TO|-/i)[0].trim(); let [h, m] = tStr.match(/\d+/g).map(Number); if (tStr.toUpperCase().includes("PM") && h < 12) h += 12; if (tStr.toUpperCase().includes("AM") && h === 12) h = 0; let now = new Date(); if (now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m)) isOver = true; } catch(e){} }
-let rowBg = isOver ? "background-color: #ffebee;" : "";
+let rowBg = isOver ? "background-color: #7FFFD4" : "";
 
 
 
