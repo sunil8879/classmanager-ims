@@ -1284,7 +1284,7 @@ window.loadAssignmentSummary = async function() {
                 ? `<span style="background:green; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">BOOKED</span>` 
                 : `<span style="background:orange; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PENDING</span>`;
 
-         const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+       const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
 
             tbody.innerHTML += `<tr>
                 <td>${item.roll_number}</td>
@@ -1297,12 +1297,7 @@ window.loadAssignmentSummary = async function() {
                 <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
                 <td>${statusBadge}</td>
                 <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')">${slots}</select></td>
-                <td>
-                    ${currentUserProfile.role === 'Student' 
-                        ? `<button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button>` 
-                        : `<span style="font-weight:900; color:#666; font-size:0.7rem;">VIEW ONLY</span>`
-                    }
-                </td>
+                <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button></td>
             </tr>`;
         });
 
