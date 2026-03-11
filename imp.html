@@ -13616,5 +13616,80 @@ window.bm2Add = async function() {
     }
 };
 </script>
+
+
+
+
+
+
+
+<!-- ADD THIS SCRIPT BLOCK RIGHT BEFORE </body> TO ENFORCE TEACHER-WISE CAPACITY -->
+<script>
+/* =========================================================================
+   ADD-ON FIX: TEACHER-WISE CAPACITY SYNC (SECTION 5)
+   ========================================================================= */
+
+// Overrides the previous global sync to be strictly Teacher-Specific
+window.bm2Update = async function() {
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
+    const tid = document.getElementById('bm2-tid').value;
+    const stu = parseInt(document.getElementById('bm2-stu').value) || 0;
+    const rem = document.getElementById('bm2-rem').value;
+
+    if (!bname || !tid) return alert("Please type a Batch Name and select a Teacher ID first.");
+    if (stu > 15) return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
+
+    // THE FIX: Updates Capacity ONLY for the specific Teacher ID selected in the dropdown
+    const { error } = await db.from('batches').update({ 
+        remarks: rem,
+        students_allotted: stu
+    }).eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID);
+
+    if (error) {
+        alert("Update Error: " + error.message); 
+    } else {
+        alert("Success! Capacity updated to " + stu + " SPECIFICALLY for Teacher " + tid + ".");
+    }
+};
+
+// Clean override for ADD to ensure it doesn't trigger the old global sync
+window.bm2Add = async function() {
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
+    const sub = document.getElementById('bm2-sub').value;
+    const tid = document.getElementById('bm2-tid').value;
+    const tname = document.getElementById('bm2-tname').value;
+    const stu = parseInt(document.getElementById('bm2-stu').value) || 0;
+    const rem = document.getElementById('bm2-rem').value;
+    
+    const timeOpts = Array.from(document.getElementById('bm2-time').options).map(o => o.value).filter(v => v);
+    const timeVal = timeOpts.join(', ');
+
+    if (!bname || !sub || !tid || timeOpts.length === 0) return alert("Error: Please fill Batch Name, Subject, and ensure Time is loaded.");
+    if (stu > 15) return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
+
+    const { data: existTch } = await db.from('batches').select('id').eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID).maybeSingle();
+    if (existTch) return alert("🛑 ERROR: You have already created this batch record for this teacher.");
+
+    const payload = { 
+        institute_id: sessionInstID, 
+        batch_name: bname, 
+        teacher_id: tid, 
+        teacher_name: tname, 
+        subject_name: sub, 
+        batch_time: timeVal, 
+        students_allotted: stu, // Saves uniquely for this teacher
+        remarks: rem 
+    };
+    
+    const { error } = await db.from('batches').insert([payload]);
+    if (error) alert("Database Error: " + error.message);
+    else { 
+        alert("Batch Added Successfully for Teacher " + tid + "!"); 
+        const { data: { user } } = await db.auth.getUser();
+        const { data: prof } = await db.from('profiles').select('role').eq('id', user.id).single();
+        if (prof && prof.role === 'Owner') bm2FilterTeachers(); 
+    }
+};
+</script>
 </body>
 </html>
