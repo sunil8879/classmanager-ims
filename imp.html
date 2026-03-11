@@ -13557,5 +13557,64 @@ window.listAllTimeBatches = async function() {
     }
 };
 </script>
+
+
+
+
+
+
+
+
+<!-- ADD THIS SCRIPT BLOCK RIGHT BEFORE </body> TO GLOBALLY SYNC BATCH CAPACITY -->
+<script>
+/* =========================================================================
+   ADD-ON FIX: GLOBAL CAPACITY SYNC (SECTION 5)
+   ========================================================================= */
+
+// Override the Update function to apply the capacity universally across the batch
+window.bm2Update = async function() {
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
+    const tid = document.getElementById('bm2-tid').value;
+    const stu = parseInt(document.getElementById('bm2-stu').value) || 0;
+    const rem = document.getElementById('bm2-rem').value;
+
+    if (!bname || !tid) return alert("Please type a Batch Name and select a Teacher ID first.");
+    if (stu > 15) return alert("🛑 ERROR: Maximum students allotted cannot be more than 15.");
+
+    // 1. Update the specific teacher's personal remarks
+    const { error: err1 } = await db.from('batches').update({ 
+        remarks: rem 
+    }).eq('batch_name', bname).eq('teacher_id', tid).eq('institute_id', sessionInstID);
+
+    // 2. THE FIX: Universally sync the Capacity (students_allotted) to ALL teachers in this batch
+    const { error: err2 } = await db.from('batches').update({
+        students_allotted: stu
+    }).eq('batch_name', bname).eq('institute_id', sessionInstID);
+
+    if (err1 || err2) {
+        alert("Update Error: " + (err1?.message || err2?.message)); 
+    } else {
+        alert("Success! Capacity updated to " + stu + " for ALL teachers in Batch '" + bname + "'.\nBooking Page and Batch Master are now in perfect sync.");
+    }
+};
+
+// Also ensure ADDing a new teacher to an existing batch adopts the universal capacity
+const oldBm2AddAction = window.bm2Add;
+window.bm2Add = async function() {
+    if (oldBm2AddAction) {
+        await oldBm2AddAction();
+    }
+    
+    const bname = document.getElementById('bm2-name').value.trim().toUpperCase();
+    const stu = parseInt(document.getElementById('bm2-stu').value) || 0;
+    
+    if (bname && stu > 0) {
+        // Force sync across the whole batch
+        await db.from('batches').update({
+            students_allotted: stu
+        }).eq('batch_name', bname).eq('institute_id', sessionInstID);
+    }
+};
+</script>
 </body>
 </html>
