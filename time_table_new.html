@@ -845,34 +845,26 @@ const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
             // TOMORROW COLUMN: The active one
         // ... inside renderTimetableGrid loop ...
 else if (day === activeDayName) {
-    if (myBooking) {
-        // CASE 1: Personally booked slot (Visible to all, but only Student sees 'ENROLLED')
-        td.className = 'booked-cell';
-        td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
-    } else if (batchSubject && batchSubject.trim().toUpperCase() === currentCourse.trim().toUpperCase()) {
-        // CASE 2: Joinable Batch
-        if (currentUserProfile.role === 'Student') {
-            td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem; background:#FFD700; color:#000; border:2px solid #000;">JOIN ${batchSubject}</button>`;
-        } else {
-            // Teacher/Owner View Only
-            td.innerHTML = `<span style="font-size:0.7rem; color:#20B2AA; font-weight:900;">OPEN FOR<br>${batchSubject}</span>`;
-        }
-    } else if (batchSubject && batchSubject.trim().toUpperCase() !== currentCourse.trim().toUpperCase()) {
-        // CASE 3: Slot locked by a different subject
-        td.style.background = "#ffeae6";
-        td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject}<br>ONLY</span>`;
-    } else {
-        // CASE 4: Slot is completely empty
-        if (currentUserProfile.role === 'Student') {
-            td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">BOOK SLOT</button>`;
-        } else {
-            // Teacher/Owner View Only
-            td.innerHTML = `<span style="font-size:0.7rem; color:#999; font-weight:bold;">AVAILABLE</span>`;
-        }
-    }
-}
-
-else {
+                if (myBooking) {
+                    td.className = 'booked-cell';
+                    td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
+                } else if (batchSubject && batchSubject.trim().toUpperCase() === currentCourse.trim().toUpperCase()) {
+                    if (currentUserProfile.role === 'Student') {
+                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem; background:#FFD700; color:#000; border:2px solid #000;">JOIN ${batchSubject}</button>`;
+                    } else {
+                        td.innerHTML = `<span style="font-size:0.7rem; color:#20B2AA; font-weight:900;">OPEN FOR<br>${batchSubject}</span>`;
+                    }
+                } else if (batchSubject && batchSubject.trim().toUpperCase() !== currentCourse.trim().toUpperCase()) {
+                    td.style.background = "#ffeae6";
+                    td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject}<br>ONLY</span>`;
+                } else {
+                    if (currentUserProfile.role === 'Student') {
+                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">BOOK SLOT</button>`;
+                    } else {
+                        td.innerHTML = `<span style="font-size:0.7rem; color:#999; font-weight:bold;">AVAILABLE</span>`;
+                    }
+                }
+            } else {
                 td.style.opacity = "0.1"; td.style.pointerEvents = "none";
             }
             tr.appendChild(td);
@@ -881,7 +873,6 @@ else {
     });
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
-
 
 
 
@@ -1177,7 +1168,7 @@ window.loadAssignmentSummary = async function() {
                 ? `<span style="background:green; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">BOOKED</span>` 
                 : `<span style="background:orange; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PENDING</span>`;
 
-            const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+         const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
 
             tbody.innerHTML += `<tr>
                 <td>${item.roll_number}</td>
@@ -1188,7 +1179,7 @@ window.loadAssignmentSummary = async function() {
                 <td><b>${item.batch_name}</b></td>
                 <td style="color:blue; font-weight:800;">${cap}</td>
                 <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
-                <td>${statusBadge}</td> <!-- INJECTED STATUS BADGE -->
+                <td>${statusBadge}</td>
                 <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')">${slots}</select></td>
                 <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button></td>
             </tr>`;
@@ -1196,6 +1187,9 @@ window.loadAssignmentSummary = async function() {
 
     } catch (err) { console.error("Sync Error:", err); }
 };
+
+
+
 </script>
 
 
