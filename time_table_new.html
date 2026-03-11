@@ -1153,5 +1153,118 @@ window.loadAssignmentSummary = async function() {
     } catch (err) { console.error("Sync Error:", err); }
 };
 </script>
+
+
+
+
+
+
+
+<!-- ADD TO BOTTOM OF TIME_TABLE_NEW.HTML: TEACHER-SPECIFIC CAPACITY FIX -->
+<script>
+window.loadAssignmentSummary = async function() {
+    const tbody = document.getElementById('session-table-body');
+    if (!currentUserProfile || !sessionInstID) return;
+
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    const targetDate = tmrw.toISOString().split('T')[0];
+
+    try {
+        const { data: roster } = await db.from('list').select('*').eq('institute_id', sessionInstID).order('created_at', { ascending: false });
+        const { data: students } = await db.from('students').select('roll_number, full_name').eq('status', 'Active').eq('institute_id', sessionInstID);
+        const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
+        const { data: bookings } = await db.from('class_bookings').select('course, time_slot, student_roll, teacher_id').eq('booking_date', targetDate).eq('institute_id', sessionInstID);
+
+        const { data: liveTeachers } = await db.from('teacher_details').select('id, time_of_slot').eq('institute_id', sessionInstID);
+        if (liveTeachers && batches) {
+            batches.forEach(b => {
+                const t = liveTeachers.find(x => x.id === b.teacher_id);
+                if (t && t.time_of_slot) {
+                    try {
+                        const slotObj = typeof t.time_of_slot === 'string' ? JSON.parse(t.time_of_slot) : t.time_of_slot;
+                        const freshTime = Object.entries(slotObj).find(([k, v]) => k.toUpperCase() === b.subject_name.toUpperCase());
+                        if (freshTime && freshTime[1]) b.batch_time = freshTime[1]; 
+                    } catch(e) {}
+                }
+            });
+        }
+
+        if (!roster || roster.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11">Student not assigned to any Batch. Use Section 25.</td></tr>';
+            return;
+        }
+
+        const uniqueMap = new Map();
+        const myName = currentUserProfile.full_name.trim().toUpperCase();
+
+        roster.forEach(r => {
+            const roll = (r.roll_number || "").trim().toUpperCase();
+            const bName = (r.batch_name || "").trim().toUpperCase();
+            const tid = (r.teacher_id || "").trim().toUpperCase(); // ADDED TID
+            const key = roll + "|" + bName + "|" + tid;
+
+            if (!uniqueMap.has(key) && roll !== "") {
+                if (!r.student_name || r.student_name === "N/A") {
+                    const match = students?.find(s => s.roll_number.trim().toUpperCase() === roll);
+                    if (match) r.student_name = match.full_name;
+                }
+                if (currentUserProfile.role === 'Student' && r.student_name.trim().toUpperCase() !== myName) return;
+                if (currentUserProfile.role === 'Teacher' && r.teacher_name.trim().toUpperCase() !== myName) return;
+                uniqueMap.set(key, r);
+            }
+        });
+
+        const finalRows = Array.from(uniqueMap.values());
+        tbody.innerHTML = "";
+
+        finalRows.forEach((item, index) => {
+            // THE FIX: MATCH BOTH BATCH NAME AND TEACHER ID!
+            const b = batches?.find(x => 
+                x.batch_name.toUpperCase() === item.batch_name.toUpperCase() && 
+                x.teacher_id.toUpperCase() === item.teacher_id.toUpperCase()
+            );
+            
+            const firstSlot = b?.batch_time ? b.batch_time.split(',')[0].trim() : null;
+            // The Fix applied to Allotted seats calculation
+            const bookedInSlot = bookings?.filter(bk => 
+                bk.course.toUpperCase() === item.batch_name.toUpperCase() && 
+                bk.teacher_id.toUpperCase() === item.teacher_id.toUpperCase() &&
+                bk.time_slot === firstSlot
+            ).length || 0;
+            
+            const cap = b ? parseInt(b.students_allotted) : 0;
+            const balance = cap - bookedInSlot;
+            
+            const isStudentBooked = bookings?.some(bk => 
+                bk.student_roll.toUpperCase() === item.roll_number.toUpperCase() && 
+                bk.course.toUpperCase() === item.batch_name.toUpperCase() &&
+                bk.teacher_id.toUpperCase() === item.teacher_id.toUpperCase()
+            );
+
+            const statusBadge = isStudentBooked 
+                ? `<span style="background:green; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">BOOKED</span>` 
+                : `<span style="background:orange; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PENDING</span>`;
+
+            const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+
+            tbody.innerHTML += `<tr>
+                <td>${item.roll_number}</td>
+                <td>${item.student_name}</td>
+                <td>${item.teacher_name}</td>
+                <td>${b ? b.teacher_id : 'N/A'}</td>
+                <td>${item.course_name || 'N/A'}</td>
+                <td><b>${item.batch_name}</b></td>
+                <td style="color:blue; font-weight:800;">${cap}</td>
+                <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
+                <td>${statusBadge}</td>
+                <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')">${slots}</select></td>
+                <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button></td>
+            </tr>`;
+        });
+
+    } catch (err) { console.error("Sync Error:", err); }
+};
+</script>
 </body>
 </html>
