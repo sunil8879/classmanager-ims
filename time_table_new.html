@@ -749,8 +749,8 @@ async function renderTimetableGrid(bookings, dateVal) {
     const todayStr = todayDate.toISOString().split('T')[0];
     const todayDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][todayDate.getDay()];
     
-    const loggedInRoll = document.getElementById('f-roll').value;
-    const currentCourse = document.getElementById('f-course').value;
+   const loggedInRoll = document.getElementById('f-roll').value.trim().toUpperCase();
+    const currentCourse = document.getElementById('f-course').value.trim().toUpperCase();
     const tid = document.getElementById('f-teacher-id').value;
 
     const { data: todayBookings } = await db.from("class_bookings").select("*").eq("booking_date", todayStr).eq("teacher_id", tid).eq("institute_id", sessionInstID);
@@ -764,7 +764,8 @@ async function renderTimetableGrid(bookings, dateVal) {
         const tr = document.createElement('tr');
         const tdTime = document.createElement('td'); 
         const batchMembers = bookings?.filter(b => b.time_slot === time) || [];
-        const myBooking = batchMembers.find(b => b.student_roll === loggedInRoll);
+        // FIX: Ensures the slot only shows "ENROLLED" if YOUR specific Roll Number is in the booking list
+        const myBooking = batchMembers.find(b => b.student_roll.trim().toUpperCase() === loggedInRoll);
         const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
 
         if (batchMembers.length > 0) {
