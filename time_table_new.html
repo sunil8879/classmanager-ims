@@ -843,27 +843,36 @@ const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
                 if (match) td.innerHTML = `<small style="font-size:0.6rem; color:#666;">OCCUPIED:<br>${match.course}</small>`;
             } 
             // TOMORROW COLUMN: The active one
-            else if (day === activeDayName) {
-                if (myBooking) {
-                    // CASE 1: You personally booked this slot
-                    td.className = 'booked-cell';
-                    td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
-                } else if (batchSubject && batchSubject.trim().toUpperCase() === currentCourse.trim().toUpperCase()) {
-                    // CASE 2: Someone else in your batch booked it, but you haven't joined yet
-                    td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem; background:#FFD700; color:#000; border:2px solid #000;">JOIN ${batchSubject}</button>`;
-                } else if (batchSubject && batchSubject.trim().toUpperCase() !== currentCourse.trim().toUpperCase()) {
-                    // CASE 3: Slot locked by a different subject
-                    td.style.background = "#ffeae6";
-                    td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject}<br>ONLY</span>`;
-                } else {
-                    // CASE 4: Slot is completely empty
-                    if (currentUserProfile.role === 'Student') {
-                        td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">BOOK SLOT</button>`;
-                    } else {
-                        td.innerHTML = `<span style="font-size:0.7rem; color:#999;">EMPTY</span>`;
-                    }
-                }
-            } else {
+        // ... inside renderTimetableGrid loop ...
+else if (day === activeDayName) {
+    if (myBooking) {
+        // CASE 1: Personally booked slot (Visible to all, but only Student sees 'ENROLLED')
+        td.className = 'booked-cell';
+        td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
+    } else if (batchSubject && batchSubject.trim().toUpperCase() === currentCourse.trim().toUpperCase()) {
+        // CASE 2: Joinable Batch
+        if (currentUserProfile.role === 'Student') {
+            td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem; background:#FFD700; color:#000; border:2px solid #000;">JOIN ${batchSubject}</button>`;
+        } else {
+            // Teacher/Owner View Only
+            td.innerHTML = `<span style="font-size:0.7rem; color:#20B2AA; font-weight:900;">OPEN FOR<br>${batchSubject}</span>`;
+        }
+    } else if (batchSubject && batchSubject.trim().toUpperCase() !== currentCourse.trim().toUpperCase()) {
+        // CASE 3: Slot locked by a different subject
+        td.style.background = "#ffeae6";
+        td.innerHTML = `<span style="color:red; font-size:0.65rem; font-weight:900;">LOCKED:<br>${batchSubject}<br>ONLY</span>`;
+    } else {
+        // CASE 4: Slot is completely empty
+        if (currentUserProfile.role === 'Student') {
+            td.innerHTML = `<button class="btn-book" onclick="bookThisSlot('${day}', '${time}')" style="font-size:0.75rem;">BOOK SLOT</button>`;
+        } else {
+            // Teacher/Owner View Only
+            td.innerHTML = `<span style="font-size:0.7rem; color:#999; font-weight:bold;">AVAILABLE</span>`;
+        }
+    }
+}
+
+else {
                 td.style.opacity = "0.1"; td.style.pointerEvents = "none";
             }
             tr.appendChild(td);
@@ -877,6 +886,11 @@ const batchSubject = batchMembers.length > 0 ? batchMembers[0].course : null;
 
 
 async function bookThisSlot(day, time) {
+
+ if (currentUserProfile.role !== 'Student') {
+        alert("ACCESS DENIED: Only students can book or join slots. Teachers/Owners have View-Only access.");
+        return;
+    }
     // 1. GET ALL NECESSARY DATA FROM THE UI
     const roll = document.getElementById('f-roll').value;
     const dateVal = document.getElementById('f-date').value;
@@ -1276,7 +1290,7 @@ window.loadAssignmentSummary = async function() {
                 ? `<span style="background:green; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">BOOKED</span>` 
                 : `<span style="background:orange; color:white; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PENDING</span>`;
 
-            const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
+         const slots = b?.batch_time ? b.batch_time.split(',').map(t => `<option value="${t.trim()}">${t.trim()}</option>`).join('') : '<option>No Slots</option>';
 
             tbody.innerHTML += `<tr>
                 <td>${item.roll_number}</td>
@@ -1289,7 +1303,12 @@ window.loadAssignmentSummary = async function() {
                 <td id="bal-${index}" style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
                 <td>${statusBadge}</td>
                 <td><select id="ts-${index}" onchange="updateBalanceUI(this.value, '${item.batch_name}', '${cap}', 'bal-${index}')">${slots}</select></td>
-                <td><button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button></td>
+                <td>
+                    ${currentUserProfile.role === 'Student' 
+                        ? `<button class="btn-select" onclick="syncSelection('${item.roll_number}','${item.student_name}','${item.batch_name}','${b ? b.teacher_id : ''}','${item.teacher_name}','${b ? b.batch_time : ''}','ts-${index}','${cap}')">SELECT</button>` 
+                        : `<span style="font-weight:900; color:#666; font-size:0.7rem;">VIEW ONLY</span>`
+                    }
+                </td>
             </tr>`;
         });
 
