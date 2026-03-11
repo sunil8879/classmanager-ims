@@ -571,7 +571,10 @@ async function loadTodaySummary() {
                     <td style="color:blue; font-weight:800;">${allotted}</td>
                     <td style="color:${balance <= 0 ? 'red' : 'green'}; font-weight:800;">${balance}</td>
                     <td style="background:#fff8e1; font-weight:bold;">${bk.time_slot}</td>
-                    <td><span style="color:green; font-weight:900;">LIVE</span></td>
+                   <td>
+    <span style="color:green; font-weight:900; display:block; margin-bottom:5px;">LIVE</span>
+    <button onclick="cancelBooking('${bk.id}', '${bk.student_roll}')" style="background:#ff4757; color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.75rem;">CANCEL</button>
+</td>
                 </tr>`;
         });
     } catch (e) { console.error(e); }
