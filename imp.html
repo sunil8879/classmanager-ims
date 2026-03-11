@@ -13839,7 +13839,6 @@ window.openBatchPicker = async function() {
     const tbody = document.getElementById('batch-picker-body');
     const thead = modal.querySelector('thead tr');
 
-    // 1. DYNAMICALLY UPDATE THE HEADER TO MATCH TIME TABLE COLUMNS
     thead.innerHTML = `
         <th style="padding:15px; border:1px solid #ddd;">SUBJECT</th>
         <th style="padding:15px; border:1px solid #ddd;">TEACHER</th>
@@ -13852,23 +13851,19 @@ window.openBatchPicker = async function() {
     tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>Syncing Real-time Balance...</td></tr>";
     modal.style.display = 'flex';
 
-    // 2. GET DATES FOR TODAY AND TOMORROW
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tmrwStr = tomorrow.toISOString().split('T')[0];
 
     try {
-        // 3. FETCH LIVE DATA FOR BOTH DAYS
         const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
         const { data: bookings } = await db.from('class_bookings')
-            .select('course, time_slot, booking_date')
+            .select('course, time_slot, booking_date, teacher_id')
             .in('booking_date', [todayStr, tmrwStr])
             .eq('institute_id', sessionInstID);
 
-        // --- START OF ADDED CODE TO SYNC FRESH TEACHER TIMINGS ---
         const { data: liveTeachers } = await db.from('teacher_details').select('id, time_of_slot').eq('institute_id', sessionInstID);
         if (liveTeachers && batches) {
             batches.forEach(b => {
@@ -13877,21 +13872,17 @@ window.openBatchPicker = async function() {
                     try {
                         const slotObj = typeof t.time_of_slot === 'string' ? JSON.parse(t.time_of_slot) : t.time_of_slot;
                         const freshTime = Object.entries(slotObj).find(([k, v]) => k.toUpperCase() === b.subject_name.toUpperCase());
-                        if (freshTime && freshTime[1]) {
-                            b.batch_time = freshTime[1]; // Overrides stale batch time with fresh teacher time
-                        }
-                    } catch(e) { console.error("Slot Sync Error", e); }
+                        if (freshTime && freshTime[1]) b.batch_time = freshTime[1]; 
+                    } catch(e) {}
                 }
             });
         }
-        // --- END OF ADDED CODE ---
 
         if (!batches || batches.length === 0) {
-            tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No Batches configured in Section 5.</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No Batches configured.</td></tr>";
             return;
         }
 
-        // 4. PROCESS AND CALCULATE
         let rows = [];
         batches.forEach(b => {
             const slots = b.batch_time.split(',').map(s => s.trim().toUpperCase());
@@ -13899,6 +13890,7 @@ window.openBatchPicker = async function() {
                 rows.push({
                     subject: b.subject_name.toUpperCase(),
                     teacher: b.teacher_name || "N/A",
+                    teacherId: b.teacher_id.toUpperCase(), // STRICT MATCH ID
                     time: slot,
                     total: parseInt(b.students_allotted) || 0,
                     batchName: b.batch_name
@@ -13906,65 +13898,46 @@ window.openBatchPicker = async function() {
             });
         });
 
-        rows.sort((a, b) => a.subject.localeCompare(b.subject));
+ rows.sort((a, b) => a.subject.localeCompare(b.subject));
         tbody.innerHTML = "";
 
         rows.forEach(row => {
-            // COUNT BOOKINGS FOR TODAY & TOMORROW
-            const todayCount = bookings ? bookings.filter(b => 
-                b.booking_date === todayStr &&
-                b.course.trim().toUpperCase() === row.batchName.trim().toUpperCase() &&
-                b.time_slot.trim().toUpperCase() === row.time
-            ).length : 0;
+            const todayCount = bookings ? bookings.filter(b => b.booking_date === todayStr && b.course.trim().toUpperCase() === row.batchName.trim().toUpperCase() && b.teacher_id.trim().toUpperCase() === row.teacherId && b.time_slot.trim().toUpperCase() === row.time).length : 0;
+            const tmrwCount = bookings ? bookings.filter(b => b.booking_date === tmrwStr && b.course.trim().toUpperCase() === row.batchName.trim().toUpperCase() && b.teacher_id.trim().toUpperCase() === row.teacherId && b.time_slot.trim().toUpperCase() === row.time).length : 0;
 
-            const tmrwCount = bookings ? bookings.filter(b => 
-                b.booking_date === tmrwStr &&
-                b.course.trim().toUpperCase() === row.batchName.trim().toUpperCase() &&
-                b.time_slot.trim().toUpperCase() === row.time
-            ).length : 0;
+          const makeRow = (count, label, color) => {
+                let bal = row.total - count;
+                let full = row.total > 0 && bal <= 0;
+                
+                // Sleek, pill-shaped badge with subtle shadow
+            let badge = count > 0 ? `<span style="background:${color}; color:#fff; font-size:0.7rem; padding:4px 10px; border-radius:12px; font-weight:900; letter-spacing:1px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">${label.toUpperCase()}</span>` : "";
+                
+                tbody.innerHTML += `
+                    <tr style="border-bottom: 1px solid #ddd; background: ${full ? '#fff0f0' : '#fff'};">
+                        <td style="padding:15px; font-weight:bold; border-right:1px solid #ddd; color:#000;">${row.subject}</td>
+                        <td style="padding:15px; border-right:1px solid #ddd; color:#444;">${row.teacher}</td>
+                        <td style="padding:15px; border-right:1px solid #ddd; font-weight:800; color:#007bff;">${row.time}</td>
+                        <td style="padding:15px; text-align:center; border-right:1px solid #ddd; font-weight:900; color:blue; font-size:1.1rem;">${row.total}</td>
+                    <td style="padding:15px; border-right:1px solid #ddd;">
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;">
+        <span style="font-weight:900; font-size:1.2rem; color:${bal <= 0 ? 'red' : 'green'};">${bal}</span>
+        ${badge}
+    </div>
+</td>
+                        <td style="padding:15px; text-align:center;">
+                            <input type="checkbox" class="batch-cb" data-sub="${row.subject}" data-time="${row.time}" ${full ? 'disabled' : ''} style="width:22px; height:22px; cursor:${full ? 'not-allowed' : 'pointer'}; accent-color:#27ae60;">
+                        </td>
+                    </tr>`;
+            };
 
-            // Base balance on tomorrow's bookings (since students book for tomorrow)
-            const balance = row.total - tmrwCount;
-            const isFull = row.total > 0 && balance <= 0;
-
-            // DYNAMIC BADGES: Only show if Booked > 0 (Meaning ALLOTTED != BALANCE)
-            let badgesHtml = "";
-            if (todayCount > 0) {
-                badgesHtml += `<div style="background:#f39c12; color:#fff; font-size:0.7rem; padding:3px 6px; border-radius:4px; margin-top:5px; display:inline-block; font-weight:bold;">TODAY: ${todayCount} Booked</div> `;
+            if (todayCount === 0 && tmrwCount === 0) {
+                makeRow(0, "", "");
+            } else {
+                if (todayCount > 0) makeRow(todayCount, "Today", "#f39c12");
+                if (tmrwCount > 0) makeRow(tmrwCount, "Tomorrow", "#27ae60");
             }
-            if (tmrwCount > 0) {
-                badgesHtml += `<div style="background:#27ae60; color:#fff; font-size:0.7rem; padding:3px 6px; border-radius:4px; margin-top:5px; display:inline-block; font-weight:bold;">TOMORROW: ${tmrwCount} Booked</div>`;
-            }
-
-            // 5. GENERATE THE ROW
-            tbody.innerHTML += `
-                <tr style="border-bottom: 2px solid #eee; background: ${isFull ? '#fff0f0' : '#fff'};">
-                    <td style="padding:12px; font-weight:bold; border-right:1px solid #ddd; line-height: 1.5;">
-                        ${row.subject}
-                        ${badgesHtml ? `<br>${badgesHtml}` : ""}
-                    </td>
-                    <td style="padding:12px; border-right:1px solid #ddd;">${row.teacher}</td>
-                    <td style="padding:12px; border-right:1px solid #ddd; font-weight:800;">${row.time}</td>
-                    
-                    <!-- MATCHES SEATS ALLOTTED -->
-                    <td style="padding:12px; text-align:center; border-right:1px solid #ddd; font-weight:900; color:blue;">
-                        ${row.total}
-                    </td>
-
-                    <!-- MATCHES BALANCE SEATS -->
-                    <td style="padding:12px; text-align:center; border-right:1px solid #ddd; font-weight:900; color:${balance <= 0 ? 'red' : 'green'};">
-                        ${balance}
-                    </td>
-
-                    <td style="padding:12px; text-align:center;">
-                        <input type="checkbox" class="batch-cb" 
-                               data-sub="${row.subject}" data-time="${row.time}" 
-                               ${isFull ? 'disabled' : ''} 
-                               style="width:22px; height:22px; cursor:${isFull ? 'not-allowed' : 'pointer'};">
-                    </td>
-                </tr>
-            `;
         });
+
     } catch (err) {
         tbody.innerHTML = "<tr><td colspan='6' style='color:red;'>Connection Error.</td></tr>";
     }
