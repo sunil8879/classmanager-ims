@@ -383,8 +383,7 @@
 
 
 
-        <!-- Session Header (User Name) -->
-     <!-- ADDITION: TODAY'S LIVE SUMMARY -->
+<!-- ADDITION: TODAY'S LIVE SUMMARY (STUDENTS WHO BOOKED) -->
         <div id="today-schedule-section" style="margin-bottom: 50px; border: 4px solid #20B2AA; border-radius: 16px; padding: 20px; background: #f0fdfa;">
             <h2 style="text-align: center; text-transform: uppercase; font-weight: 900; margin-bottom: 15px; color: #008080;">
                 <i class="fas fa-calendar-day"></i> Today's Live Schedule (<span id="display-today-date"></span>)
@@ -411,8 +410,6 @@
                 </table>
             </div>
         </div>
-
-
 
 
 
@@ -936,43 +933,39 @@ await loadAssignmentSummary();
 
 // ADDITION: Function to load Today's Schedule (DYNAMIC & ROLE-BASED)
 // ADDITION: Function to load Today's Schedule (DYNAMIC & FORMATTED)
+// ADDITION: LOAD TODAY'S LIVE BOOKINGS
 async function loadTodaySummary() {
     const tbody = document.getElementById('today-table-body');
-    const dateLabel = document.getElementById('display-today-date');
     if (!currentUserProfile || !sessionInstID) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    dateLabel.innerText = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    document.getElementById('display-today-date').innerText = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     try {
-        // Fetch bookings for Today
         const { data: bookings } = await db.from('class_bookings').select('*').eq('booking_date', todayStr).eq('institute_id', sessionInstID);
-        // Fetch batches for metadata
         const { data: batches } = await db.from('batches').select('*').eq('institute_id', sessionInstID);
-        // Fetch students for name recovery
         const { data: students } = await db.from('students').select('roll_number, full_name').eq('institute_id', sessionInstID);
         
         const stuMap = Object.fromEntries(students.map(s => [s.roll_number.toUpperCase(), s.full_name]));
         const tchMap = Object.fromEntries(batches.map(b => [b.teacher_id.toUpperCase(), b.teacher_name]));
 
         tbody.innerHTML = "";
-        
         const myName = currentUserProfile.full_name.toUpperCase();
-        let myBookings = bookings || [];
+        let list = bookings || [];
         
         if (currentUserProfile.role === 'Student') {
-            myBookings = myBookings.filter(b => stuMap[b.student_roll.toUpperCase()] === myName);
+            list = list.filter(b => stuMap[b.student_roll.toUpperCase()] === myName);
         } else if (currentUserProfile.role === 'Teacher') {
             const myTid = batches.find(b => b.teacher_name.toUpperCase() === myName)?.teacher_id;
-            if (myTid) myBookings = myBookings.filter(b => b.teacher_id === myTid);
+            if (myTid) list = list.filter(b => b.teacher_id === myTid);
         }
 
-        if (myBookings.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" style="color:#666; padding:20px;">No students have booked for today.</td></tr>';
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;">No bookings found for today.</td></tr>';
             return;
         }
 
-        myBookings.forEach(bk => {
+        list.forEach(bk => {
             const bMeta = batches.find(x => x.batch_name.toUpperCase() === bk.course.toUpperCase());
             const allotted = bMeta ? bMeta.students_allotted : 0;
             const bookedCount = bookings.filter(x => x.course === bk.course && x.time_slot === bk.time_slot).length;
@@ -989,13 +982,11 @@ async function loadTodaySummary() {
                     <td style="color:blue;">${allotted}</td>
                     <td style="color:${balance <= 0 ? 'red' : 'green'};">${balance}</td>
                     <td style="background:#fff8e1; font-weight:bold;">${bk.time_slot}</td>
-                    <td><span style="color:green; font-weight:900;">LIVE</span></td>
+                    <td><span style="color:green; font-weight:900;">BOOKED</span></td>
                 </tr>`;
         });
-    } catch (err) { tbody.innerHTML = '<tr><td colspan="10" style="color:red">Error syncing today\'s schedule.</td></tr>'; }
+    } catch (e) { console.error(e); }
 }
-
-
 
 
     initSession();
