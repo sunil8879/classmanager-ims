@@ -343,9 +343,45 @@
 
     <div class="form-container">
         <!-- Mischief Warning Banner -->
+
+<!-- ADDITION: TODAY'S LIVE SUMMARY (READ-ONLY) -->
+        <div id="today-schedule-section" style="margin-bottom: 40px; border: 4px solid #20B2AA; border-radius: 16px; padding: 20px; background: #f0fdfa;">
+            <h2 style="text-align: center; text-transform: uppercase; font-weight: 900; margin-bottom: 15px; color: #008080;">
+                <i class="fas fa-calendar-check"></i> Today's Live Schedule (<span id="display-today-date"></span>)
+            </h2>
+            <div class="summary-table-wrapper" style="margin-bottom: 0;">
+                <table class="summary-table">
+                    <thead>
+                        <tr style="background: #20B2AA;">
+                            <th>Roll No</th>
+                            <th>Student Name</th>
+                            <th>Teacher ID</th>
+                            <th>Subject</th>
+                            <th>Batch Name</th>
+                            <th>Time Slot</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="today-table-body">
+                        <tr><td colspan="7">Loading today's sessions...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+
+
         <div id="mischief-warning">
             ⚠️ WARNING: YOU HAVE A HISTORY OF MULTIPLE CANCELLATIONS. FURTHER MISCHIEF WILL RESULT IN A BLOCK.
         </div>
+
+
+
+
+
+
+
 
         <!-- Session Header (User Name) -->
         <h2 id="session-title">Identifying Session...</h2>
@@ -472,6 +508,8 @@
         }
 
         loadAssignmentSummary();
+// ADD THIS LINE at the end of your existing initSession() function
+loadTodaySummary();
     }
 
   
@@ -641,11 +679,18 @@ async function renderTimetableGrid(bookings, dateVal) {
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
     
     const activeDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][new Date(dateVal).getDay()];
+    const todayDate = new Date();
+    const todayStr = todayDate.toISOString().split('T')[0];
+    const todayDayName = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][todayDate.getDay()];
+    
     const loggedInRoll = document.getElementById('f-roll').value;
     const currentCourse = document.getElementById('f-course').value;
     const tid = document.getElementById('f-teacher-id').value;
 
-    // Fetch names for all students assigned to this teacher to show in Yellow Box
+    // 1. Fetch Today's bookings once at the top for speed
+    const { data: todayBookings } = await db.from("class_bookings").select("*")
+        .eq("booking_date", todayStr).eq("teacher_id", tid).eq("institute_id", sessionInstID);
+
     const { data: studentRegistry } = await db.from('list').select('student_name, roll_number').eq('teacher_id', tid);
 
     const tbody = document.getElementById('timetable-body');
@@ -663,7 +708,7 @@ async function renderTimetableGrid(bookings, dateVal) {
             tdTime.style.background = "linear-gradient(135deg, #FFD700, #F1C40F)";
             tdTime.style.border = "2px solid #000";
             tdTime.style.position = "relative";
-            tdTime.style.minWidth = window.innerWidth < 768 ? "150px" : "220px";
+            tdTime.style.minWidth = "220px";
 
             let deleteBtn = "";
             if (currentUserProfile.role !== 'Student' || myBooking) {
@@ -672,36 +717,43 @@ async function renderTimetableGrid(bookings, dateVal) {
                 deleteBtn = `<button style="background:#000; color:#fff; border:none; padding:6px 10px; position:absolute; top:5px; right:5px; border-radius:4px; cursor:pointer;" onclick="cancelBooking('${targetId}','${targetRoll}')"><i class="fas fa-trash-alt"></i></button>`;
             }
 
-            // Look up student names from the Registry we fetched
             const rollList = batchMembers.map(m => {
                 const student = studentRegistry?.find(s => s.roll_number === m.student_roll);
-                const name = student ? student.student_name : "Student";
-                return `• ${name} (${m.student_roll})`;
+                return `• ${student ? student.student_name : "Student"} (${m.student_roll})`;
             }).join('<br>');
 
-const totalCap = document.getElementById('f-capacity').value || 10;
+            const totalCap = document.getElementById('f-capacity').value || 10;
 
-         tdTime.innerHTML = `
-    ${deleteBtn}
-    <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
-    <div style="font-size:0.7rem; line-height:1.4;">
-<b style="color:red; font-size:0.8rem;">CAPACITY: ${batchMembers.length} / ${totalCap}</b>
-        <b style="color:blue;">BATCH: ${batchSubject}</b>
-        <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">
-            ${rollList}
-        </div>
-    </div>`;
+            tdTime.innerHTML = `
+                ${deleteBtn}
+                <div style="font-weight:900; text-decoration:underline; font-size:0.85rem; margin-bottom:5px;">${time}</div>
+                <div style="font-size:0.7rem; line-height:1.4;">
+                    <b style="color:red; font-size:0.8rem;">CAPACITY: ${batchMembers.length} / ${totalCap}</b>
+                    <b style="color:blue;">BATCH: ${batchSubject}</b>
+                    <div style="margin-top:5px; border-top:1px solid rgba(0,0,0,0.1); padding-top:5px;">${rollList}</div>
+                </div>`;
         } else {
             tdTime.className = 'time-slot'; 
             tdTime.innerText = time;
-            tdTime.style.minWidth = window.innerWidth < 768 ? "150px" : "220px";
+            tdTime.style.minWidth = "220px";
         }
         tr.appendChild(tdTime);
 
         DAYS.forEach(day => {
             const td = document.createElement('td');
-            if (day !== activeDayName) { td.style.opacity = "0.2"; td.style.pointerEvents = "none"; }
-            if (day === activeDayName) {
+            
+            // LOGIC FOR TODAY (Visible but Disabled)
+            if (day === todayDayName && day !== activeDayName) {
+                td.style.opacity = "0.5"; 
+                td.style.background = "#eeeeee";
+                td.style.pointerEvents = "none";
+                const match = todayBookings?.find(b => b.time_slot === time);
+                if (match) {
+                    td.innerHTML = `<small style="font-size:0.65rem; font-weight:bold; color:#666;">OCCUPIED:<br>${match.course}</small>`;
+                }
+            } 
+            // LOGIC FOR TOMORROW (Active Day)
+            else if (day === activeDayName) {
                 if (myBooking) {
                     td.className = 'booked-cell';
                     td.innerHTML = `<b style="font-size:0.85rem;">ENROLLED</b><br><small>${batchSubject}</small>`;
@@ -716,6 +768,11 @@ const totalCap = document.getElementById('f-capacity').value || 10;
                         td.innerHTML = `<span style="font-size:0.7rem; color:#999;">${batchMembers.length > 0 ? batchMembers.length + ' Students' : 'EMPTY'}</span>`;
                     }
                 }
+            } 
+            // ALL OTHER DAYS
+            else {
+                td.style.opacity = "0.1";
+                td.style.pointerEvents = "none";
             }
             tr.appendChild(td);
         });
@@ -723,7 +780,8 @@ const totalCap = document.getElementById('f-capacity').value || 10;
     });
     document.getElementById('timetable-wrapper').style.display = 'block';
 }
-   
+
+
 async function bookThisSlot(day, time) {
     // 1. GET ALL NECESSARY DATA FROM THE UI
     const roll = document.getElementById('f-roll').value;
@@ -892,6 +950,67 @@ await loadAssignmentSummary();
 }
     function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
 
+
+
+// ADDITION: Function to load Today's Schedule (DYNAMIC & ROLE-BASED)
+async function loadTodaySummary() {
+    const tbody = document.getElementById('today-table-body');
+    const dateLabel = document.getElementById('display-today-date');
+    if (!currentUserProfile || !sessionInstID) return;
+
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    dateLabel.innerText = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    try {
+        // 1. Fetch Today's bookings
+        const { data: bookings } = await db.from('class_bookings')
+            .select('*')
+            .eq('booking_date', todayStr)
+            .eq('institute_id', sessionInstID);
+
+        // 2. Fetch Students for Name Mapping
+        const { data: students } = await db.from('students').select('roll_number, full_name').eq('institute_id', sessionInstID);
+        const stuMap = Object.fromEntries(students.map(s => [s.roll_number.toUpperCase(), s.full_name]));
+
+        tbody.innerHTML = "";
+        
+        const myName = currentUserProfile.full_name.toUpperCase();
+        let filtered = bookings || [];
+        
+        // 3. Role-Based Filtering
+        if (currentUserProfile.role === 'Student') {
+            filtered = filtered.filter(b => b.student_roll.toUpperCase() === currentUserProfile.full_name.toUpperCase() || stuMap[b.student_roll.toUpperCase()] === myName);
+        } else if (currentUserProfile.role === 'Teacher') {
+            const { data: tDetails } = await db.from('teacher_details').select('id').eq('teacher_name', myName).maybeSingle();
+            if (tDetails) filtered = filtered.filter(b => b.teacher_id === tDetails.id);
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="color:#666; padding:20px;">No sessions booked for today.</td></tr>';
+            return;
+        }
+
+        filtered.forEach(bk => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${bk.student_roll}</td>
+                    <td>${stuMap[bk.student_roll.toUpperCase()] || 'N/A'}</td>
+                    <td>${bk.teacher_id}</td>
+                    <td>${bk.course}</td>
+                    <td>${bk.course}</td>
+                    <td style="background:#fff8e1; font-weight:bold; color:blue;">${bk.time_slot}</td>
+                    <td style="color:green; font-weight:800;">LIVE / ACTIVE</td>
+                </tr>`;
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:red">Error syncing today\'s schedule.</td></tr>';
+    }
+}
+
+
+
+
     initSession();
 
 
@@ -1020,5 +1139,15 @@ window.loadAssignmentSummary = async function() {
     } catch (err) { console.error("Sync Error:", err); }
 };
 </script>
+
+
+
+
+
+
+
+
+
+
 </body>
 </html>
