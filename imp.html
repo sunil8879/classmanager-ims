@@ -2546,6 +2546,9 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
                 <textarea id="notice-text" placeholder="Type message to appear in Student Portal..." rows="2"></textarea>
             </div>
             <button class="btn-add" style="background: #ff0000; width: 100%; margin-top: 10px;" onclick="sendInternalNotice()">POST TO PORTALS</button>
+<button id="notice-history-btn" class="btn-fetch" style="background: #000; width: 100%; margin-top: 10px; display: none;" onclick="openNoticeHistory()">
+    <i class="fas fa-history"></i> VIEW SENT HISTORY
+</button>
         </div>
 
         <!-- RESULTS LIST -->
@@ -10014,6 +10017,7 @@ async function applyRoleVisibility() {
     if (!profile) return;
 
     const role = profile.role;
+if (document.getElementById('notice-history-btn')) document.getElementById('notice-history-btn').style.display = 'block';
     
 
 // SEC 19: UI Control Logic for Owner vs others
@@ -14378,6 +14382,98 @@ async function deleteNotice(id) {
     const { error } = await db.from('messages').delete().eq('id', id);
     if (error) alert(error.message);
     else { alert("Message deleted."); openNoticeHistory(); }
+}
+</script>
+
+
+
+
+
+<script>
+/* =========================================================================
+   SEC 19 OWNER UPGRADE: BATCH-WISE POSTING & HISTORY LOGIC
+   ========================================================================= */
+
+// 1. Populate "Post to Portal" Batch list (General + Specific Batches)
+const originalDropdownSync = window.refreshMessageHubDropdowns;
+window.refreshMessageHubDropdowns = async function() {
+    if (originalDropdownSync) await originalDropdownSync(); 
+    
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
+
+    if (profile.role === 'Owner') {
+        const noticeSelect = document.getElementById('notice-subject');
+        const { data: batches } = await db.from('batches').select('batch_name').eq('institute_id', sessionInstID);
+        
+        if (batches && noticeSelect) {
+            noticeSelect.innerHTML = '<option value="General">All Batches (General)</option>';
+            const uniqueB = [...new Set(batches.map(b => b.batch_name.toUpperCase()))].sort();
+            uniqueB.forEach(bn => { noticeSelect.innerHTML += `<option value="${bn}">${bn}</option>`; });
+        }
+    }
+};
+
+// 2. Sent History Engine (The Popup with Delete Icon)
+async function openNoticeHistory() {
+    const { data, error } = await db.from('messages')
+        .select('*')
+        .eq('institute_id', sessionInstID)
+        .order('created_at', { ascending: false });
+
+    if (error) return alert("Error: " + error.message);
+
+    let rows = "";
+    if (data && data.length > 0) {
+        data.forEach(m => {
+            rows += `
+                <tr style="border-bottom:1px solid #ddd; color: #000;">
+                    <td style="padding:10px; border:1px solid #ccc;">${new Date(m.created_at).toLocaleDateString()}</td>
+                    <td style="padding:10px; border:1px solid #ccc;"><b style="color:#ff0000;">${m.target_subject}</b></td>
+                    <td style="padding:10px; border:1px solid #ccc;">${m.content}</td>
+                    <td style="padding:10px; border:1px solid #ccc; text-align:center;">
+                        <button onclick="deleteNotice('${m.id}')" style="background:none; border:none; color:red; cursor:pointer; font-size:1.2rem;">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>`;
+        });
+    } else {
+        rows = `<tr><td colspan="4" style="padding:30px; text-align:center; color:#666;">No sent messages found.</td></tr>`;
+    }
+
+    const modalHtml = `
+        <div id="notice-history-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:999999;display:flex;justify-content:center;align-items:center; padding:10px;">
+            <div style="background:white; padding:25px; border-radius:15px; width:100%; max-width:1000px; max-height:85vh; overflow-y:auto; font-family:'Times New Roman', serif;">
+                <h2 style="text-align:center; text-decoration:underline; color:#000;">PORTAL MESSAGE HISTORY</h2>
+                <table style="width:100%; border-collapse:collapse; margin-top:20px; text-align:left;" border="1">
+                    <thead style="background:#7FFFD4; color:#000;">
+                        <tr>
+                            <th style="padding:10px;">DATE</th>
+                            <th style="padding:10px;">BATCH</th>
+                            <th style="padding:10px;">MESSAGE</th>
+                            <th style="padding:10px; text-align:center;">DEL</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                <div style="text-align:center; margin-top:30px;">
+                    <button onclick="document.getElementById('notice-history-overlay').remove()" style="padding:12px 50px; background:#000; color:#fff; font-weight:900; border-radius:8px; cursor:pointer; border:2px solid #7FFFD4;">CLOSE HISTORY</button>
+                </div>
+            </div>
+        </div>`;
+    
+    const existing = document.getElementById('notice-history-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// 3. Utility: Delete a sent notice
+async function deleteNotice(id) {
+    if (!confirm("Delete this message permanently? It will disappear from all portals.")) return;
+    const { error } = await db.from('messages').delete().eq('id', id);
+    if (error) alert("Error: " + error.message);
+    else { alert("Success: Message deleted."); openNoticeHistory(); }
 }
 </script>
 </body>
