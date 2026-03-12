@@ -10019,6 +10019,10 @@ async function applyRoleVisibility() {
     if (role !== 'Owner') {
         document.getElementById('home-user-view').style.display = 'none';
         document.getElementById('home-visitor-view').style.display = 'block';
+document.getElementById('calendar-admin-view').style.display = 'none';
+    }
+else {
+        document.getElementById('calendar-admin-view').style.display = 'block'; // <--- ALSO ADD THIS TO SHOW FOR OWNER
     }
 
     // 3. Setup Teacher Portal Restrictions
