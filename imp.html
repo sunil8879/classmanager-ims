@@ -10519,9 +10519,12 @@ const operationalSteps = [
     "<b>Student Privacy:</b> Students are strictly limited to their own Portal, Feedback, Messages, and Calendar.",
     "<b>Data Integrity:</b> In Sec 5 (Batch) and Sec 27 (Leave), the system auto-detects the logged-in Teacher's ID and locks it.",
 "<h3 style='color:#e67e22; text-decoration:none;'>34. IMPORTANT RULES</h3>",
-    "<b>1. Batch Scheduler Sync:</b> In order to update the BATCH SCHEDULER in SECTION 3 (Student Management): use FETCH, open the batch scheduler, reschedule the subjects as per your liking, click EDIT, and then manually update the record in SECTION 25 (Batch Master) to ensure total system synchronization.",
-    "<b>2. Core Management Pillars:</b> The 5 most critical sections for institutional integrity are: Section 3 (Student Management), Section 5 (Batch Management), Section 11 (Teacher Portal), Section 18 (Student Allocation), and Section 25 (Batch Master) . Master these to master the software.",
-    "<b>3. Roster Discipline:</b> Always ensure that a student's Admission record (Sec 3) matches their Batch Roster (Sec 25). The analytics engine for Attendance and Engagement depends on these two sections being perfectly aligned."
+"<b>1. Batch Scheduler Sync:</b> In order to update the BATCH SCHEDULER in SECTION 3 (Student Management): use FETCH, open the batch scheduler, reschedule the subjects as per your liking, click EDIT, and then manually update the record in SECTION 25 (Batch Master) to ensure total system synchronization.",
+"<b>2. Core Management Pillars:</b> The 5 most critical sections for institutional integrity are: Section 3 (Student Management), Section 5 (Batch Management), Section 11 (Teacher Portal), Section 18 (Student Allocation), and Section 25 (Batch Master). Master these to master the software.",
+"<b>3. Payment Gateway Setup:</b> The Owner/Admin must configure the payment system by opening Section 4 (Fee Management), entering any Roll Number, entering an amount in 'Amount Now Paying', and clicking 'GENERATE PAYMENT QR'. This one-time setup saves your UPI ID to the cloud, enabling online payments for all students.",
+"<b>4. Payment Confirmation Flow:</b> After a student pays via QR code, they must send a screenshot to the Admin. The Owner must then log this payment in Section 4 using 'ADD PAYMENT'. This manual verification triggers the dynamic update across the Dashboard, Reports, and Student Portals.",
+"<b>5. Email-Roll Integrity:</b> For the Student Portal to work, the Email used during 'Signup' (Sec 2) must exactly match the Email entered during 'Admission' (Sec 3). If these don't match, the student will be locked out of their personal performance data.",
+"<b>6. Roster Discipline:</b> Always ensure that a student's Admission record (Sec 3) matches their Batch Roster (Sec 25). The analytics engine for Attendance and Engagement depends on these two sections being perfectly aligned."
 ];
 
 let currentGuideIndex = 0;
