@@ -14570,5 +14570,65 @@ window.generateStudentPortalQR = function() {
     document.getElementById('p-upi-qr-area').scrollIntoView({ behavior: 'smooth' });
 };
 </script>
+
+
+
+
+
+
+<script>
+/* --- SEC 4: OWNER SAVES UPI (NO-SQL VERSION) --- */
+window.generateUPIQR = async function() {
+    const amount = document.getElementById('fee-paid-now').value;
+    const roll = document.getElementById('fee-roll').value;
+    if (!amount || amount <= 0) return alert("Please enter the 'Amount Now Paying' first.");
+
+    // 1. Look for the "Bank Master" record in your existing students table
+    const { data } = await db.from('students').select('mobile').eq('roll_number', 'BANK-MASTER').eq('institute_id', sessionInstID).maybeSingle();
+    let upiID = data ? data.mobile : null;
+
+    // 2. If it doesn't exist, ask the owner once and create it
+    if (!upiID) {
+        upiID = prompt("Enter Institute UPI ID (e.g. 9876543210@upi):");
+        if (!upiID) return;
+        await db.from('students').upsert({ 
+            institute_id: sessionInstID, 
+            roll_number: 'BANK-MASTER', 
+            full_name: 'INSTITUTE BANK SETTINGS', 
+            mobile: upiID,
+            status: 'System' 
+        });
+        alert("Payment settings saved to cloud! Students can now pay you.");
+    }
+
+    // 3. Generate the QR
+    const upiString = `upi://pay?pa=${upiID}&pn=${encodeURIComponent(sessionUserName)}&am=${amount}&tn=${encodeURIComponent('Fees-'+roll)}&cu=INR`;
+    document.getElementById('upi-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+    document.getElementById('disp-qr-amt').innerText = amount;
+    document.getElementById('upi-qr-area').style.display = 'block';
+};
+</script>
+
+
+<script>
+/* --- SEC 12: STUDENT FETCHES UPI (NO-SQL VERSION) --- */
+window.generateStudentPortalQR = async function() {
+    const amt = document.getElementById('p-pay-amt').value;
+    const roll = document.getElementById('portal-roll-input').value.toUpperCase();
+    if (!amt || amt <= 0) return alert("Enter amount first.");
+
+    // FETCH FROM THE FAKE STUDENT RECORD
+    const { data } = await db.from('students').select('mobile').eq('roll_number', 'BANK-MASTER').eq('institute_id', sessionInstID).maybeSingle();
+
+    if (!data || !data.mobile) {
+        return alert("Online Payments are not configured by the Admin. Ask the Owner to set their UPI ID in Section 4.");
+    }
+
+    const upiString = `upi://pay?pa=${data.mobile}&pn=${encodeURIComponent('INSTITUTE FEE')}&am=${amt}&tn=${encodeURIComponent('FEE-'+roll)}&cu=INR`;
+    document.getElementById('p-upi-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+    document.getElementById('p-disp-amt').innerText = amt;
+    document.getElementById('p-upi-qr-area').style.display = 'block';
+};
+</script>
 </body>
 </html>
