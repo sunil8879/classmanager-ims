@@ -10017,6 +10017,16 @@ async function applyRoleVisibility() {
     
     // 2. Hide Dashboard Stats for non-owners
     if (role !== 'Owner') {
+
+
+// Hides the "Post to Portals" (Internal Notice Board) for everyone except Owner
+const noticeBoard = document.querySelector('#message-corner .card > div:last-of-type');
+if (noticeBoard) noticeBoard.style.display = (role === 'Owner') ? 'block' : 'none';
+
+
+
+
+
         document.getElementById('home-user-view').style.display = 'none';
         document.getElementById('home-visitor-view').style.display = 'block';
 document.getElementById('calendar-admin-view').style.display = 'none';
@@ -13992,6 +14002,60 @@ window.openBatchPicker = async function() {
     } catch (err) {
         tbody.innerHTML = "<tr><td colspan='6' style='color:red;'>Connection Error.</td></tr>";
     }
+};
+</script>
+
+
+
+
+
+<script>
+/* =========================================================================
+   OVERRIDE: SECTION 19 DYNAMIC LINKED SEARCH (SECURITY RESTRICTION)
+   ========================================================================= */
+
+// 1. Students can only find Teachers they are linked to
+window.fetchTeachersBySubject = async function() {
+    const sub = document.getElementById('wa-teacher-subject').value;
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+
+    let query = db.from('teacher_details').select('teacher_name, mobile, id').eq('institute_id', sessionInstID);
+
+    // DYNAMIC FILTER: If user is a Student, find their linked Teachers in Section 18
+    if (profile.role === 'Student') {
+        const { data: stu } = await db.from('students').select('roll_number').eq('email', profile.email).single();
+        const { data: links } = await db.from('student_allocations').select('teacher_id').eq('roll_number', stu.roll_number).eq('institute_id', sessionInstID);
+        const allowedIds = links.map(l => l.teacher_id);
+        if (allowedIds.length === 0) return displayWAContactList([]); // Block if not linked
+        query = query.in('id', allowedIds);
+    }
+
+    if (sub !== "All") query = query.ilike('subject_taught', `%${sub}%`);
+    const { data } = await query;
+    displayWAContactList(data);
+};
+
+// 2. Teachers can only find Students they are linked to
+window.fetchStudentsByCourse = async function() {
+    const crs = document.getElementById('wa-student-course').value;
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+
+    let query = db.from('students').select('full_name, mobile, roll_number').eq('institute_id', sessionInstID).eq('status', 'Active');
+
+    // DYNAMIC FILTER: If user is a Teacher, find their linked Students in Section 18
+    if (profile.role === 'Teacher') {
+        const { data: tch } = await db.from('teacher_details').select('id').eq('email', profile.email).single();
+        const { data: links } = await db.from('student_allocations').select('roll_number').eq('teacher_id', tch.id).eq('institute_id', sessionInstID);
+        const allowedRolls = links.map(l => l.roll_number);
+        if (allowedRolls.length === 0) return displayWAContactList([]); // Block if not linked
+        query = query.in('roll_number', allowedRolls);
+    }
+
+    if (crs !== "All") query = query.ilike('course', `%${crs}%`);
+    const { data } = await query;
+    displayWAContactList(data);
 };
 </script>
 </body>
