@@ -2135,6 +2135,43 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
         </div>
     </div>
 </div>
+
+
+
+
+<!-- STUDENT SELF-PAYMENT BOX -->
+<div style="margin-top: 25px; padding: 20px; border: 3px solid #27ae60; border-radius: 15px; background: #f0fff4;">
+    <h4 style="color: #27ae60; text-decoration: none; border: none; margin-bottom: 15px;">
+        <i class="fas fa-wallet"></i> Pay Fees Online
+    </h4>
+    <div class="form-grid" style="grid-template-columns: 1fr; gap: 10px;">
+        <div class="input-group">
+            <label>Amount to Pay (₹)</label>
+            <input type="number" id="p-pay-amt" placeholder="Enter amount you want to pay">
+        </div>
+        <button class="btn-add" style="background: #27ae60; width: 100%;" onclick="generateStudentPortalQR()">
+            GENERATE PAYMENT QR
+        </button>
+    </div>
+
+    <!-- Hidden QR Display for Student -->
+    <div id="p-upi-qr-area" style="display: none; margin-top: 20px; text-align: center; border-top: 1px dashed #27ae60; padding-top: 20px;">
+        <div style="background: #fff; padding: 10px; display: inline-block; border-radius: 10px; border: 1px solid #ddd;">
+            <img id="p-upi-qr-img" src="" alt="Payment QR" style="width: 180px; height: 180px;">
+        </div>
+        <p style="margin-top: 10px; font-weight: 900; color: #000; font-size: 1.2rem;">
+            Amount: ₹ <span id="p-disp-amt">0</span>
+        </p>
+        <div style="background: #fff3cd; padding: 10px; border-radius: 8px; font-size: 0.8rem; color: #856404; margin-top: 10px; font-weight: bold;">
+            ⚠️ INSTRUCTIONS: After successful payment, please take a screenshot and send it to the Institute Admin for confirmation.
+        </div>
+    </div>
+</div>
+
+
+
+
+
     <!-- Resources Section -->
     <div class="card" style="margin-top: 20px; background: #f0faff;">
         <h4><i class="fas fa-book"></i> Institute Resources</h4>
@@ -4191,41 +4228,58 @@ async function fetchPaymentLog() {
 
 
 
-async function generateUPIQR() {
+
+
+
+
+
+
+
+
+/* =========================================================================
+   SEC 4: SMART UPI QR GENERATOR (REMEMBERS YOUR ID)
+   ========================================================================= */
+window.generateUPIQR = function() {
     // 1. Get current data from the Fee Form
     const amount = document.getElementById('fee-paid-now').value;
     const studentName = document.getElementById('fee-name').value;
     const roll = document.getElementById('fee-roll').value;
 
-    // 2. Validation
     if (!amount || amount <= 0) return alert("Please enter the 'Amount Now Paying' first.");
     if (!studentName) return alert("Please fetch student details first.");
 
-    // 3. Get UPI ID (VPA) from the owner
-    // For a production system, we pull this from 'institute_settings' table.
-    // As a shortcut, we will prompt once or you can hardcode it.
-    let upiID = prompt("Enter Institute UPI ID (e.g., owner@okaxis or 9876543210@upi):");
+    // 2. Check if UPI ID is already saved in this browser
+    let upiID = localStorage.getItem('institute_upi_id_' + sessionInstID);
     
-    if (!upiID) return;
+    if (!upiID) {
+        upiID = prompt("Enter Institute UPI ID to receive payments\n(e.g., owner@okaxis or 9876543210@upi):");
+        if (!upiID) return;
+        // Save it so we don't ask again for this specific institute
+        localStorage.setItem('institute_upi_id_' + sessionInstID, upiID);
+    }
 
-    // 4. Construct the UPI String
-    // Format: upi://pay?pa=VPA&pn=NAME&am=AMOUNT&tn=REMARK&cu=INR
-    const payeeName = encodeURIComponent("ClassManager Institute");
+    // 3. Construct the UPI String
+    const payeeName = encodeURIComponent(sessionUserName || "Institute Fee");
     const remarks = encodeURIComponent(`Fees-${roll}`);
     const upiString = `upi://pay?pa=${upiID}&pn=${payeeName}&am=${amount}&tn=${remarks}&cu=INR`;
 
-    // 5. Use Google Chart API or GoQR to generate the image
+    // 4. Generate the QR via API
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
 
-    // 6. Update UI
+    // 5. Update UI
     document.getElementById('upi-qr-img').src = qrUrl;
     document.getElementById('disp-qr-amt').innerText = amount;
-    document.getElementById('disp-qr-name').innerText = studentName;
     document.getElementById('upi-qr-area').style.display = 'block';
 
-    // Scroll to the QR code so the user sees it
     document.getElementById('upi-qr-area').scrollIntoView({ behavior: 'smooth' });
 }
+
+
+
+
+
+
+
 /* ==========================================
    5. BATCH MANAGEMENT
    ========================================== */
@@ -14477,6 +14531,44 @@ async function deleteNotice(id) {
     if (error) alert("Error: " + error.message);
     else { alert("Success: Message deleted."); openNoticeHistory(); }
 }
+</script>
+
+
+
+
+
+<script>
+/* =========================================================================
+   SEC 12: STUDENT SELF-PAYMENT QR LOGIC
+   ========================================================================= */
+window.generateStudentPortalQR = function() {
+    const amt = document.getElementById('p-pay-amt').value;
+    const sName = document.getElementById('p-name').innerText;
+    const roll = document.getElementById('portal-roll-input').value.toUpperCase();
+
+    if (!amt || amt <= 0) return alert("Please enter the amount you wish to pay.");
+
+    // Retrieve the UPI ID set by the Owner for this institute
+    const upiID = localStorage.getItem('institute_upi_id_' + sessionInstID);
+    
+    if (!upiID) {
+        return alert("Online Payments are currently not configured by the Institute. Please contact the Admin to set up their UPI ID.");
+    }
+
+    const payeeName = encodeURIComponent(sessionInstID + " FEE");
+    const remarks = encodeURIComponent(`FEE-${roll}-${sName}`);
+    const upiString = `upi://pay?pa=${upiID}&pn=${payeeName}&am=${amt}&tn=${remarks}&cu=INR`;
+
+    // Generate QR
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+
+    // Update UI
+    document.getElementById('p-upi-qr-img').src = qrUrl;
+    document.getElementById('p-disp-amt').innerText = amt;
+    document.getElementById('p-upi-qr-area').style.display = 'block';
+    
+    document.getElementById('p-upi-qr-area').scrollIntoView({ behavior: 'smooth' });
+};
 </script>
 </body>
 </html>
