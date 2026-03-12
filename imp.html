@@ -913,6 +913,13 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
 .nav-tab { background: #ffffff !important; } .nav-tab i { color: #008B8B !important; }
 header { background:#7FFFD4!important; }
 footer * { font-size: 1.20rem !important; }
+
+
+#visitor-search-container { margin-bottom: 100px !important; }
+#process-guide-box { margin-top: 140px !important; }
+
+#feature-highlighter { margin-bottom: 20px !important; } #visitor-search-container, #process-guide-box { margin-top: 20px !important; }
+#feature-highlighter, #visitor-search-container { margin-bottom: 170px !important; } #visitor-search-container, #process-guide-box { margin-top: 0 !important; }
     </style>
 </head>
 <body>
@@ -3188,6 +3195,18 @@ footer * { font-size: 1.20rem !important; }
         </div>
 
 
+
+
+
+
+<!-- VISITOR DYNAMIC TAB SEARCH -->
+<div id="visitor-search-container" class="feature-box" style="margin-top: 50px; margin-bottom: 20px; flex-direction: column; gap: 10px; padding: 25px; min-height: 120px;">
+    <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: #666; font-weight: bold; width: 100%; text-align: left;">
+        <i class="fas fa-search"></i> Instant Module & Tab Lookup
+    </div>
+    <input type="text" id="tab-search-input" placeholder="Type keywords (e.g. 'Money', 'Late', 'ID Card', 'Staff')..." style="width: 100%; height: 50px; font-size: 1.1rem; font-weight: 800;" onkeyup="runTabSearch()">
+    <div id="tab-search-results" style="width: 100%; text-align: left; padding-top: 10px;"></div>
+</div>
 
 
 
@@ -14684,6 +14703,68 @@ window.fetchStudentPortalData = async function() {
     // If verified, run the original fetch function
     if (originalPortalFetchLogic) await originalPortalFetchLogic();
 };
+</script>
+
+
+
+
+
+<script>
+/* =========================================================================
+   VISITOR VIEW: 30-TAB KEYWORD MAPPING ENGINE
+   ========================================================================= */
+const tabDictionary = {
+    "1. Home": "Stats, Dashboard, Overview, Total Admissions, Collection",
+    "2. Login System": "Signup, Register, Password, Login, Account",
+    "3. Student Management": "Admission, Roll Number, Standard, Profile, New Student",
+    "4. Fee Management": "Money, QR Code, Receipt, Payment, Online Pay, Collection",
+    "5. Batch Management": "Timing, Slot, Schedule, Time, Class Room",
+    "6. Attendance": "Presence, Absent, Punctuality, Daily Log, Register",
+    "7. Admin Dashboard": "Reports, P&L, Profit, Loss, Financials, Appraisal",
+    "8. Fee Reminder System": "Pending, Dues, Late, Debt, WhatsApp Reminder, SMS",
+    "9. Lead Management": "Enquiry, Walk-in, Conversion, Follow-up, Marketing",
+    "10. Expense Tracking": "Rent, Electricity, Bills, Salary Outflow, Spending",
+    "11. Teacher Portal": "Staff, Faculty, Qualification, Subject Taught",
+    "12. Students Portal": "Student Login, My Performance, My Marks, Personal Data",
+    "13. ID Card Generator": "Identity, Photo, Card Studio, Vertical ID",
+    "14. Certificate Generator": "Completion, Award, Graduation, Diploma",
+    "15. Performance Tracking": "Growth, Progress, Historical Trend, Analysis",
+    "16. Exam Management": "Marks, Result, Pass, Fail, Score, Test",
+    "17. Teacher Attendance": "Staff Attendance, Workday, Arrival, Staff Presence",
+    "18. Student Allocation": "Mapping, Linking, Assign Teacher, Allocation",
+    "19. Message Corner": "WhatsApp, Chat, Broadcast, Connect, Notification",
+    "20. Academic Calendar": "Holiday, Event, Vacation, Date, Schedule",
+    "21. Alumni Section": "Graduate, Job, Placement, College, Success",
+    "22. Inventory Manager": "Stationery, Stock, Sale, Uniform, Bag, Items",
+    "23. Scholarship Tracker": "Waiver, Discount, Financial Aid, Scholarship",
+    "24. PTM Schedule": "Parent Teacher Meeting, Appointment, Meeting",
+    "25. Batch Master": "Roster, Registry, Master List, Enrollment, Capacity",
+    "26. Teacher Reviews": "Rating, Feedback, Review, Student Opinion",
+    "27. Leave Management": "Holiday Request, Vacation, Leave Balance, Staff Off",
+    "28. AI Attendance Insights": "AI, Trend, Analytics, Intelligence, Irregularity",
+    "29. Teacher Leaderboard": "Ranking, Top Faculty, Performance Index, Medal",
+    "30. Student Engagement": "Engagement Score, Activity, Health, Student Participation"
+};
+
+function runTabSearch() {
+    const input = document.getElementById('tab-search-input').value.toUpperCase();
+    const resultDiv = document.getElementById('tab-search-results');
+    
+    if (input.length < 2) { resultDiv.innerHTML = ""; return; }
+
+    let matches = [];
+    for (let [tabName, keywords] of Object.entries(tabDictionary)) {
+        if (tabName.toUpperCase().includes(input) || keywords.toUpperCase().includes(input)) {
+            matches.push(`<div style="margin-bottom:8px; padding:5px; border-bottom:1px dashed #ccc;"><b style="color:#ff0000;">${tabName}</b><br><small style="color:#666;">Keywords: ${keywords}</small></div>`);
+        }
+    }
+
+    if (matches.length > 0) {
+        resultDiv.innerHTML = `<p style="font-weight:bold; color:green; margin-bottom:10px;">${matches.length} Matches Found:</p>` + matches.join("");
+    } else {
+        resultDiv.innerHTML = `<p style="color:#888;">No tabs match that keyword. Try 'Money', 'Staff', or 'Exam'.</p>`;
+    }
+}
 </script>
 </body>
 </html>
