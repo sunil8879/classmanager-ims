@@ -10015,6 +10015,21 @@ async function applyRoleVisibility() {
 
     const role = profile.role;
     
+
+// SEC 19: UI Control Logic for Owner vs others
+const noticeRow = document.querySelector('div[style*="background: #fff8f8"]');
+const broadcastRow = document.querySelector('div[style*="background: #fff8e1"]');
+
+if (role === 'Owner') {
+    if (noticeRow) { noticeRow.style.pointerEvents = 'auto'; noticeRow.style.opacity = '1'; noticeRow.style.display = 'block'; }
+    if (broadcastRow) { broadcastRow.style.display = 'block'; }
+} else {
+    if (noticeRow) { noticeRow.style.pointerEvents = 'none'; noticeRow.style.opacity = '0.5'; noticeRow.style.display = 'block'; }
+    if (broadcastRow) { broadcastRow.style.display = 'none'; }
+}
+
+
+
     // 2. Hide Dashboard Stats for non-owners
     if (role !== 'Owner') {
 
@@ -14179,6 +14194,86 @@ async function fetchUnifiedNotices(course, targetId) {
         div.innerHTML = "<p style='color:#888;'>No new notifications at this time.</p>";
     }
 }
+</script>
+
+
+
+
+<script>
+/* =========================================================================
+   SEC 19: OWNER RESTORATION & STAFF RESTRICTION (DYNAMIC)
+   ========================================================================= */
+
+// 1. Restore Dropdown Logic for Owner
+window.refreshMessageHubDropdowns = async function() {
+    if (!sessionInstID) return;
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role, email, full_name').eq('id', user.id).single();
+
+    const tDropdown = document.getElementById('wa-teacher-subject'); 
+    const sDropdown = document.getElementById('wa-student-course'); 
+
+    if (profile.role === 'Owner') {
+        // OWNER: Load all subjects like the original system
+        const { data: batches } = await db.from('batches').select('subject_name').eq('institute_id', sessionInstID);
+        const unique = [...new Set(batches.map(b => b.subject_name.toUpperCase()))].sort();
+        tDropdown.innerHTML = '<option value="All">All Staff</option>';
+        sDropdown.innerHTML = '<option value="All">All Students</option>';
+        unique.forEach(s => { 
+            tDropdown.innerHTML += `<option value="${s}">${s}</option>`; 
+            sDropdown.innerHTML += `<option value="${s}">${s}</option>`; 
+        });
+    } else if (profile.role === 'Student') {
+        sDropdown.innerHTML = `<option value="SELF">${profile.full_name.toUpperCase()}</option>`;
+        const { data: stu } = await db.from('students').select('roll_number').eq('email', profile.email).eq('institute_id', sessionInstID).maybeSingle();
+        const { data: links } = await db.from('list').select('teacher_name, teacher_id').eq('roll_number', stu.roll_number).eq('institute_id', sessionInstID);
+        tDropdown.innerHTML = '<option value="">-- Select Your Teacher --</option>';
+        const seen = new Set();
+        if (links) links.forEach(l => { if(!seen.has(l.teacher_id)) { seen.add(l.teacher_id); tDropdown.innerHTML += `<option value="${l.teacher_id}">${l.teacher_name}</option>`; }});
+    } else if (profile.role === 'Teacher') {
+        tDropdown.innerHTML = `<option value="SELF">${profile.full_name.toUpperCase()}</option>`;
+        const { data: tch } = await db.from('teacher_details').select('id').eq('email', profile.email).eq('institute_id', sessionInstID).maybeSingle();
+        const { data: links } = await db.from('list').select('student_name, roll_number').eq('teacher_id', tch.id).eq('institute_id', sessionInstID);
+        sDropdown.innerHTML = '<option value="">-- Select Your Student --</option>';
+        const seen = new Set();
+        if (links) links.forEach(l => { if(!seen.has(l.roll_number)) { seen.add(l.roll_number); sDropdown.innerHTML += `<option value="${l.roll_number}">${l.student_name}</option>`; }});
+    }
+};
+
+// 2. Restore Search Logic for Owner
+window.fetchTeachersBySubject = async function() {
+    const val = document.getElementById('wa-teacher-subject').value;
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
+
+    let query = db.from('teacher_details').select('teacher_name, mobile').eq('institute_id', sessionInstID);
+    
+    if (profile.role === 'Owner') {
+        if (val !== "All") query = query.ilike('subject_taught', `%${val}%`);
+    } else {
+        if (val === "SELF") query = query.ilike('teacher_name', sessionUserName);
+        else query = query.eq('id', val);
+    }
+    const { data } = await query;
+    displayWAContactList(data);
+};
+
+window.fetchStudentsByCourse = async function() {
+    const val = document.getElementById('wa-student-course').value;
+    const { data: { user } } = await db.auth.getUser();
+    const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
+
+    let query = db.from('students').select('full_name, mobile').eq('institute_id', sessionInstID).eq('status', 'Active');
+
+    if (profile.role === 'Owner') {
+        if (val !== "All") query = query.ilike('course', `%${val}%`);
+    } else {
+        if (val === "SELF") query = query.ilike('full_name', sessionUserName);
+        else query = query.eq('roll_number', val);
+    }
+    const { data } = await query;
+    displayWAContactList(data);
+};
 </script>
 </body>
 </html>
