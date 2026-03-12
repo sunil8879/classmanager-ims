@@ -10177,16 +10177,33 @@ else {
 
 
 
-            } else if (role === 'Student') {
+     } else if (role === 'Student') {
                 tab.style.display = studentAllowed.includes(sectionId) ? '' : 'none';
-// Play with these numbers (px) to adjust the gaps
-document.getElementById('sidebar-profile-section').style.marginTop = "415px";  // Gap above Upload Button
-document.getElementById('sidebar-learning-widget').style.marginTop = "140px"; // Gap above Idioms Button
+                document.body.classList.add('student-mode');
+
+                // 1. SEC 12: Lock Student Portal to Logged-in Student Only
+                const portalRollBox = document.getElementById('portal-roll-input');
+                if (portalRollBox) {
+                    db.from('students').select('roll_number').eq('email', profile.email).eq('institute_id', sessionInstID).maybeSingle()
+                    .then(({data: stuRec}) => {
+                        if (stuRec) {
+                            portalRollBox.value = stuRec.roll_number;
+                            portalRollBox.readOnly = true;
+                            portalRollBox.style.background = "#eee";
+                            fetchStudentPortalData(); // Auto-load data
+                        }
+                    });
+                }
+
+                // 2. Adjust gaps for Student Sidebar
+                const profileWidget = document.getElementById('sidebar-profile-section');
+                const learningWidget = document.getElementById('sidebar-learning-widget');
+                if (profileWidget) profileWidget.style.marginTop = "415px"; 
+                if (learningWidget) learningWidget.style.marginTop = "140px";
             }
         }
     });
-} // <--- THIS WAS THE MISSING BRACKET THAT CAUSED YOUR ERROR
-
+}
 
 
 // Observe changes to the Auth Status Bar to trigger visibility rules securely on login/page load
@@ -14628,6 +14645,36 @@ window.generateStudentPortalQR = async function() {
     document.getElementById('p-upi-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
     document.getElementById('p-disp-amt').innerText = amt;
     document.getElementById('p-upi-qr-area').style.display = 'block';
+};
+</script>
+
+
+
+
+<script>
+/* =========================================================================
+   SEC 12: STUDENT PORTAL DATA INTEGRITY GUARD (ASYNC VERSION)
+   ========================================================================= */
+const originalPortalFetchLogic = window.fetchStudentPortalData;
+
+window.fetchStudentPortalData = async function() {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await db.from('profiles').select('role, email').eq('id', user.id).single();
+
+    if (profile.role === 'Student') {
+        const inputRoll = document.getElementById('portal-roll-input').value.toUpperCase();
+        const { data: verify } = await db.from('students').select('roll_number').eq('email', profile.email).eq('institute_id', sessionInstID).maybeSingle();
+        
+        if (!verify || inputRoll !== verify.roll_number) {
+            alert("🛑 DATA INTEGRITY ERROR: Access Denied.");
+            if (verify) document.getElementById('portal-roll-input').value = verify.roll_number;
+            return;
+        }
+    }
+    
+    // If verified, run the original fetch function
+    if (originalPortalFetchLogic) await originalPortalFetchLogic();
 };
 </script>
 </body>
