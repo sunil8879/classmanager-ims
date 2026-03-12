@@ -1414,6 +1414,8 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
             <div id="history-links-container" style="max-height: 150px; overflow-y: auto; font-size: 13px;"></div>
         </div>
 
+    <button class="btn-add" style="background: #1877F2; width: 100%; margin-top:10px;" onclick="generateUPIQR()"><i class="fas fa-qrcode"></i> GENERATE PAYMENT QR</button>
+
         <!-- UPI QR -->
         <div id="upi-qr-area" style="display: none; margin-top: 30px; padding: 20px; background: #fff; border-radius: 15px; border: 2px solid #000; text-align: center;">
             <h4 style="color: #000; margin-bottom: 15px;">Scan to Pay Fees</h4>
@@ -1421,7 +1423,7 @@ min-height: 350px; /* Adjust this number to make it taller or shorter */
                 <img id="upi-qr-img" src="" alt="UPI QR Code" style="width: 200px; height: 200px;">
             </div>
             <p style="margin-top: 10px; font-weight: bold; color: #1877F2;">Amount: ₹ <span id="disp-qr-amt">0</span></p>
-            <button class="btn-add" style="background: #1877F2; width: 100%; margin-top:10px;" onclick="generateUPIQR()"><i class="fas fa-qrcode"></i> GENERATE PAYMENT QR</button>
+        
         </div>
     </div>
 
