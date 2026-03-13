@@ -10156,6 +10156,7 @@ else {
 
     // Apply specific Teacher restrictions
     if (role === 'Teacher') {
+document.body.classList.add('teacher-mode');
         adminButtons.forEach(sel => { 
             const btn = document.querySelector(sel);
             if(btn) btn.style.display = 'none'; 
@@ -14755,6 +14756,15 @@ function runTabSearch() {
     let matches = [];
     for (let [tabName, keywords] of Object.entries(tabDictionary)) {
         if (tabName.toUpperCase().includes(input) || keywords.toUpperCase().includes(input)) {
+const idMap={"1. Home":"home","2. Login System":"login","3. Student Management":"students","4. Fee Management":"fee","5. Batch Management":"batch","6. Attendance":"attendance","7. Admin Dashboard":"admin","8. Fee Reminder System":"reminder","9. Lead Management":"leads","10. Expense Tracking":"expense","11. Teacher Portal":"teacher","12. Students Portal":"student-p","13. ID Card Generator":"id-gen","14. Certificate Generator":"cert-gen","15. Performance Tracking":"tracking","16. Exam Management":"exam-mod","17. Teacher Attendance":"t-attn-mod","18. Student Allocation":"allocation-mod","19. Message Corner":"message-corner","20. Academic Calendar":"calendar-mod","21. Alumni Section":"alumni-mod","22. Inventory Manager":"inventory-mod","23. Scholarship Tracker":"scholarship-mod","24. PTM Schedule":"ptm-mod","25. Batch Master":"batch-master","26. Teacher Reviews":"reviews-mod","27. Leave Management":"leave-mod","28. AI Attendance Insights":"ai-attendance","29. Teacher Leaderboard":"teacher-leaderboard","30. Student Engagement":"student-engagement"};
+const tID=idMap[tabName];
+let isB=false;
+if(document.body.classList.contains('student-mode')) isB=!['home','login','student-p','message-corner','calendar-mod','reviews-mod'].includes(tID);
+if(document.body.classList.contains('teacher-mode')) isB=['fee','expense','reminder','admin','reviews-mod','leads','allocation-mod','batch-master','students','inventory-mod','scholarship-mod','alumni-mod','cert-gen','id-gen','ai-attendance','teacher-leaderboard','student-engagement'].includes(tID);
+
+const onClick=isB?`alert('🛑 ACCESS DENIED: This section is restricted for your role.')`:`showSection('${tID}');document.getElementById('tab-search-input').value='';document.getElementById('tab-search-results').innerHTML=''`;
+matches.push(`<div onclick="${onClick}" style="margin-bottom:8px;padding:5px;border-bottom:1px dashed #ccc;cursor:pointer;"><b style="color:${isB?'#999':'#ff0000'};">${tabName}${isB?' (LOCKED)':''}</b><br><small style="color:#666;">Keywords: ${keywords}</small></div>`);
+continue;
             matches.push(`<div style="margin-bottom:8px; padding:5px; border-bottom:1px dashed #ccc;"><b style="color:#ff0000;">${tabName}</b><br><small style="color:#666;">Keywords: ${keywords}</small></div>`);
         }
     }
