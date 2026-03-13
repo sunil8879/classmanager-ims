@@ -14787,64 +14787,52 @@ continue;
 
 <script>
 /* =========================================================================
-   MASTER STATUS & EXPIRY GUARD (SEC 3 & PORTAL)
+   INACTIVE STUDENT SECURITY & OWNER ALERT ENGINE
    ========================================================================= */
 
-// 1. WATCHER: When Owner clicks "EDIT Student" in Sec 3, sync to Login Table
+// 1. FOR STUDENT LOGIN: If status is not Active, block the entire screen immediately
+setInterval(async () => {
+    if (document.body.classList.contains('student-mode')) {
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return;
+        const { data: p } = await db.from('profiles').select('status').eq('id', user.id).single();
+        
+        if (p && p.status !== 'Active') {
+            document.body.innerHTML = `
+                <div style="height:100vh; display:flex; align-items:center; justify-content:center; background:#000; color:#fff; font-family:serif; text-align:center;">
+                    <h1 style="font-size:3rem; border:2px solid #fff; padding:20px;">LOGIN BLOCKED BY ADMIN</h1>
+                </div>`;
+        }
+    }
+}, 2000); // Checks every 2 seconds
+
+// 2. FOR OWNER SYNC: When Owner clicks "EDIT Student" in Sec 3, update the login table
 document.addEventListener('click', async (e) => {
-    if (e.target.getAttribute('onclick') === 'editStudentByRoll()') {
+    if (e.target.innerText === 'EDIT (by Roll No)' || e.target.getAttribute('onclick')?.includes('editStudentByRoll')) {
         const email = document.getElementById('stu-email').value;
         const status = document.getElementById('stu-status').value;
         if (email) {
-            await db.from('profiles').update({ status: status }).eq('email', email).eq('institute_id', sessionInstID);
-            console.log("Security: Login Profile status synced to " + status);
+            await db.from('profiles').update({ status: status }).eq('email', email);
+            console.log("Login table updated to " + status);
         }
     }
 });
 
-// 2. THE JAIL: Force-check Student Status & Course End Date on Login
-setInterval(async () => {
-    // Only run this if we are in Student Login
-    if (document.body.classList.contains('student-mode')) {
-        const { data: { user } } = await db.auth.getUser();
-        if (!user) return;
-
-        // Fetch Status from Profile AND Course End Date from Student Details
-        const { data: profile } = await db.from('profiles').select('status, email').eq('id', user.id).single();
-        const { data: details } = await db.from('student_details').select('course_end_date').eq('roll_number', document.getElementById('portal-roll-input')?.value).maybeSingle();
-
-        const today = new Date().toISOString().split('T')[0];
-        const isExpired = details?.course_end_date && today > details.course_end_date;
-
-        // BLOCK IF: Status is not Active OR Date has passed (1st Sep 2026 check)
-        if (profile.status !== 'Active' || isExpired) {
-            const reason = isExpired ? `COURSE EXPIRED ON ${details.course_end_date}` : `STATUS: ${profile.status.toUpperCase()}`;
-            document.body.innerHTML = `
-                <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:#fff; font-family:serif; border:10px solid red; padding:20px;">
-                    <h1 style="color:red; font-size:3.5rem; margin:0;">ACCESS DENIED</h1>
-                    <p style="font-size:1.8rem; font-weight:bold; margin-top:20px;">${reason}</p>
-                    <p style="color:#555;">Your access to the Student Portal has been restricted.<br>Please contact the Institute Admin for reactivation.</p>
-                    <button onclick="location.reload()" style="margin-top:30px; padding:15px 40px; background:#000; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">RETRY LOGIN</button>
-                </div>`;
-        }
-    }
-}, 3000); // Checks every 3 seconds to ensure they haven't bypassed it
-
-// 3. OWNER ALERT: Pop-up when fetching an Inactive Student
+// 3. FOR OWNER ALERT: Pop-up when fetching an Inactive student in any tab
 document.addEventListener('click', (e) => {
     if (!document.body.classList.contains('owner-mode')) return;
     
-    // Trigger on any FETCH button
+    // If Owner clicks any FETCH button
     if (e.target.innerText.includes('FETCH') || e.target.closest('.btn-fetch')) {
         setTimeout(() => {
             const s3 = document.getElementById('stu-status')?.value;
             const s4 = document.getElementById('fee-status')?.value;
-            const current = s3 || s4 || "";
+            const currentStatus = s3 || s4 || "";
 
-            if (current !== "" && current !== "Active") {
-                alert("⚠️ ALERT TO OWNER: YOU ARE VIEWING AN INACTIVE / CLOSED STUDENT RECORD!");
+            if (currentStatus !== "" && currentStatus !== "Active") {
+                alert("YOU ARE VIEWING THE RECORD OF THE INACTIVE STUDENT");
             }
-        }, 1000); // Wait 1 sec for data to fill the box
+        }, 1200); // 1.2 second delay to allow data to load from database into the box
     }
 });
 </script>
