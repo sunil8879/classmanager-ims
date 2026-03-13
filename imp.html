@@ -14776,5 +14776,76 @@ continue;
     }
 }
 </script>
+
+
+
+
+
+
+
+<script>
+/* =========================================================================
+   GLOBAL SYNC ENGINE: SECTION 3 TO ALL 30 MODULES
+   ========================================================================= */
+
+// 1. Redefine the Edit function to sync status across the entire database
+window.editStudentByRoll = async function() {
+    const roll = document.getElementById('stu-roll').value;
+    const status = document.getElementById('stu-status').value;
+    const email = document.getElementById('stu-email').value;
+
+    if (!roll) return alert("Please FETCH a student first.");
+
+    // A. Perform the basic update in the Students table
+    const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
+    const updateData = {
+        admission_date: document.getElementById('stu-date').value,
+        full_name: document.getElementById('stu-name').value,
+        mobile: document.getElementById('stu-mobile').value,
+        status: status // THE KEY CHANGE
+    };
+    await db.from('students').update(updateData).eq('id', detail.student_id);
+
+    // B. Sync to Login System (Section 2) - Updates Profile status
+    await db.from('profiles').update({ status: status }).eq('email', email).eq('institute_id', sessionInstID);
+
+    // C. Data Cleanup for Inactive/Closed students
+    if (status !== 'Active') {
+        // Physically remove from Active Roster (Sec 25) and Allocation (Sec 18)
+        // This ensures they disappear from Teacher dropdowns and Message Corner (Sec 19)
+        await db.from('list').delete().eq('roll_number', roll).eq('institute_id', sessionInstID);
+        await db.from('student_allocations').delete().eq('roll_number', roll).eq('institute_id', sessionInstID);
+        
+        // This student will now also disappear from Fee Reminders (Sec 8) and AI Analytics (Sec 28, 30)
+        // because those modules filter for "Active" students only.
+    }
+
+    // D. Refresh Dashboard Stats (Sec 1)
+    if (typeof loadHomeDashboardStats === 'function') await loadHomeDashboardStats();
+
+    alert(`SUCCESS: Student ${roll} is now marked ${status}. System-wide sync complete.`);
+};
+
+// 2. Global Security Blocker: Kicks out Inactive Students from their Portal (Sec 12)
+const originalRoleVisibility = window.applyRoleVisibility;
+window.applyRoleVisibility = async function() {
+    if (originalRoleVisibility) await originalRoleVisibility();
+
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await db.from('profiles').select('role, status').eq('id', user.id).single();
+
+    // If a Student logs in but their status is Inactive or Closed, block the entire page
+    if (profile.role === 'Student' && profile.status !== 'Active') {
+        document.body.innerHTML = `
+            <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:#fff; font-family:serif;">
+                <h1 style="color:red; font-size:3rem;">ACCESS SUSPENDED</h1>
+                <p style="font-size:1.5rem;">Your account status is currently: <b>${profile.status}</b></p>
+                <p>Please contact the Institute Admin to reactivate your portal.</p>
+                <button onclick="handleLogout()" style="padding:15px 30px; background:#000; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">LOGOUT</button>
+            </div>`;
+    }
+};
+</script>
 </body>
 </html>
