@@ -920,11 +920,6 @@ footer * { font-size: 1.20rem !important; }
 
 #feature-highlighter { margin-bottom: 20px !important; } #visitor-search-container, #process-guide-box { margin-top: 20px !important; }
 #feature-highlighter, #visitor-search-container { margin-bottom: 170px !important; } #visitor-search-container, #process-guide-box { margin-top: 0 !important; }
-
-
-
-
-nav.sidebar { flex: 0 0 300px !important; width: 300px !important; } main.content { flex: 1 !important; min-width: 0 !important; }
     </style>
 </head>
 <body>
@@ -14757,40 +14752,17 @@ function runTabSearch() {
     
     if (input.length < 2) { resultDiv.innerHTML = ""; return; }
 
-    const sectionIds = {
-        "1. Home": "home", "2. Login System": "login", "3. Student Management": "students",
-        "4. Fee Management": "fee", "5. Batch Management": "batch", "6. Attendance": "attendance",
-        "7. Admin Dashboard": "admin", "8. Fee Reminder System": "reminder", "9. Lead Management": "leads",
-        "10. Expense Tracking": "expense", "11. Teacher Portal": "teacher", "12. Students Portal": "student-p",
-        "13. ID Card Generator": "id-gen", "14. Certificate Generator": "cert-gen", "15. Performance Tracking": "tracking",
-        "16. Exam Management": "exam-mod", "17. Teacher Attendance": "t-attn-mod", "18. Student Allocation": "allocation-mod",
-        "19. Message Corner": "message-corner", "20. Academic Calendar": "calendar-mod", "21. Alumni Section": "alumni-mod",
-        "22. Inventory Manager": "inventory-mod", "23. Scholarship Tracker": "scholarship-mod", "24. PTM Schedule": "ptm-mod",
-        "25. Batch Master": "batch-master", "26. Teacher Reviews": "reviews-mod", "27. Leave Management": "leave-mod",
-        "28. AI Attendance Insights": "ai-attendance", "29. Teacher Leaderboard": "teacher-leaderboard", "30. Student Engagement": "student-engagement"
-    };
-
     let matches = [];
     for (let [tabName, keywords] of Object.entries(tabDictionary)) {
         if (tabName.toUpperCase().includes(input) || keywords.toUpperCase().includes(input)) {
-            const targetId = sectionIds[tabName];
-
-            // ADDED: white-space: normal and word-wrap to prevent layout break
-            matches.push(`
-                <div onclick="showSection('${targetId}'); document.getElementById('tab-search-input').value=''; document.getElementById('tab-search-results').innerHTML='';"
-                     style="margin-bottom:8px; padding:10px; border-bottom:1px dashed #ccc; cursor:pointer; white-space: normal; word-wrap: break-word;" 
-                     onmouseover="this.style.background='#f0fffb';" 
-                     onmouseout="this.style.background='transparent';">
-                    <b style="color:#ff0000; display: block;">${tabName}</b>
-                    <small style="color:#666; display: block; line-height: 1.2;">Keywords: ${keywords}</small>
-                </div>`);
+            matches.push(`<div style="margin-bottom:8px; padding:5px; border-bottom:1px dashed #ccc;"><b style="color:#ff0000;">${tabName}</b><br><small style="color:#666;">Keywords: ${keywords}</small></div>`);
         }
     }
 
     if (matches.length > 0) {
-        resultDiv.innerHTML = `<p style="font-weight:bold; color:green; margin-bottom:10px;">${matches.length} Matches Found (Click to Open):</p>` + matches.join("");
+        resultDiv.innerHTML = `<p style="font-weight:bold; color:green; margin-bottom:10px;">${matches.length} Matches Found:</p>` + matches.join("");
     } else {
-        resultDiv.innerHTML = `<p style="color:#888;">No tabs match that keyword.</p>`;
+        resultDiv.innerHTML = `<p style="color:#888;">No tabs match that keyword. Try 'Money', 'Staff', or 'Exam'.</p>`;
     }
 }
 </script>
