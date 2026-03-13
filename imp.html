@@ -14787,71 +14787,64 @@ continue;
 
 <script>
 /* =========================================================================
-   GLOBAL SYNC ENGINE: SECTION 3 TO ALL 30 MODULES
+   MASTER STATUS & EXPIRY GUARD (SEC 3 & PORTAL)
    ========================================================================= */
 
-/* =========================================================================
-   SaaS SECURITY & STATUS SYNC ENGINE (SEC 3 - GLOBAL)
-   ========================================================================= */
-
-// 1. Sync Section 3 Status to Login Table (Profiles)
-const originalEditStudent = window.editStudentByRoll;
-window.editStudentByRoll = async function() {
-    if (originalEditStudent) await originalEditStudent(); // Run original update
-    
-    const email = document.getElementById('stu-email').value;
-    const status = document.getElementById('stu-status').value;
-
-    if (email) {
-        // Sync the status to the profiles table so login is blocked immediately
-        await db.from('profiles').update({ status: status }).eq('email', email).eq('institute_id', sessionInstID);
-        console.log("Login Profile synced to: " + status);
+// 1. WATCHER: When Owner clicks "EDIT Student" in Sec 3, sync to Login Table
+document.addEventListener('click', async (e) => {
+    if (e.target.getAttribute('onclick') === 'editStudentByRoll()') {
+        const email = document.getElementById('stu-email').value;
+        const status = document.getElementById('stu-status').value;
+        if (email) {
+            await db.from('profiles').update({ status: status }).eq('email', email).eq('institute_id', sessionInstID);
+            console.log("Security: Login Profile status synced to " + status);
+        }
     }
-};
+});
 
-// 2. Student Blocker: Checks status on every tab click
-const originalRoleCheck = window.applyRoleVisibility;
-window.applyRoleVisibility = async function() {
-    if (originalRoleCheck) await originalRoleCheck();
+// 2. THE JAIL: Force-check Student Status & Course End Date on Login
+setInterval(async () => {
+    // Only run this if we are in Student Login
+    if (document.body.classList.contains('student-mode')) {
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return;
 
-    const { data: { user } } = await db.auth.getUser();
-    if (!user) return;
-    
-    // Check live status from Profiles
-    const { data: profile } = await db.from('profiles').select('role, status').eq('id', user.id).single();
+        // Fetch Status from Profile AND Course End Date from Student Details
+        const { data: profile } = await db.from('profiles').select('status, email').eq('id', user.id).single();
+        const { data: details } = await db.from('student_details').select('course_end_date').eq('roll_number', document.getElementById('portal-roll-input')?.value).maybeSingle();
 
-    if (profile && profile.role === 'Student' && profile.status !== 'Active') {
-        document.body.innerHTML = `
-            <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:#fff; font-family:'Times New Roman', serif; padding:20px;">
-                <h1 style="color:red; font-size:3rem; border-bottom:5px solid red; padding-bottom:10px;">ACCESS SUSPENDED</h1>
-                <p style="font-size:1.5rem; margin-top:20px;">Your Student Account is currently <b>${profile.status.toUpperCase()}</b>.</p>
-                <p style="color:#666;">You cannot access the portal. Please contact the Institute Owner to settle dues or reactivate your account.</p>
-                <button onclick="handleLogout()" style="margin-top:30px; padding:15px 40px; background:#000; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">EXIT PORTAL</button>
-            </div>`;
+        const today = new Date().toISOString().split('T')[0];
+        const isExpired = details?.course_end_date && today > details.course_end_date;
+
+        // BLOCK IF: Status is not Active OR Date has passed (1st Sep 2026 check)
+        if (profile.status !== 'Active' || isExpired) {
+            const reason = isExpired ? `COURSE EXPIRED ON ${details.course_end_date}` : `STATUS: ${profile.status.toUpperCase()}`;
+            document.body.innerHTML = `
+                <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:#fff; font-family:serif; border:10px solid red; padding:20px;">
+                    <h1 style="color:red; font-size:3.5rem; margin:0;">ACCESS DENIED</h1>
+                    <p style="font-size:1.8rem; font-weight:bold; margin-top:20px;">${reason}</p>
+                    <p style="color:#555;">Your access to the Student Portal has been restricted.<br>Please contact the Institute Admin for reactivation.</p>
+                    <button onclick="location.reload()" style="margin-top:30px; padding:15px 40px; background:#000; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">RETRY LOGIN</button>
+                </div>`;
+        }
     }
-};
+}, 3000); // Checks every 3 seconds to ensure they haven't bypassed it
 
-// 3. Owner "Inactive" Alert: Monitors all Fetch Buttons
-document.addEventListener('click', function(e) {
-    // Only run for Owners
+// 3. OWNER ALERT: Pop-up when fetching an Inactive Student
+document.addEventListener('click', (e) => {
     if (!document.body.classList.contains('owner-mode')) return;
-
-    // List of common Fetch buttons
-    const isFetchBtn = e.target.classList.contains('btn-fetch') || e.target.closest('.btn-fetch');
     
-    if (isFetchBtn) {
-        // Wait 800ms for Supabase to finish loading data into the UI
+    // Trigger on any FETCH button
+    if (e.target.innerText.includes('FETCH') || e.target.closest('.btn-fetch')) {
         setTimeout(() => {
-            const stuStatus = document.getElementById('stu-status')?.value;
-            const feeStatus = document.getElementById('fee-status')?.value;
-            
-            // Check if any status field in the current view is not 'Active'
-            const currentStatus = stuStatus || feeStatus || "";
-            
-            if (currentStatus !== "" && currentStatus !== "Active") {
-                alert(`🛑 ATTENTION OWNER: THIS STUDENT IS CURRENTLY ${currentStatus.toUpperCase()}!`);
+            const s3 = document.getElementById('stu-status')?.value;
+            const s4 = document.getElementById('fee-status')?.value;
+            const current = s3 || s4 || "";
+
+            if (current !== "" && current !== "Active") {
+                alert("⚠️ ALERT TO OWNER: YOU ARE VIEWING AN INACTIVE / CLOSED STUDENT RECORD!");
             }
-        }, 800);
+        }, 1000); // Wait 1 sec for data to fill the box
     }
 });
 </script>
