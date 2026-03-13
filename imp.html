@@ -14783,69 +14783,77 @@ continue;
 
 
 
+
+
 <script>
 /* =========================================================================
    GLOBAL SYNC ENGINE: SECTION 3 TO ALL 30 MODULES
    ========================================================================= */
 
-// 1. Redefine the Edit function to sync status across the entire database
+/* =========================================================================
+   SaaS SECURITY & STATUS SYNC ENGINE (SEC 3 - GLOBAL)
+   ========================================================================= */
+
+// 1. Sync Section 3 Status to Login Table (Profiles)
+const originalEditStudent = window.editStudentByRoll;
 window.editStudentByRoll = async function() {
-    const roll = document.getElementById('stu-roll').value;
-    const status = document.getElementById('stu-status').value;
+    if (originalEditStudent) await originalEditStudent(); // Run original update
+    
     const email = document.getElementById('stu-email').value;
+    const status = document.getElementById('stu-status').value;
 
-    if (!roll) return alert("Please FETCH a student first.");
-
-    // A. Perform the basic update in the Students table
-    const { data: detail } = await db.from('student_details').select('student_id').eq('roll_number', roll).single();
-    const updateData = {
-        admission_date: document.getElementById('stu-date').value,
-        full_name: document.getElementById('stu-name').value,
-        mobile: document.getElementById('stu-mobile').value,
-        status: status // THE KEY CHANGE
-    };
-    await db.from('students').update(updateData).eq('id', detail.student_id);
-
-    // B. Sync to Login System (Section 2) - Updates Profile status
-    await db.from('profiles').update({ status: status }).eq('email', email).eq('institute_id', sessionInstID);
-
-    // C. Data Cleanup for Inactive/Closed students
-    if (status !== 'Active') {
-        // Physically remove from Active Roster (Sec 25) and Allocation (Sec 18)
-        // This ensures they disappear from Teacher dropdowns and Message Corner (Sec 19)
-        await db.from('list').delete().eq('roll_number', roll).eq('institute_id', sessionInstID);
-        await db.from('student_allocations').delete().eq('roll_number', roll).eq('institute_id', sessionInstID);
-        
-        // This student will now also disappear from Fee Reminders (Sec 8) and AI Analytics (Sec 28, 30)
-        // because those modules filter for "Active" students only.
+    if (email) {
+        // Sync the status to the profiles table so login is blocked immediately
+        await db.from('profiles').update({ status: status }).eq('email', email).eq('institute_id', sessionInstID);
+        console.log("Login Profile synced to: " + status);
     }
-
-    // D. Refresh Dashboard Stats (Sec 1)
-    if (typeof loadHomeDashboardStats === 'function') await loadHomeDashboardStats();
-
-    alert(`SUCCESS: Student ${roll} is now marked ${status}. System-wide sync complete.`);
 };
 
-// 2. Global Security Blocker: Kicks out Inactive Students from their Portal (Sec 12)
-const originalRoleVisibility = window.applyRoleVisibility;
+// 2. Student Blocker: Checks status on every tab click
+const originalRoleCheck = window.applyRoleVisibility;
 window.applyRoleVisibility = async function() {
-    if (originalRoleVisibility) await originalRoleVisibility();
+    if (originalRoleCheck) await originalRoleCheck();
 
     const { data: { user } } = await db.auth.getUser();
     if (!user) return;
+    
+    // Check live status from Profiles
     const { data: profile } = await db.from('profiles').select('role, status').eq('id', user.id).single();
 
-    // If a Student logs in but their status is Inactive or Closed, block the entire page
-    if (profile.role === 'Student' && profile.status !== 'Active') {
+    if (profile && profile.role === 'Student' && profile.status !== 'Active') {
         document.body.innerHTML = `
-            <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:#fff; font-family:serif;">
-                <h1 style="color:red; font-size:3rem;">ACCESS SUSPENDED</h1>
-                <p style="font-size:1.5rem;">Your account status is currently: <b>${profile.status}</b></p>
-                <p>Please contact the Institute Admin to reactivate your portal.</p>
-                <button onclick="handleLogout()" style="padding:15px 30px; background:#000; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">LOGOUT</button>
+            <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:#fff; font-family:'Times New Roman', serif; padding:20px;">
+                <h1 style="color:red; font-size:3rem; border-bottom:5px solid red; padding-bottom:10px;">ACCESS SUSPENDED</h1>
+                <p style="font-size:1.5rem; margin-top:20px;">Your Student Account is currently <b>${profile.status.toUpperCase()}</b>.</p>
+                <p style="color:#666;">You cannot access the portal. Please contact the Institute Owner to settle dues or reactivate your account.</p>
+                <button onclick="handleLogout()" style="margin-top:30px; padding:15px 40px; background:#000; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">EXIT PORTAL</button>
             </div>`;
     }
 };
+
+// 3. Owner "Inactive" Alert: Monitors all Fetch Buttons
+document.addEventListener('click', function(e) {
+    // Only run for Owners
+    if (!document.body.classList.contains('owner-mode')) return;
+
+    // List of common Fetch buttons
+    const isFetchBtn = e.target.classList.contains('btn-fetch') || e.target.closest('.btn-fetch');
+    
+    if (isFetchBtn) {
+        // Wait 800ms for Supabase to finish loading data into the UI
+        setTimeout(() => {
+            const stuStatus = document.getElementById('stu-status')?.value;
+            const feeStatus = document.getElementById('fee-status')?.value;
+            
+            // Check if any status field in the current view is not 'Active'
+            const currentStatus = stuStatus || feeStatus || "";
+            
+            if (currentStatus !== "" && currentStatus !== "Active") {
+                alert(`🛑 ATTENTION OWNER: THIS STUDENT IS CURRENTLY ${currentStatus.toUpperCase()}!`);
+            }
+        }, 800);
+    }
+});
 </script>
 </body>
 </html>
