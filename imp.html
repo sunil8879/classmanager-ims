@@ -10549,7 +10549,9 @@ const operationalSteps = [
 "<b>3. Payment Gateway Setup:</b> The Owner/Admin must configure the payment system by opening Section 4 (Fee Management), entering any Roll Number, entering an amount in 'Amount Now Paying', and clicking 'GENERATE PAYMENT QR'. This one-time setup saves your UPI ID to the cloud, enabling online payments for all students.",
 "<b>4. Payment Confirmation Flow:</b> After a student pays via QR code, they must send a screenshot to the Admin. The Owner must then log this payment in Section 4 using 'ADD PAYMENT'. This manual verification triggers the dynamic update across the Dashboard, Reports, and Student Portals.",
 "<b>5. Email-Roll Integrity:</b> For the Student Portal to work, the Email used during 'Signup' (Sec 2) must exactly match the Email entered during 'Admission' (Sec 3). If these don't match, the student will be locked out of their personal performance data.",
-"<b>6. Roster Discipline:</b> Always ensure that a student's Admission record (Sec 3) matches their Batch Roster (Sec 25). The analytics engine for Attendance and Engagement depends on these two sections being perfectly aligned."
+"<b>6. Roster Discipline:</b> Always ensure that a student's Admission record (Sec 3) matches their Batch Roster (Sec 25). The analytics engine for Attendance and Engagement depends on these two sections being perfectly aligned.",
+"<b>7. Inactive Student Protocol:</b> If a student's course is over or for disciplinary action, the admin must go to SECTION 3 (Student Management) and mark them INACTIVE. This blocks the student's login and triggers warning popups across Owner/Teacher portals. To reactivate, update to ACTIVE in Section 3 and re-do the linking in SECTION 18 (Student Allocation).",
+    "<b>8. Inactive Teacher Protocol:</b> If a teacher leaves, the admin must go to SECTION 11 (Teacher Portal) and mark them INACTIVE. This blocks the teacher's login and triggers warning popups/hides them in Student/Owner portals. To reactivate, update to ACTIVE in Section 11 and re-do the linking in SECTION 18 (Student Allocation)."
 ];
 
 let currentGuideIndex = 0;
@@ -14941,6 +14943,163 @@ continue;
                         setTimeout(() => {
                             alert(`⚠️ SYSTEM ALERT: THIS STUDENT IS CURRENTLY MARKED AS "${stuStatus.status.toUpperCase()}"!`);
                         }, 800); 
+                    }
+                }
+            };
+        }
+    });
+})();
+</script>
+
+
+
+
+
+
+
+
+<!-- =========================================================================
+     GLOBAL FIX: ULTIMATE INACTIVE TEACHER BLOCKER & SYSTEM-WIDE WARNINGS
+     ========================================================================= -->
+<script>
+(function() {
+    // -----------------------------------------------------------------------
+    // PART 1: AUTO-SYNC 'INACTIVE' STATUS TO THE PROFILES TABLE
+    // -----------------------------------------------------------------------
+    const origEditTeacher = window.editTeacher;
+    window.editTeacher = async function(...args) {
+        // Run the normal Section 11 update first
+        if (origEditTeacher) await origEditTeacher.apply(this, args);
+
+        const statusVal = document.getElementById('tch-status').value;
+        const idVal = document.getElementById('tch-id').value.trim();
+
+        if (statusVal && idVal) {
+            // Fetch exact email and mobile from the freshly updated teacher table
+            const { data: tch } = await db.from('teacher_details').select('email, mobile').eq('id', idVal).maybeSingle();
+            
+            if (tch) {
+                // Attempt to push status to the profiles table
+                let query = db.from('profiles').update({ status: statusVal });
+                if (tch.email) query = query.eq('email', tch.email);
+                else if (tch.mobile) query = query.eq('mobile_number', tch.mobile);
+                
+                await query;
+            }
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // PART 2: THE BULLETPROOF LOGIN BLOCKER (READS FROM TEACHER TABLE)
+    // -----------------------------------------------------------------------
+    const origTeacherLogin = window.handleLogin;
+    window.handleLogin = async function(...args) {
+        const roleSelected = document.getElementById('log-role').value;
+        const email = document.getElementById('log-email').value.trim();
+
+        // Check the Master Teacher table BEFORE letting them log in
+        if (roleSelected === 'Teacher' && email) {
+            const { data: tchCheck } = await db.from('teacher_details')
+                .select('status')
+                .ilike('email', email)
+                .maybeSingle();
+            
+            if (tchCheck && tchCheck.status !== 'Active') {
+                return alert("🛑 ACCESS DENIED: Your account has been marked as INACTIVE. Please contact the administrator.");
+            }
+        }
+
+        // If clear, proceed with original login
+        if (origTeacherLogin) await origTeacherLogin.apply(this, args);
+
+        // POST-LOGIN DOUBLE CHECK
+        const { data: { user } } = await db.auth.getUser();
+        if (user && roleSelected === 'Teacher') {
+            const { data: profile } = await db.from('profiles').select('email, mobile_number').eq('id', user.id).single();
+            if (profile) {
+                const { data: finalCheck } = await db.from('teacher_details')
+                    .select('status')
+                    .or(`email.ilike.${profile.email},mobile.eq.${profile.mobile_number}`)
+                    .limit(1).maybeSingle();
+
+                if (finalCheck && finalCheck.status !== 'Active') {
+                    alert("🛑 ACCESS DENIED: Your account has been marked as INACTIVE.");
+                    await db.auth.signOut();
+                    location.reload();
+                }
+            }
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // PART 3: KICK OUT ALREADY LOGGED IN TEACHERS (On Page Refresh)
+    // -----------------------------------------------------------------------
+    const origTeacherSession = window.checkCurrentSession;
+    window.checkCurrentSession = async function(...args) {
+        if (origTeacherSession) await origTeacherSession.apply(this, args);
+
+        const { data: { user } } = await db.auth.getUser();
+        if (user) {
+            const { data: profile } = await db.from('profiles').select('role, email, mobile_number').eq('id', user.id).single();
+            if (profile && profile.role === 'Teacher') {
+                const { data: tchRecord } = await db.from('teacher_details')
+                    .select('status')
+                    .or(`email.ilike.${profile.email},mobile.eq.${profile.mobile_number}`)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (tchRecord && tchRecord.status !== 'Active') {
+                    alert("🛑 SESSION TERMINATED: Your account has been marked as INACTIVE. Logging out...");
+                    await db.auth.signOut();
+                    location.reload();
+                }
+            }
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // PART 4: GLOBAL WARNING POPUP ACROSS ALL TABS (USING MAPPED ARRAY)
+    // -----------------------------------------------------------------------
+    // Mapped all 14 functions where a Teacher ID is fetched or selected via dropdown
+    const tchFetchFuncs = [
+        { fn: 'fetchTeacher', input: 'tch-id' }, // Sec 11 Teacher Portal
+        { fn: 'fetchBatchByTeacher', input: 'batch-teacher-id' }, // Sec 5 Old Batch
+        { fn: 'bm2Fetch', input: 'bm2-tid' }, // Sec 5 New Batch Override
+        { fn: 'fetchTeacherForTAttn', input: 't-attn-id' }, // Sec 17 Teacher Attn
+        { fn: 'fetchTeacherHistory', input: 't-attn-id' }, // Sec 17 Teacher Attn Hist
+        { fn: 'fetchTeacherForAlloc', input: 'alloc-tid' }, // Sec 18 Allocation
+        { fn: 'fetchTeacherForLeave', input: 'lv-tid' }, // Sec 27 Leave
+        { fn: 'fetchLeaveRecord', input: 'lv-tid' }, // Sec 27 Leave Record
+        { fn: 'handleBMTeacherChange', input: 'bm-tid' }, // Sec 25 Batch Master Dropdown
+        { fn: 'syncReviewTeacherName', input: 'rev-tid' }, // Sec 26 Reviews Dropdown
+        { fn: 'syncTeacherNamePerf', input: 't-perf-id' }, // Sec 29 Leaderboard Dropdown
+        { fn: 'populateTeacherRepName', input: 'rep-t-id' }, // Sec 7 Admin Attn Report
+        { fn: 'populateTeacherRatName', input: 'rep-rat-tid' }, // Sec 7 Admin Appraisal Report
+        { fn: 'syncPTMTeacherDetails', input: 'ptm-tid' } // Sec 24 PTM Allocations
+    ];
+
+    tchFetchFuncs.forEach(item => {
+        if (typeof window[item.fn] === 'function') {
+            const origFn = window[item.fn];
+            window[item.fn] = async function(...args) {
+                // Execute original fetch/dropdown logic first so UI populates normally
+                await origFn.apply(this, args);
+                
+                const tidEl = document.getElementById(item.input);
+                if (tidEl && tidEl.value) {
+                    const tidVal = tidEl.value.trim();
+                    
+                    const { data: tchStatus } = await db.from('teacher_details')
+                        .select('status')
+                        .ilike('id', tidVal)
+                        .eq('institute_id', sessionInstID)
+                        .maybeSingle();
+                        
+                    if (tchStatus && tchStatus.status !== 'Active') {
+                        // 850ms delay ensures this warning pops up right AFTER the normal "Loaded Successfully" alerts clear
+                        setTimeout(() => {
+                            alert(`⚠️ SYSTEM ALERT: THIS TEACHER IS CURRENTLY MARKED AS "${tchStatus.status.toUpperCase()}"!`);
+                        }, 850); 
                     }
                 }
             };
