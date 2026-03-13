@@ -14785,125 +14785,168 @@ continue;
 
 
 
+
+
+
+
+
+<!-- =========================================================================
+     GLOBAL FIX: ULTIMATE INACTIVE STUDENT BLOCKER & SYSTEM-WIDE WARNINGS
+     ========================================================================= -->
 <script>
-/* =========================================================================
-   INACTIVE STUDENT SECURITY & OWNER ALERT ENGINE
-   ========================================================================= */
+(function() {
+    // -----------------------------------------------------------------------
+    // PART 1: AUTO-SYNC 'INACTIVE' STATUS TO THE PROFILES TABLE (IF ALLOWED)
+    // -----------------------------------------------------------------------
+    const origEditStudent = window.editStudentByRoll;
+    window.editStudentByRoll = async function(...args) {
+        // Run the normal Section 3 update first
+        if (origEditStudent) await origEditStudent.apply(this, args);
 
-// 1. FOR STUDENT LOGIN: If status is not Active, block the entire screen immediately
-setInterval(async () => {
-    if (document.body.classList.contains('student-mode')) {
+        const statusVal = document.getElementById('stu-status').value;
+        const roll = document.getElementById('stu-roll').value.trim();
+
+        if (statusVal && roll) {
+            // Fetch exact email and mobile from the freshly updated students table
+            const { data: stu } = await db.from('students').select('email, mobile').eq('roll_number', roll).maybeSingle();
+            
+            if (stu) {
+                // Attempt to push status to the profiles table
+                let query = db.from('profiles').update({ status: statusVal });
+                if (stu.email) query = query.eq('email', stu.email);
+                else if (stu.mobile) query = query.eq('mobile_number', stu.mobile);
+                
+                await query; // Will update if RLS policies allow it
+            }
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // PART 2: THE BULLETPROOF LOGIN BLOCKER (READS FROM STUDENTS TABLE DIRECTLY)
+    // -----------------------------------------------------------------------
+    const origHandleLogin = window.handleLogin;
+    window.handleLogin = async function(...args) {
+        const roleSelected = document.getElementById('log-role').value;
+        const email = document.getElementById('log-email').value.trim();
+
+        // Check the Master Students table BEFORE letting them log in
+        if (roleSelected === 'Student' && email) {
+            const { data: stuCheck } = await db.from('students')
+                .select('status')
+                .ilike('email', email)
+                .maybeSingle();
+            
+            if (stuCheck && stuCheck.status !== 'Active') {
+                return alert("🛑 ACCESS DENIED: Your account has been marked as INACTIVE. Please contact the administrator.");
+            }
+        }
+
+        // If clear, proceed with original login
+        if (origHandleLogin) await origHandleLogin.apply(this, args);
+
+        // POST-LOGIN DOUBLE CHECK (In case they logged in via mobile number instead of email)
         const { data: { user } } = await db.auth.getUser();
-        if (!user) return;
-        const { data: p } = await db.from('profiles').select('status').eq('id', user.id).single();
-        
-        if (p && p.status !== 'Active') {
-            document.body.innerHTML = `
-                <div style="height:100vh; display:flex; align-items:center; justify-content:center; background:#000; color:#fff; font-family:serif; text-align:center;">
-                    <h1 style="font-size:3rem; border:2px solid #fff; padding:20px;">LOGIN BLOCKED BY ADMIN</h1>
-                </div>`;
-        }
-    }
-}, 2000); // Checks every 2 seconds
+        if (user && roleSelected === 'Student') {
+            const { data: profile } = await db.from('profiles').select('email, mobile_number').eq('id', user.id).single();
+            if (profile) {
+                const { data: finalCheck } = await db.from('students')
+                    .select('status')
+                    .or(`email.ilike.${profile.email},mobile.eq.${profile.mobile_number}`)
+                    .limit(1).maybeSingle();
 
-// 2. FOR OWNER SYNC: When Owner clicks "EDIT Student" in Sec 3, update the login table
-document.addEventListener('click', async (e) => {
-    if (e.target.innerText === 'EDIT (by Roll No)' || e.target.getAttribute('onclick')?.includes('editStudentByRoll')) {
-        const email = document.getElementById('stu-email').value;
-        const status = document.getElementById('stu-status').value;
-        if (email) {
-            await db.from('profiles').update({ status: status }).eq('email', email);
-            console.log("Login table updated to " + status);
-        }
-    }
-});
-
-// 3. FOR OWNER ALERT: Pop-up when fetching an Inactive student in any tab
-document.addEventListener('click', (e) => {
-    if (!document.body.classList.contains('owner-mode')) return;
-    
-    // If Owner clicks any FETCH button
-    if (e.target.innerText.includes('FETCH') || e.target.closest('.btn-fetch')) {
-        setTimeout(() => {
-            const s3 = document.getElementById('stu-status')?.value;
-            const s4 = document.getElementById('fee-status')?.value;
-            const currentStatus = s3 || s4 || "";
-
-            if (currentStatus !== "" && currentStatus !== "Active") {
-                alert("YOU ARE VIEWING THE RECORD OF THE INACTIVE STUDENT");
+                if (finalCheck && finalCheck.status !== 'Active') {
+                    alert("🛑 ACCESS DENIED: Your account has been marked as INACTIVE.");
+                    await db.auth.signOut();
+                    location.reload();
+                }
             }
-        }, 1200); // 1.2 second delay to allow data to load from database into the box
-    }
-});
-</script>
+        }
+    };
 
+    // -----------------------------------------------------------------------
+    // PART 3: KICK OUT ALREADY LOGGED IN USERS (On Page Refresh)
+    // -----------------------------------------------------------------------
+    const origCheckSession = window.checkCurrentSession;
+    window.checkCurrentSession = async function(...args) {
+        if (origCheckSession) await origCheckSession.apply(this, args);
 
-
-
-
-<script>
-/* =========================================================================
-   MASTER SYNC: SECTION 3 STATUS -> LOGIN SYSTEM -> OWNER ALERTS
-   ========================================================================= */
-
-// 1. OVERRIDE: When Owner clicks "EDIT" in Sec 3, update BOTH tables
-const originalEditFunc = window.editStudentByRoll;
-window.editStudentByRoll = async function() {
-    // A. Run your original code to update 'students' table
-    if (originalEditFunc) await originalEditFunc();
-
-    // B. Get the info from the UI
-    const email = document.getElementById('stu-email').value;
-    const status = document.getElementById('stu-status').value;
-
-    // C. Update the Login (profiles) table so the block actually works
-    if (email) {
-        const { error } = await db.from('profiles').update({ status: status }).eq('email', email);
-        if (!error) console.log("Login access updated to: " + status);
-    }
-};
-
-// 2. SECURITY GUARD: Kicks out inactive students every 2 seconds
-setInterval(async () => {
-    // Only monitor if the current browser is in 'student-mode'
-    if (document.body.classList.contains('student-mode')) {
         const { data: { user } } = await db.auth.getUser();
-        if (!user) return;
+        if (user) {
+            const { data: profile } = await db.from('profiles').select('role, email, mobile_number').eq('id', user.id).single();
+            if (profile && profile.role === 'Student') {
+                // Check Master Students table
+                const { data: stuRecord } = await db.from('students')
+                    .select('status')
+                    .or(`email.ilike.${profile.email},mobile.eq.${profile.mobile_number}`)
+                    .limit(1)
+                    .maybeSingle();
 
-        // Fetch live status from the profiles (login) table
-        const { data: profile } = await db.from('profiles').select('status').eq('id', user.id).single();
-
-        if (profile && profile.status !== 'Active') {
-            document.body.innerHTML = `
-                <div style="height:100vh; display:flex; align-items:center; justify-content:center; background:#000; color:#fff; font-family:serif; text-align:center;">
-                    <div style="border:5px solid #fff; padding:40px;">
-                        <h1 style="font-size:3.5rem; margin:0;">LOGIN BLOCKED BY ADMIN</h1>
-                        <p style="font-size:1.2rem; margin-top:20px;">Contact your institute head for reactivation.</p>
-                    </div>
-                </div>`;
+                if (stuRecord && stuRecord.status !== 'Active') {
+                    alert("🛑 SESSION TERMINATED: Your account has been marked as INACTIVE. Logging out...");
+                    await db.auth.signOut();
+                    location.reload();
+                }
+            }
         }
-    }
-}, 2000);
+    };
 
-// 3. OWNER ALERT: Watches for Fetch results in Section 3 and Section 4
-setInterval(() => {
-    if (document.body.classList.contains('owner-mode')) {
-        const s3Status = document.getElementById('stu-status');
-        const s4Status = document.getElementById('fee-status');
+    // -----------------------------------------------------------------------
+    // PART 4: GLOBAL WARNING POPUP ACROSS ALL TABS
+    // -----------------------------------------------------------------------
+    // Mapped all 22 fetch functions to their specific UI input boxes
+    const fetchFuncs = [
+        { fn: 'fetchStudentByRoll', input: 'stu-roll' },
+        { fn: 'fetchFeeByRoll', input: 'fee-roll' },
+        { fn: 'fetchPaymentLog', input: 'log-roll' },
+        { fn: 'fetchStudentForAttn', input: 'attn-roll' },
+        { fn: 'fetchAttendanceByPrompt', input: 'attn-roll' },
+        { fn: 'fetchStudentPortalData', input: 'portal-roll-input' },
+        { fn: 'fetchPerformanceData', input: 'perf-fetch-roll' },
+        { fn: 'fetchStudentForExam', input: 'ex-roll' },
+        { fn: 'fetchExamByRoll', input: 'ex-roll' },
+        { fn: 'fetchExamHistory', input: 'ex-roll' },
+        { fn: 'fetchStudentForAlloc', input: 'alloc-roll' },
+        { fn: 'fetchStudentForAlumni', input: 'al-roll' }, // Warning is fine here, allows alumni processing
+        { fn: 'fetchStudentForInv', input: 'inv-stu-roll' },
+        { fn: 'fetchInventorySale', input: 'inv-stu-roll' },
+        { fn: 'fetchStudentForScholarship', input: 'sch-roll' },
+        { fn: 'fetchScholarshipByRoll', input: 'sch-roll' },
+        { fn: 'fetchPTMAllocations', input: 'ptm-roll' },
+        { fn: 'fetchPTMRecordByRoll', input: 'ptm-roll' },
+        { fn: 'autopopulateBatchMaster', input: 'bm-roll' },
+        { fn: 'fetchBatchMasterRecord', input: 'bm-roll' },
+        { fn: 'autopopulateReviewForm', input: 'rev-roll' },
+        { fn: 'calculateStudentEngagement', input: 's-eng-roll' }
+    ];
 
-        [s3Status, s4Status].forEach(el => {
-            // If the box is filled, not 'Active', and we haven't alerted for this specific view yet
-            if (el && el.value && el.value !== "Active" && el.dataset.lastAlerted !== el.value) {
-                alert("YOU ARE VIEWING THE RECORD OF THE INACTIVE STUDENT");
-                el.dataset.lastAlerted = el.value; // Remembers we alerted for this status
-            }
-            // Reset if the box is cleared or changed back to Active
-            if (el && (el.value === "Active" || el.value === "")) {
-                el.dataset.lastAlerted = "";
-            }
-        });
-    }
-}, 1000);
+    fetchFuncs.forEach(item => {
+        if (typeof window[item.fn] === 'function') {
+            const origFn = window[item.fn];
+            window[item.fn] = async function(...args) {
+                // Execute original fetch first so UI populates normally
+                await origFn.apply(this, args);
+                
+                const rollEl = document.getElementById(item.input);
+                if (rollEl && rollEl.value) {
+                    const rollVal = rollEl.value.trim();
+                    
+                    const { data: stuStatus } = await db.from('students')
+                        .select('status')
+                        .ilike('roll_number', rollVal)
+                        .eq('institute_id', sessionInstID)
+                        .maybeSingle();
+                        
+                    if (stuStatus && stuStatus.status !== 'Active') {
+                        // 800ms delay ensures this warning pops up right AFTER the normal "Loaded Successfully" alerts clear
+                        setTimeout(() => {
+                            alert(`⚠️ SYSTEM ALERT: THIS STUDENT IS CURRENTLY MARKED AS "${stuStatus.status.toUpperCase()}"!`);
+                        }, 800); 
+                    }
+                }
+            };
+        }
+    });
+})();
 </script>
 </body>
 </html>
