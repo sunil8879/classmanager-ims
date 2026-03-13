@@ -14836,5 +14836,74 @@ document.addEventListener('click', (e) => {
     }
 });
 </script>
+
+
+
+
+
+<script>
+/* =========================================================================
+   MASTER SYNC: SECTION 3 STATUS -> LOGIN SYSTEM -> OWNER ALERTS
+   ========================================================================= */
+
+// 1. OVERRIDE: When Owner clicks "EDIT" in Sec 3, update BOTH tables
+const originalEditFunc = window.editStudentByRoll;
+window.editStudentByRoll = async function() {
+    // A. Run your original code to update 'students' table
+    if (originalEditFunc) await originalEditFunc();
+
+    // B. Get the info from the UI
+    const email = document.getElementById('stu-email').value;
+    const status = document.getElementById('stu-status').value;
+
+    // C. Update the Login (profiles) table so the block actually works
+    if (email) {
+        const { error } = await db.from('profiles').update({ status: status }).eq('email', email);
+        if (!error) console.log("Login access updated to: " + status);
+    }
+};
+
+// 2. SECURITY GUARD: Kicks out inactive students every 2 seconds
+setInterval(async () => {
+    // Only monitor if the current browser is in 'student-mode'
+    if (document.body.classList.contains('student-mode')) {
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return;
+
+        // Fetch live status from the profiles (login) table
+        const { data: profile } = await db.from('profiles').select('status').eq('id', user.id).single();
+
+        if (profile && profile.status !== 'Active') {
+            document.body.innerHTML = `
+                <div style="height:100vh; display:flex; align-items:center; justify-content:center; background:#000; color:#fff; font-family:serif; text-align:center;">
+                    <div style="border:5px solid #fff; padding:40px;">
+                        <h1 style="font-size:3.5rem; margin:0;">LOGIN BLOCKED BY ADMIN</h1>
+                        <p style="font-size:1.2rem; margin-top:20px;">Contact your institute head for reactivation.</p>
+                    </div>
+                </div>`;
+        }
+    }
+}, 2000);
+
+// 3. OWNER ALERT: Watches for Fetch results in Section 3 and Section 4
+setInterval(() => {
+    if (document.body.classList.contains('owner-mode')) {
+        const s3Status = document.getElementById('stu-status');
+        const s4Status = document.getElementById('fee-status');
+
+        [s3Status, s4Status].forEach(el => {
+            // If the box is filled, not 'Active', and we haven't alerted for this specific view yet
+            if (el && el.value && el.value !== "Active" && el.dataset.lastAlerted !== el.value) {
+                alert("YOU ARE VIEWING THE RECORD OF THE INACTIVE STUDENT");
+                el.dataset.lastAlerted = el.value; // Remembers we alerted for this status
+            }
+            // Reset if the box is cleared or changed back to Active
+            if (el && (el.value === "Active" || el.value === "")) {
+                el.dataset.lastAlerted = "";
+            }
+        });
+    }
+}, 1000);
+</script>
 </body>
 </html>
