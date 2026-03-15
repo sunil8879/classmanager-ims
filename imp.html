@@ -932,76 +932,50 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* --- ULTIMATE MOBILE TOGGLE OVERRIDE --- */
+/* --- STRICT MOBILE MENU/WRITEUP TOGGLE --- */
 @media (max-width: 768px) {
-    /* 1. Force sidebar to be a full-page vertical list again */
-    nav.sidebar {
-        display: flex !important;
-        flex-direction: column !important;
+    /* DEFAULT STATE: Show Tabs, Hide Writeup area */
+    aside.sidebar {
+        display: block !important;
         width: 100% !important;
         min-height: 100vh !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        background: #ffffff !important;
-        padding-bottom: 50px !important;
     }
-
-    /* 2. Style tabs to look like list items */
-    .nav-tab {
-        width: 90% !important;
-        margin: 0 auto 12px auto !important;
-        padding: 15px !important;
-        justify-content: flex-start !important;
-        font-size: 1rem !important;
-        height: auto !important;
-    }
-
-    /* 3. Hide the content area by default on mobile */
     main.content {
-        display: none !important;
+        display: none !important; /* Hide writeup initially */
     }
 
-    /* 4. CONTENT ACTIVE STATE: Switch views */
-    body.mobile-view-active nav.sidebar {
-        display: none !important; /* Hide tabs completely */
+    /* ACTIVE STATE (When tab is clicked): Hide Tabs, Show Writeup Area */
+    body.mobile-active aside.sidebar {
+        display: none !important; /* THIS REMOVES THE TABS FROM BOTTOM */
     }
-
-    body.mobile-view-active main.content {
-        display: block !important; /* Show only the writeup */
+    body.mobile-active main.content {
+        display: block !important; /* THIS SHOWS THE WRITEUP ALONE */
         width: 100% !important;
-        padding: 15px !important;
+        padding: 20px !important;
         background: #ffffff !important;
-        min-height: 100vh;
     }
 
-    /* 5. Hide Header/Footer when reading content to maximize space */
-    body.mobile-view-active header,
-    body.mobile-view-active footer,
-    body.mobile-view-active #auth-status-bar {
+    /* Hide other clutter during reading */
+    body.mobile-active header, body.mobile-active footer {
         display: none !important;
     }
 
-    /* 6. Stylish Circular Back Arrow */
-    .mobile-back-btn {
+    /* Stylish Back Arrow */
+    .mobile-back-arrow {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 50px;
-        height: 50px;
+        width: 45px;
+        height: 45px;
         background: #000;
         color: #7FFFD4;
         border-radius: 50%;
-        font-size: 1.4rem;
-        cursor: pointer;
         margin-bottom: 20px;
-        border: 2px solid #000;
+        cursor: pointer;
         box-shadow: 4px 4px 0px #7FFFD4;
+        border: 2px solid #000;
+        font-size: 1.2rem;
     }
-}
-
-/* Hide back button on Laptop */
-@media (min-width: 769px) {
-    .mobile-back-btn { display: none !important; }
 }
     </style>
 </head>
@@ -15254,28 +15228,29 @@ continue;
 
 
 <script>
-/* --- MOBILE NAVIGATION REPLACEMENT LOGIC --- */
+/* --- MOBILE NAVIGATION TOGGLE LOGIC --- */
 document.addEventListener('DOMContentLoaded', () => {
-    const mainContent = document.getElementById('main-content');
+    const mainArea = document.getElementById('main-content');
     
-    // 1. Create and Insert the Back Arrow
-    const backArrow = document.createElement('div');
-    backArrow.className = 'mobile-back-btn';
-    backArrow.innerHTML = '<i class="fas fa-arrow-left"></i>';
+    // 1. Create and add the stylish Back Arrow to the Writeup area
+    const backBtn = document.createElement('div');
+    backBtn.className = 'mobile-back-arrow';
+    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i>';
     
-    // Logic to go back to Menu
-    backArrow.onclick = function() {
-        document.body.classList.remove('mobile-view-active');
+    // When Back Arrow is clicked, return to the Tabs List
+    backBtn.onclick = function() {
+        document.body.classList.remove('mobile-active');
         window.scrollTo(0,0);
     };
     
-    if(mainContent) mainContent.prepend(backArrow);
+    if(mainArea) mainArea.prepend(backBtn);
 
-    // 2. Tab Click Logic: Hide Menu, Show Writeup
+    // 2. Click logic for all Tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             if (window.innerWidth <= 768) {
-                document.body.classList.add('mobile-view-active');
+                // When any tab is clicked, replace Menu with Writeup
+                document.body.classList.add('mobile-active');
                 window.scrollTo(0,0);
             }
         });
