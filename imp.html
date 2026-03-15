@@ -932,65 +932,44 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* --- MOBILE NAVIGATION REPLACEMENT LOGIC --- */
+/* --- STRICT MOBILE VIEW OVERRIDE --- */
 @media (max-width: 768px) {
-    /* Initially hide the content area on mobile, show only the sidebar */
+    /* Initially: Show Sidebar, Hide Content */
+    aside.sidebar {
+        display: flex !important;
+        width: 100% !important;
+    }
     main.content {
         display: none !important;
-        width: 100% !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 2000;
-        min-height: 100vh;
-        background: var(--white) !important; /* Matches your high contrast theme */
     }
 
-    /* When a specific class is added to the body, hide sidebar and show content */
-    body.mobile-content-active nav.sidebar {
-        display: none !important;
+    /* Active State: HIDE SIDEBAR, SHOW CONTENT */
+    body.mobile-content-active aside.sidebar {
+        display: none !important; /* This stops tabs from showing at bottom */
     }
-
     body.mobile-content-active main.content {
         display: block !important;
+        width: 100% !important;
+        min-height: 100vh;
     }
 
-    /* Stylish Back Arrow Button */
+    /* Stylish Back Button */
     .mobile-back-btn {
-        display: block;
-        width: 50px;
-        height: 50px;
-        line-height: 46px;
-        text-align: center;
+        display: inline-block;
         background: #000;
         color: #7FFFD4;
-        border: 2px solid #000;
-        border-radius: 50%;
-        font-size: 1.5rem;
-        cursor: pointer;
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: 900;
         margin-bottom: 20px;
+        cursor: pointer;
+        border: 2px solid #000;
         box-shadow: 4px 4px 0px #7FFFD4;
-        transition: 0.2s;
-        position: sticky;
-        top: 10px;
-        z-index: 3000;
     }
-
-    .mobile-back-btn:active {
-        transform: translate(2px, 2px);
-        box-shadow: 0px 0px 0px #000;
-    }
-
-    /* Ensure sidebar tabs are large and easy to click */
-    nav.sidebar {
-        width: 100% !important;
-        padding-bottom: 100px !important; /* Extends to bottom */
-    }
-}
-
-/* Hide back button on laptop */
-@media (min-width: 769px) {
-    .mobile-back-btn {
+    
+    /* Hide Header/Footer when reading content to save space */
+    body.mobile-content-active header, 
+    body.mobile-content-active footer {
         display: none !important;
     }
 }
@@ -15246,20 +15225,23 @@ continue;
 
 
 <script>
-/* --- MOBILE INTERFACE TOGGLE LOGIC --- */
+/* --- MOBILE INTERFACE SWAP LOGIC --- */
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Inject the Back Arrow at the top of the main content area
     const contentArea = document.getElementById('main-content');
+    
+    // Create Back Button
     const backBtn = document.createElement('div');
     backBtn.className = 'mobile-back-btn';
-    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i>';
+    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> BACK TO MENU';
     backBtn.onclick = function() {
         document.body.classList.remove('mobile-content-active');
         window.scrollTo(0,0);
     };
-    contentArea.prepend(backBtn);
+    
+    // Insert back button at top of content
+    if(contentArea) contentArea.prepend(backBtn);
 
-    // 2. Hook into every tab click to hide the menu and show the writeup
+    // Click trigger for all tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             if (window.innerWidth <= 768) {
@@ -15268,11 +15250,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-
-    // 3. Special case: If user starts at Home on mobile, show the menu first
-    if (window.innerWidth <= 768) {
-        document.body.classList.remove('mobile-content-active');
-    }
 });
 </script>
 </body>
