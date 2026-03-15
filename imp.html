@@ -1162,75 +1162,74 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* --- LAPTOP PROFILE HEADER VIEW (Side of Welcome Text) --- */
+/* --- LAPTOP: PROFILE IN TOP NAVIGATION BAR --- */
 @media (min-width: 769px) {
-    /* 1. Move the profile section from the sidebar to the Top Bar */
+    /* 1. Position the entire profile unit in the top bar */
     #sidebar-profile-section {
         position: fixed !important;
-        top: 112px !important; /* Aligns with the Welcome Bar */
-        left: 420px !important; /* Places it to the right of "Welcome User..." */
-        z-index: 10001 !important;
+        top: 106px !important;    /* Vertical center of the Auth Bar */
+        left: 410px !important;   /* Adjust this value to move it left/right */
+        z-index: 10002 !important;
+        display: flex !important;
+        flex-direction: row !important; /* Photo and + sign side-by-side */
+        align-items: center !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
+        margin: 0 !important;
         padding: 0 !important;
-        margin: 0 !important;
-        flex-direction: row !important; /* Align photo and button horizontally */
-        width: auto !important;
         min-height: auto !important;
+        width: auto !important;
     }
 
-    /* 2. Shrink photo into a small 40px circle */
+    /* 2. Style the Photo as a small circle */
     #sidebar-photo-container {
-        width: 40px !important;
-        height: 40px !important;
+        width: 38px !important;
+        height: 38px !important;
         border: 2px solid #000 !important;
-        margin: 0 !important;
+        margin-right: 8px !important; /* Space between photo and + sign */
         border-radius: 50% !important;
+        background: #fff;
     }
 
-    /* 3. Transform Upload Button into a small circular '+' badge */
+    /* 3. Style the Upload Button as a fixed '+' sign next to photo */
     #sidebar-profile-section button {
-        width: 20px !important;
-        height: 20px !important;
-        min-width: 20px !important;
-        border-radius: 50% !important;
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px !important;
+        border-radius: 4px !important; /* Stylish square-ish button */
         background: #000 !important;
         color: #7FFFD4 !important;
-        border: 1px solid #fff !important;
+        border: 1px solid #000 !important;
         font-size: 0 !important; /* Hide "UPLOAD PHOTO" text */
-        position: absolute !important;
-        bottom: 0px;
-        right: -5px;
         display: flex !important;
-        align-items: center;
-        justify-content: center;
-        padding: 0 !important;
+        align-items: center !important;
+        justify-content: center !important;
         cursor: pointer;
-        box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        box-shadow: 2px 2px 0px #ccc;
     }
 
-    /* 4. Injects the '+' sign for Laptop */
+    /* 4. Injects the '+' sign */
     #sidebar-profile-section button::before {
         content: "+" !important;
-        font-size: 16px !important;
+        font-size: 18px !important;
         font-weight: bold !important;
         font-family: Arial, sans-serif;
     }
 
-    /* Hide original camera icon and redundant text on Laptop */
+    /* Hide redundant elements on laptop */
     #sidebar-profile-section button i, 
-    #sidebar-id-text,
+    #sidebar-id-text, 
     #sidebar-upload-status {
         display: none !important;
     }
 
-    /* 5. SIDEBAR FIX: Move tabs to the very top of the sidebar */
+    /* 5. SIDEBAR CLEANUP: Move tabs to the very top */
     nav.sidebar {
         padding-top: 10px !important;
     }
-    
-    /* Zero out the previous large margin that pushed tabs down */
+
+    /* Ensure sidebar margin is reset so tabs aren't pushed down */
     #sidebar-profile-section { 
         margin-top: 0 !important; 
     }
