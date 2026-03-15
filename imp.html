@@ -935,69 +935,85 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* --- FORCE SIDE-BY-SIDE LAYOUT ON MOBILE --- */
+/* --- FIXED MOBILE SIDE-BY-SIDE REPAIR --- */
 @media (max-width: 768px) {
-    /* 1. Force the container to stay horizontal */
+    /* 1. Force the container to be a row and hide horizontal spill */
     .app-container {
-        flex-direction: row !important;
         display: flex !important;
-        align-items: flex-start !important;
+        flex-direction: row !important;
+        width: 100vw !important;
+        overflow-x: hidden !important;
+        align-items: stretch !important; /* Forces sidebar to match content height */
     }
 
-    /* 2. Shrink sidebar to a narrow column and allow vertical scrolling for the 30 tabs */
+    /* 2. Sidebar: Fixed narrow width, stretches to bottom */
     nav.sidebar {
-        width: 100px !important;
-        min-width: 100px !important;
-        max-width: 100px !important;
-        flex-direction: column !important; /* Stack tabs vertically */
-        height: 100vh !important;
-        position: sticky !important;
-        top: 0 !important;
-        overflow-y: auto !important; /* Scroll through all 30 tabs */
+        width: 90px !important;
+        min-width: 90px !important;
+        flex: 0 0 90px !important;
+        display: flex !important;
+        flex-direction: column !important;
         padding: 10px 5px !important;
-        border-right: 2px solid #000 !important;
-        border-bottom: none !important;
+        border-right: 3px solid #000 !important;
+        background: #fff !important;
+        height: auto !important; /* Allows it to grow with content */
+        min-height: 100vh !important; /* Covers space to bottom if content is short */
     }
 
-    /* 3. Adjust tabs to fit the narrow sidebar column */
+    /* 3. Content: Prevents cutting by using flex: 1 and min-width: 0 */
+    main.content {
+        flex: 1 !important;
+        min-width: 0 !important; /* CRITICAL: Stops the 'cutting' effect */
+        width: auto !important;
+        padding: 15px 10px !important;
+        background: #ffffff !important;
+        display: block !important;
+        overflow-x: hidden !important;
+    }
+
+    /* 4. Shrink tabs to fit the 90px column */
     .nav-tab {
         width: 100% !important;
         min-width: unset !important;
         height: auto !important;
-        padding: 8px 2px !important;
-        font-size: 0.6rem !important; /* Small text for mobile sidebar */
-        flex-direction: column !important; /* Icon on top of text */
-        gap: 4px !important;
-        white-space: normal !important; /* Allow text to wrap */
+        min-height: 60px !important;
+        padding: 5px !important;
+        font-size: 0.55rem !important; /* Smaller text for fit */
+        flex-direction: column !important;
         text-align: center !important;
         justify-content: center !important;
-        margin-right: 0 !important;
-        margin-bottom: 8px !important;
+        white-space: normal !important;
+        margin-bottom: 10px !important;
+        box-shadow: 3px 3px 0px #000 !important; /* Thinner shadow for mobile */
     }
 
     .nav-tab i {
-        font-size: 1.1rem !important;
-        width: auto !important;
+        font-size: 1rem !important;
         margin: 0 !important;
     }
 
-    /* 4. Ensure the writeup (Content) takes the remaining right-side space */
-    main.content {
-        flex: 1 !important;
-        padding: 15px !important;
-        width: calc(100% - 100px) !important;
-        overflow-x: hidden !important;
-    }
-
-    /* 5. Adjust cards and stats to stack inside the narrow content area */
-    .card {
-        padding: 15px !important;
+    /* 5. Force all cards to fit inside the remaining screen width */
+    .card, .stat-card, .feature-box {
         width: 100% !important;
+        max-width: 100% !important;
         box-sizing: border-box !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: 15px !important;
+        box-shadow: 6px 6px 0px #000 !important; /* Scaled down 3D shadow */
     }
 
-    .dashboard-stats, .form-grid {
-        grid-template-columns: 1fr !important; /* Single column inside the content */
+    /* Adjust the digital clock for the narrow view */
+    #time-display {
+        font-size: 2.2rem !important;
+    }
+    #date-display {
+        font-size: 0.8rem !important;
+    }
+    
+    /* Ensure footer also respects the layout */
+    .footer-grid {
+        grid-template-columns: 1fr !important;
     }
 }
     </style>
