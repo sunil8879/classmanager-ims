@@ -1162,80 +1162,65 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* --- LAPTOP: RIGID TOP BAR PROFILE (NO FLOATING, NO OVERLAP) --- */
+/* --- PLAN B: TOP BAR PROFILE RIGID STYLE --- */
 @media (min-width: 769px) {
-    /* 1. Move the unit into the white Welcome Bar */
-    #sidebar-profile-section {
-        position: fixed !important;
-        top: 104px !important;     /* Centers vertically in the bar */
-        left: 420px !important;    /* Positioned after the Name text */
+    /* Ensure the Top Bar allows items to sit in a row */
+    #auth-status-bar {
         display: flex !important;
-        flex-direction: row !important; /* Photo and Button in a straight line */
         align-items: center !important;
-        gap: 10px !important;      /* Fixed physical gap between photo and + button */
-        z-index: 20000 !important;
+        gap: 15px !important;
+        padding: 10px 5% !important;
+    }
+
+    /* The unit is no longer fixed or floating; it is part of the bar's layout */
+    #sidebar-profile-section {
+        display: inline-flex !important;
+        position: static !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 8px !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        padding: 0 !important;
         margin: 0 !important;
+        padding: 0 !important;
         width: auto !important;
         min-height: auto !important;
     }
 
-    /* 2. Photo: Static Circle */
     #sidebar-photo-container {
-        position: relative !important;
-        width: 36px !important;
-        height: 36px !important;
+        width: 35px !important;
+        height: 35px !important;
         border: 2px solid #000 !important;
         border-radius: 50% !important;
         margin: 0 !important;
-        flex-shrink: 0 !important;
         background: #fff;
     }
 
-    /* 3. Button: Rigidly fixed next to the photo */
     #sidebar-profile-section button {
-        position: relative !important; /* KILLS THE FLOATING BEHAVIOR */
-        top: 0 !important;             /* Resets vertical position */
-        left: 0 !important;            /* Resets horizontal position */
-        width: 26px !important;
-        height: 26px !important;
-        min-width: 26px !important;
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px !important;
         background: #000 !important;
         color: #7FFFD4 !important;
-        border: 1px solid #000 !important;
         border-radius: 4px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        font-size: 0 !important;       /* Hides UPLOAD text */
-        padding: 0 !important;
-        margin: 0 !important;
+        font-size: 0 !important;
         cursor: pointer;
-        box-shadow: 2px 2px 0px #ccc;
+        border: 1px solid #000 !important;
     }
 
-    /* 4. The "+" sign inside the fixed button */
     #sidebar-profile-section button::before {
         content: "+" !important;
-        font-size: 20px !important;
-        font-weight: bold !important;
-        font-family: Arial, sans-serif !important;
+        font-size: 18px !important;
+        font-weight: bold;
     }
 
-    /* Hide redundant elements */
-    #sidebar-profile-section button i, 
-    #sidebar-id-text, 
-    #sidebar-upload-status,
-    #sidebar-photo-placeholder {
+    /* Hide redundant text/icons */
+    #sidebar-id-text, #sidebar-upload-status, #sidebar-profile-section i {
         display: none !important;
-    }
-
-    /* 5. SIDEBAR: Force tabs to the very top */
-    nav.sidebar {
-        padding-top: 10px !important;
     }
 }
     </style>
@@ -15517,6 +15502,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+</script>
+
+
+
+
+
+
+
+
+<script>
+/* --- PLAN B: PHYSICAL RELOCATION SCRIPT --- */
+function relocateProfileWidget() {
+    if (window.innerWidth > 768) {
+        const topBar = document.getElementById('auth-status-bar');
+        const profileWidget = document.getElementById('sidebar-profile-section');
+        const greeting = document.getElementById('user-greeting');
+
+        if (topBar && profileWidget && greeting) {
+            // Physically moves the Profile Widget right after the Greeting text
+            greeting.after(profileWidget);
+            console.log("Profile Widget moved to Top Bar (Laptop View)");
+        }
+    }
+}
+
+// Run the relocation when the page loads
+window.addEventListener('load', relocateProfileWidget);
+
+// Run the relocation every time a login status change is detected
+const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'style') {
+            relocateProfileWidget();
+        }
+    });
+});
+
+const authStatus = document.getElementById('auth-status-bar');
+if (authStatus) {
+    observer.observe(authStatus, { attributes: true });
+}
 </script>
 </body>
 </html>
