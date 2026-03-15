@@ -932,7 +932,90 @@ footer * { font-size: 1.20rem !important; }
 
 
 
+/* --- MOBILE SIDE-BY-SIDE LAYOUT OVERRIDE --- */
+@media (max-width: 768px) {
+    /* Force the main container to stay in a row (Sidebar Left, Content Right) */
+    .app-container {
+        flex-direction: row !important;
+        display: flex !important;
+        align-items: flex-start !important;
+    }
 
+    /* Adjust Sidebar: Narrower width, vertical stacking, and full height */
+    nav.sidebar {
+        width: 90px !important; /* Adjusted for mobile thumb-reach */
+        min-width: 90px !important;
+        flex-direction: column !important; 
+        height: auto !important;
+        min-height: 100vh !important; /* Extends to the bottom */
+        position: sticky !important;
+        top: 0 !important;
+        padding: 10px 5px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        border-right: 2px solid #000 !important;
+    }
+
+    /* Adjust Tabs: Stack icon and small text vertically to fit narrow sidebar */
+    .nav-tab {
+        width: 100% !important;
+        min-width: unset !important;
+        height: auto !important;
+        min-height: 70px !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 8px 2px !important;
+        margin-right: 0 !important;
+        margin-bottom: 8px !important;
+        font-size: 0.65rem !important; /* Smaller font to fit labels */
+        text-align: center !important;
+        white-space: normal !important;
+        line-height: 1.1 !important;
+    }
+
+    /* Center and enlarge icons in the mobile sidebar */
+    .nav-tab i {
+        margin-right: 0 !important;
+        margin-bottom: 4px !important;
+        font-size: 1.1rem !important;
+        width: auto !important;
+        padding-left: 0 !important;
+    }
+
+    /* Main Content: Ensure it fills the remaining right-side space */
+    main.content {
+        flex: 1 !important;
+        width: calc(100% - 90px) !important;
+        padding: 15px 10px !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Hide sidebar text if it's too cramped (Optional: uncomment if text overlaps) */
+    /* .nav-tab { font-size: 0 !important; } */
+    
+    /* Ensure the Visitor View images and grids scale correctly in the narrow right column */
+    #home-visitor-view img {
+        width: 100% !important;
+    }
+    
+    .feature-grid, .footer-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Adjust Profile and Learning Widgets to fit the thin sidebar */
+    #sidebar-profile-section, #sidebar-learning-widget {
+        width: 95% !important;
+        margin-top: 20px !important;
+        padding: 5px !important;
+        font-size: 0.7rem !important;
+    }
+    
+    #sidebar-photo-container {
+        width: 50px !important;
+        height: 50px !important;
+    }
+}
 
 
 
