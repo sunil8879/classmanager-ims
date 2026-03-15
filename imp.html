@@ -920,6 +920,86 @@ footer * { font-size: 1.20rem !important; }
 
 #feature-highlighter { margin-bottom: 20px !important; } #visitor-search-container, #process-guide-box { margin-top: 20px !important; }
 #feature-highlighter, #visitor-search-container { margin-bottom: 170px !important; } #visitor-search-container, #process-guide-box { margin-top: 0 !important; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* --- FORCE SIDE-BY-SIDE LAYOUT ON MOBILE --- */
+@media (max-width: 768px) {
+    /* 1. Force the container to stay horizontal */
+    .app-container {
+        flex-direction: row !important;
+        display: flex !important;
+        align-items: flex-start !important;
+    }
+
+    /* 2. Shrink sidebar to a narrow column and allow vertical scrolling for the 30 tabs */
+    nav.sidebar {
+        width: 100px !important;
+        min-width: 100px !important;
+        max-width: 100px !important;
+        flex-direction: column !important; /* Stack tabs vertically */
+        height: 100vh !important;
+        position: sticky !important;
+        top: 0 !important;
+        overflow-y: auto !important; /* Scroll through all 30 tabs */
+        padding: 10px 5px !important;
+        border-right: 2px solid #000 !important;
+        border-bottom: none !important;
+    }
+
+    /* 3. Adjust tabs to fit the narrow sidebar column */
+    .nav-tab {
+        width: 100% !important;
+        min-width: unset !important;
+        height: auto !important;
+        padding: 8px 2px !important;
+        font-size: 0.6rem !important; /* Small text for mobile sidebar */
+        flex-direction: column !important; /* Icon on top of text */
+        gap: 4px !important;
+        white-space: normal !important; /* Allow text to wrap */
+        text-align: center !important;
+        justify-content: center !important;
+        margin-right: 0 !important;
+        margin-bottom: 8px !important;
+    }
+
+    .nav-tab i {
+        font-size: 1.1rem !important;
+        width: auto !important;
+        margin: 0 !important;
+    }
+
+    /* 4. Ensure the writeup (Content) takes the remaining right-side space */
+    main.content {
+        flex: 1 !important;
+        padding: 15px !important;
+        width: calc(100% - 100px) !important;
+        overflow-x: hidden !important;
+    }
+
+    /* 5. Adjust cards and stats to stack inside the narrow content area */
+    .card {
+        padding: 15px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .dashboard-stats, .form-grid {
+        grid-template-columns: 1fr !important; /* Single column inside the content */
+    }
+}
     </style>
 </head>
 <body>
