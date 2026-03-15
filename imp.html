@@ -1153,6 +1153,88 @@ footer * { font-size: 1.20rem !important; }
         display: none !important;
     }
 }
+
+
+
+
+
+
+
+
+
+/* --- LAPTOP PROFILE HEADER VIEW (Side of Welcome Text) --- */
+@media (min-width: 769px) {
+    /* 1. Move the profile section from the sidebar to the Top Bar */
+    #sidebar-profile-section {
+        position: fixed !important;
+        top: 112px !important; /* Aligns with the Welcome Bar */
+        left: 420px !important; /* Places it to the right of "Welcome User..." */
+        z-index: 10001 !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex-direction: row !important; /* Align photo and button horizontally */
+        width: auto !important;
+        min-height: auto !important;
+    }
+
+    /* 2. Shrink photo into a small 40px circle */
+    #sidebar-photo-container {
+        width: 40px !important;
+        height: 40px !important;
+        border: 2px solid #000 !important;
+        margin: 0 !important;
+        border-radius: 50% !important;
+    }
+
+    /* 3. Transform Upload Button into a small circular '+' badge */
+    #sidebar-profile-section button {
+        width: 20px !important;
+        height: 20px !important;
+        min-width: 20px !important;
+        border-radius: 50% !important;
+        background: #000 !important;
+        color: #7FFFD4 !important;
+        border: 1px solid #fff !important;
+        font-size: 0 !important; /* Hide "UPLOAD PHOTO" text */
+        position: absolute !important;
+        bottom: 0px;
+        right: -5px;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        padding: 0 !important;
+        cursor: pointer;
+        box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* 4. Injects the '+' sign for Laptop */
+    #sidebar-profile-section button::before {
+        content: "+" !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        font-family: Arial, sans-serif;
+    }
+
+    /* Hide original camera icon and redundant text on Laptop */
+    #sidebar-profile-section button i, 
+    #sidebar-id-text,
+    #sidebar-upload-status {
+        display: none !important;
+    }
+
+    /* 5. SIDEBAR FIX: Move tabs to the very top of the sidebar */
+    nav.sidebar {
+        padding-top: 10px !important;
+    }
+    
+    /* Zero out the previous large margin that pushed tabs down */
+    #sidebar-profile-section { 
+        margin-top: 0 !important; 
+    }
+}
     </style>
 </head>
 <body>
