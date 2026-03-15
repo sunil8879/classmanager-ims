@@ -1162,76 +1162,78 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* --- LAPTOP: PROFILE IN TOP NAVIGATION BAR --- */
+/* --- LAPTOP: FIXED PROFILE IN TOP BAR (NO OVERLAP) --- */
 @media (min-width: 769px) {
-    /* 1. Position the entire profile unit in the top bar */
+    /* 1. Move the unit into the Top Bar */
     #sidebar-profile-section {
         position: fixed !important;
-        top: 106px !important;    /* Vertical center of the Auth Bar */
-        left: 410px !important;   /* Adjust this value to move it left/right */
-        z-index: 10002 !important;
-        display: flex !important;
-        flex-direction: row !important; /* Photo and + sign side-by-side */
+        top: 108px !important;     /* Centers vertically in the white bar */
+        left: 450px !important;    /* Positioned between Name and Book Button */
+        z-index: 10005 !important;
+        display: flex !important;  
+        flex-direction: row !important; /* Photo and Button side-by-side */
         align-items: center !important;
+        gap: 8px !important;       /* Fixed space between them */
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
         margin: 0 !important;
         padding: 0 !important;
-        min-height: auto !important;
         width: auto !important;
+        min-height: auto !important;
     }
 
-    /* 2. Style the Photo as a small circle */
+    /* 2. Circular Photo Container - Fixed in place */
     #sidebar-photo-container {
-        width: 38px !important;
-        height: 38px !important;
+        position: static !important; /* Removes "floating" behavior */
+        width: 35px !important;
+        height: 35px !important;
         border: 2px solid #000 !important;
-        margin-right: 8px !important; /* Space between photo and + sign */
         border-radius: 50% !important;
+        margin: 0 !important;
         background: #fff;
-    }
-
-    /* 3. Style the Upload Button as a fixed '+' sign next to photo */
-    #sidebar-profile-section button {
-        width: 24px !important;
-        height: 24px !important;
-        min-width: 24px !important;
-        border-radius: 4px !important; /* Stylish square-ish button */
-        background: #000 !important;
-        color: #7FFFD4 !important;
-        border: 1px solid #000 !important;
-        font-size: 0 !important; /* Hide "UPLOAD PHOTO" text */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+    }
+
+    /* 3. The Plus Button - Fixed next to the photo */
+    #sidebar-profile-section button {
+        position: static !important; /* Removes "floating" behavior */
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px !important;
+        background: #000 !important;
+        color: #7FFFD4 !important;
+        border: 1px solid #000 !important;
+        border-radius: 4px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 0 !important; /* Hides "UPLOAD" text */
         cursor: pointer;
+        padding: 0 !important;
         box-shadow: 2px 2px 0px #ccc;
     }
 
-    /* 4. Injects the '+' sign */
+    /* 4. The "+" sign inside the button */
     #sidebar-profile-section button::before {
         content: "+" !important;
         font-size: 18px !important;
         font-weight: bold !important;
-        font-family: Arial, sans-serif;
+        font-family: Arial, sans-serif !important;
     }
 
-    /* Hide redundant elements on laptop */
+    /* Hide Redundant elements */
     #sidebar-profile-section button i, 
     #sidebar-id-text, 
     #sidebar-upload-status {
         display: none !important;
     }
 
-    /* 5. SIDEBAR CLEANUP: Move tabs to the very top */
+    /* 5. SIDEBAR FIX: Move the 30 tabs to the very top */
     nav.sidebar {
         padding-top: 10px !important;
-    }
-
-    /* Ensure sidebar margin is reset so tabs aren't pushed down */
-    #sidebar-profile-section { 
-        margin-top: 0 !important; 
     }
 }
     </style>
