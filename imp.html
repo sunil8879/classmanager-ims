@@ -1065,6 +1065,94 @@ footer * { font-size: 1.20rem !important; }
         display: none !important;
     }
 }
+
+
+
+
+
+
+
+/* --- MOBILE PROFILE LOCATION & STYLE FIX --- */
+@media (max-width: 768px) {
+    /* 1. Force the Sidebar to allow re-ordering */
+    aside.sidebar {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* 2. Move Profile to the top (Order -1) and reset margins */
+    #sidebar-profile-section {
+        order: -1 !important; /* THIS MOVES IT TO THE TOP */
+        margin: 15px auto 20px auto !important; /* Space below Logout, above Tabs */
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        min-height: auto !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        position: relative !important;
+    }
+
+    /* 3. Small Circle Photo */
+    #sidebar-photo-container {
+        width: 75px !important;
+        height: 75px !important;
+        border-radius: 50% !important;
+        border: 2px solid #000 !important;
+        margin-bottom: 5px !important;
+        background: #fff;
+    }
+
+    /* 4. Transform Button into small '+' badge */
+    #sidebar-profile-section button {
+        position: absolute !important;
+        top: 50px;
+        left: calc(50% + 18px);
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        background: #000 !important;
+        border: 2px solid #fff !important;
+        border-radius: 50% !important;
+        font-size: 0 !important; /* Hide "UPLOAD PHOTO" text */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 5;
+        padding: 0 !important;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    }
+
+    /* 5. Injects the '+' sign */
+    #sidebar-profile-section button::before {
+        content: "+" !important;
+        font-size: 20px !important;
+        color: #7FFFD4 !important;
+        font-weight: bold !important;
+        font-family: Arial, sans-serif;
+    }
+
+    /* 6. Hide original camera icon */
+    #sidebar-profile-section button i {
+        display: none !important;
+    }
+
+    /* 7. Tiny ID/Name Text */
+    #sidebar-id-text {
+        font-size: 0.75rem !important;
+        margin: 0 !important;
+        font-weight: 900 !important;
+        color: #000 !important;
+    }
+
+    /* Hide any checkmark/status text on mobile */
+    #sidebar-upload-status {
+        display: none !important;
+    }
+}
     </style>
 </head>
 <body>
