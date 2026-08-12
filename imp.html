@@ -15791,6 +15791,173 @@ async function printIDCard() {
 }
 </script>
 
+
+
+
+<!-- =========================================================
+     SECTION 14 CERTIFICATE - MOBILE ALIGNMENT ADD-ON
+     ADD ONLY — DO NOT DELETE EXISTING CODE
+     ========================================================= -->
+
+<style>
+
+/* ---------- CERTIFICATE MOBILE FIX ---------- */
+
+@media (max-width: 768px) {
+
+    #cert-preview-area {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: flex-start !important;
+        padding: 15px 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    #certificate-visual {
+        width: 800px !important;
+        height: 600px !important;
+
+        /*
+         * Automatically scale the 800px certificate
+         * to the available mobile screen width.
+         */
+        transform: scale(
+            calc((100vw - 30px) / 800)
+        ) !important;
+
+        transform-origin: top center !important;
+
+        flex-shrink: 0 !important;
+
+        /*
+         * Compensate for the reduced height caused
+         * by the transform.
+         */
+        margin-bottom: calc(
+            -600px + ((100vw - 30px) * 0.75)
+        ) !important;
+    }
+
+}
+
+
+/* ---------- VERY SMALL PHONES ---------- */
+
+@media (max-width: 400px) {
+
+    #certificate-visual {
+
+        transform: scale(
+            calc((100vw - 20px) / 800)
+        ) !important;
+
+        margin-bottom: calc(
+            -600px + ((100vw - 20px) * 0.75)
+        ) !important;
+    }
+
+}
+
+
+/* ---------- PRINT BUTTON ALIGNMENT ---------- */
+
+#cert-print-btn {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+
+/* ---------- PREVENT CERTIFICATE FROM PUSHING
+             THE WHOLE PAGE SIDEWAYS ---------- */
+
+#cert-gen {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+#cert-gen .card {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+</style>
+
+
+<script>
+
+/* =========================================================
+   CERTIFICATE MOBILE DISPLAY SAFETY
+   ADD-ON ONLY
+   ========================================================= */
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    function fixCertificateMobile() {
+
+        const preview =
+            document.getElementById("cert-preview-area");
+
+        const certificate =
+            document.getElementById("certificate-visual");
+
+        if (!preview || !certificate) return;
+
+        if (window.innerWidth <= 768) {
+
+            /*
+             * Keep the original certificate dimensions.
+             * CSS transform handles the visual scaling.
+             */
+
+            certificate.style.width = "800px";
+            certificate.style.height = "600px";
+            certificate.style.flexShrink = "0";
+
+        } else {
+
+            /*
+             * Restore normal desktop behaviour.
+             */
+
+            certificate.style.width = "800px";
+            certificate.style.height = "600px";
+            certificate.style.transform = "";
+            certificate.style.marginBottom = "";
+
+        }
+
+    }
+
+
+    /* Run when page loads */
+    fixCertificateMobile();
+
+
+    /* Run when phone orientation/size changes */
+    window.addEventListener(
+        "resize",
+        fixCertificateMobile
+    );
+
+
+    window.addEventListener(
+        "orientationchange",
+        function () {
+
+            setTimeout(
+                fixCertificateMobile,
+                200
+            );
+
+        }
+    );
+
+});
+
+</script>
    
           
 </body>
