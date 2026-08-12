@@ -15592,65 +15592,78 @@ if (authStatus) {
 </script>
 
 
-<!-- START OF ID CARD PRINT FIX -->
+<!-- ID CARD PRINT FIX: SELF-CONTAINED ENGINE -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
-    /* Ensures the print button is not blocked by any other layers on mobile */
-    button[onclick="printIDCard()"] {
+    /* Force the button to be on top and responsive to touch */
+    button[onclick="printIDCard()"], #print-btn {
         position: relative !important;
-        z-index: 99999 !important;
+        z-index: 999999 !important;
         pointer-events: auto !important;
-        opacity: 1 !important;
+        cursor: pointer !important;
+        display: block !important;
+        visibility: visible !important;
     }
 </style>
 
 <script>
-async function printIDCard() {
-    // We target 'id-card-preview' because that is the ID in your code link
-    const card = document.getElementById('id-card-preview');
-    // We find the button by its onclick attribute
+(function() {
+    // This overwrites any previous broken printIDCard function
+    window.printIDCard = async function() {
+        // Target the ID from your PrivateBin code
+        const card = document.getElementById('id-card-preview');
+        const btn = document.querySelector('button[onclick="printIDCard()"]');
+
+        if (!card) {
+            alert("❌ Error: ID Card area (#id-card-preview) not found.");
+            return;
+        }
+
+        // Visual feedback for mobile
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '⌛ GENERATING...';
+        btn.style.opacity = '0.7';
+
+        try {
+            // Use html2canvas to take a high-res "photo" of the card
+            const canvas = await html2canvas(card, {
+                scale: 3, 
+                useCORS: true, 
+                allowTaint: true,
+                backgroundColor: null,
+                logging: false
+            });
+
+            // Convert to image
+            const imgData = canvas.toDataURL('image/png');
+            
+            // Create a temporary link to force download on mobile
+            const link = document.createElement('a');
+            link.href = imgData;
+            link.download = 'Student_ID_Card.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            alert("✅ Success! ID Card saved to your phone.");
+        } catch (err) {
+            console.error(err);
+            alert("❌ Mobile Error: Browser blocked the generation.");
+        } finally {
+            btn.innerHTML = originalText;
+            btn.style.opacity = '1';
+        }
+    };
+
+    // Force link the button to this new function
     const btn = document.querySelector('button[onclick="printIDCard()"]');
-    
-    if (!card) {
-        alert("⚠️ Error: ID Card area (#id-card-preview) not found!");
-        return;
-    }
-
-    // Visual feedback for mobile user
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERATING...';
-    btn.disabled = true;
-
-    try {
-        // Capture the HTML div as a High-Resolution Image
-        const canvas = await html2canvas(card, {
-            scale: 3, // Makes the text sharp for printing
-            useCORS: true,
-            backgroundColor: null,
-            logging: false
+    if (btn) {
+        btn.addEventListener('touchstart', function() {
+            btn.style.backgroundColor = '#7FFFD4'; // Instant feedback on touch
         });
-        
-        // Convert to data and trigger mobile download
-        const imgData = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = imgData;
-        link.download = 'Student_ID_Card.png';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        alert("✅ ID Card generated and saved to your downloads!");
-    } catch (err) {
-        console.error("Print Error:", err);
-        alert("❌ Failed to generate ID card. Please try again.");
-    } finally {
-        // Reset button state
-        btn.innerHTML = originalText;
-        btn.disabled = false;
     }
-}
+})();
 </script>
-<!-- END OF ID CARD PRINT FIX -->
 </body>
 </html>
