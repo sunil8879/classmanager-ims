@@ -15592,94 +15592,22 @@ if (authStatus) {
 </script>
 
 
-<!-- FINAL SELF-HEALING ID CARD ENGINE -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
 <style>
-    /* Force the button to the front-most layer of the smartphone screen */
-    button[onclick*="printIDCard"], #print-btn {
-        position: relative !important;
-        z-index: 9999999 !important;
-        pointer-events: auto !important;
-        cursor: pointer !important;
-        -webkit-tap-highlight-color: rgba(0,0,0,0);
+    /* When you click print, hide everything except the ID card */
+    @media print {
+        body * { visibility: hidden !important; }
+        #id-card-preview, #id-card-preview * { visibility: visible !important; }
+        #id-card-preview { position: absolute; left: 0; top: 0; width: 100%; border: none; }
     }
+    /* Ensure the button is clickable on mobile */
+    button[onclick="printIDCard()"] { position: relative; z-index: 9999; cursor: pointer !important; }
 </style>
 
 <script>
-(function() {
-    // 1. Overwrite the function to handle Iframe restrictions
-    window.printIDCard = async function() {
-        const card = document.getElementById('id-card-preview');
-        const btn = document.querySelector('button[onclick*="printIDCard"]');
-        
-        if (!card) {
-            alert("Error: ID Card area not found.");
-            return;
-        }
-
-        // Check if library is loaded
-        if (typeof html2canvas === 'undefined') {
-            alert("Library still loading... Please wait 2 seconds and try again.");
-            return;
-        }
-
-        const originalText = btn.innerHTML;
-        btn.innerHTML = "⌛ PROCESSING...";
-        btn.disabled = true;
-
-        try {
-            const canvas = await html2canvas(card, {
-                scale: 3,
-                useCORS: true,
-                allowTaint: true,
-                logging: false,
-                backgroundColor: null
-            });
-
-            // 2. Convert to Blob (Most reliable for mobile/iframe environments)
-            canvas.toBlob(function(blob) {
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'Student_ID_Card.png';
-                
-                // 3. Try Auto-Download
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                // 4. Fallback: If download didn't trigger, open in new tab for "Long Press Save"
-                setTimeout(() => {
-                    if (confirm("If download didn't start, would you like to view the image to save it manually?")) {
-                        const newTab = window.open();
-                        newTab.document.body.innerHTML = `<img src="${canvas.toDataURL()}" style="width:100%;">`;
-                        newTab.document.title = "Long Press to Save ID Card";
-                    }
-                }, 1000);
-
-            }, 'image/png');
-
-        } catch (err) {
-            alert("Mobile security blocked the capture. Try opening the site directly via the .render.com URL instead of the GoDaddy domain.");
-            console.error(err);
-        } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    };
-
-    // 5. Force the button to wake up on mobile touch
-    const btn = document.querySelector('button[onclick*="printIDCard"]');
-    if (btn) {
-        btn.addEventListener('touchstart', function() {
-            btn.style.transform = "scale(0.95)";
-        }, {passive: true});
-        btn.addEventListener('touchend', function() {
-            btn.style.transform = "scale(1)";
-        }, {passive: true});
+    // Overwrite the function with the simplest native command
+    function printIDCard() {
+        window.print();
     }
-})();
 </script>
 </body>
 </html>
