@@ -1222,6 +1222,40 @@ footer * { font-size: 1.20rem !important; }
 
 
 #auth-status-bar[style*="none"] #sidebar-profile-section { display: none !important; }
+
+
+
+
+
+/* 1. FIX THE "INVISIBLE WALL": Clicks pass through the button bar container */
+.action-tray, .action-bar, .fixed-bottom {
+    pointer-events: none !important;
+}
+
+/* 2. RESTORE BUTTONS: Clicks still work on the actual buttons */
+.btn, .btn-dazzle, .btn-round {
+    pointer-events: auto !important;
+}
+
+/* 3. LIFT THE TABLE: Ensure table is physically on the top layer */
+.table-responsive {
+    position: relative !important;
+    z-index: 99 !important;
+}
+
+/* 4. INCREASE TOUCH TARGET: Make the checkbox 2x larger for mobile fingers */
+input[type="checkbox"] {
+    width: 22px !important;
+    height: 22px !important;
+    margin: 5px !important;
+    cursor: pointer !important;
+    -webkit-appearance: checkbox !important; /* Forces rendering on some mobile browsers */
+}
+
+/* 5. ADD SPACE: Ensure the bottom rows aren't hidden behind the buttons */
+form, .container {
+    padding-bottom: 100px !important;
+}
     </style>
 </head>
 <body>
