@@ -15597,34 +15597,80 @@ if (authStatus) {
 }
 </script>
 
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
-function printIDCard() {
+async function printIDCard() {
 
-    // CORRECT ID — this is the actual ID card in your HTML
-    const target = document.getElementById('id-card-visual');
+    /* ============================================
+       REMOVE ANY PREVIOUS ID CARD SCREEN
+       ============================================ */
+
+    const existingScreen =
+        document.getElementById("id-card-image-screen");
+
+    if (existingScreen) {
+        existingScreen.remove();
+    }
+
+
+    /* ============================================
+       GET THE ACTUAL ID CARD
+       ============================================ */
+
+    const target =
+        document.getElementById("id-card-visual");
 
     if (!target) {
         alert("ID Card preview not found.");
         return;
     }
 
-    html2canvas(target, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#ffffff"
-    }).then(function(canvas) {
+
+    /* ============================================
+       CREATE ONE IMAGE
+       ============================================ */
+
+    try {
+
+        const canvas = await html2canvas(target, {
+            scale: 3,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+            logging: false
+        });
 
         const img = canvas.toDataURL("image/png");
 
-        // Create temporary screen
+
+        /* ============================================
+           CREATE ONE SCREEN ONLY
+           ============================================ */
+
         const screen = document.createElement("div");
 
         screen.id = "id-card-image-screen";
 
+        screen.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #ffffff;
+            z-index: 999999;
+            overflow-y: auto;
+        `;
+
+
+        /* ============================================
+           SCREEN CONTENT
+           ============================================ */
+
         screen.innerHTML = `
+
+            <!-- HEADER -->
+
             <div style="
                 background:#7FFFD4;
                 padding:15px;
@@ -15637,40 +15683,53 @@ function printIDCard() {
                 ID CARD
             </div>
 
+
+            <!-- CONTENT -->
+
             <div style="
                 min-height:calc(100vh - 60px);
-                background:#fff;
+                background:#ffffff;
                 display:flex;
                 flex-direction:column;
                 align-items:center;
-                justify-content:flex-start;
-                padding:25px 10px;
+                padding:25px 10px 40px;
                 box-sizing:border-box;
             ">
+
+
+                <!-- INSTRUCTION -->
 
                 <div style="
                     background:#7FFFD4;
                     border:2px solid #000;
                     padding:10px 15px;
-                    margin-bottom:20px;
+                    margin-bottom:25px;
                     font-family:'Times New Roman',serif;
                     font-weight:bold;
                     text-align:center;
+                    box-shadow:4px 4px 0 #000;
                 ">
                     LONG PRESS THE ID CARD TO SAVE
                 </div>
 
+
+                <!-- ONE ID CARD IMAGE ONLY -->
+
                 <img
                     src="${img}"
+                    alt="ID Card"
                     style="
+                        display:block;
                         width:350px;
                         max-width:90vw;
                         height:auto;
                         border:3px solid #000;
                         box-shadow:8px 8px 0 #000;
-                        display:block;
                     "
                 >
+
+
+                <!-- BACK BUTTON -->
 
                 <button
                     id="id-card-back-button"
@@ -15684,6 +15743,7 @@ function printIDCard() {
                         font-family:'Times New Roman',serif;
                         font-weight:bold;
                         font-size:16px;
+                        cursor:pointer;
                     "
                 >
                     ← BACK
@@ -15692,23 +15752,46 @@ function printIDCard() {
             </div>
         `;
 
+
+        /* ============================================
+           ADD SCREEN TO PAGE
+           ============================================ */
+
         document.body.appendChild(screen);
 
-        document.getElementById("id-card-back-button")
-            .addEventListener("click", function() {
 
-                screen.remove();
+        /* ============================================
+           BACK BUTTON
+           ============================================ */
 
-            });
+        document
+            .getElementById("id-card-back-button")
+            .onclick = function () {
 
-    }).catch(function(error) {
+                const currentScreen =
+                    document.getElementById("id-card-image-screen");
 
-        console.error(error);
+                if (currentScreen) {
+                    currentScreen.remove();
+                }
 
-        alert("Unable to generate ID Card. Please try again.");
+            };
 
-    });
+
+    } catch (error) {
+
+        console.error("ID Card Error:", error);
+
+        alert(
+            "Unable to generate ID Card.\n\nPlease try again."
+        );
+
+    }
+
 }
 </script>
+
+   
+          
 </body>
 </html>
