@@ -1227,34 +1227,44 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* 1. FIX THE "INVISIBLE WALL": Clicks pass through the button bar container */
+/* 1. FORCE THE TABLE TO THE FRONT LAYER */
+.table-responsive, table, tbody, tr, td {
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: visible !important; /* Prevents clipping the checkbox hit-area */
+    touch-action: auto !important; /* Ensures touch is registered */
+}
+
+/* 2. OVERSIZE THE CHECKBOX HIT-AREA */
+/* This makes the checkbox a large, easy-to-hit target for thumbs */
+input[type="checkbox"] {
+    -webkit-appearance: checkbox !important;
+    appearance: checkbox !important;
+    width: 28px !important;
+    height: 28px !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 999 !important; /* Moves it above everything else in the cell */
+    margin: 5px !important;
+    display: inline-block !important;
+}
+
+/* 3. NEUTRALIZE FLOATING OVERLAYS */
+/* This prevents the action bar area from absorbing your finger touches */
 .action-tray, .action-bar, .fixed-bottom {
     pointer-events: none !important;
 }
 
-/* 2. RESTORE BUTTONS: Clicks still work on the actual buttons */
-.btn, .btn-dazzle, .btn-round {
+/* 4. RESTORE BUTTON CLICKS ONLY */
+.btn, .btn-dazzle, .btn-round, .btn-action {
     pointer-events: auto !important;
 }
 
-/* 3. LIFT THE TABLE: Ensure table is physically on the top layer */
+/* 5. FIX BOOTSTRAP TABLE BUG */
+/* Sometimes .table-responsive eats clicks; this forces it to behave */
 .table-responsive {
-    position: relative !important;
-    z-index: 99 !important;
-}
-
-/* 4. INCREASE TOUCH TARGET: Make the checkbox 2x larger for mobile fingers */
-input[type="checkbox"] {
-    width: 22px !important;
-    height: 22px !important;
-    margin: 5px !important;
-    cursor: pointer !important;
-    -webkit-appearance: checkbox !important; /* Forces rendering on some mobile browsers */
-}
-
-/* 5. ADD SPACE: Ensure the bottom rows aren't hidden behind the buttons */
-form, .container {
-    padding-bottom: 100px !important;
+    transform: translateZ(0); 
+    -webkit-transform: translateZ(0);
 }
     </style>
 </head>
