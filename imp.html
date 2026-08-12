@@ -15592,22 +15592,32 @@ if (authStatus) {
 </script>
 
 
-<style>
-    /* When you click print, hide everything except the ID card */
-    @media print {
-        body * { visibility: hidden !important; }
-        #id-card-preview, #id-card-preview * { visibility: visible !important; }
-        #id-card-preview { position: absolute; left: 0; top: 0; width: 100%; border: none; }
-    }
-    /* Ensure the button is clickable on mobile */
-    button[onclick="printIDCard()"] { position: relative; z-index: 9999; cursor: pointer !important; }
-</style>
+<!-- PNG SAVER ENGINE -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
-    // Overwrite the function with the simplest native command
-    function printIDCard() {
-        window.print();
-    }
+function printIDCard() {
+    const target = document.getElementById('id-card-preview');
+    if (!target) return alert("Card area not found");
+
+    html2canvas(target, { scale: 3, useCORS: true }).then(canvas => {
+        const imgData = canvas.toDataURL("image/png");
+        
+        // 1. Attempt automatic download
+        const link = document.createElement('a');
+        link.href = imgData;
+        link.download = 'ID_Card.png';
+        link.click();
+
+        // 2. Mobile Fallback (For GoDaddy Masking): Opens image in new tab
+        // YOU MUST LONG-PRESS THE IMAGE IN THE NEW TAB TO SAVE
+        const newTab = window.open();
+        newTab.document.write('<body style="margin:0; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center;">');
+        newTab.document.write('<h2 style="color:#7FFFD4; font-family:sans-serif;">Long Press to Save PNG</h2>');
+        newTab.document.write('<img src="' + imgData + '" style="width:100%; border:2px solid #7FFFD4;">');
+        newTab.document.write('</body>');
+    });
+}
 </script>
 </body>
 </html>
