@@ -1227,44 +1227,47 @@ footer * { font-size: 1.20rem !important; }
 
 
 
-/* 1. FORCE THE TABLE TO THE FRONT LAYER */
-.table-responsive, table, tbody, tr, td {
-    position: relative !important;
-    z-index: 1 !important;
-    overflow: visible !important; /* Prevents clipping the checkbox hit-area */
-    touch-action: auto !important; /* Ensures touch is registered */
+/* 1. PREVENT SCROLL INTERFERENCE */
+/* This forces the table to register a 'tap' immediately instead of waiting for a scroll */
+.table-responsive {
+    touch-action: pan-x !important; 
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 20px !important;
+    overflow-y: visible !important;
 }
 
-/* 2. OVERSIZE THE CHECKBOX HIT-AREA */
-/* This makes the checkbox a large, easy-to-hit target for thumbs */
+/* 2. ENLARGE THE HIT-AREA */
+/* Small checkboxes are hard to hit on mobile; this makes them 2x larger */
 input[type="checkbox"] {
-    -webkit-appearance: checkbox !important;
-    appearance: checkbox !important;
-    width: 28px !important;
-    height: 28px !important;
-    cursor: pointer !important;
+    width: 26px !important;
+    height: 26px !important;
     position: relative !important;
-    z-index: 999 !important; /* Moves it above everything else in the cell */
-    margin: 5px !important;
+    z-index: 9999 !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
     display: inline-block !important;
 }
 
-/* 3. NEUTRALIZE FLOATING OVERLAYS */
-/* This prevents the action bar area from absorbing your finger touches */
-.action-tray, .action-bar, .fixed-bottom {
+/* 3. PUSH FORM ABOVE THE ACTION TRAY */
+/* This prevents your bottom buttons from 'ghosting' over the table rows */
+form {
+    padding-bottom: 150px !important;
+}
+
+/* 4. REPAIR TABLE Z-INDEX */
+/* Ensures the table is on a higher layer than the card background */
+table, td, tr {
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* 5. FIX OVERLAY BLOCKING */
+/* Tells the action bar area to let clicks pass through to the form below */
+.action-tray, .action-bar {
     pointer-events: none !important;
 }
-
-/* 4. RESTORE BUTTON CLICKS ONLY */
-.btn, .btn-dazzle, .btn-round, .btn-action {
+.action-tray button, .action-tray a, .btn {
     pointer-events: auto !important;
-}
-
-/* 5. FIX BOOTSTRAP TABLE BUG */
-/* Sometimes .table-responsive eats clicks; this forces it to behave */
-.table-responsive {
-    transform: translateZ(0); 
-    -webkit-transform: translateZ(0);
 }
     </style>
 </head>
