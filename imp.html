@@ -15590,5 +15590,67 @@ if (authStatus) {
     observer.observe(authStatus, { attributes: true });
 }
 </script>
+
+
+<!-- START OF ID CARD PRINT FIX -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+    /* Ensures the print button is not blocked by any other layers on mobile */
+    button[onclick="printIDCard()"] {
+        position: relative !important;
+        z-index: 99999 !important;
+        pointer-events: auto !important;
+        opacity: 1 !important;
+    }
+</style>
+
+<script>
+async function printIDCard() {
+    // We target 'id-card-preview' because that is the ID in your code link
+    const card = document.getElementById('id-card-preview');
+    // We find the button by its onclick attribute
+    const btn = document.querySelector('button[onclick="printIDCard()"]');
+    
+    if (!card) {
+        alert("⚠️ Error: ID Card area (#id-card-preview) not found!");
+        return;
+    }
+
+    // Visual feedback for mobile user
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERATING...';
+    btn.disabled = true;
+
+    try {
+        // Capture the HTML div as a High-Resolution Image
+        const canvas = await html2canvas(card, {
+            scale: 3, // Makes the text sharp for printing
+            useCORS: true,
+            backgroundColor: null,
+            logging: false
+        });
+        
+        // Convert to data and trigger mobile download
+        const imgData = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = imgData;
+        link.download = 'Student_ID_Card.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        alert("✅ ID Card generated and saved to your downloads!");
+    } catch (err) {
+        console.error("Print Error:", err);
+        alert("❌ Failed to generate ID card. Please try again.");
+    } finally {
+        // Reset button state
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+</script>
+<!-- END OF ID CARD PRINT FIX -->
 </body>
 </html>
