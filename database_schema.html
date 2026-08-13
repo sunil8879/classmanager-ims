@@ -84,37 +84,46 @@ const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
     }
 
     async function loadTableData(tableName) {
-        if (!tableName) return;
-        const head = document.getElementById('tHead');
-        const body = document.getElementById('tBody');
-        const countBadge = document.getElementById('recordCount');
+    if (!tableName) return;
+    const head = document.getElementById('tHead');
+    const body = document.getElementById('tBody');
+    const countBadge = document.getElementById('recordCount');
 
-        body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-sync fa-spin"></i> Loading Records...</td></tr>';
+    body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-sync fa-spin"></i> Loading...</td></tr>';
 
-        // Fetch all rows from the selected table
-        // Change localStorage to sessionStorage
-const { data, error } = await client.from(tableName).select('*').eq('institute_id', sessionStorage.getItem('institute_id'));
+    // 1. Fetch ALL data for this table first
+    let { data, error } = await supabase.from(tableName).select('*');
 
-        if (error) {
-            alert("Access Denied: You need to disable RLS for this table or add a SELECT policy.");
-            return;
+    if (error) {
+        body.innerHTML = `<tr><td class="p-5 text-center text-danger">Access Denied: ${error.message}</td></tr>`;
+        return;
+    }
+
+    // 2. SMART FILTER: Only filter if the column 'institute_id' exists and myID is set
+    if (data && data.length > 0) {
+        const hasIDColumn = 'institute_id' in data[0];
+        
+        if (hasIDColumn && myID) {
+            data = data.filter(row => row.institute_id === myID);
         }
 
-        if (data && data.length > 0) {
+        if (data.length > 0) {
             const columns = Object.keys(data[0]);
             countBadge.innerText = `${data.length} Records Found`;
             countBadge.classList.remove('d-none');
-            
             head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
             body.innerHTML = data.map(row => `
                 <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
             `).join('');
         } else {
-            body.innerHTML = '<tr><td class="p-5 text-center text-muted">Table is empty. No records found.</td></tr>';
+            body.innerHTML = `<tr><td class="p-5 text-center text-warning">No records found matching ID: ${myID}</td></tr>`;
             countBadge.classList.add('d-none');
         }
+    } else {
+        body.innerHTML = '<tr><td class="p-5 text-center text-muted">This table is empty in the database.</td></tr>';
+        countBadge.classList.add('d-none');
     }
-
+}
     window.onload = loadTableList;
 </script>
 </body>
