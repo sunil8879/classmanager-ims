@@ -1275,87 +1275,14 @@ table, td, tr {
 
 /* --- CLASS MANAGER: 30-MODULE FULL-WIDTH BREAKOUT ENGINE --- */
 
-/* --- CLASS MANAGER: 30-MODULE DYNAMIC BACKGROUND ENGINE --- */
-
-/* 1. LOCK SCREEN (Prevents horizontal shaking on mobile) */
-html, body {
-    max-width: 100% !important;
-    overflow-x: hidden !important;
-}
-
-/* 2. TRANSFORM MODULE CARDS TO 3:2 RATIO */
-.row.force-center > div .card {
-    aspect-ratio: 3 / 2 !important; /* Width 3 : Height 2 */
+.module-card .card {
+    width: 100% !important;
+    aspect-ratio: 3 / 2 !important;
     height: auto !important;
-    background-size: cover !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-    position: relative !important;
-    overflow: hidden !important;
     display: flex !important;
-    justify-content: center !important;
     align-items: center !important;
-    border: 2px solid #7FFFD4 !important; /* Aquamarine Border */
-    margin-bottom: 10px !important;
-    transition: transform 0.3s ease !important;
+    justify-content: center !important;
 }
-
-/* 3. DARK OVERLAY (Ensures white text is readable over images) */
-.row.force-center > div .card::before {
-    content: "" !important;
-    position: absolute !important;
-    top: 0; left: 0; right: 0; bottom: 0 !important;
-    background: rgba(0, 0, 0, 0.55) !important; /* 55% Black Tint */
-    z-index: 1 !important;
-}
-
-/* 4. PUSH TEXT & ICONS ABOVE OVERLAY */
-.row.force-center > div .card > * {
-    position: relative !important;
-    z-index: 2 !important;
-    color: #FFFFFF !important; /* White Text */
-    text-shadow: 2px 2px 8px #000000 !important; /* Glow for readability */
-}
-
-.row.force-center > div .card:hover {
-    transform: scale(1.02) !important;
-}
-
-/* 5. INDIVIDUAL BACKGROUND IMAGE MAPPING (1-30) */
-/* Images are pulled directly from your folder */
-
-.row.force-center > div:nth-child(1) .card { background-image: url('home.png'); }
-.row.force-center > div:nth-child(2) .card { background-image: url('login.png'); }
-.row.force-center > div:nth-child(3) .card { background-image: url('students.png'); }
-.row.force-center > div:nth-child(4) .card { background-image: url('teachers.png'); }
-.row.force-center > div:nth-child(5) .card { background-image: url('batches.png'); }
-.row.force-center > div:nth-child(6) .card { background-image: url('attendance.png'); }
-.row.force-center > div:nth-child(7) .card { background-image: url('fees.png'); }
-.row.force-center > div:nth-child(8) .card { background-image: url('exams.png'); }
-.row.force-center > div:nth-child(9) .card { background-image: url('calendar.png'); }
-.row.force-center > div:nth-child(10) .card { background-image: url('expenses.png'); }
-.row.force-center > div:nth-child(11) .card { background-image: url('idcards.png'); }
-.row.force-center > div:nth-child(12) .card { background-image: url('certificates.png'); }
-.row.force-center > div:nth-child(13) .card { background-image: url('reports.png'); }
-.row.force-center > div:nth-child(14) .card { background-image: url('student_performance.png'); }
-.row.force-center > div:nth-child(15) .card { background-image: url('teacher_performance.png'); }
-.row.force-center > div:nth-child(16) .card { background-image: url('ptm.png'); }
-.row.force-center > div:nth-child(17) .card { background-image: url('scholarships.png'); }
-.row.force-center > div:nth-child(18) .card { background-image: url('library.png'); }
-.row.force-center > div:nth-child(19) .card { background-image: url('messages.png'); }
-.row.force-center > div:nth-child(20) .card { background-image: url('alumni.png'); }
-.row.force-center > div:nth-child(21) .card { background-image: url('leads.png'); }
-.row.force-center > div:nth-child(22) .card { background-image: url('allocation.png'); }
-.row.force-center > div:nth-child(23) .card { background-image: url('inventory.png'); }
-.row.force-center > div:nth-child(24) .card { background-image: url('batch_master.png'); }
-.row.force-center > div:nth-child(25) .card { background-image: url('profile.png'); }
-.row.force-center > div:nth-child(26) .card { background-image: url('notices.png'); }
-.row.force-center > div:nth-child(27) .card { background-image: url('settings.png'); }
-.row.force-center > div:nth-child(28) .card { background-image: url('salary.png'); }
-.row.force-center > div:nth-child(29) .card { background-image: url('leave.png'); }
-.row.force-center > div:nth-child(30) .card { background-image: url('backup.png'); }
-
-/* --- END OF ENGINE --- */
     </style>
 </head>
 <body>
