@@ -7,72 +7,81 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
     <style>
         :root { --aqua: #7FFFD4; --black: #000000; --white: #FFFFFF; }
-        body { background-color: var(--black); color: var(--white); font-family: 'Segoe UI', sans-serif; }
-        .header-bar { background: var(--black); border-bottom: 3px solid var(--aqua); padding: 20px; text-align: center; }
-        .table-selector { background: #111; border: 2px solid var(--aqua); border-radius: 10px; color: var(--aqua); padding: 12px; width: 100%; font-weight: bold; cursor: pointer; }
-        .data-card { border: 1px solid var(--aqua); border-radius: 15px; background: rgba(127, 255, 212, 0.02); margin-top: 20px; overflow: hidden; }
-        th { background: var(--aqua) !important; color: black !important; text-transform: uppercase; font-size: 0.75rem; }
-        td { font-size: 0.85rem; border-color: #222 !important; }
-        .badge-count { background: var(--aqua); color: black; font-weight: bold; border-radius: 50px; padding: 5px 15px; }
+        body { background-color: var(--black); color: var(--white); font-family: sans-serif; }
+        .header-bar { border-bottom: 3px solid var(--aqua); padding: 20px; margin-bottom: 20px; }
+        .table-selector { background: #111; border: 2px solid var(--aqua); border-radius: 10px; color: var(--aqua); padding: 12px; width: 100%; font-weight: bold; }
+        th { background: var(--aqua) !important; color: black !important; text-transform: uppercase; font-size: 12px; }
+        td { font-size: 13px; border-color: #333 !important; color: white !important; }
+        #debug-status { color: #ffc107; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="header-bar">
-    <h3 class="fw-bold text-uppercase" style="color: var(--aqua);">🗄️ DATABASE EXPLORER</h3>
-    <p class="text-white-50">Direct Supabase Live View</p>
+    <h3 class="fw-bold text-uppercase" style="color: var(--aqua);">DATABASE EXPLORER</h3>
+    <!-- THIS IS THE MISSING ELEMENT THAT CAUSED THE ERROR -->
+    <div id="debug-status">Initializing connection...</div>
 </div>
 
-<div class="container py-4">
-    <div class="row align-items-center">
+<div class="container-fluid py-4">
+    <div class="row mb-4">
         <div class="col-md-6">
-            <label class="form-label text-aqua small fw-bold">SELECT TABLE TO BROWSE RECORDS</label>
+            <label class="text-aqua small fw-bold">SELECT TABLE</label>
             <select id="tableDropdown" class="table-selector" onchange="loadTableData(this.value)">
-                <option value="">-- Fetching Tables... --</option>
+                <option value="">-- Loading Tables... --</option>
             </select>
-        </div>
-        <div class="col-md-6 text-end">
-            <span id="recordCount" class="badge-count d-none">0 Records</span>
         </div>
     </div>
 
-    <div class="data-card shadow-lg">
-        <div class="table-responsive" style="max-height: 700px;">
-            <table class="table table-dark table-hover mb-0">
-                <thead id="tHead"></thead>
-                <tbody id="tBody">
-                    <tr><td class="p-5 text-center text-muted">Select a table from the list above to view live data.</td></tr>
-                </tbody>
-            </table>
-        </div>
+    <div class="table-responsive" style="max-height: 75vh; border: 1px solid var(--aqua); border-radius: 10px;">
+        <table class="table table-dark table-hover mb-0">
+            <thead id="tHead"></thead>
+            <tbody id="tBody">
+                <tr><td class="p-5 text-center text-muted">Select a table from the dropdown above.</td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
 <script>
-    // 1. PROJECT CREDENTIALS (Double check these in Supabase Settings -> API)
+    // 1. UPDATE YOUR CREDENTIALS HERE
     const _url = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
     const _key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
     const client = window.supabase.createClient(_url, _key);
 
-    // 2. GET ID SAFELY
-    const currentID = localStorage.getItem('institute_id') || sessionStorage.getItem('institute_id');
+    // 2. GET LOGIN ID
+    const myID = localStorage.getItem('institute_id') || sessionStorage.getItem('institute_id');
 
-    async function loadTableList() {
+    async function init() {
+        const status = document.getElementById('debug-status');
         const dropdown = document.getElementById('tableDropdown');
-        const { data, error } = await client.rpc('get_all_tables');
-        
-        if (error) {
-            dropdown.innerHTML = `<option>Error: ${error.message}</option>`;
+
+        if (!myID) {
+            status.innerText = "❌ ERROR: Login ID not found. Please log in again.";
             return;
         }
 
-        dropdown.innerHTML = '<option value="">-- Select Table --</option>';
+        status.innerText = "Connected. Fetching table list...";
+
+        // Call the RPC function to get tables
+        const { data, error } = await client.rpc('get_all_tables');
+        
+        if (error) {
+            status.innerText = "❌ ERROR: Could not fetch tables. Ensure the SQL RPC function is created.";
+            console.error(error);
+            return;
+        }
+
+        dropdown.innerHTML = '<option value="">-- Select a Table --</option>';
         data.forEach(t => {
-            dropdown.innerHTML += `<option value="${t.table_name}">${t.table_name}</option>`;
+            const opt = document.createElement('option');
+            opt.value = t.table_name;
+            opt.innerText = t.table_name;
+            dropdown.appendChild(opt);
         });
+        status.innerText = `Ready. Logged in as: ${myID}`;
     }
 
     async function loadTableData(tableName) {
@@ -80,15 +89,13 @@
         
         const head = document.getElementById('tHead');
         const body = document.getElementById('tBody');
-        const debug = document.getElementById('debug-status');
+        const status = document.getElementById('debug-status');
 
-        // Reset UI
         head.innerHTML = "";
-        body.innerHTML = '<tr><td class="text-center p-5">Fetching Records...</td></tr>';
+        body.innerHTML = '<tr><td class="text-center p-5"><div class="spinner-border text-info"></div><br>Fetching...</td></tr>';
 
         try {
-            // FETCH DATA (Limit 50 for speed)
-            const { data, error } = await client.from(tableName).select('*').limit(50);
+            const { data, error } = await client.from(tableName).select('*').limit(100);
 
             if (error) {
                 body.innerHTML = `<tr><td class="p-5 text-center text-danger">Database Error: ${error.message}</td></tr>`;
@@ -96,29 +103,28 @@
             }
 
             if (!data || data.length === 0) {
-                body.innerHTML = '<tr><td class="p-5 text-center text-muted">No records found in this table.</td></tr>';
+                body.innerHTML = '<tr><td class="p-5 text-center text-muted">This table is currently empty.</td></tr>';
                 return;
             }
 
-            // FILTER: If the table has an institute_id, only show your records
-            let displayData = data;
-            const columns = Object.keys(data[0]);
-            
-            if (columns.includes('institute_id') && currentID) {
-                displayData = data.filter(row => String(row.institute_id) === String(currentID));
+            // FILTER LOGIC
+            const cols = Object.keys(data[0]);
+            let filtered = data;
+            if (cols.includes('institute_id')) {
+                filtered = data.filter(row => String(row.institute_id) === String(myID));
             }
 
             // RENDER HEADERS
-            head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+            head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
 
             // RENDER ROWS
-            if (displayData.length > 0) {
-                body.innerHTML = displayData.map(row => `
-                    <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
+            if (filtered.length > 0) {
+                body.innerHTML = filtered.map(row => `
+                    <tr>${cols.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
                 `).join('');
-                debug.innerText = `Showing ${displayData.length} records for ${currentID}`;
+                status.innerText = `Viewing ${tableName} | Found ${filtered.length} matches for ${myID}`;
             } else {
-                body.innerHTML = `<tr><td class="p-5 text-center text-warning">Data exists in DB, but 0 records match your ID: ${currentID}</td></tr>`;
+                body.innerHTML = `<tr><td class="p-5 text-center text-warning">Table has data, but 0 records match your ID: ${myID}</td></tr>`;
             }
 
         } catch (err) {
@@ -126,7 +132,7 @@
         }
     }
 
-    window.onload = loadTableList;
+    window.onload = init;
 </script>
 </body>
 </html>
