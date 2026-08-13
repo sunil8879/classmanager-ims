@@ -44,64 +44,52 @@
 </div>
 
 <script>
-    // 1. YOUR WORKER URL (Make sure there is NO slash / at the very end)
-    let WORKER_URL = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-    
-    // Auto-fix: Removes trailing slash if you accidentally added one
-    if (WORKER_URL.endsWith('/')) WORKER_URL = WORKER_URL.slice(0, -1);
+    // 1. YOUR CREDENTIALS
+    const WORKER_URL = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
 
     // 2. GET LOGIN ID
-    const myID = localStorage.getItem('institute_id') || 
-                 sessionStorage.getItem('institute_id') || 
-                 localStorage.getItem('tenant_id');
+    const myID = localStorage.getItem('institute_id') || sessionStorage.getItem('institute_id');
+
+    // 3. COMMON HEADERS (Making use of the ANON KEY)
+    const headers = {
+        "apikey": ANON_KEY,
+        "Authorization": "Bearer " + ANON_KEY,
+        "Content-Type": "application/json"
+    };
 
     async function init() {
         const status = document.getElementById('debug-status');
         const dropdown = document.getElementById('tableDropdown');
 
-        if (!myID) {
-            status.innerText = "❌ ERROR: No Login ID found. Please log in again.";
-            return;
-        }
-
         try {
-            // Test connection to the Worker
-            const res = await fetch(`${WORKER_URL}/get-table-list`);
-            
-            if (!res.ok) {
-                status.innerText = `❌ SERVER ERROR: ${res.status} ${res.statusText}`;
-                return;
-            }
-
+            // Using headers to satisfy Supabase security
+            const res = await fetch(`${WORKER_URL}/get-table-list`, { headers: headers });
             const tables = await res.json();
 
             dropdown.innerHTML = '<option value="">-- Select Table --</option>';
             tables.forEach(t => {
-                // Some SQL returns 'table_name', some returns 'relname'
                 const name = t.table_name || t.relname || t;
                 dropdown.innerHTML += `<option value="${name}">${name}</option>`;
             });
-
-            status.innerText = `✅ Connected as Owner: ${myID}`;
-            status.style.color = "#7FFFD4";
+            status.innerText = `✅ Connected. Logged in as: ${myID}`;
         } catch (err) {
-            status.innerText = "❌ CONNECTION FAILED: The Worker is not responding.";
-            console.error("Fetch Error:", err);
+            status.innerText = "❌ Connection Failed. Ensure ANON KEY and Worker URL are correct.";
         }
     }
 
     async function loadTableData(tableName) {
         if (!tableName) return;
-        
         const head = document.getElementById('tHead');
         const body = document.getElementById('tBody');
         const status = document.getElementById('debug-status');
 
         head.innerHTML = "";
-        body.innerHTML = '<tr><td class="p-5 text-center">Syncing records...</td></tr>';
+        body.innerHTML = '<tr><td class="p-5 text-center">Fetching records...</td></tr>';
 
         try {
-            const response = await fetch(`${WORKER_URL}/get-table-data?table=${tableName}`);
+            // Sending the ANON KEY through the worker bridge
+            const response = await fetch(`${WORKER_URL}/get-table-data?table=${tableName}`, { headers: headers });
             const data = await response.json();
 
             if (!data || data.length === 0) {
@@ -112,8 +100,7 @@
             const cols = Object.keys(data[0]);
             let filteredRows = data;
             
-            // Apply filter only if 'institute_id' column exists
-            if (cols.includes('institute_id')) {
+            if (cols.includes('institute_id') && myID) {
                 filteredRows = data.filter(row => String(row.institute_id) === String(myID));
             }
 
@@ -124,10 +111,10 @@
                 `).join('');
                 status.innerText = `✅ Viewing ${tableName} (${filteredRows.length} records)`;
             } else {
-                body.innerHTML = `<tr><td class="p-5 text-center text-warning">No records found for ID: ${myID}</td></tr>`;
+                body.innerHTML = `<tr><td class="p-5 text-center text-warning">0 matches for ID: ${myID}</td></tr>`;
             }
         } catch (err) {
-            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Error: Could not parse data.</td></tr>`;
+            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Error: ${err.message}</td></tr>`;
         }
     }
 
