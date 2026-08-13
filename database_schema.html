@@ -44,37 +44,34 @@
 </div>
 
 <script>
-    // 1. YOUR CREDENTIALS
-    const WORKER_URL = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+    // 1. Ensure these are your ACTUAL credentials from Supabase Settings -> API
+    const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+    
+    const { createClient } = supabase;
+    const client = createClient(_supabaseUrl, _supabaseKey);
 
-    // 2. GET LOGIN ID
-    const myID = localStorage.getItem('institute_id') || sessionStorage.getItem('institute_id');
-
-    // 3. COMMON HEADERS (Making use of the ANON KEY)
-    const headers = {
-        "apikey": ANON_KEY,
-        "Authorization": "Bearer " + ANON_KEY,
-        "Content-Type": "application/json"
-    };
-
-    async function init() {
-        const status = document.getElementById('debug-status');
+    async function loadTableList() {
         const dropdown = document.getElementById('tableDropdown');
+        
+        // Call the SQL function we created in Step 1
+        const { data, error } = await client.rpc('get_all_tables');
+        
+        if (error) {
+            console.error(error);
+            alert("Connection Error: " + error.message);
+            dropdown.innerHTML = '<option>Error: Check SQL Permissions</option>';
+            return;
+        }
 
-        try {
-            // Using headers to satisfy Supabase security
-            const res = await fetch(`${WORKER_URL}/get-table-list`, { headers: headers });
-            const tables = await res.json();
-
-            dropdown.innerHTML = '<option value="">-- Select Table --</option>';
-            tables.forEach(t => {
-                const name = t.table_name || t.relname || t;
-                dropdown.innerHTML += `<option value="${name}">${name}</option>`;
+        if (data) {
+            dropdown.innerHTML = '<option value="">-- Select a Table --</option>';
+            data.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.table_name;
+                opt.innerText = t.table_name;
+                dropdown.appendChild(opt);
             });
-            status.innerText = `✅ Connected. Logged in as: ${myID}`;
-        } catch (err) {
-            status.innerText = "❌ Connection Failed. Ensure ANON KEY and Worker URL are correct.";
         }
     }
 
@@ -82,43 +79,34 @@
         if (!tableName) return;
         const head = document.getElementById('tHead');
         const body = document.getElementById('tBody');
-        const status = document.getElementById('debug-status');
+        const countBadge = document.getElementById('recordCount');
 
-        head.innerHTML = "";
-        body.innerHTML = '<tr><td class="p-5 text-center">Fetching records...</td></tr>';
+        body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-sync fa-spin"></i> Loading Records...</td></tr>';
 
-        try {
-            // Sending the ANON KEY through the worker bridge
-            const response = await fetch(`${WORKER_URL}/get-table-data?table=${tableName}`, { headers: headers });
-            const data = await response.json();
+        // Fetch all rows from the selected table
+        const { data, error } = await client.from(tableName).select('*');
 
-            if (!data || data.length === 0) {
-                body.innerHTML = '<tr><td class="p-5 text-center text-muted">Table is empty.</td></tr>';
-                return;
-            }
+        if (error) {
+            alert("Access Denied: You need to disable RLS for this table or add a SELECT policy.");
+            return;
+        }
 
-            const cols = Object.keys(data[0]);
-            let filteredRows = data;
+        if (data && data.length > 0) {
+            const columns = Object.keys(data[0]);
+            countBadge.innerText = `${data.length} Records Found`;
+            countBadge.classList.remove('d-none');
             
-            if (cols.includes('institute_id') && myID) {
-                filteredRows = data.filter(row => String(row.institute_id) === String(myID));
-            }
-
-            if (filteredRows.length > 0) {
-                head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
-                body.innerHTML = filteredRows.map(row => `
-                    <tr>${cols.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
-                `).join('');
-                status.innerText = `✅ Viewing ${tableName} (${filteredRows.length} records)`;
-            } else {
-                body.innerHTML = `<tr><td class="p-5 text-center text-warning">0 matches for ID: ${myID}</td></tr>`;
-            }
-        } catch (err) {
-            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Error: ${err.message}</td></tr>`;
+            head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+            body.innerHTML = data.map(row => `
+                <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
+            `).join('');
+        } else {
+            body.innerHTML = '<tr><td class="p-5 text-center text-muted">Table is empty. No records found.</td></tr>';
+            countBadge.classList.add('d-none');
         }
     }
 
-    window.onload = init;
+    window.onload = loadTableList;
 </script>
 </body>
 </html>
