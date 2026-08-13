@@ -1269,6 +1269,85 @@ table, td, tr {
 .action-tray button, .action-tray a, .btn {
     pointer-events: auto !important;
 }
+
+
+
+
+/* --- CLASS MANAGER: 30-MODULE FULL-WIDTH BREAKOUT ENGINE --- */
+
+/* 1. LOCK SCREEN TO PREVENT HORIZONTAL WOBBLE */
+html, body { 
+    max-width: 100%; 
+    overflow-x: hidden; 
+    margin: 0; 
+    padding: 0; 
+}
+
+/* 2. THE IMAGE BLOCK (3:2 RATIO & FULL WIDTH) */
+.row.force-center > div::after {
+    content: "";
+    display: block;
+    
+    /* Forced Full Width Breakout */
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+
+    /* Aspect Ratio 3:2 (Height is 2 units for 3 units width) */
+    aspect-ratio: 3 / 2;
+
+    /* Image Display Logic */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #000;
+    
+    /* Dazzling Spacing & Borders */
+    margin-top: 35px;
+    margin-bottom: 35px;
+    border-top: 5px solid #7FFFD4;
+    border-bottom: 5px solid #7FFFD4;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+    z-index: 1;
+}
+
+/* 3. MAPPING PROPER CLASS MANAGER FILENAMES (1-30) */
+
+.row.force-center > div:nth-child(1)::after { background-image: url('home.png'); }
+.row.force-center > div:nth-child(2)::after { background-image: url('login.png'); }
+.row.force-center > div:nth-child(3)::after { background-image: url('students.png'); }
+.row.force-center > div:nth-child(4)::after { background-image: url('teachers.png'); }
+.row.force-center > div:nth-child(5)::after { background-image: url('batches.png'); }
+.row.force-center > div:nth-child(6)::after { background-image: url('attendance.png'); }
+.row.force-center > div:nth-child(7)::after { background-image: url('fees.png'); }
+.row.force-center > div:nth-child(8)::after { background-image: url('exams.png'); }
+.row.force-center > div:nth-child(9)::after { background-image: url('calendar.png'); }
+.row.force-center > div:nth-child(10)::after { background-image: url('expenses.png'); }
+.row.force-center > div:nth-child(11)::after { background-image: url('idcards.png'); }
+.row.force-center > div:nth-child(12)::after { background-image: url('certificates.png'); }
+.row.force-center > div:nth-child(13)::after { background-image: url('reports.png'); }
+.row.force-center > div:nth-child(14)::after { background-image: url('student_performance.png'); }
+.row.force-center > div:nth-child(15)::after { background-image: url('teacher_performance.png'); }
+.row.force-center > div:nth-child(16)::after { background-image: url('ptm.png'); }
+.row.force-center > div:nth-child(17)::after { background-image: url('scholarships.png'); }
+.row.force-center > div:nth-child(18)::after { background-image: url('library.png'); }
+.row.force-center > div:nth-child(19)::after { background-image: url('messages.png'); }
+.row.force-center > div:nth-child(20)::after { background-image: url('alumni.png'); }
+.row.force-center > div:nth-child(21)::after { background-image: url('leads.png'); }
+.row.force-center > div:nth-child(22)::after { background-image: url('allocation.png'); }
+.row.force-center > div:nth-child(23)::after { background-image: url('inventory.png'); }
+.row.force-center > div:nth-child(24)::after { background-image: url('batch_master.png'); }
+.row.force-center > div:nth-child(25)::after { background-image: url('profile.png'); }
+.row.force-center > div:nth-child(26)::after { background-image: url('notices.png'); }
+.row.force-center > div:nth-child(27)::after { background-image: url('settings.png'); }
+.row.force-center > div:nth-child(28)::after { background-image: url('salary.png'); }
+.row.force-center > div:nth-child(29)::after { background-image: url('leave.png'); }
+.row.force-center > div:nth-child(30)::after { background-image: url('backup.png'); }
+
+/* --- END OF ENGINE --- */
     </style>
 </head>
 <body>
