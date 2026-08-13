@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Explorer | ClassManager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Supabase Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { --aqua: #7FFFD4; --black: #000000; --white: #FFFFFF; }
+        body { background-color: var(--black); color: var(--white); font-family: 'Segoe UI', sans-serif; }
+        .header-bar { background: var(--black); border-bottom: 3px solid var(--aqua); padding: 20px; text-align: center; }
+        .table-selector { background: #111; border: 2px solid var(--aqua); border-radius: 10px; color: var(--aqua); padding: 12px; width: 100%; font-weight: bold; cursor: pointer; }
+        .data-card { border: 1px solid var(--aqua); border-radius: 15px; background: rgba(127, 255, 212, 0.02); margin-top: 20px; overflow: hidden; }
+        th { background: var(--aqua) !important; color: black !important; text-transform: uppercase; font-size: 0.75rem; }
+        td { font-size: 0.85rem; border-color: #222 !important; }
+        .badge-count { background: var(--aqua); color: black; font-weight: bold; border-radius: 50px; padding: 5px 15px; }
+    </style>
+</head>
+<body>
+
+<div class="header-bar">
+    <h3 class="fw-bold text-uppercase" style="color: var(--aqua);">🗄️ DATABASE EXPLORER</h3>
+    <p class="text-white-50">Direct Supabase Live View</p>
+</div>
+
+<div class="container py-4">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <label class="form-label text-aqua small fw-bold">SELECT TABLE TO BROWSE RECORDS</label>
+            <select id="tableDropdown" class="table-selector" onchange="loadTableData(this.value)">
+                <option value="">-- Fetching Tables... --</option>
+            </select>
+        </div>
+        <div class="col-md-6 text-end">
+            <span id="recordCount" class="badge-count d-none">0 Records</span>
+        </div>
+    </div>
+
+    <div class="data-card shadow-lg">
+        <div class="table-responsive" style="max-height: 700px;">
+            <table class="table table-dark table-hover mb-0">
+                <thead id="tHead"></thead>
+                <tbody id="tBody">
+                    <tr><td class="p-5 text-center text-muted">Select a table from the list above to view live data.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. YOUR CREDENTIALS (Safe to use Anon key here)
+    const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+    const supabase = supabase.createClient(_supabaseUrl, _supabaseKey);
+
+    // 2. Load Table List using the RPC function we created in Step 1
+    async function loadTableList() {
+        const { data, error } = await supabase.rpc('get_all_tables');
+        const dropdown = document.getElementById('tableDropdown');
+        
+        if (error) {
+            dropdown.innerHTML = '<option>Error loading tables</option>';
+            return;
+        }
+
+        dropdown.innerHTML = '<option value="">-- Choose a Table --</option>';
+        data.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.table_name;
+            opt.innerText = t.table_name;
+            dropdown.appendChild(opt);
+        });
+    }
+
+    // 3. Fetch data for selected table
+    async function loadTableData(tableName) {
+        if (!tableName) return;
+
+        const head = document.getElementById('tHead');
+        const body = document.getElementById('tBody');
+        const countBadge = document.getElementById('recordCount');
+
+        head.innerHTML = "";
+        body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-spinner fa-spin me-2"></i>Loading...</td></tr>';
+
+        const { data, error } = await supabase.from(tableName).select('*');
+
+        if (error) {
+            alert("Security Error: Check if RLS is disabled or policy allows viewing.");
+            return;
+        }
+
+        if (data.length > 0) {
+            const columns = Object.keys(data[0]);
+            // Set Count
+            countBadge.innerText = `${data.length} Records`;
+            countBadge.classList.remove('d-none');
+            // Headers
+            head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+            // Rows
+            body.innerHTML = data.map(row => `
+                <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
+            `).join('');
+        } else {
+            body.innerHTML = '<tr><td class="p-5 text-center">Table is empty.</td></tr>';
+            countBadge.classList.add('d-none');
+        }
+    }
+
+    window.onload = loadTableList;
+</script>
+
+</body>
+</html>
