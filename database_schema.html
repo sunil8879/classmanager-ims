@@ -92,7 +92,7 @@ const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
         body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-sync fa-spin"></i> Loading Records...</td></tr>';
 
         // Fetch all rows from the selected table
-        const { data, error } = await client.from(tableName).select('*');
+        const { data, error } = await client.from(tableName).select('*').eq('institute_id', localStorage.getItem('institute_id'));
 
         if (error) {
             alert("Access Denied: You need to disable RLS for this table or add a SELECT policy.");
