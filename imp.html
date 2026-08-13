@@ -15827,7 +15827,919 @@ async function printIDCard() {
 
 
 
- 
+<script>
+
+/* =========================================================
+   CERTIFICATE GENERATOR — OPEN IN NEW PAGE
+   ========================================================= */
+
+async function generateCertificateNewPage() {
+
+    const mobile =
+        document.getElementById('cert-fetch-mobile').value.trim();
+
+    if (!mobile) {
+        alert("Please enter mobile number");
+        return;
+    }
+
+
+    /* -----------------------------------------------------
+       FETCH STUDENT
+       ----------------------------------------------------- */
+
+    const { data: student, error: err1 } =
+        await db
+        .from('students')
+        .select('*')
+        .eq('mobile', mobile)
+        .single();
+
+
+    if (err1 || !student) {
+
+        alert("Student not found.");
+
+        return;
+    }
+
+
+    /* -----------------------------------------------------
+       FETCH STUDENT DETAILS
+       ----------------------------------------------------- */
+
+    const { data: details } =
+        await db
+        .from('student_details')
+        .select('*')
+        .eq('student_id', student.id)
+        .single();
+
+
+    if (!details) {
+
+        alert(
+            "Student details not found. " +
+            "Please save student management details first."
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------------------
+       FETCH INSTITUTE SETTINGS
+       ----------------------------------------------------- */
+
+    const { data: settings } =
+        await db
+        .from('institute_settings')
+        .select('*')
+        .limit(1)
+        .single();
+
+
+    if (!settings) {
+
+        alert("Institute settings not found.");
+
+        return;
+    }
+
+
+    /* -----------------------------------------------------
+       CERTIFICATE NUMBER
+       ----------------------------------------------------- */
+
+    let certNo;
+
+
+    const { data: existingCert } =
+        await db
+        .from('certificates')
+        .select('cert_number')
+        .eq('student_id', student.id)
+        .single();
+
+
+    if (existingCert) {
+
+        certNo = existingCert.cert_number;
+
+    } else {
+
+        const randomID =
+            Math.floor(
+                1000 + Math.random() * 9000
+            );
+
+
+        certNo =
+            `IMS/CERT/${new Date().getFullYear()}/${randomID}`;
+
+
+        await db
+            .from('certificates')
+            .insert([{
+
+                institute_id: sessionInstID,
+
+                student_id: student.id,
+
+                cert_number: certNo
+
+            }]);
+
+    }
+
+
+    /* -----------------------------------------------------
+       DATA
+       ----------------------------------------------------- */
+
+    const studentName =
+        student.full_name || "Student Name";
+
+    const rollNumber =
+        details.roll_number || "---";
+
+    const course =
+        student.course || "Course Name";
+
+    const startDate =
+        student.admission_date || "---";
+
+    const endDate =
+        details.course_end_date || "Ongoing";
+
+    const duration =
+        `${startDate} to ${endDate}`;
+
+    const branch =
+        settings.branch_name || "Main Branch";
+
+    const signatory =
+        settings.authorised_signatory || "Admin";
+
+
+    /* -----------------------------------------------------
+       OPEN NEW WINDOW
+       ----------------------------------------------------- */
+
+    const certificateWindow =
+        window.open(
+            "",
+            "_blank"
+        );
+
+
+    if (!certificateWindow) {
+
+        alert(
+            "Please allow pop-ups for this website."
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------------------
+       NEW CERTIFICATE PAGE
+       ----------------------------------------------------- */
+
+    certificateWindow.document.open();
+
+    certificateWindow.document.write(`
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0"
+>
+
+<title>Certificate - ${studentName}</title>
+
+
+<style>
+
+/* =====================================================
+   PAGE
+   ===================================================== */
+
+* {
+    box-sizing: border-box;
+}
+
+
+html,
+body {
+
+    margin: 0;
+    padding: 0;
+
+    width: 100%;
+
+    background: #ffffff;
+
+    font-family:
+        'Times New Roman',
+        Times,
+        serif;
+
+}
+
+
+/* =====================================================
+   TOP BAR
+   ===================================================== */
+
+.top-bar {
+
+    width: 100%;
+
+    background: #7FFFD4;
+
+    border-bottom: 3px solid #000;
+
+    padding: 12px;
+
+    text-align: center;
+
+    font-size: 20px;
+
+    font-weight: bold;
+
+}
+
+
+/* =====================================================
+   CERTIFICATE AREA
+   ===================================================== */
+
+.page-area {
+
+    width: 100%;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: flex-start;
+
+    padding: 20px;
+
+}
+
+
+/* =====================================================
+   CERTIFICATE
+   ===================================================== */
+
+.certificate {
+
+    width: 800px;
+
+    height: 600px;
+
+    background: #ffffff;
+
+    border: 15px double #007bff;
+
+    padding: 40px;
+
+    position: relative;
+
+    overflow: hidden;
+
+    box-shadow:
+        0 10px 30px
+        rgba(0,0,0,0.20);
+
+    background-image:
+        radial-gradient(
+            #7FFFD4 0.5px,
+            transparent 0.5px
+        );
+
+    background-size: 20px 20px;
+
+}
+
+
+/* =====================================================
+   LOGO
+   ===================================================== */
+
+.logo {
+
+    position: absolute;
+
+    top: 30px;
+
+    right: 30px;
+
+    width: 80px;
+
+    height: 80px;
+
+}
+
+
+.logo img {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: contain;
+
+}
+
+
+/* =====================================================
+   CONTENT
+   ===================================================== */
+
+.content {
+
+    text-align: center;
+
+    margin-top: 20px;
+
+}
+
+
+.title {
+
+    color: #007bff;
+
+    font-size: 3.5rem;
+
+    margin: 0;
+
+    font-weight: 800;
+
+}
+
+
+.subtitle {
+
+    letter-spacing: 5px;
+
+    color: #333;
+
+    font-weight: 600;
+
+    margin-top: 5px;
+
+}
+
+
+.student-area {
+
+    margin-top: 40px;
+
+}
+
+
+.certify-text {
+
+    font-size: 1.2rem;
+
+    color: #666;
+
+}
+
+
+.student-name {
+
+    font-size: 2.5rem;
+
+    color: #ff0000;
+
+    border-bottom: 2px solid #ccc;
+
+    display: inline-block;
+
+    padding: 0 30px;
+
+    margin: 10px 0;
+
+}
+
+
+.details {
+
+    font-size: 1.1rem;
+
+    color: #666;
+
+    margin-top: 15px;
+
+}
+
+
+.course-area {
+
+    margin-top: 30px;
+
+    line-height: 1.8;
+
+}
+
+
+.course-text {
+
+    font-size: 1.3rem;
+
+    color: #333;
+
+}
+
+
+.course-name {
+
+    font-size: 1.8rem;
+
+    color: #007bff;
+
+    font-weight: 700;
+
+}
+
+
+.duration {
+
+    font-size: 1.1rem;
+
+}
+
+
+/* =====================================================
+   SIGNATURES
+   ===================================================== */
+
+.signatories {
+
+    position: absolute;
+
+    bottom: 45px;
+
+    left: 50px;
+
+    right: 50px;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-end;
+
+}
+
+
+.sign-box {
+
+    text-align: center;
+
+    min-width: 180px;
+
+}
+
+
+.sign-name {
+
+    margin: 0;
+
+    font-size: 1.5rem;
+
+    color: #333;
+
+}
+
+
+.sign-line {
+
+    margin: 0;
+
+    font-weight: bold;
+
+    border-top: 1px solid #333;
+
+    padding-top: 5px;
+
+}
+
+
+/* =====================================================
+   MOBILE
+   ===================================================== */
+
+@media (max-width: 768px) {
+
+    .page-area {
+
+        padding: 10px;
+
+        overflow: hidden;
+
+    }
+
+
+    .certificate {
+
+        /*
+         * Keep original certificate dimensions.
+         * JavaScript scales it proportionally.
+         */
+
+        flex-shrink: 0;
+
+        transform-origin: top left;
+
+    }
+
+}
+
+
+/* =====================================================
+   MOBILE BUTTONS
+   ===================================================== */
+
+.controls {
+
+    text-align: center;
+
+    padding: 15px;
+
+}
+
+
+.controls button {
+
+    padding: 12px 25px;
+
+    margin: 5px;
+
+    border: 2px solid #000;
+
+    border-radius: 6px;
+
+    background: #7FFFD4;
+
+    color: #000;
+
+    font-family:
+        'Times New Roman',
+        Times,
+        serif;
+
+    font-weight: bold;
+
+    font-size: 16px;
+
+}
+
+
+/* =====================================================
+   PRINT
+   ===================================================== */
+
+@media print {
+
+    .top-bar,
+    .controls {
+
+        display: none !important;
+
+    }
+
+
+    .page-area {
+
+        padding: 0;
+
+        display: block;
+
+    }
+
+
+    .certificate {
+
+        transform: none !important;
+
+        margin: 0 auto;
+
+        box-shadow: none;
+
+    }
+
+
+    @page {
+
+        size: A4 landscape;
+
+        margin: 0;
+
+    }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="top-bar">
+
+    PROFESSIONAL CERTIFICATE
+
+</div>
+
+
+<div class="page-area">
+
+    <div
+        class="certificate"
+        id="new-certificate"
+    >
+
+
+        <!-- LOGO -->
+
+        <div class="logo">
+
+            <img
+                src="classmanager.png"
+                alt="ClassManager"
+            >
+
+        </div>
+
+
+        <!-- CONTENT -->
+
+        <div class="content">
+
+            <h1 class="title">
+                CERTIFICATE
+            </h1>
+
+            <div class="subtitle">
+                OF COMPLETION
+            </div>
+
+
+            <div class="student-area">
+
+                <p class="certify-text">
+                    This is to certify that
+                </p>
+
+
+                <h2 class="student-name">
+                    ${studentName}
+                </h2>
+
+
+                <p class="details">
+
+                    Roll Number:
+                    <b>${rollNumber}</b>
+
+                    &nbsp; | &nbsp;
+
+                    Certificate No:
+                    <b style="color:#007bff;">
+                        ${certNo}
+                    </b>
+
+                </p>
+
+            </div>
+
+
+            <div class="course-area">
+
+                <p class="course-text">
+
+                    has
+                    <b>
+                        Successfully Completed the Course
+                    </b>
+                    in
+
+                </p>
+
+
+                <div class="course-name">
+
+                    ${course}
+
+                </div>
+
+
+                <p class="duration">
+
+                    Course Duration:
+                    ${duration}
+
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- SIGNATORIES -->
+
+        <div class="signatories">
+
+
+            <div class="sign-box">
+
+                <p class="sign-line">
+
+                    ${branch}
+
+                </p>
+
+                <small>
+                    Institute Branch
+                </small>
+
+            </div>
+
+
+            <div class="sign-box">
+
+                <p class="sign-name">
+
+                    ${signatory}
+
+                </p>
+
+                <p class="sign-line">
+
+                    Authorised Signatory
+
+                </p>
+
+            </div>
+
+
+        </div>
+
+
+    </div>
+
+</div>
+
+
+<!-- CONTROLS -->
+
+<div class="controls">
+
+    <button onclick="window.print()">
+
+        🖨 PRINT CERTIFICATE
+
+    </button>
+
+
+    <button onclick="window.close()">
+
+        ← BACK
+
+    </button>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   MOBILE AUTO-SCALE
+   ===================================================== */
+
+function fitCertificate() {
+
+    const cert =
+        document.getElementById(
+            "new-certificate"
+        );
+
+    if (!cert) return;
+
+
+    if (window.innerWidth <= 768) {
+
+        const availableWidth =
+            window.innerWidth - 20;
+
+
+        let scale =
+            availableWidth / 800;
+
+
+        if (scale > 1) {
+            scale = 1;
+        }
+
+
+        cert.style.transform =
+            "scale(" + scale + ")";
+
+
+        cert.style.transformOrigin =
+            "top left";
+
+
+        const area =
+            document.querySelector(
+                ".page-area"
+            );
+
+
+        /*
+         * Reserve the scaled height.
+         */
+
+        area.style.height =
+            (600 * scale + 20) + "px";
+
+
+        /*
+         * Center horizontally.
+         */
+
+        const left =
+            (window.innerWidth -
+             (800 * scale)) / 2;
+
+
+        cert.style.marginLeft =
+            Math.max(0, left) + "px";
+
+    } else {
+
+        cert.style.transform =
+            "none";
+
+        cert.style.margin =
+            "0 auto";
+
+    }
+
+}
+
+
+fitCertificate();
+
+
+window.addEventListener(
+    "resize",
+    fitCertificate
+);
+
+
+window.addEventListener(
+    "orientationchange",
+    function () {
+
+        setTimeout(
+            fitCertificate,
+            300
+        );
+
+    }
+);
+
+<\/script>
+
+
+</body>
+
+</html>
+
+    `);
+
+
+    certificateWindow.document.close();
+
+}
+
+</script>
 
 
 
