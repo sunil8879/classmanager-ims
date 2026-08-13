@@ -1275,81 +1275,87 @@ table, td, tr {
 
 /* --- CLASS MANAGER: 30-MODULE FULL-WIDTH BREAKOUT ENGINE --- */
 
-/* --- CLASS MANAGER: 30-MODULE FULL-WIDTH UNBREAKABLE ENGINE --- */
+/* --- CLASS MANAGER: 30-MODULE DYNAMIC BACKGROUND ENGINE --- */
 
-/* 1. LOCK THE SCREEN (Prevents horizontal shaking) */
-html, body { 
-    max-width: 100% !important; 
-    overflow-x: hidden !important; 
-    margin: 0 !important; 
-    padding: 0 !important; 
+/* 1. LOCK SCREEN (Prevents horizontal shaking on mobile) */
+html, body {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
 }
 
-/* 2. THE IMAGE INJECTOR */
-/* Targets the wrapper of your module cards */
-.row.force-center > div::after {
-    content: "" !important;
-    display: block !important;
-    
-    /* Forced Full Width Breakout */
-    width: 100vw !important;
-    position: relative !important;
-    left: 50% !important;
-    right: 50% !important;
-    margin-left: -50vw !important;
-    margin-right: -50vw !important;
-
-    /* Forced 3:2 Aspect Ratio (Height 2 / Width 3 = 66.66%) */
-    padding-top: 66.66% !important; 
-
-    /* Image Display Setup */
+/* 2. TRANSFORM MODULE CARDS TO 3:2 RATIO */
+.row.force-center > div .card {
+    aspect-ratio: 3 / 2 !important; /* Width 3 : Height 2 */
+    height: auto !important;
     background-size: cover !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
-    background-color: #111 !important;
-    
-    /* Dazzling Spacing & Borders */
-    margin-top: 20px !important;
-    margin-bottom: 40px !important;
-    border-top: 5px solid #7FFFD4 !important;
-    border-bottom: 5px solid #7FFFD4 !important;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
-    z-index: 999 !important;
+    position: relative !important;
+    overflow: hidden !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    border: 2px solid #7FFFD4 !important; /* Aquamarine Border */
+    margin-bottom: 10px !important;
+    transition: transform 0.3s ease !important;
 }
 
-/* 3. MAPPING 30 SEQUENTIAL CLASS MANAGER IMAGES */
-/* Note: Images must be in the same folder as imp.html */
+/* 3. DARK OVERLAY (Ensures white text is readable over images) */
+.row.force-center > div .card::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0; left: 0; right: 0; bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.55) !important; /* 55% Black Tint */
+    z-index: 1 !important;
+}
 
-.row.force-center > div:nth-child(1)::after { background-image: url('home.png'); }
-.row.force-center > div:nth-child(2)::after { background-image: url('login.png'); }
-.row.force-center > div:nth-child(3)::after { background-image: url('students.png'); }
-.row.force-center > div:nth-child(4)::after { background-image: url('teachers.png'); }
-.row.force-center > div:nth-child(5)::after { background-image: url('batches.png'); }
-.row.force-center > div:nth-child(6)::after { background-image: url('attendance.png'); }
-.row.force-center > div:nth-child(7)::after { background-image: url('fees.png'); }
-.row.force-center > div:nth-child(8)::after { background-image: url('exams.png'); }
-.row.force-center > div:nth-child(9)::after { background-image: url('calendar.png'); }
-.row.force-center > div:nth-child(10)::after { background-image: url('expenses.png'); }
-.row.force-center > div:nth-child(11)::after { background-image: url('idcards.png'); }
-.row.force-center > div:nth-child(12)::after { background-image: url('certificates.png'); }
-.row.force-center > div:nth-child(13)::after { background-image: url('reports.png'); }
-.row.force-center > div:nth-child(14)::after { background-image: url('student_performance.png'); }
-.row.force-center > div:nth-child(15)::after { background-image: url('teacher_performance.png'); }
-.row.force-center > div:nth-child(16)::after { background-image: url('ptm.png'); }
-.row.force-center > div:nth-child(17)::after { background-image: url('scholarships.png'); }
-.row.force-center > div:nth-child(18)::after { background-image: url('library.png'); }
-.row.force-center > div:nth-child(19)::after { background-image: url('messages.png'); }
-.row.force-center > div:nth-child(20)::after { background-image: url('alumni.png'); }
-.row.force-center > div:nth-child(21)::after { background-image: url('leads.png'); }
-.row.force-center > div:nth-child(22)::after { background-image: url('allocation.png'); }
-.row.force-center > div:nth-child(23)::after { background-image: url('inventory.png'); }
-.row.force-center > div:nth-child(24)::after { background-image: url('batch_master.png'); }
-.row.force-center > div:nth-child(25)::after { background-image: url('profile.png'); }
-.row.force-center > div:nth-child(26)::after { background-image: url('notices.png'); }
-.row.force-center > div:nth-child(27)::after { background-image: url('settings.png'); }
-.row.force-center > div:nth-child(28)::after { background-image: url('salary.png'); }
-.row.force-center > div:nth-child(29)::after { background-image: url('leave.png'); }
-.row.force-center > div:nth-child(30)::after { background-image: url('backup.png'); }
+/* 4. PUSH TEXT & ICONS ABOVE OVERLAY */
+.row.force-center > div .card > * {
+    position: relative !important;
+    z-index: 2 !important;
+    color: #FFFFFF !important; /* White Text */
+    text-shadow: 2px 2px 8px #000000 !important; /* Glow for readability */
+}
+
+.row.force-center > div .card:hover {
+    transform: scale(1.02) !important;
+}
+
+/* 5. INDIVIDUAL BACKGROUND IMAGE MAPPING (1-30) */
+/* Images are pulled directly from your folder */
+
+.row.force-center > div:nth-child(1) .card { background-image: url('home.png'); }
+.row.force-center > div:nth-child(2) .card { background-image: url('login.png'); }
+.row.force-center > div:nth-child(3) .card { background-image: url('students.png'); }
+.row.force-center > div:nth-child(4) .card { background-image: url('teachers.png'); }
+.row.force-center > div:nth-child(5) .card { background-image: url('batches.png'); }
+.row.force-center > div:nth-child(6) .card { background-image: url('attendance.png'); }
+.row.force-center > div:nth-child(7) .card { background-image: url('fees.png'); }
+.row.force-center > div:nth-child(8) .card { background-image: url('exams.png'); }
+.row.force-center > div:nth-child(9) .card { background-image: url('calendar.png'); }
+.row.force-center > div:nth-child(10) .card { background-image: url('expenses.png'); }
+.row.force-center > div:nth-child(11) .card { background-image: url('idcards.png'); }
+.row.force-center > div:nth-child(12) .card { background-image: url('certificates.png'); }
+.row.force-center > div:nth-child(13) .card { background-image: url('reports.png'); }
+.row.force-center > div:nth-child(14) .card { background-image: url('student_performance.png'); }
+.row.force-center > div:nth-child(15) .card { background-image: url('teacher_performance.png'); }
+.row.force-center > div:nth-child(16) .card { background-image: url('ptm.png'); }
+.row.force-center > div:nth-child(17) .card { background-image: url('scholarships.png'); }
+.row.force-center > div:nth-child(18) .card { background-image: url('library.png'); }
+.row.force-center > div:nth-child(19) .card { background-image: url('messages.png'); }
+.row.force-center > div:nth-child(20) .card { background-image: url('alumni.png'); }
+.row.force-center > div:nth-child(21) .card { background-image: url('leads.png'); }
+.row.force-center > div:nth-child(22) .card { background-image: url('allocation.png'); }
+.row.force-center > div:nth-child(23) .card { background-image: url('inventory.png'); }
+.row.force-center > div:nth-child(24) .card { background-image: url('batch_master.png'); }
+.row.force-center > div:nth-child(25) .card { background-image: url('profile.png'); }
+.row.force-center > div:nth-child(26) .card { background-image: url('notices.png'); }
+.row.force-center > div:nth-child(27) .card { background-image: url('settings.png'); }
+.row.force-center > div:nth-child(28) .card { background-image: url('salary.png'); }
+.row.force-center > div:nth-child(29) .card { background-image: url('leave.png'); }
+.row.force-center > div:nth-child(30) .card { background-image: url('backup.png'); }
+
+/* --- END OF ENGINE --- */
     </style>
 </head>
 <body>
