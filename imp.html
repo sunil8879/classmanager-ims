@@ -1275,46 +1275,50 @@ table, td, tr {
 
 /* --- CLASS MANAGER: 30-MODULE FULL-WIDTH BREAKOUT ENGINE --- */
 
-/* 1. LOCK SCREEN TO PREVENT HORIZONTAL WOBBLE */
+/* --- CLASS MANAGER: 30-MODULE FULL-WIDTH UNBREAKABLE ENGINE --- */
+
+/* 1. LOCK THE SCREEN (Prevents horizontal shaking) */
 html, body { 
-    max-width: 100%; 
-    overflow-x: hidden; 
-    margin: 0; 
-    padding: 0; 
+    max-width: 100% !important; 
+    overflow-x: hidden !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
 }
 
-/* 2. THE IMAGE BLOCK (3:2 RATIO & FULL WIDTH) */
+/* 2. THE IMAGE INJECTOR */
+/* Targets the wrapper of your module cards */
 .row.force-center > div::after {
-    content: "";
-    display: block;
+    content: "" !important;
+    display: block !important;
     
     /* Forced Full Width Breakout */
-    width: 100vw;
-    position: relative;
-    left: 50%;
-    right: 50%;
-    margin-left: -50vw;
-    margin-right: -50vw;
+    width: 100vw !important;
+    position: relative !important;
+    left: 50% !important;
+    right: 50% !important;
+    margin-left: -50vw !important;
+    margin-right: -50vw !important;
 
-    /* Aspect Ratio 3:2 (Height is 2 units for 3 units width) */
-    aspect-ratio: 3 / 2;
+    /* Forced 3:2 Aspect Ratio (Height 2 / Width 3 = 66.66%) */
+    padding-top: 66.66% !important; 
 
-    /* Image Display Logic */
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-color: #000;
+    /* Image Display Setup */
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-color: #111 !important;
     
     /* Dazzling Spacing & Borders */
-    margin-top: 35px;
-    margin-bottom: 35px;
-    border-top: 5px solid #7FFFD4;
-    border-bottom: 5px solid #7FFFD4;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.9);
-    z-index: 1;
+    margin-top: 20px !important;
+    margin-bottom: 40px !important;
+    border-top: 5px solid #7FFFD4 !important;
+    border-bottom: 5px solid #7FFFD4 !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+    z-index: 999 !important;
 }
 
-/* 3. MAPPING PROPER CLASS MANAGER FILENAMES (1-30) */
+/* 3. MAPPING 30 SEQUENTIAL CLASS MANAGER IMAGES */
+/* Note: Images must be in the same folder as imp.html */
 
 .row.force-center > div:nth-child(1)::after { background-image: url('home.png'); }
 .row.force-center > div:nth-child(2)::after { background-image: url('login.png'); }
@@ -1346,8 +1350,6 @@ html, body {
 .row.force-center > div:nth-child(28)::after { background-image: url('salary.png'); }
 .row.force-center > div:nth-child(29)::after { background-image: url('leave.png'); }
 .row.force-center > div:nth-child(30)::after { background-image: url('backup.png'); }
-
-/* --- END OF ENGINE --- */
     </style>
 </head>
 <body>
