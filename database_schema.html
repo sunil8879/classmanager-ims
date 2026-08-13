@@ -85,43 +85,53 @@ const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
     async function loadTableData(tableName) {
     if (!tableName) return;
+    
     const head = document.getElementById('tHead');
     const body = document.getElementById('tBody');
-    const countBadge = document.getElementById('recordCount');
+    const debug = document.getElementById('debug-status');
 
-    body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-sync fa-spin"></i> Loading...</td></tr>';
+    // 1. Initial State
+    head.innerHTML = "";
+    body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-spinner fa-spin"></i> Fetching from Supabase...</td></tr>';
+    
+    try {
+        // 2. Fetch the data
+        const { data, error } = await supabase.from(tableName).select('*').limit(100);
 
-    // 1. Fetch ALL data for this table first
-    let { data, error } = await supabase.from(tableName).select('*');
+        if (error) {
+            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Supabase Error: ${error.message}</td></tr>`;
+            return;
+        }
 
-    if (error) {
-        body.innerHTML = `<tr><td class="p-5 text-center text-danger">Access Denied: ${error.message}</td></tr>`;
-        return;
-    }
+        if (!data || data.length === 0) {
+            body.innerHTML = '<tr><td class="p-5 text-center text-muted">This table exists but has 0 records.</td></tr>';
+            return;
+        }
 
-    // 2. SMART FILTER: Only filter if the column 'institute_id' exists and myID is set
-    if (data && data.length > 0) {
-        const hasIDColumn = 'institute_id' in data[0];
+        // 3. Generate Headers dynamically from the database response
+        const columns = Object.keys(data[0]);
+        head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+
+        // 4. Filter data by Institute ID manually to prevent "Loading" hang
+        const currentID = sessionStorage.getItem('institute_id') || localStorage.getItem('institute_id');
         
-        if (hasIDColumn && myID) {
-            data = data.filter(row => row.institute_id === myID);
+        let filteredData = data;
+        if (currentID && columns.includes('institute_id')) {
+            filteredData = data.filter(row => String(row.institute_id) === String(currentID));
         }
 
-        if (data.length > 0) {
-            const columns = Object.keys(data[0]);
-            countBadge.innerText = `${data.length} Records Found`;
-            countBadge.classList.remove('d-none');
-            head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
-            body.innerHTML = data.map(row => `
-                <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
+        // 5. Build the rows
+        if (filteredData.length > 0) {
+            body.innerHTML = filteredData.map(row => `
+                <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '<span style="color:gray">null</span>'}</td>`).join('')}</tr>
             `).join('');
+            debug.innerText = `Table: ${tableName} | Showing ${filteredData.length} records for ${currentID}`;
         } else {
-            body.innerHTML = `<tr><td class="p-5 text-center text-warning">No records found matching ID: ${myID}</td></tr>`;
-            countBadge.classList.add('d-none');
+            body.innerHTML = `<tr><td class="p-5 text-center text-warning">Table has data, but 0 records match your ID: ${currentID}</td></tr>`;
         }
-    } else {
-        body.innerHTML = '<tr><td class="p-5 text-center text-muted">This table is empty in the database.</td></tr>';
-        countBadge.classList.add('d-none');
+
+    } catch (err) {
+        body.innerHTML = `<tr><td class="p-5 text-center text-danger">Critical JS Crash: ${err.message}</td></tr>`;
     }
 }
     window.onload = loadTableList;
