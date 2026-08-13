@@ -52,67 +52,69 @@
 </div>
 
 <script>
-    // 1. YOUR CREDENTIALS (Safe to use Anon key here)
+    // 1. Ensure these are your ACTUAL credentials from Supabase Settings -> API
     const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-    const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-    const supabase = supabase.createClient(_supabaseUrl, _supabaseKey);
+const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+    
+    const { createClient } = supabase;
+    const client = createClient(_supabaseUrl, _supabaseKey);
 
-    // 2. Load Table List using the RPC function we created in Step 1
     async function loadTableList() {
-        const { data, error } = await supabase.rpc('get_all_tables');
         const dropdown = document.getElementById('tableDropdown');
         
+        // Call the SQL function we created in Step 1
+        const { data, error } = await client.rpc('get_all_tables');
+        
         if (error) {
-            dropdown.innerHTML = '<option>Error loading tables</option>';
+            console.error(error);
+            alert("Connection Error: " + error.message);
+            dropdown.innerHTML = '<option>Error: Check SQL Permissions</option>';
             return;
         }
 
-        dropdown.innerHTML = '<option value="">-- Choose a Table --</option>';
-        data.forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t.table_name;
-            opt.innerText = t.table_name;
-            dropdown.appendChild(opt);
-        });
+        if (data) {
+            dropdown.innerHTML = '<option value="">-- Select a Table --</option>';
+            data.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.table_name;
+                opt.innerText = t.table_name;
+                dropdown.appendChild(opt);
+            });
+        }
     }
 
-    // 3. Fetch data for selected table
     async function loadTableData(tableName) {
         if (!tableName) return;
-
         const head = document.getElementById('tHead');
         const body = document.getElementById('tBody');
         const countBadge = document.getElementById('recordCount');
 
-        head.innerHTML = "";
-        body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-spinner fa-spin me-2"></i>Loading...</td></tr>';
+        body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-sync fa-spin"></i> Loading Records...</td></tr>';
 
-        const { data, error } = await supabase.from(tableName).select('*');
+        // Fetch all rows from the selected table
+        const { data, error } = await client.from(tableName).select('*');
 
         if (error) {
-            alert("Security Error: Check if RLS is disabled or policy allows viewing.");
+            alert("Access Denied: You need to disable RLS for this table or add a SELECT policy.");
             return;
         }
 
-        if (data.length > 0) {
+        if (data && data.length > 0) {
             const columns = Object.keys(data[0]);
-            // Set Count
-            countBadge.innerText = `${data.length} Records`;
+            countBadge.innerText = `${data.length} Records Found`;
             countBadge.classList.remove('d-none');
-            // Headers
+            
             head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
-            // Rows
             body.innerHTML = data.map(row => `
                 <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
             `).join('');
         } else {
-            body.innerHTML = '<tr><td class="p-5 text-center">Table is empty.</td></tr>';
+            body.innerHTML = '<tr><td class="p-5 text-center text-muted">Table is empty. No records found.</td></tr>';
             countBadge.classList.add('d-none');
         }
     }
 
     window.onload = loadTableList;
 </script>
-
 </body>
 </html>
