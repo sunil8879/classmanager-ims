@@ -3,79 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contact Support - Class Manager</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Contact Us | ClassManager Source Code</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #fff; display: flex; flex-direction: column; min-height: 100vh; }
-        .hero { background: #7FFFD4; padding: 60px 20px; text-align: center; border-bottom: 8px solid #ff0000; }
-        h1 { color: #ff0000; margin: 0; font-size: 3rem; text-transform: uppercase; }
-        .container { display: flex; flex: 1; justify-content: center; align-items: center; gap: 40px; padding: 40px; flex-wrap: wrap; }
-        .contact-card { background: white; border: 3px solid #7FFFD4; border-radius: 20px; width: 350px; padding: 40px; text-align: center; transition: 0.3s; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-        .contact-card:hover { transform: translateY(-10px); box-shadow: 0 15px 30px rgba(255, 0, 0, 0.2); border-color: #ff0000; }
-        .icon-box { font-size: 4rem; margin-bottom: 20px; }
-        .email-icon { color: #ff0000; }
-        .whatsapp-icon { color: #25D366; } /* WhatsApp brand green for the icon only */
-        h2 { color: #333; }
-        p { color: #666; margin-bottom: 30px; line-height: 1.5; }
-        .btn { display: inline-block; text-decoration: none; padding: 15px 30px; border-radius: 50px; font-weight: bold; font-size: 1.1rem; transition: 0.3s; }
-        .btn-mail { background: #ff0000; color: white; }
-        .btn-whatsapp { background: #7FFFD4; color: #000; }
-        .btn:hover { opacity: 0.8; letter-spacing: 1px; }
+        :root {
+            --aqua: #7FFFD4;
+            --black: #000000;
+            --dark-gray: #121212;
+            --white: #ffffff;
+        }
+
+        body {
+            background-color: var(--black);
+            color: var(--white);
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .text-aqua { color: var(--aqua); }
+        .border-aqua { border: 1px solid var(--aqua) !important; }
+
+        /* Hero / Header */
+        .contact-hero {
+            padding: 80px 0 40px;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(127, 255, 212, 0.08) 0%, rgba(0,0,0,1) 100%);
+        }
+
+        .brand-header {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            letter-spacing: 6px;
+            color: var(--aqua);
+            text-shadow: 0 0 15px rgba(127, 255, 212, 0.4);
+        }
+
+        /* Contact Card */
+        .main-contact-card {
+            background: var(--dark-gray);
+            border: 2px solid var(--aqua);
+            border-radius: 25px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 0 25px rgba(127, 255, 212, 0.15);
+            margin-bottom: 40px;
+        }
+
+        .email-display {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            background: rgba(127, 255, 212, 0.1);
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 1px dashed var(--aqua);
+            display: inline-block;
+            margin: 20px 0;
+            word-break: break-all;
+            color: var(--white);
+            transition: 0.3s;
+        }
+        
+        .email-display:hover {
+            background: var(--aqua);
+            color: var(--black);
+            text-decoration: none;
+        }
+
+        /* Enquiry Categories */
+        .category-box {
+            background: var(--dark-gray);
+            border-radius: 15px;
+            padding: 20px;
+            height: 100%;
+            border-left: 4px solid var(--aqua);
+            transition: 0.3s;
+        }
+
+        .category-box:hover {
+            background: rgba(127, 255, 212, 0.05);
+            transform: translateX(5px);
+        }
+
+        .category-icon {
+            font-size: 1.2rem;
+            color: var(--aqua);
+            margin-bottom: 10px;
+        }
+
+        /* Important Info */
+        .important-note {
+            background: linear-gradient(90deg, rgba(127, 255, 212, 0.05) 0%, rgba(0,0,0,0) 100%);
+            border-left: 5px solid #ff4757; /* Accent for "Important" */
+            padding: 25px;
+            border-radius: 0 15px 15px 0;
+            margin-top: 40px;
+        }
+
+        .btn-aqua {
+            background-color: var(--aqua);
+            color: var(--black);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            padding: 15px 40px;
+            border-radius: 50px;
+            border: none;
+            transition: 0.4s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn-aqua:hover {
+            box-shadow: 0 0 25px var(--aqua);
+            background-color: var(--white);
+        }
+
+        /* Typography */
+        h4, h5 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .instruction {
+            color: #ffc107; /* Warning color for specific instruction */
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .brand-header { font-size: 1.8rem; }
+            .email-display { font-size: 1.1rem; }
+            .main-contact-card { padding: 25px 15px; }
+        }
     </style>
 </head>
 <body>
-    <div class="hero">
-        <h1>GET IN TOUCH</h1>
-        <p>We are here to help your institute grow.</p>
-    </div>
+
+    <!-- HERO SECTION -->
+    <header class="contact-hero">
+        <div class="container">
+            <h1 class="brand-header">CLASSMANAGER</h1>
+            <h4 class="mt-2 text-white-50">Get In Touch</h4>
+        </div>
+    </header>
+
     <div class="container">
-        <!-- EMAIL CARD -->
-        <div class="contact-card">
-            <div class="icon-box email-icon"><i class="fas fa-envelope-open-text"></i></div>
-            <h2>Official Email</h2>
-            <p>Send us your detailed queries, feature requests, or partnership proposals.</p>
-            <a href="mailto:sv@nexusai-group.in" class="btn btn-mail">Send Email</a>
-        </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                
+                <!-- MAIN MESSAGE -->
+                <div class="main-contact-card">
+                    <p class="fs-5">
+                        For enquiries regarding **ClassManager Source Code**, pricing, licensing, purchase, deployment guidance, customization requirements or remote technical support, please contact us by email.
+                    </p>
+                    
+                    <div class="mt-4">
+                        <i class="fas fa-envelope-open-text fa-3x text-aqua"></i>
+                    </div>
 
+                    <a href="mailto:sunilvasarkar1975@gmail.com" class="email-display text-decoration-none">
+                        sunilvasarkar1975@gmail.com
+                    </a>
 
-<p style="font-size: 0.95rem; line-height: 1.6; color: #444; text-align: left;">
-    For technical integrity and to maintain a paper trail of your requests, all support is handled via <b>sv@nexusai-group.in</b>. This ensures our developers can track and resolve issues systematically.
-</p>
+                    <p class="instruction">
+                        <i class="fas fa-info-circle me-1"></i> Please include “CLASSMANAGER ENQUIRY” in the subject line.
+                    </p>
+                </div>
 
+                <!-- CATEGORIES -->
+                <div class="mb-5">
+                    <h5 class="text-center mb-4 text-aqua">Enquiries May Include</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6 col-lg-4">
+                            <div class="category-box">
+                                <i class="fas fa-code category-icon"></i>
+                                <div>Source Code Purchase</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <div class="category-box">
+                                <i class="fas fa-file-contract category-icon"></i>
+                                <div>Non-Exclusive Licensing</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <div class="category-box">
+                                <i class="fas fa-tags category-icon"></i>
+                                <div>Pricing & Payment</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <div class="category-box">
+                                <i class="fas fa-server category-icon"></i>
+                                <div>Deployment Guidance</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <div class="category-box">
+                                <i class="fas fa-headset category-icon"></i>
+                                <div>Technical Support</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <div class="category-box">
+                                <i class="fas fa-tools category-icon"></i>
+                                <div>Customization</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- WHATSAPP CARD -->
-        <div class="contact-card">
-            <div class="icon-box whatsapp-icon"><i class="fab fa-whatsapp"></i></div>
-            <h2>Quick Support</h2>
-         <p style="font-size: 0.95rem; line-height: 1.6; color: #444; text-align: left;">
-    For quick technical logs and status updates, you can reach us via WhatsApp. All chat records are digitally archived to ensure every request is systematically documented for our development team.
-</p>
-            <a href="https://wa.me/919136516298" class="btn btn-whatsapp">Chat Now</a>
+                <!-- IMPORTANT NOTES -->
+                <div class="important-note">
+                    <h5 class="text-white"><i class="fas fa-exclamation-triangle me-2" style="color:#ff4757;"></i>Important</h5>
+                    <p class="mb-2">ClassManager is offered as a **non-exclusive source-code sale**.</p>
+                    <p class="mb-0 text-white-50 small">
+                        Deployment is performed from the buyer's side. Any support provided is remote only and subject to the scope of the enquiry.
+                    </p>
+                </div>
+
+                <div class="text-center my-5 py-4">
+                    <h5 class="text-white-50 mb-4">We'd be happy to hear from you.</h5>
+                    <a href="mailto:sunilvasarkar1975@gmail.com" class="btn btn-aqua">
+                        Send Email Now
+                    </a>
+                </div>
+
+            </div>
         </div>
     </div>
 
+    <!-- FOOTER -->
+    <footer class="text-center py-4 border-top border-secondary">
+        <p class="small text-muted">&copy; 2026 ClassManager Systems. Dazzling SME Management Solutions.</p>
+    </footer>
 
-
-<!-- OFFICIAL SUPPORT POLICY SECTION -->
-<div style="max-width: 800px; margin: 40px auto; padding: 30px; border: 2px dashed #ff0000; border-radius: 15px; background: #fff8f8; text-align: left; font-family: 'Segoe UI', sans-serif;">
-    <h3 style="color: #ff0000; text-align: center; margin-top: 0;">
-        <i class="fas fa-shield-alt"></i> Official Support Policy
-    </h3>
-    <p style="font-size: 1rem; line-height: 1.8; color: #333;">
-        To maintain our commitment to providing high-performance, affordable software, <b>all technical support and issue resolutions are handled strictly through official ONLINE channels only.</b> 
-    </p>
-    <p style="font-size: 0.95rem; line-height: 1.6; color: #444;">
-        <b>Reasons for this policy:</b>
-    </p>
-    <ul style="color: #444; line-height: 1.8; font-size: 0.95rem;">
-        <li><b>Technical Efficiency:</b> Remote screen-sharing allows our developers to diagnose and resolve issues in real-time, eliminating the delays of physical travel.</li>
-        <li><b>Systematic Logging:</b> Digital communication ensures a permanent "paper trail" of every request, guaranteeing that no issue is overlooked.</li>
-        <li><b>Data Privacy:</b> Troubleshooting in a controlled cloud environment is significantly more secure for your institute's sensitive data than on-site visits.</li>
-        <li><b>Resource Optimization:</b> By operating as a remote-first SaaS company, we reduce overhead costs, allowing us to invest more in feature updates for your institute.</li>
-    </ul>
-    <p style="margin-bottom: 0; text-align: center; font-weight: 800; color: #000; border-top: 1px solid #ddd; padding-top: 15px;">
-        ⚠️ NOTICE: No physical visits or walk-ins are entertained at our development center.
-    </p>
-</div>
 </body>
 </html>
