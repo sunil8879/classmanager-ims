@@ -44,39 +44,49 @@
 </div>
 
 <script>
-    // 1. SETTINGS (PASTE YOUR URL HERE)
-    const WORKER_URL = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    // 1. YOUR WORKER URL (Make sure there is NO slash / at the very end)
+    let WORKER_URL = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    
+    // Auto-fix: Removes trailing slash if you accidentally added one
+    if (WORKER_URL.endsWith('/')) WORKER_URL = WORKER_URL.slice(0, -1);
 
-    // 2. SMART ID FINDER (Tries all possible names used in your app)
+    // 2. GET LOGIN ID
     const myID = localStorage.getItem('institute_id') || 
                  sessionStorage.getItem('institute_id') || 
-                 localStorage.getItem('tenant_id') || 
-                 'OWNER'; // Fallback if still not found
+                 localStorage.getItem('tenant_id');
 
     async function init() {
         const status = document.getElementById('debug-status');
         const dropdown = document.getElementById('tableDropdown');
 
-        status.innerText = "Attempting to fetch table list...";
+        if (!myID) {
+            status.innerText = "❌ ERROR: No Login ID found. Please log in again.";
+            return;
+        }
 
         try {
-            // Fetch tables from your Cloudflare Worker
+            // Test connection to the Worker
             const res = await fetch(`${WORKER_URL}/get-table-list`);
-            const tables = await res.json();
+            
+            if (!res.ok) {
+                status.innerText = `❌ SERVER ERROR: ${res.status} ${res.statusText}`;
+                return;
+            }
 
-            if (tables.error) throw new Error(tables.error);
+            const tables = await res.json();
 
             dropdown.innerHTML = '<option value="">-- Select Table --</option>';
             tables.forEach(t => {
+                // Some SQL returns 'table_name', some returns 'relname'
                 const name = t.table_name || t.relname || t;
                 dropdown.innerHTML += `<option value="${name}">${name}</option>`;
             });
 
-            status.innerText = `✅ Connected. Logged in as: ${myID}`;
+            status.innerText = `✅ Connected as Owner: ${myID}`;
             status.style.color = "#7FFFD4";
         } catch (err) {
-            status.innerText = "❌ Connection Failed. Check Worker URL or Internet.";
-            console.error(err);
+            status.innerText = "❌ CONNECTION FAILED: The Worker is not responding.";
+            console.error("Fetch Error:", err);
         }
     }
 
@@ -88,10 +98,9 @@
         const status = document.getElementById('debug-status');
 
         head.innerHTML = "";
-        body.innerHTML = '<tr><td class="p-5 text-center"><div class="spinner-border text-info"></div><br>Syncing...</td></tr>';
+        body.innerHTML = '<tr><td class="p-5 text-center">Syncing records...</td></tr>';
 
         try {
-            // Fetch actual rows from Worker
             const response = await fetch(`${WORKER_URL}/get-table-data?table=${tableName}`);
             const data = await response.json();
 
@@ -100,11 +109,11 @@
                 return;
             }
 
-            // FILTER: If table has 'institute_id', only show your records
             const cols = Object.keys(data[0]);
             let filteredRows = data;
             
-            if (cols.includes('institute_id') && myID !== 'OWNER') {
+            // Apply filter only if 'institute_id' column exists
+            if (cols.includes('institute_id')) {
                 filteredRows = data.filter(row => String(row.institute_id) === String(myID));
             }
 
@@ -113,12 +122,12 @@
                 body.innerHTML = filteredRows.map(row => `
                     <tr>${cols.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
                 `).join('');
-                status.innerText = `Viewing ${tableName} (${filteredRows.length} records)`;
+                status.innerText = `✅ Viewing ${tableName} (${filteredRows.length} records)`;
             } else {
-                body.innerHTML = `<tr><td class="p-5 text-center text-warning">Table has data, but none match ID: ${myID}</td></tr>`;
+                body.innerHTML = `<tr><td class="p-5 text-center text-warning">No records found for ID: ${myID}</td></tr>`;
             }
         } catch (err) {
-            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Error: ${err.message}</td></tr>`;
+            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Error: Could not parse data.</td></tr>`;
         }
     }
 
