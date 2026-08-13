@@ -2,34 +2,40 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Database Explorer | ClassManager</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Supabase Official Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --aqua: #7FFFD4; --black: #000000; --white: #FFFFFF; }
         body { background-color: var(--black); color: var(--white); font-family: sans-serif; text-align: left; margin: 0; }
-        .header-bar { border-bottom: 3px solid var(--aqua); padding: 15px; background: #000; position: sticky; top: 0; z-index: 100; }
+        .header-bar { border-bottom: 3px solid var(--aqua); padding: 20px; background: #000; position: sticky; top: 0; z-index: 100; }
         .table-selector { background: #111; border: 2px solid var(--aqua); border-radius: 10px; color: var(--aqua); padding: 12px; width: 100%; font-weight: bold; }
-        th { background: var(--aqua) !important; color: black !important; text-transform: uppercase; font-size: 11px; padding: 10px !important; }
-        td { font-size: 13px; border-color: #333 !important; color: white !important; white-space: nowrap; padding: 8px !important; }
-        #debug-status { color: #ffc107; font-size: 11px; margin-top: 5px; }
-        .table-responsive { max-height: 75vh; border: 1px solid var(--aqua); border-radius: 10px; margin-top: 20px; }
+        th { background: var(--aqua) !important; color: black !important; text-transform: uppercase; font-size: 11px; padding: 10px !important; border: 1px solid #000 !important; }
+        td { font-size: 13px; border-color: #333 !important; color: white !important; white-space: nowrap; padding: 10px !important; }
+        #debug-status { color: #ffc107; font-size: 12px; margin-top: 5px; font-weight: bold; }
+        .badge-aqua { background: var(--aqua); color: black; padding: 5px 15px; border-radius: 50px; font-weight: bold; font-size: 12px; }
+        .table-responsive { max-height: 75vh; border: 1px solid var(--aqua); border-radius: 15px; margin-top: 20px; background: #050505; }
     </style>
 </head>
 <body>
 
 <div class="header-bar">
     <h5 class="fw-bold text-uppercase m-0" style="color: var(--aqua);">🗄️ DATABASE EXPLORER</h5>
-    <div id="debug-status">Initializing Cloudflare Bridge...</div>
+    <div id="debug-status">Initializing Supabase Client...</div>
 </div>
 
-<div class="container-fluid py-3">
-    <div class="row g-3">
-        <div class="col-12">
-            <label class="text-aqua small fw-bold mb-1">SELECT TABLE</label>
+<div class="container-fluid py-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-8 col-md-6">
+            <label class="text-aqua small fw-bold mb-1">SELECT TABLE TO BROWSE</label>
             <select id="tableDropdown" class="table-selector" onchange="loadTableData(this.value)">
                 <option value="">-- Loading Tables... --</option>
             </select>
+        </div>
+        <div class="col-4 col-md-6 text-end">
+            <span id="recordCount" class="badge-aqua d-none">0 Records</span>
         </div>
     </div>
 
@@ -37,81 +43,102 @@
         <table class="table table-dark table-hover mb-0">
             <thead id="tHead"></thead>
             <tbody id="tBody">
-                <tr><td class="p-5 text-center text-muted">Select a table to see live records.</td></tr>
+                <tr><td class="p-5 text-center text-muted">Select a table from the list to view live records.</td></tr>
             </tbody>
         </table>
     </div>
 </div>
 
 <script>
-    // 1. YOUR DETAILS
+    // 1. SETTINGS
     const WORKER_URL = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
     const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
 
-    // 2. GET ID (With fallback for GoDaddy/Mobile Iframe issues)
+    // 2. INITIALIZE CLIENT (Using the line you requested)
+    const db = window.supabase.createClient(WORKER_URL, ANON_KEY);
+
+    // 3. GET IDENTITY (Handling GoDaddy Iframe masking)
     let myID = localStorage.getItem('institute_id') || sessionStorage.getItem('institute_id');
-    if (!myID || myID === "null") {
-        myID = prompt("GoDaddy Security: Please enter your Institute ID manually:");
-    }
-
-    const headers = {
-        "apikey": ANON_KEY,
-        "Authorization": "Bearer " + ANON_KEY,
-        "Content-Type": "application/json"
-    };
-
+    
     async function init() {
         const status = document.getElementById('debug-status');
         const dropdown = document.getElementById('tableDropdown');
-        try {
-            // RPC calls (get-table-list) MUST be POST
-            const res = await fetch(`${WORKER_URL}/get-table-list`, { 
-                method: 'POST', 
-                headers: headers 
-            });
-            const tables = await res.json();
 
-            dropdown.innerHTML = '<option value="">-- Select Table --</option>';
-            tables.forEach(t => {
-                const name = t.table_name || t.relname || t;
-                dropdown.innerHTML += `<option value="${name}">${name}</option>`;
+        // If GoDaddy masking blocks storage, ask the user
+        if (!myID || myID === "null") {
+            myID = prompt("Security Check: Please enter your Institute ID (e.g. CM-101):");
+        }
+
+        try {
+            // Fetch list of tables using the RPC function we created in Supabase
+            const { data, error } = await db.rpc('get_all_tables');
+
+            if (error) throw error;
+
+            dropdown.innerHTML = '<option value="">-- Choose a Table --</option>';
+            data.forEach(t => {
+                dropdown.innerHTML += `<option value="${t.table_name}">${t.table_name}</option>`;
             });
-            status.innerText = "✅ Connected to: " + myID;
+
+            status.innerText = `✅ Connected. Logged in as: ${myID}`;
+            status.style.color = "#7FFFD4";
         } catch (err) {
             status.innerText = "❌ Connection Failed. Check Worker URL and Anon Key.";
-            console.error(err);
+            console.error("Supabase Init Error:", err);
         }
     }
 
     async function loadTableData(tableName) {
         if (!tableName) return;
-        const body = document.getElementById('tBody');
+        
         const head = document.getElementById('tHead');
-        body.innerHTML = '<tr><td class="p-5 text-center">Syncing...</td></tr>';
+        const body = document.getElementById('tBody');
+        const countBadge = document.getElementById('recordCount');
+        const status = document.getElementById('debug-status');
+
+        head.innerHTML = "";
+        body.innerHTML = '<tr><td class="p-5 text-center">Syncing Live Records...</td></tr>';
+        countBadge.classList.add('d-none');
 
         try {
-            // Table data is a GET request
-            const res = await fetch(`${WORKER_URL}/get-table-data?table=${tableName}`, { headers: headers });
-            const data = await res.json();
+            // Fetch rows for the specific table
+            const { data, error } = await db.from(tableName).select('*');
+
+            if (error) throw error;
 
             if (!data || data.length === 0) {
-                body.innerHTML = '<tr><td class="p-5 text-center">Table is empty.</td></tr>';
+                body.innerHTML = '<tr><td class="p-5 text-center text-muted">Table is empty in database.</td></tr>';
                 return;
             }
 
-            const cols = Object.keys(data[0]);
-            const filtered = data.filter(r => String(r.institute_id) === String(myID));
+            // FILTER: Only show records for the current Owner/Institute
+            const columns = Object.keys(data[0]);
+            let filteredRows = data;
+            
+            if (columns.includes('institute_id')) {
+                filteredRows = data.filter(row => String(row.institute_id) === String(myID));
+            }
 
-            if (filtered.length > 0) {
-                head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
-                body.innerHTML = filtered.map(r => `<tr>${cols.map(c => `<td>${r[c] !== null ? r[c] : '-'}</td>`).join('')}</tr>`).join('');
+            if (filteredRows.length > 0) {
+                // Generate Table Headers
+                head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+                
+                // Generate Table Rows
+                body.innerHTML = filteredRows.map(row => `
+                    <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
+                `).join('');
+                
+                countBadge.innerText = `${filteredRows.length} Records Found`;
+                countBadge.classList.remove('d-none');
+                status.innerText = `Viewing: ${tableName}`;
             } else {
-                body.innerHTML = `<tr><td class="p-5 text-center">0 records match ID: ${myID}</td></tr>`;
+                body.innerHTML = `<tr><td class="p-5 text-center text-warning">Data exists, but 0 records match ID: ${myID}</td></tr>`;
             }
         } catch (err) {
-            alert("Fetch error: " + err.message);
+            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Fetch Error: ${err.message}</td></tr>`;
         }
     }
+
     window.onload = init;
 </script>
 </body>
