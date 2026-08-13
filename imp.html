@@ -2534,14 +2534,32 @@ table, td, tr {
 
 
     <!-- Resources Section -->
-    <!-- OPEN DIGITAL LIBRARY (Project Gutenberg) -->
-<div class="mt-3">
-    <a href="https://gutenberg.org" target="_blank" class="btn btn-dark w-100 fw-bold py-3 shadow" style="border: 2px solid #7FFFD4; color: #7FFFD4; text-decoration: underline !important; letter-spacing: 1px;">
-        <i class="fas fa-book-open me-2"></i> OPEN DIGITAL LIBRARY
+    <!-- STYLISH OPEN DIGITAL LIBRARY BUTTON -->
+<div style="margin-top: 35px; padding: 0 10px;">
+    <a href="https://gutenberg.org" target="_blank" class="btn shadow-lg" 
+       style="
+        background-color: #7FFFD4 !important; 
+        color: #000000 !important; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        width: 100%; 
+        padding: 18px; 
+        border-radius: 15px; 
+        border: 3px solid #000000; 
+        text-decoration: none !important; 
+        font-family: 'Georgia', 'Times New Roman', serif; 
+        font-weight: 900; 
+        font-size: 1.1rem; 
+        text-transform: uppercase; 
+        letter-spacing: 2px; 
+        transition: 0.3s;
+       "
+       onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 0 20px #7FFFD4';"
+       onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
+        <i class="fas fa-book-reader" style="margin-right: 15px; font-size: 1.4rem;"></i>
+        OPEN DIGITAL LIBRARY
     </a>
-    <small style="color: #666; display: block; text-align: center; margin-top: 5px;">
-        Access 70,000+ free educational eBooks
-    </small>
 </div>
 </section>
 
