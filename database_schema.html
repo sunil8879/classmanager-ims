@@ -52,88 +52,80 @@
 </div>
 
 <script>
-    // 1. Ensure these are your ACTUAL credentials from Supabase Settings -> API
-    const _supabaseUrl = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
-const _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
-    
-    const { createClient } = supabase;
-    const client = createClient(_supabaseUrl, _supabaseKey);
+    // 1. PROJECT CREDENTIALS (Double check these in Supabase Settings -> API)
+    const _url = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    const _key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyendpam5sYm53amRsbHV2eHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTkzMDgsImV4cCI6MjA4NjgzNTMwOH0.H8c9tT5HsxeL4xJAM9KrKmb1v6KKO8dZ-NOB-Pz2G2k';
+    const client = window.supabase.createClient(_url, _key);
+
+    // 2. GET ID SAFELY
+    const currentID = localStorage.getItem('institute_id') || sessionStorage.getItem('institute_id');
 
     async function loadTableList() {
         const dropdown = document.getElementById('tableDropdown');
-        
-        // Call the SQL function we created in Step 1
         const { data, error } = await client.rpc('get_all_tables');
         
         if (error) {
-            console.error(error);
-            alert("Connection Error: " + error.message);
-            dropdown.innerHTML = '<option>Error: Check SQL Permissions</option>';
+            dropdown.innerHTML = `<option>Error: ${error.message}</option>`;
             return;
         }
 
-        if (data) {
-            dropdown.innerHTML = '<option value="">-- Select a Table --</option>';
-            data.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.table_name;
-                opt.innerText = t.table_name;
-                dropdown.appendChild(opt);
-            });
-        }
+        dropdown.innerHTML = '<option value="">-- Select Table --</option>';
+        data.forEach(t => {
+            dropdown.innerHTML += `<option value="${t.table_name}">${t.table_name}</option>`;
+        });
     }
 
     async function loadTableData(tableName) {
-    if (!tableName) return;
-    
-    const head = document.getElementById('tHead');
-    const body = document.getElementById('tBody');
-    const debug = document.getElementById('debug-status');
-
-    // 1. Initial State
-    head.innerHTML = "";
-    body.innerHTML = '<tr><td class="text-center p-5"><i class="fas fa-spinner fa-spin"></i> Fetching from Supabase...</td></tr>';
-    
-    try {
-        // 2. Fetch the data
-        const { data, error } = await supabase.from(tableName).select('*').limit(100);
-
-        if (error) {
-            body.innerHTML = `<tr><td class="p-5 text-center text-danger">Supabase Error: ${error.message}</td></tr>`;
-            return;
-        }
-
-        if (!data || data.length === 0) {
-            body.innerHTML = '<tr><td class="p-5 text-center text-muted">This table exists but has 0 records.</td></tr>';
-            return;
-        }
-
-        // 3. Generate Headers dynamically from the database response
-        const columns = Object.keys(data[0]);
-        head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
-
-        // 4. Filter data by Institute ID manually to prevent "Loading" hang
-        const currentID = sessionStorage.getItem('institute_id') || localStorage.getItem('institute_id');
+        if (!tableName) return;
         
-        let filteredData = data;
-        if (currentID && columns.includes('institute_id')) {
-            filteredData = data.filter(row => String(row.institute_id) === String(currentID));
-        }
+        const head = document.getElementById('tHead');
+        const body = document.getElementById('tBody');
+        const debug = document.getElementById('debug-status');
 
-        // 5. Build the rows
-        if (filteredData.length > 0) {
-            body.innerHTML = filteredData.map(row => `
-                <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '<span style="color:gray">null</span>'}</td>`).join('')}</tr>
-            `).join('');
-            debug.innerText = `Table: ${tableName} | Showing ${filteredData.length} records for ${currentID}`;
-        } else {
-            body.innerHTML = `<tr><td class="p-5 text-center text-warning">Table has data, but 0 records match your ID: ${currentID}</td></tr>`;
-        }
+        // Reset UI
+        head.innerHTML = "";
+        body.innerHTML = '<tr><td class="text-center p-5">Fetching Records...</td></tr>';
 
-    } catch (err) {
-        body.innerHTML = `<tr><td class="p-5 text-center text-danger">Critical JS Crash: ${err.message}</td></tr>`;
+        try {
+            // FETCH DATA (Limit 50 for speed)
+            const { data, error } = await client.from(tableName).select('*').limit(50);
+
+            if (error) {
+                body.innerHTML = `<tr><td class="p-5 text-center text-danger">Database Error: ${error.message}</td></tr>`;
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                body.innerHTML = '<tr><td class="p-5 text-center text-muted">No records found in this table.</td></tr>';
+                return;
+            }
+
+            // FILTER: If the table has an institute_id, only show your records
+            let displayData = data;
+            const columns = Object.keys(data[0]);
+            
+            if (columns.includes('institute_id') && currentID) {
+                displayData = data.filter(row => String(row.institute_id) === String(currentID));
+            }
+
+            // RENDER HEADERS
+            head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+
+            // RENDER ROWS
+            if (displayData.length > 0) {
+                body.innerHTML = displayData.map(row => `
+                    <tr>${columns.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
+                `).join('');
+                debug.innerText = `Showing ${displayData.length} records for ${currentID}`;
+            } else {
+                body.innerHTML = `<tr><td class="p-5 text-center text-warning">Data exists in DB, but 0 records match your ID: ${currentID}</td></tr>`;
+            }
+
+        } catch (err) {
+            body.innerHTML = `<tr><td class="p-5 text-center text-danger">JS Error: ${err.message}</td></tr>`;
+        }
     }
-}
+
     window.onload = loadTableList;
 </script>
 </body>
