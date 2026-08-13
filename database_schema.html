@@ -7,73 +7,76 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         :root { --aqua: #7FFFD4; --black: #000000; --white: #FFFFFF; }
-        body { background-color: var(--black); color: var(--white); font-family: sans-serif; text-align: left; }
-        .header-bar { border-bottom: 3px solid var(--aqua); padding: 20px; margin-bottom: 20px; }
+        body { background-color: var(--black); color: var(--white); font-family: sans-serif; text-align: left; margin: 0; }
+        .header-bar { border-bottom: 3px solid var(--aqua); padding: 15px; background: #000; position: sticky; top: 0; z-index: 100; }
         .table-selector { background: #111; border: 2px solid var(--aqua); border-radius: 10px; color: var(--aqua); padding: 12px; width: 100%; font-weight: bold; }
-        th { background: var(--aqua) !important; color: black !important; text-transform: uppercase; font-size: 11px; }
-        td { font-size: 13px; border-color: #333 !important; color: white !important; white-space: nowrap; }
-        #debug-status { color: #ffc107; font-size: 12px; margin-top: 10px; }
-        .badge-aqua { background: var(--aqua); color: black; padding: 5px 12px; border-radius: 50px; font-weight: bold; font-size: 12px; }
+        th { background: var(--aqua) !important; color: black !important; text-transform: uppercase; font-size: 11px; padding: 10px !important; }
+        td { font-size: 13px; border-color: #333 !important; color: white !important; white-space: nowrap; padding: 8px !important; }
+        #debug-status { color: #ffc107; font-size: 11px; margin-top: 5px; }
+        .table-responsive { max-height: 75vh; border: 1px solid var(--aqua); border-radius: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
 
 <div class="header-bar">
-    <h3 class="fw-bold text-uppercase" style="color: var(--aqua);">🗄️ DATABASE EXPLORER</h3>
-    <div id="debug-status">Connecting to Cloudflare Bridge...</div>
+    <h5 class="fw-bold text-uppercase m-0" style="color: var(--aqua);">🗄️ DATABASE EXPLORER</h5>
+    <div id="debug-status">Initializing Cloudflare Bridge...</div>
 </div>
 
-<div class="container-fluid py-4">
-    <div class="row mb-4 align-items-end">
-        <div class="col-8 col-md-6">
-            <label class="text-aqua small fw-bold mb-2">CHOOSE TABLE</label>
+<div class="container-fluid py-3">
+    <div class="row g-3">
+        <div class="col-12">
+            <label class="text-aqua small fw-bold mb-1">SELECT TABLE</label>
             <select id="tableDropdown" class="table-selector" onchange="loadTableData(this.value)">
-                <option value="">-- Loading --</option>
+                <option value="">-- Loading Tables... --</option>
             </select>
-        </div>
-        <div class="col-4 col-md-6 text-end">
-            <span id="recordCount" class="badge-aqua d-none">0 Records</span>
         </div>
     </div>
 
-    <div class="table-responsive" style="max-height: 70vh; border: 1px solid var(--aqua); border-radius: 15px;">
+    <div class="table-responsive">
         <table class="table table-dark table-hover mb-0">
             <thead id="tHead"></thead>
             <tbody id="tBody">
-                <tr><td class="p-5 text-center text-muted">Select a table to view live data.</td></tr>
+                <tr><td class="p-5 text-center text-muted">Select a table to see live records.</td></tr>
             </tbody>
         </table>
     </div>
 </div>
 
 <script>
-    // 1. YOUR CLOUDFLARE WORKER URL
-    const WORKER_URL = 'https://classmanager-api.sunilvasarkar1975.workers.dev';
+    // 1. SETTINGS (PASTE YOUR URL HERE)
+    const WORKER_URL = 'https://your-worker-name.workers.dev'; 
 
-    // 2. GET CURRENT LOGIN ID
-    const myID = localStorage.getItem('institute_id') || sessionStorage.getItem('institute_id');
+    // 2. SMART ID FINDER (Tries all possible names used in your app)
+    const myID = localStorage.getItem('institute_id') || 
+                 sessionStorage.getItem('institute_id') || 
+                 localStorage.getItem('tenant_id') || 
+                 'OWNER'; // Fallback if still not found
 
     async function init() {
-        const debug = document.getElementById('debug-status');
+        const status = document.getElementById('debug-status');
         const dropdown = document.getElementById('tableDropdown');
 
-        if (!myID) {
-            debug.innerText = "❌ ERROR: No Login ID found. Please login again.";
-            return;
-        }
+        status.innerText = "Attempting to fetch table list...";
 
         try {
-            // Fetch Table List from Worker
-            const response = await fetch(`${WORKER_URL}/get-table-list`);
-            const tables = await response.json();
+            // Fetch tables from your Cloudflare Worker
+            const res = await fetch(`${WORKER_URL}/get-table-list`);
+            const tables = await res.json();
+
+            if (tables.error) throw new Error(tables.error);
 
             dropdown.innerHTML = '<option value="">-- Select Table --</option>';
             tables.forEach(t => {
-                dropdown.innerHTML += `<option value="${t.table_name}">${t.table_name}</option>`;
+                const name = t.table_name || t.relname || t;
+                dropdown.innerHTML += `<option value="${name}">${name}</option>`;
             });
-            debug.innerText = `Connected as Owner: ${myID}`;
+
+            status.innerText = `✅ Connected. Logged in as: ${myID}`;
+            status.style.color = "#7FFFD4";
         } catch (err) {
-            debug.innerText = "❌ CONNECTION ERROR: Check if your Worker is Live.";
+            status.innerText = "❌ Connection Failed. Check Worker URL or Internet.";
+            console.error(err);
         }
     }
 
@@ -82,44 +85,37 @@
         
         const head = document.getElementById('tHead');
         const body = document.getElementById('tBody');
-        const countBadge = document.getElementById('recordCount');
+        const status = document.getElementById('debug-status');
 
         head.innerHTML = "";
-        body.innerHTML = '<tr><td class="text-center p-5">Fetching via Bridge...</td></tr>';
+        body.innerHTML = '<tr><td class="p-5 text-center"><div class="spinner-border text-info"></div><br>Syncing...</td></tr>';
 
         try {
-            // Fetch Table Content from Worker
+            // Fetch actual rows from Worker
             const response = await fetch(`${WORKER_URL}/get-table-data?table=${tableName}`);
             const data = await response.json();
 
             if (!data || data.length === 0) {
                 body.innerHTML = '<tr><td class="p-5 text-center text-muted">Table is empty.</td></tr>';
-                countBadge.classList.add('d-none');
                 return;
             }
 
-            // FILTER: Only show records belonging to THIS owner
+            // FILTER: If table has 'institute_id', only show your records
             const cols = Object.keys(data[0]);
             let filteredRows = data;
             
-            if (cols.includes('institute_id')) {
+            if (cols.includes('institute_id') && myID !== 'OWNER') {
                 filteredRows = data.filter(row => String(row.institute_id) === String(myID));
             }
 
             if (filteredRows.length > 0) {
-                // Render Headers
                 head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
-                
-                // Render Rows
                 body.innerHTML = filteredRows.map(row => `
                     <tr>${cols.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('')}</tr>
                 `).join('');
-                
-                countBadge.innerText = `${filteredRows.length} Records`;
-                countBadge.classList.remove('d-none');
+                status.innerText = `Viewing ${tableName} (${filteredRows.length} records)`;
             } else {
-                body.innerHTML = `<tr><td class="p-5 text-center text-warning">0 records match your ID: ${myID}</td></tr>`;
-                countBadge.classList.add('d-none');
+                body.innerHTML = `<tr><td class="p-5 text-center text-warning">Table has data, but none match ID: ${myID}</td></tr>`;
             }
         } catch (err) {
             body.innerHTML = `<tr><td class="p-5 text-center text-danger">Error: ${err.message}</td></tr>`;
