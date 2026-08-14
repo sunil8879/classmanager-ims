@@ -1497,7 +1497,87 @@ table, td, tr {
     
 
     
+/* =====================================================
+   30 TAB SERIAL NUMBERS — OVERLAY ONLY
+   DOES NOT CHANGE TAB SIZE OR LAYOUT
+   ===================================================== */
 
+.nav-tab {
+    position: relative !important;
+}
+
+/* Number circle */
+.nav-tab::before {
+    position: absolute !important;
+
+    top: 4px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+
+    width: 24px !important;
+    height: 24px !important;
+
+    border-radius: 50% !important;
+
+    background: #7FFFD4 !important;
+    color: #000000 !important;
+
+    border: 2px solid #000000 !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    font-family: "Times New Roman", serif !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+
+    line-height: 1 !important;
+
+    box-shadow: 2px 2px 0 #000000 !important;
+
+    z-index: 9999 !important;
+
+    pointer-events: none !important;
+
+    content: "" !important;
+}
+
+
+/* ===============================
+   1 — 30
+   =============================== */
+
+.nav-tab:nth-child(1)::before  { content: "1" !important; }
+.nav-tab:nth-child(2)::before  { content: "2" !important; }
+.nav-tab:nth-child(3)::before  { content: "3" !important; }
+.nav-tab:nth-child(4)::before  { content: "4" !important; }
+.nav-tab:nth-child(5)::before  { content: "5" !important; }
+.nav-tab:nth-child(6)::before  { content: "6" !important; }
+.nav-tab:nth-child(7)::before  { content: "7" !important; }
+.nav-tab:nth-child(8)::before  { content: "8" !important; }
+.nav-tab:nth-child(9)::before  { content: "9" !important; }
+.nav-tab:nth-child(10)::before { content: "10" !important; }
+.nav-tab:nth-child(11)::before { content: "11" !important; }
+.nav-tab:nth-child(12)::before { content: "12" !important; }
+.nav-tab:nth-child(13)::before { content: "13" !important; }
+.nav-tab:nth-child(14)::before { content: "14" !important; }
+.nav-tab:nth-child(15)::before { content: "15" !important; }
+.nav-tab:nth-child(16)::before { content: "16" !important; }
+.nav-tab:nth-child(17)::before { content: "17" !important; }
+.nav-tab:nth-child(18)::before { content: "18" !important; }
+.nav-tab:nth-child(19)::before { content: "19" !important; }
+.nav-tab:nth-child(20)::before { content: "20" !important; }
+.nav-tab:nth-child(21)::before { content: "21" !important; }
+.nav-tab:nth-child(22)::before { content: "22" !important; }
+.nav-tab:nth-child(23)::before { content: "23" !important; }
+.nav-tab:nth-child(24)::before { content: "24" !important; }
+.nav-tab:nth-child(25)::before { content: "25" !important; }
+.nav-tab:nth-child(26)::before { content: "26" !important; }
+.nav-tab:nth-child(27)::before { content: "27" !important; }
+.nav-tab:nth-child(28)::before { content: "28" !important; }
+.nav-tab:nth-child(29)::before { content: "29" !important; }
+.nav-tab:nth-child(30)::before { content: "30" !important; }
 
 
 		
