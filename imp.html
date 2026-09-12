@@ -16462,7 +16462,49 @@ async function printIDCard() {
 
 
 
+<script>
+/* =========================================================
+   LAPTOP/DESKTOP — CLICK IMAGE → REPLACE IMAGE MENU
+   ========================================================= */
 
+document.addEventListener("DOMContentLoaded", function () {
+
+    if (window.innerWidth <= 768) return;
+
+    const sidebar = document.querySelector("aside.sidebar");
+    const content = document.querySelector("main.content");
+
+    if (!sidebar || !content) return;
+
+    const tabs = sidebar.querySelectorAll("button.nav-tab");
+
+    tabs.forEach(function (tab) {
+
+        tab.addEventListener("click", function () {
+
+            /* Hide all 30 image buttons */
+            sidebar.style.display = "none";
+
+            /* Show the selected content in their place */
+            content.style.display = "block";
+            content.style.width = "100%";
+            content.style.maxWidth = "100%";
+            content.style.boxSizing = "border-box";
+            content.style.margin = "0";
+            content.style.padding = "30px";
+
+            /* Move content to the top of the page */
+            window.scrollTo({
+                top: 0,
+                behavior: "instant"
+            });
+
+        });
+
+    });
+
+});
+</script>
 
           
 </body>
