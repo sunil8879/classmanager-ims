@@ -1771,6 +1771,67 @@ footer, footer .footer-grid, footer .footer-bottom { text-align: center !importa
     }
 
 }
+
+/* =========================================================
+   LAPTOP/DESKTOP — FULL-WIDTH IMAGE MENU
+   ========================================================= */
+
+@media screen and (min-width: 769px) {
+
+    /* Make the menu occupy the full available width */
+    .app-container {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    /* Full-width vertical image menu */
+    aside.sidebar {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+
+        box-sizing: border-box !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+
+        padding: 20px 5% !important;
+
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+
+    /* Each of the 30 images */
+    aside.sidebar > button.nav-tab {
+        display: block !important;
+
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+
+        aspect-ratio: 3 / 2 !important;
+
+        flex: 0 0 auto !important;
+
+        padding: 0 !important;
+        margin: 0 0 20px 0 !important;
+
+        box-sizing: border-box !important;
+
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+
+        border-radius: 10px !important;
+        overflow: hidden !important;
+    }
+
+}
 </style>
 </head>
 <body>
