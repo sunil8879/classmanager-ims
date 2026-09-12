@@ -8359,6 +8359,29 @@ function showSection(id) {
     const targetSection = document.getElementById(id);
     if (targetSection) {
         targetSection.classList.add('active');
+
+	// =========================================================
+// LAPTOP/DESKTOP: HIDE IMAGE MENU WHEN A MODULE IS SELECTED
+// =========================================================
+if (window.innerWidth > 768) {
+    const sidebar = document.querySelector('aside.sidebar');
+    const mainContent = document.querySelector('main.content');
+
+    if (sidebar) {
+        sidebar.style.display = 'none';
+    }
+
+    if (mainContent) {
+        mainContent.style.display = 'block';
+        mainContent.style.width = '100%';
+        mainContent.style.maxWidth = '100%';
+        mainContent.style.margin = '0';
+        mainContent.style.padding = '30px';
+        mainContent.style.boxSizing = 'border-box';
+    }
+
+    window.scrollTo(0, 0);
+}
         console.log("Navigated to: " + id);
     } else {
         console.error("Error: Section ID '" + id + "' does not exist in HTML.");
