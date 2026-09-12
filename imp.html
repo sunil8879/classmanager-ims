@@ -1854,6 +1854,115 @@ footer, footer .footer-grid, footer .footer-bottom { text-align: center !importa
     }
 
 }
+
+
+
+/* =========================================================
+   CLASS MANAGER - DESKTOP IMAGE MENU
+   Make desktop behave like mobile
+   ========================================================= */
+
+@media screen and (min-width: 769px) {
+
+    /* Make the complete app vertical */
+    .app-container {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* Full-width sidebar */
+    aside.sidebar {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 20px !important;
+        box-sizing: border-box !important;
+        overflow: visible !important;
+    }
+
+    /* The 30 image buttons */
+    aside.sidebar .nav-tab {
+        display: flex !important;
+
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+
+        aspect-ratio: 3 / 2 !important;
+
+        flex: 0 0 auto !important;
+
+        margin: 0 0 15px 0 !important;
+        padding: 20px 25px !important;
+
+        box-sizing: border-box !important;
+
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+
+        font-size: 0 !important;
+
+        position: relative !important;
+        overflow: hidden !important;
+    }
+
+    /* Hide the Font Awesome icons because the image itself is the button */
+    aside.sidebar .nav-tab i {
+        display: none !important;
+    }
+
+    /* Profile widget stays below the 30 images */
+    #sidebar-profile-section {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Learning widget stays below the 30 images */
+    #sidebar-learning-widget {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /*
+       BEFORE clicking a menu item:
+       show image menu and hide content
+    */
+    body:not(.mobile-active) main.content {
+        display: none !important;
+    }
+
+    body:not(.mobile-active) aside.sidebar {
+        display: flex !important;
+    }
+
+    /*
+       AFTER clicking a menu item:
+       hide image menu and show selected content
+    */
+    body.mobile-active aside.sidebar {
+        display: none !important;
+    }
+
+    body.mobile-active main.content {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding: 20px !important;
+        box-sizing: border-box !important;
+    }
+}
 </style>
 </head>
 <body>
@@ -16521,6 +16630,33 @@ document.addEventListener("DOMContentLoaded", function () {
                 top: 0,
                 behavior: "instant"
             });
+
+        });
+
+    });
+
+});
+</script>
+
+<script>
+/* =========================================================
+   CLASS MANAGER - DESKTOP MENU TO CONTENT SWITCH
+   ========================================================= */
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    document.querySelectorAll("aside.sidebar .nav-tab").forEach(function (tab) {
+
+        tab.addEventListener("click", function () {
+
+            /*
+             * This works on desktop.
+             * Your existing showSection() continues to
+             * control which content section is displayed.
+             */
+            if (window.innerWidth >= 769) {
+                document.body.classList.add("mobile-active");
+            }
 
         });
 
