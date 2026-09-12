@@ -1569,33 +1569,42 @@ table, td, tr {
 footer, footer .footer-grid, footer .footer-bottom { text-align: center !important; justify-items: center !important; }
 
 /* =========================================================
-   CLASS MANAGER — LAPTOP/DESKTOP IMAGE TABS
+   CLASS MANAGER - DESKTOP SIDEBAR IMAGE TABS
    ========================================================= */
 
 @media screen and (min-width: 769px) {
 
-    nav.sidebar {
-        width: 330px !important;
-        min-width: 330px !important;
-        padding: 20px 15px !important;
+    aside.sidebar {
+        width: 360px !important;
+        min-width: 360px !important;
+        padding: 20px !important;
+        box-sizing: border-box !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+
         overflow-y: auto !important;
         overflow-x: hidden !important;
     }
 
-    nav.sidebar .nav-tab {
+    aside.sidebar > button.nav-tab {
         width: 100% !important;
         min-width: 0 !important;
+        max-width: 100% !important;
 
-        /* IMPORTANT: override the old 65px height */
-        height: 190px !important;
-        min-height: 190px !important;
-        max-height: 190px !important;
+        height: 200px !important;
+        min-height: 200px !important;
+        max-height: 200px !important;
 
-        padding: 0 !important;
+        flex: 0 0 200px !important;
+
         margin: 0 0 18px 0 !important;
+        padding: 0 !important;
+
+        box-sizing: border-box !important;
 
         display: block !important;
-        flex: none !important;
 
         background-size: cover !important;
         background-position: center !important;
@@ -1604,7 +1613,6 @@ footer, footer .footer-grid, footer .footer-bottom { text-align: center !importa
         border: 2px solid #000 !important;
         border-radius: 10px !important;
 
-        position: relative !important;
         overflow: hidden !important;
     }
 
@@ -1612,22 +1620,154 @@ footer, footer .footer-grid, footer .footer-bottom { text-align: center !importa
 
 
 /* =========================================================
-   MOBILE — DO NOT CHANGE YOUR EXISTING DESIGN
+   MOBILE - KEEP LARGE FULL-WIDTH IMAGE TABS
    ========================================================= */
 
 @media screen and (max-width: 768px) {
 
-    nav.sidebar .nav-tab {
+    aside.sidebar > button.nav-tab {
         width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+
         height: auto !important;
         min-height: 0 !important;
         max-height: none !important;
+
+        flex: 0 0 auto !important;
 
         aspect-ratio: 3 / 2 !important;
 
         background-size: cover !important;
         background-position: center !important;
         background-repeat: no-repeat !important;
+    }
+
+}
+
+
+		/* ADDITIONAL DESKTOP IMAGE TAB SELECTORS */
+
+@media screen and (min-width: 769px) {
+
+    aside.sidebar > button.nav-tab:nth-child(1) {
+        background-image: url("home.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(2) {
+        background-image: url("login.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(3) {
+        background-image: url("students.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(4) {
+        background-image: url("fees.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(5) {
+        background-image: url("batches.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(6) {
+        background-image: url("attendance.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(7) {
+        background-image: url("admin.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(8) {
+        background-image: url("fees_reminder.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(9) {
+        background-image: url("leads.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(10) {
+        background-image: url("expenses.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(11) {
+        background-image: url("teachers.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(12) {
+        background-image: url("students.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(13) {
+        background-image: url("idcards.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(14) {
+        background-image: url("certificates.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(15) {
+        background-image: url("performance.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(16) {
+        background-image: url("exams.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(17) {
+        background-image: url("teachers_attendance.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(18) {
+        background-image: url("allocations.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(19) {
+        background-image: url("messages.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(20) {
+        background-image: url("calendar.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(21) {
+        background-image: url("alumni.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(22) {
+        background-image: url("inventory.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(23) {
+        background-image: url("scholarships.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(24) {
+        background-image: url("ptm.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(25) {
+        background-image: url("batch_master.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(26) {
+        background-image: url("reviews.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(27) {
+        background-image: url("leaves.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(28) {
+        background-image: url("ai.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(29) {
+        background-image: url("leaderboard.jpg") !important;
+    }
+
+    aside.sidebar > button.nav-tab:nth-child(30) {
+        background-image: url("student_engage.jpg") !important;
     }
 
 }
