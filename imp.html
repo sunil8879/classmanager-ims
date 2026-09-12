@@ -1832,6 +1832,28 @@ footer, footer .footer-grid, footer .footer-bottom { text-align: center !importa
     }
 
 }
+
+/* =========================================================
+   LAPTOP/DESKTOP — CLICKED TAB REPLACES IMAGE MENU
+   ========================================================= */
+
+@media screen and (min-width: 769px) {
+
+    /* Hide the entire image menu when content is active */
+    body.mobile-active aside.sidebar {
+        display: none !important;
+    }
+
+    /* Show the selected content at full laptop width */
+    body.mobile-active main.content {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 30px !important;
+    }
+
+}
 </style>
 </head>
 <body>
