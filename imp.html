@@ -1568,6 +1568,76 @@ table, td, tr {
 		
 footer, footer .footer-grid, footer .footer-bottom { text-align: center !important; justify-items: center !important; }
 
+/* =========================================================
+   CLASS MANAGER — DESKTOP + LAPTOP TAB IMAGE FIX
+   Makes all 30 image tabs large and proportional
+   ========================================================= */
+
+@media screen and (min-width: 769px) {
+
+    nav.sidebar {
+        width: 320px !important;
+        min-width: 320px !important;
+        padding: 20px 15px !important;
+        overflow-y: auto !important;
+    }
+
+    .nav-tab {
+        width: 100% !important;
+        min-width: 100% !important;
+
+        /* PERFECT 3:2 IMAGE PROPORTION */
+        aspect-ratio: 3 / 2 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+
+        /* Remove old 65px height effect */
+        flex: 0 0 auto !important;
+
+        padding: 0 !important;
+        margin-bottom: 18px !important;
+
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+
+        border-radius: 10px !important;
+        overflow: hidden !important;
+    }
+
+}
+
+
+/* =========================================================
+   MOBILE — KEEP FULL-WIDTH 3:2 IMAGES
+   ========================================================= */
+
+@media screen and (max-width: 768px) {
+
+    nav.sidebar {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    .nav-tab {
+        width: 100% !important;
+        min-width: 100% !important;
+
+        aspect-ratio: 3 / 2 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+
+        flex: 0 0 auto !important;
+
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+    }
+
+}
+
     </style>
 </head>
 <body>
